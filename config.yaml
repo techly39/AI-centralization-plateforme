@@ -1,0 +1,24 @@
+# AI Fund Environment — single source of runtime configuration.
+# Loaded by app/config.py via Pydantic Settings. Environment variables with the
+# prefix FUND_ override any value here (e.g. FUND_DATABASE_URL=...).
+
+# Database. SQLite single file for now; the URL form keeps a Postgres move open.
+database_url: "sqlite:///fund.db"
+
+# Clock. Phase 0 supports live mode only
+clock:
+  mode: "live"          # live
+
+# Order management (used from Phase 1). Kept here so config shape is stable.
+oms:
+  fee_rate: 0.001       # flat simulated fee, fraction of notional (0.1%)
+
+# Logging.
+logging:
+  level: "INFO"
+  json: true            # structured JSON logs (loguru)
+
+# API server.
+server:
+  host: "127.0.0.1"
+  port: 8000

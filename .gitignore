@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# uv / venv
+.venv/
+
+# Database (runtime state — never commit)
+*.db
+*.db-wal
+*.db-shm
+fund.db*
+
+# Env / secrets
+.env
+*.local.yaml
+
+# Claude Code personal/local settings (shared settings.json may be committed)
+.claude/settings.local.json
+
+# OS
+.DS_Store
