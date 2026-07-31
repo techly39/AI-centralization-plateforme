@@ -23,7 +23,16 @@ EVENT_AGENT_REGISTERED = "agent_registered"
 EVENT_AGENT_DEACTIVATED = "agent_deactivated"
 EVENT_PERMISSION_DENIED = "permission_denied"
 
-# State-changing events consumed by the rebuild reducers:
+EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent_id}
+
+# OMS lifecycle events (audit only — no effect on derived state):
+EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
+EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}
+EVENT_ORDER_CANCELLED = "order_cancelled" # payload: {order_id}
+
+# State-changing events consumed by the rebuild reducers. Every reducer-backed
+# event MUST carry ``pod_id`` in its payload: that is how the incremental
+# applier (app/ledger/apply.py) knows which derived rows to load and rewrite.
 EVENT_ALLOCATION_SET = "allocation_set"   # payload: {pod_id, delta}
 EVENT_ORDER_FILLED = "order_filled"       # payload: {pod_id, ticker, side, qty, fill_price, fee}
 

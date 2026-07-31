@@ -9,9 +9,18 @@ database_url: "sqlite:///fund.db"
 clock:
   mode: "live"          # live
 
-# Order management (used from Phase 1). Kept here so config shape is stable.
+# Order management system.
 oms:
-  fee_rate: 0.001       # flat simulated fee, fraction of notional (0.1%)
+  fee_rate: 0.001              # flat simulated fee, fraction of notional (0.1%)
+  pending_check_minutes: 1     # how often pending limit orders are re-checked
+  pending_monitor_enabled: true
+
+# Market data. "yfinance" = real delayed quotes. Switch to "static" to run the
+# whole app offline against the fixed prices listed under static_prices.
+marketdata:
+  provider: "yfinance"
+  cache_ttl_seconds: 60        # reuse a quote while the clock moves less than this
+  static_prices: {}            # e.g. {AAPL: 200.0, MSFT: 380.0}
 
 # Logging.
 logging:

@@ -1,1 +1,68 @@
-"""Placeholder package — implemented in a later build phase."""
+"""Market data: the provider interface, its implementations, and the singleton.
+
+Callers ask for :func:`get_provider` and receive whatever ``config.yaml``
+selected. Tests (and Phase 3's backtest wiring) swap it with
+:func:`set_provider`, exactly like the clock — same pattern, so there is only
+one idea to learn.
+"""
+
+from __future__ import annotations
+
+from app.config import get_settings
+from app.marketdata.base import (
+    VALID_INTERVALS,
+    Bar,
+    Interval,
+    InvalidRequestError,
+    LookAheadError,
+    MarketDataError,
+    MarketDataProvider,
+    Quote,
+    UnknownTickerError,
+    normalise_ticker,
+    validate_window,
+)
+from app.marketdata.static_provider import StaticProvider
+from app.marketdata.yfinance_provider import YFinanceProvider
+
+_provider: MarketDataProvider | None = None
+
+
+def _build_default_provider() -> MarketDataProvider:
+    cfg = get_settings().marketdata
+    if cfg.provider == "static":
+        return StaticProvider(cfg.static_prices)
+    return YFinanceProvider(cache_ttl_seconds=cfg.cache_ttl_seconds)
+
+
+def get_provider() -> MarketDataProvider:
+    """The process-wide market data provider (built lazily on first use)."""
+    global _provider
+    if _provider is None:
+        _provider = _build_default_provider()
+    return _provider
+
+
+def set_provider(provider: MarketDataProvider | None) -> None:
+    """Install a provider (or ``None`` to fall back to the configured default)."""
+    global _provider
+    _provider = provider
+
+
+__all__ = [
+    "VALID_INTERVALS",
+    "Bar",
+    "Interval",
+    "InvalidRequestError",
+    "LookAheadError",
+    "MarketDataError",
+    "MarketDataProvider",
+    "Quote",
+    "StaticProvider",
+    "UnknownTickerError",
+    "YFinanceProvider",
+    "get_provider",
+    "normalise_ticker",
+    "set_provider",
+    "validate_window",
+]

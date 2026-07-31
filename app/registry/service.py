@@ -92,6 +92,37 @@ def deactivate_agent(
     return agent
 
 
+#: Name of the built-in identity the app itself acts under (rejection notices,
+#: scheduled fills). It is a real row so that foreign keys and the audit trail
+#: work, but it is never handed an API key anyone can use.
+SYSTEM_AGENT_NAME = "system"
+
+
+def get_or_create_system_agent(session: Session) -> Agent:
+    """The app's own identity, created on first use.
+
+    Its API key is generated, hashed, and immediately discarded: nothing can
+    authenticate as ``system`` over HTTP, which is the point — internal actions
+    are attributable without opening a back door.
+    """
+    agent = session.scalar(select(Agent).where(Agent.name == SYSTEM_AGENT_NAME))
+    if agent is not None:
+        return agent
+
+    agent = Agent(
+        name=SYSTEM_AGENT_NAME,
+        role=AgentRole.system,
+        pod_id=None,
+        api_key_hash=hash_api_key(generate_api_key()),
+        charter_ref=None,
+        status=AgentStatus.active,
+        created_at=get_clock().now(),
+    )
+    session.add(agent)
+    session.flush()
+    return agent
+
+
 def get_agent_by_api_key(session: Session, api_key: str) -> Agent | None:
     """Look up the active agent owning ``api_key``; ``None`` if unknown/inactive."""
     if not api_key:

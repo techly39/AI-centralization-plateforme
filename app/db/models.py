@@ -126,12 +126,24 @@ class Event(Base):
 # --- OMS tables (behaviour: Phase 1) ---------------------------------------
 
 class Order(Base):
+    """One PM submission for one ticker.
+
+    The row is the current *state* of the order; the *history* of how it got
+    there lives in ``events`` (``order_placed`` / ``order_filled`` /
+    ``order_rejected`` / ``order_cancelled``). ``fee`` and ``realized_pnl``
+    duplicate what the fill event already records — deliberately, so that
+    ``GET /orders`` can answer "what did this cost me" without replaying the
+    ledger. The event stays the source of truth.
+    """
+
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    pod_id: Mapped[int] = mapped_column(ForeignKey("pods.id"), nullable=False)
+    pod_id: Mapped[int] = mapped_column(
+        ForeignKey("pods.id"), nullable=False, index=True
+    )
     created_by: Mapped[int] = mapped_column(ForeignKey("agents.id"), nullable=False)
-    ticker: Mapped[str] = mapped_column(String(16), nullable=False)
+    ticker: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     side: Mapped[OrderSide] = mapped_column(
         Enum(OrderSide, native_enum=False, length=8), nullable=False
     )
@@ -144,11 +156,18 @@ class Order(Base):
         Enum(OrderStatus, native_enum=False, length=12),
         nullable=False,
         default=OrderStatus.pending,
+        index=True,
     )
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     filled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     fill_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Simulated commission actually charged on the fill.
+    fee: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Sells only: proceeds minus the weighted-average cost of the shares sold.
+    realized_pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Why the order was rejected or cancelled, in plain words, for the PM.
+    status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 # --- Derived tables (rebuildable from events) ------------------------------

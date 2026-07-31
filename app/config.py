@@ -14,7 +14,12 @@ from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 # Repo root = parent of the ``app`` package directory.
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -26,8 +31,23 @@ class ClockConfig(BaseModel):
 
 
 class OMSConfig(BaseModel):
-    # Flat simulated fee as a fraction of notional (0.1% default). Used from Phase 1.
+    # Flat simulated fee as a fraction of notional (0.1% default), TRD §8.2.
     fee_rate: float = Field(default=0.001, ge=0.0)
+    # How often the background job re-checks pending limit orders (TRD §8.4).
+    # In backtest mode this is ignored: the check runs on every clock advance.
+    pending_check_minutes: float = Field(default=1.0, gt=0.0)
+    # Master switch for that background job. Turned off in tests and whenever
+    # you want a server that only ever acts on explicit API calls.
+    pending_monitor_enabled: bool = True
+
+
+class MarketDataConfig(BaseModel):
+    # "yfinance" for real delayed quotes, "static" for an offline fixed table.
+    provider: Literal["yfinance", "static"] = "yfinance"
+    # Reuse a quote while the clock has advanced less than this. 0 disables.
+    cache_ttl_seconds: float = Field(default=60.0, ge=0.0)
+    # Prices used when provider == "static" (ticker -> price).
+    static_prices: dict[str, float] = Field(default_factory=dict)
 
 
 class LoggingConfig(BaseModel):
@@ -44,8 +64,33 @@ class ServerConfig(BaseModel):
     port: int = 8000
 
 
+class YamlSettingsSource(PydanticBaseSettingsSource):
+    """Reads ``config.yaml`` as a settings source.
+
+    It exists so the file can be ranked *below* environment variables. Passing
+    the YAML in as constructor kwargs (the obvious approach) makes it rank
+    *above* env vars, which silently breaks every ``FUND_*`` override for keys
+    the file happens to mention — the exact opposite of what the file's own
+    comments promise.
+    """
+
+    def get_field_value(  # pragma: no cover - required by the ABC, unused
+        self, field: FieldInfo, field_name: str
+    ) -> tuple[Any, str, bool]:
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        return _load_yaml(CONFIG_PATH)
+
+
 class Settings(BaseSettings):
-    """Top-level settings object."""
+    """Top-level settings object.
+
+    Precedence, highest first: explicit constructor arguments, ``FUND_*``
+    environment variables, ``config.yaml``, then the defaults declared here.
+    Nested sections merge across sources, so setting ``FUND_OMS__FEE_RATE``
+    overrides only that one key and leaves the rest of the ``oms`` block alone.
+    """
 
     model_config = SettingsConfigDict(
         env_prefix="FUND_",
@@ -53,9 +98,27 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            YamlSettingsSource(settings_cls),
+            file_secret_settings,
+        )
+
     database_url: str = "sqlite:///fund.db"
     clock: ClockConfig = Field(default_factory=ClockConfig)
     oms: OMSConfig = Field(default_factory=OMSConfig)
+    marketdata: MarketDataConfig = Field(default_factory=MarketDataConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
 
@@ -73,4 +136,4 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return the cached, fully-resolved settings (YAML file + env overrides)."""
-    return Settings(**_load_yaml(CONFIG_PATH))
+    return Settings()

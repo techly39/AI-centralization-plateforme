@@ -13,7 +13,7 @@ from app.api.schemas import (
 )
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
-from app.registry.auth import get_current_agent, require
+from app.registry.auth import require
 from app.registry.permissions import Action
 from app.registry.service import (
     RegistryError,

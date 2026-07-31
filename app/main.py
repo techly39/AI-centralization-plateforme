@@ -7,16 +7,28 @@ of these same endpoints (TRD principle 1). No domain logic lives here.
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from loguru import logger
 
 from app import __version__
-from app.api import agents, clock, events
+from app.api import agents, clock, events, marketdata, orders
 from app.clock import get_clock
 from app.config import get_settings
 from app.logging_setup import setup_logging
+from app.scheduler import shutdown_scheduler, start_scheduler
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Own the background jobs for exactly as long as the server runs."""
+    start_scheduler()
+    try:
+        yield
+    finally:
+        shutdown_scheduler()
 
 
 def create_app() -> FastAPI:
@@ -27,6 +39,7 @@ def create_app() -> FastAPI:
         title="AI Fund Environment",
         version=__version__,
         summary="Deterministic environment/bus for a simulated multi-agent fund.",
+        lifespan=lifespan,
     )
 
     @app.middleware("http")
@@ -54,6 +67,8 @@ def create_app() -> FastAPI:
     app.include_router(agents.router)
     app.include_router(events.router)
     app.include_router(clock.router)
+    app.include_router(marketdata.router)
+    app.include_router(orders.router)
 
     logger.info("app created (env database_url={})", settings.database_url)
     return app

@@ -38,6 +38,35 @@ def get_current_agent(
     return agent
 
 
+def deny(
+    session: Session,
+    agent: Agent,
+    action: Action,
+    *,
+    detail: str,
+    context: dict | None = None,
+) -> HTTPException:
+    """Log a permission violation and build the 403 to raise (TRD §6).
+
+    Used for checks the coarse role matrix cannot express — above all "is this
+    *your* pod". Returns the exception rather than raising it so the call site
+    reads ``raise deny(...)`` and control flow stays obvious.
+    """
+    append_event(
+        session,
+        type=EVENT_PERMISSION_DENIED,
+        actor_agent_id=agent.id,
+        payload={
+            "action": action.value,
+            "role": agent.role.value,
+            "detail": detail,
+            **(context or {}),
+        },
+    )
+    session.commit()
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
 def require(action: Action) -> Callable[..., Agent]:
     """Return a dependency that admits only agents permitted to do ``action``."""
 
