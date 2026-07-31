@@ -1,0 +1,21 @@
+{
+  "cash": 901565.4998,
+  "positions": {
+    "JPM": {
+      "quantity": 100,
+      "avg_price": 297.81
+    },
+    "JNJ": {
+      "quantity": 100,
+      "avg_price": 226.71
+    },
+    "UNH": {
+      "quantity": 50,
+      "avg_price": 393.85
+    },
+    "WMT": {
+      "quantity": 200,
+      "avg_price": 131.45
+    }
+  }
+}

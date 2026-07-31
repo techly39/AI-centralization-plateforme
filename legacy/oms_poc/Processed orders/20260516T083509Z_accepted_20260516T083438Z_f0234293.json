@@ -1,0 +1,6 @@
+[
+  {"ticker": "JPM", "quantity": 100, "price_to_enter": "current", "justification": "Best value in the group with 14.3x P/E, 11.6% off high, and 12-14% analyst upside."},
+  {"ticker": "JNJ", "quantity": 100, "price_to_enter": "current", "justification": "Defensive healthcare quality 10% off high with 10-15% analyst upside."},
+  {"ticker": "UNH", "quantity": 50, "price_to_enter": "current", "justification": "Healthcare leader pulled back from $404 high; Medicare Advantage recovery intact."},
+  {"ticker": "WMT", "quantity": 200, "price_to_enter": "current", "justification": "Consumer defensive anchor with Buy consensus, resilient earnings, and best inflation hedge."}
+]

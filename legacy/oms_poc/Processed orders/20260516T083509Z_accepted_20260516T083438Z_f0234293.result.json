@@ -1,0 +1,33 @@
+{
+  "submission_id": "6fa3cd1f-e29d-4c85-abca-32493125b922",
+  "source_file": "20260516T083438Z_f0234293.json",
+  "status": "accepted",
+  "processed_at": "2026-05-16T08:35:09.543016+00:00",
+  "results": [
+    {
+      "ticker": "JPM",
+      "status": "filled",
+      "quantity": 100,
+      "fill_price": 297.80999755859375
+    },
+    {
+      "ticker": "JNJ",
+      "status": "filled",
+      "quantity": 100,
+      "fill_price": 226.7100067138672
+    },
+    {
+      "ticker": "UNH",
+      "status": "filled",
+      "quantity": 50,
+      "fill_price": 393.8500061035156
+    },
+    {
+      "ticker": "WMT",
+      "status": "filled",
+      "quantity": 200,
+      "fill_price": 131.4499969482422
+    }
+  ],
+  "remaining_cash": 901565.4998
+}

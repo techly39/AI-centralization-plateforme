@@ -1,0 +1,14 @@
+[
+  {
+    "ticker": "AAPL",
+    "quantity": 10,
+    "price_to_enter": "current",
+    "justification": "Market entry on the AI hardware re-rating thesis."
+  },
+  {
+    "ticker": "MSFT",
+    "quantity": 5,
+    "price_to_enter": 380.50,
+    "justification": "Buy-limit at support; only fill if MSFT trades down to 380.50."
+  }
+]

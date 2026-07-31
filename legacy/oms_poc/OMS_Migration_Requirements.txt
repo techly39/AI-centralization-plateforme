@@ -1,0 +1,13 @@
+OMS Migration Requirements Analysis
+===================================
+
+The following architectural discrepancies exist between the current OMS implementation and the required AI Fund Environment specifications. Further investigation is required to validate implementation paths.
+
+* Order Ingestion: The existing system scans a directory for JSON files. The required architecture mandates receiving orders exclusively through a REST API via a POST /orders endpoint.
+* State Management: The existing system saves portfolio states to a Portfolio.json file. The required architecture mandates storing state changes as immutable events in a SQLite database using SQLAlchemy 2.0.
+* Time Synchronization: The existing system retrieves time using the system clock. The required architecture mandates reading time exclusively from the internal clock service to support backtesting.
+* Data Retrieval: The existing system executes a separate script to fetch prices. The required architecture mandates retrieving prices through a MarketDataProvider interface wrapping yfinance.
+* Transaction Support: The existing system rejects all sell orders. The required architecture mandates processing partial sell orders and recording realized profit and loss.
+* Cost Calculation: The existing system calculates order costs using only quantity and price. The required architecture mandates adding a configurable simulated fee, defaulting to 0.1%, to the total cost check.
+* Security: The existing system processes orders without verifying the sender. The required architecture mandates verifying the agent's API key and checking their role permissions before order execution.
+* Pending Order Tracking: The existing system tracks pending limit orders in individual JSON files. The required architecture mandates tracking pending orders in the database and checking them via a background job scheduler.
