@@ -90,6 +90,10 @@ def report_cost(
     task_label: str | None = None,
 ) -> Cost:
     """Record one unit of work's token and dollar cost. Caller owns the transaction."""
+    # The API schema refuses these first (422); this guards in-process callers.
+    for name, value in (("tokens_in", tokens_in), ("tokens_out", tokens_out)):
+        if not 0 <= value <= MAX_TOKENS_PER_REPORT:
+            raise ValueError(f"{name}={value} outside 0..{MAX_TOKENS_PER_REPORT}")
     cost = Cost(
         ts=get_clock().now(),
         agent_id=reporter.id,

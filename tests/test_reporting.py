@@ -8,6 +8,7 @@ cost figure that can be attributed to a rival pod is worse than no figure at all
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import select
 
 from app.db.models import Cost, Event, Task
@@ -90,6 +91,18 @@ def test_token_counts_are_capped_per_report(client, desk):
         assert post(client, pm_key, "/costs", usd_cost=0.0, **ok).status_code == 201
         too_big = {**ok, field: MAX_TOKENS_PER_REPORT + 1}
         assert post(client, pm_key, "/costs", usd_cost=0.0, **too_big).status_code == 422
+
+
+def test_token_cap_also_binds_in_process_callers(desk, db):
+    """A future system cost-sync calls report_cost directly, not over HTTP."""
+    from app.db.models import Agent
+    from app.metrics.reporting import MAX_TOKENS_PER_REPORT, report_cost
+
+    _, pm_id, _ = desk
+    pm = db.get(Agent, pm_id)
+    with pytest.raises(ValueError):
+        report_cost(db, reporter=pm, tokens_in=MAX_TOKENS_PER_REPORT + 1,
+                    tokens_out=0, usd_cost=0.0)
 
 
 # --- Tasks ------------------------------------------------------------------

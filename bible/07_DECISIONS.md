@@ -104,3 +104,12 @@ per thread). Evidence: StaleDataError flake ~1/3 runs → 0/40. See F-0001.
 Phase 2 grants READ_MESSAGES, REPORT_COST, REPORT_TASK to every role via `_UNIVERSAL`
 (`app/registry/permissions.py`), extending TRD §6. Every agent must read its inbox and report
 what it spent; denying either to a role would only create unmetered agents. Flagged by the auditor.
+
+## ADR-018 — Token counts are capped per report and summed with TOTAL   (builder, cycle 2) — accepted
+`POST /costs` (and the MCP tool, and `report_cost` in-process) refuses `tokens_in`/`tokens_out`
+above `MAX_TOKENS_PER_REPORT` = 100,000,000 (`app/metrics/reporting.py`). One report is one unit
+of work; 1e8 is ~100 full re-reads of a 1M-token context, so no honest report hits it. Pod token
+totals are summed with SQLite `TOTAL` (float, never raises) instead of `SUM` (raises on int64
+overflow). Two walls because the red-team showed one agent could 500 the leaderboard for the whole
+run with two reports (F-0002, B-000c). Cost: totals above 2⁵³ tokens round. Alternatives rejected:
+summing in Python (loads every row); a cap alone (a future in-process writer could still bypass it).
