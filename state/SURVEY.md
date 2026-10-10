@@ -14,7 +14,7 @@ Sections: 1 Toolchain · 2 What exists · 3 What works · 4 What's broken · 5 W
 | SQLite | 3.50.4 in the venv's `sqlite3`; CLI 3.51.0 | `TOTAL()` (ADR-018) available in both |
 | Node / npm | v22.22.2 / 10.9.7 | needed by OpenClaw |
 | OpenClaw | 2026.5.12 (f066dd2), `/opt/homebrew/bin/openclaw` | details → S-005 / `runtime/openclaw/VERSION_NOTES.md` |
-| Claude Code | 2.1.296 (from its install path) | `claude --version` needs a permission prompt in loop mode |
+| Claude Code | 2.1.296 (inferred from the install path, not `--version`) | `claude --version` needs a permission prompt in loop mode |
 | git | not captured | `git --version` needs a permission prompt in loop mode |
 | origin | github.com/techly39/AI-centralization-plateforme | `main` = origin/main at cycle start |
 
@@ -34,7 +34,7 @@ All match the TRD stack.
 [PASS] GET /docs
 [PASS] MCP handshake + list_tools — 20 tools
 [PASS] MCP call get_health / get_clock / list_agents / get_leaderboard / list_events
-[PASS] server stopped cleanly — rc=143
+[PASS] server stopped cleanly on SIGINT — rc=0
 ```
 
 So: the CLI builds a schema from zero through all alembic migrations, the API serves, and an
@@ -46,8 +46,9 @@ every layer. The physics runs outside pytest.
   doc written against mcp 1.x idioms will break silently-ish; `agent_console.py` only reads
   `.content`, so it is unaffected. Watch for this in the OpenClaw adapter (B-012).
 - `scripts/README.md` said "19 tools"; there are 20 (fixed).
-- `fund-env serve` exits with rc=143 on SIGTERM (uvicorn reports the signal rather than 0). Harmless
-  now; the Runtime (B-009) should stop the server with SIGINT or treat 143 as a clean stop.
+- Stopping `uv run fund-env serve`: SIGTERM → rc=143 (128+15; which process reports it — `uv` or
+  uvicorn — is unverified), SIGINT → rc=0 (measured). The script and the Runtime (B-009) stop
+  the server with SIGINT.
 - The live clock reports UTC (`2026-10-10T23:33Z` while local time was 01:33 CEST) — correct.
 - `fund.db` at the repo root holds the Human's August history (167 kB, last write 2026-08-02).
   The Builder must never run the CLI against it by default — use `FUND_DATABASE_URL` or the smoke script.

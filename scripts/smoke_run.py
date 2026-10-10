@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -81,19 +82,21 @@ async def mcp_check(env: dict[str, str], errlog_path: Path) -> bool:
 
 
 def main() -> int:
+    if (REPO / "governance" / "HALT").exists():
+        print("governance/HALT exists — not starting anything (Constitution Art. 5).")
+        return 1
     with tempfile.TemporaryDirectory(prefix="fund-smoke-") as tmp:
         tmpdir = Path(tmp)
         port = free_port()
         base = f"http://127.0.0.1:{port}"
-        env = {
-            **os.environ,
-            "FUND_DATABASE_URL": f"sqlite:///{tmpdir / 'smoke.db'}",
-            "FUND_MCP__API_BASE_URL": base,
-        }
-        env.pop("FUND_MCP__API_KEY", None)
+        # Drop every inherited FUND_* override so the run is defined by config.yaml + these two.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
+        env["FUND_DATABASE_URL"] = f"sqlite:///{tmpdir / 'smoke.db'}"
+        env["FUND_MCP__API_BASE_URL"] = base
 
         r = run_cli(env, "init-db")
-        if not step("fund-env init-db", r.returncode == 0, r.stdout.strip()):
+        detail = r.stdout.strip() if r.returncode == 0 else (r.stdout + r.stderr).strip()[-300:]
+        if not step("fund-env init-db", r.returncode == 0, detail):
             return 1
         r = run_cli(env, "seed-admin", "--name", "smoke-mgmt")
         key = re.search(r"\bfk_\S+", r.stdout)
@@ -112,17 +115,27 @@ def main() -> int:
             if not step("fund-env serve answers /health", wait_for_health(base), base):
                 print((tmpdir / "serve.log").read_text()[-2000:])
                 return 1
-            ok = step("GET /docs", urllib.request.urlopen(f"{base}/docs", timeout=5).status == 200)
+            try:
+                docs_ok = urllib.request.urlopen(f"{base}/docs", timeout=5).status == 200
+            except OSError as exc:
+                docs_ok = False
+                print(f"       {exc}")
+            ok = step("GET /docs", docs_ok)
             mcp_env = {**env, "FUND_MCP__API_KEY": key.group(0)}
             ok &= anyio.run(mcp_check, mcp_env, tmpdir / "mcp.log")
         finally:
-            server.terminate()
+            # SIGINT is the Ctrl-C an operator sends; a graceful shutdown exits 0.
+            server.send_signal(signal.SIGINT)
             try:
                 server.wait(timeout=10)
+                killed = False
             except subprocess.TimeoutExpired:
                 server.kill()
+                server.wait()
+                killed = True
             server_log.close()
-        step("server stopped cleanly", server.returncode is not None, f"rc={server.returncode}")
+        ok &= step("server stopped cleanly on SIGINT", not killed and server.returncode == 0,
+                   f"rc={server.returncode}")
         return 0 if ok else 1
 
 
