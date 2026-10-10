@@ -1,0 +1,95 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch",
+      "Task",
+      "Agent",
+      "TodoWrite",
+      "Bash(uv *)",
+      "Bash(uvx *)",
+      "Bash(python3 *)",
+      "Bash(pytest *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git switch *)",
+      "Bash(git checkout *)",
+      "Bash(git branch*)",
+      "Bash(git merge *)",
+      "Bash(git push origin *)",
+      "Bash(git stash*)",
+      "Bash(ls*)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(find *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(mv *)",
+      "Bash(cp *)",
+      "Bash(sqlite3 *)",
+      "Bash(curl *localhost*)",
+      "Bash(curl *127.0.0.1*)",
+      "Bash(openclaw *)",
+      "Bash(node *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(date*)",
+      "Bash(sleep *)",
+      "Bash(kill *)",
+      "Bash(lsof *)",
+      "Bash(ps *)",
+      "Bash(tar *)",
+      "Bash(openclaw)",
+      "Bash(which *)",
+      "Bash(sw_vers*)"
+    ],
+    "deny": [
+      "Edit(bible/00_CONSTITUTION.md)",
+      "Edit(bible/01_GENESIS.md)",
+      "Edit(governance/**)",
+      "Edit(loop/**)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/hooks/**)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git rebase*)",
+      "Bash(git filter-branch*)",
+      "Bash(git branch -D*)",
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Edit(~/.firm/**)"
+    ],
+    "additionalDirectories": [
+      "~/.openclaw",
+      "~/firm-openclaw-backups"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

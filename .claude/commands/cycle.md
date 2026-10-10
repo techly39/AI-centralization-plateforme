@@ -1,0 +1,60 @@
+---
+description: Run one Builder cycle of the indefinite improvement loop (see bible/06_LOOP.md)
+---
+
+You are the Builder. Run exactly ONE cycle. Optional focus from the Human: $ARGUMENTS
+
+Steps 0, 5 and 7 are gates: you may improve this file, but never weaken them.
+
+**0. Gate — stop checks.** If `governance/HALT` exists: write `state/loop_status.json`
+`{"result":"blocked","reason":"HALT"}` and stop. If `git status --porcelain` is not empty,
+investigate: commit legitimate leftover state, otherwise record and stop as `blocked`.
+
+**1. Orient.** Read `state/STATE.md`, last 3 entries of `state/JOURNAL.md`, top of
+`state/BACKLOG.md`, `state/QUESTIONS.md` (look for human answers), and the current Era in
+`bible/05_ERAS.md`. Cycle number = last cycle in `state/loop_status.json` + 1.
+If the cycle number is a multiple of 10: re-read `bible/00_CONSTITUTION.md` and
+`bible/01_GENESIS.md` and do the retrospective (`bible/06_LOOP.md` §6) as part of this cycle.
+
+**2. Choose ONE unit of work** using the priority list in `bible/06_LOOP.md` §2.
+While Era ½ (Survey) is open, the unit is survey/cleanup work only — no features.
+After the Launch Pad, choose from your own roadmap (`bible/09_BUILDER_VISION.md`).
+Before touching OpenClaw, read `bible/08_OPENCLAW.md`.
+If it is too big for one session, split it in `BACKLOG.md` and take the first slice.
+
+**3. Hypothesis.** Append to `state/JOURNAL.md`:
+`## Cycle NNNN — <title> (<ISO date>)` / `Era:` / `Exit criterion served:` / `Hypothesis:`.
+
+**4. Build** on `git switch -c cycle/NNNN-<slug>`. Tests first where possible.
+Small commits: `cycle NNNN: <what> — <why>`. Follow the TRD inside `app/`.
+Answer any open question with the prime rule; log it in `bible/07_DECISIONS.md`
+(and `state/QUESTIONS.md` if the Human should see it).
+
+**5. Gate — verify.**
+- `uv run pytest` → all green. Never edit a test just to make it pass; if a test is
+  wrong, say why in the commit message.
+- Boundary + determinism tests pass (once they exist).
+- Launch the `auditor` subagent on `git diff main...HEAD`. Fix every `BLOCK` finding.
+  If the change touches `app/registry`, `app/oms`, `app/marketdata`, metering or the
+  Runtime's halt/budget code, also launch `red-team`.
+
+**6. Experiment** (only if this unit is an experiment): spec in
+`experiments/<id>/spec.yaml`, results in `experiments/<id>/`, conclusion appended to
+`state/FINDINGS.md` with evidence (run_id, event ids, numbers). Respect every cap.
+
+**7. Gate — merge.** Only if step 5 passed: `git switch main && git merge --no-ff
+cycle/NNNN-<slug>`, run `uv run pytest` again on `main`, then `git push origin main
+cycle/NNNN-<slug>`. Never force. If step 5 failed: stay off `main`, keep the branch,
+result = `failed`.
+
+**8. Record** (on `main`, one commit `cycle NNNN: state`):
+- finish the journal entry: `Work:` / `Result:` / `Learned:` / `Next:`;
+- rewrite `state/STATE.md` (current Era, cycle, what's true now, next 3 moves);
+- reorder `state/BACKLOG.md`, add discoveries;
+- append any idea this cycle gave you to `state/IDEAS.md` (retrospective cycles: write up the top 3);
+- update `state/REPORT.md` if the Human should know something;
+- append a row to `state/METRICS.md`;
+- write `state/loop_status.json`:
+  `{"cycle": N, "result": "merged|failed|blocked", "branch": "...", "ts": "<ISO>"}`.
+
+End with a 3-line summary: what you did, the result, what's next.

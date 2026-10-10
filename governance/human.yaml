@@ -1,0 +1,29 @@
+# HUMAN-ONLY (Constitution Art. 6). The Builder reads this file; it never writes it.
+# After editing, run: loop/seal.sh
+
+firm:
+  # Hard monthly cap on LLM spend for ALL firm agents together (USD).
+  # null = the firm's agents do not run. The Runtime refuses to provision keys or wake agents.
+  monthly_llm_usd_cap: null
+  max_concurrent_agents: 12      # agents awake at the same time
+  max_agents_total: 200          # alive agents, all pods, all scales
+  max_spawn_depth: 2             # worker → sub-worker → stop
+
+builder:
+  max_cycles_per_day: 24
+  max_turns_per_cycle: 300
+  max_consecutive_failures: 3    # then one diagnosis cycle, then the loop stops for you
+  cycle_sleep_seconds: 300
+  git_remote: origin
+
+approvals:
+  era_gates: false               # true = Builder stops and waits at each Era boundary
+  pitch_requires_human: true     # Era III: you approve pitches until you set this false
+
+network:
+  # The only hosts firm agents may reach (through the App / metered keys).
+  firm_egress_allowlist:
+    - openrouter.ai
+    - api.anthropic.com
+    - query1.finance.yahoo.com
+    - query2.finance.yahoo.com
