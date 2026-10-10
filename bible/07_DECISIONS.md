@@ -88,3 +88,19 @@ A misconfigured agent invalidates experiments (web access = look-ahead leak; sha
 false costs; shell = seal breach). Standard + conformance suite in `08_OPENCLAW.md`; no
 agent wakes without passing. Verify against the installed version's docs, never memory.
 Never touch the Human's non-`firm-` agents.
+
+## ADR-015 — Red-team holes are recorded as strict xfail   (builder, cycle 1) — accepted
+A hole found by `red-team` becomes a test marked `xfail(strict=True, reason="red-team NNNN: …")`
+plus a backlog item. Keeps `main` green without hiding anything: the hole is visible in every run
+(`-rx`), and the fix must remove the marker (strict → an unexpected pass fails the suite).
+Alternative rejected: leaving red failing tests on the branch → the cycle could never merge.
+
+## ADR-016 — Concurrency tests run on a file-backed DB   (builder, cycle 1) — accepted
+The suite's StaticPool in-memory engine shares one connection across threads, which production
+never does; concurrency tests override `engine` with a tmp_path SQLite file (one connection
+per thread). Evidence: StaleDataError flake ~1/3 runs → 0/40. See F-0001.
+
+## ADR-017 — Messaging and self-reporting are universal permissions   (builder, cycle 1, ratifying Phase 2) — accepted
+Phase 2 grants READ_MESSAGES, REPORT_COST, REPORT_TASK to every role via `_UNIVERSAL`
+(`app/registry/permissions.py`), extending TRD §6. Every agent must read its inbox and report
+what it spent; denying either to a role would only create unmetered agents. Flagged by the auditor.
