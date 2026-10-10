@@ -193,19 +193,44 @@ def test_held_non_management_cannot_see_metrics_or_ledger(client, two_desks, pat
 # HOLES — metrics manipulation via self-reported cost
 # =============================================================================
 
-@pytest.mark.xfail(strict=True, reason="red-team 0001: summed tokens overflow SQLite INTEGER; "
-                   "any agent can permanently 500 the leaderboard and pod metrics")
-def test_hole_metrics_token_overflow_dos(client, two_desks, admin_key):
-    """Any role (analyst here) reports two in-range token counts whose SUM
-    overflows int64. ``_cost_metrics`` then raises on every call, so management
-    loses /metrics/leaderboard and /metrics/pod/1 for the rest of the run."""
+def test_held_metrics_token_overflow_dos(client, two_desks, admin_key):
+    """Was a hole (cycle 0001): any role reported two in-range token counts
+    whose SUM overflowed int64, and ``_cost_metrics`` raised on every call —
+    management lost /metrics/leaderboard and /metrics/pod/1 for the run.
+    Fixed in cycle 0002: one report is capped at MAX_TOKENS_PER_REPORT, so the
+    attack is refused at the door and the leaderboard stays up."""
     _, an1_key = two_desks["an1"]
     for _ in range(2):
         r = client.post("/costs", headers=H(an1_key),
                         json={"tokens_in": 2**63 - 1, "tokens_out": 0, "usd_cost": 0.0})
-        assert r.status_code == 201
+        assert r.status_code == 422
     resp = client.get("/metrics/leaderboard", headers=H(admin_key))
     assert resp.status_code == 200
+    assert client.get("/metrics/pod/1", headers=H(admin_key)).status_code == 200
+
+
+def test_held_metrics_survive_token_rows_whose_sum_exceeds_int64(
+    client, two_desks, admin_key, SessionFactory
+):
+    """Second wall behind the cap: rows that got in another way (a future
+    system cost-sync, a hand-edited db) must not take the metrics down either."""
+    from app.db.models import Agent, Cost
+    from app.clock import get_clock
+
+    an1_id, _ = two_desks["an1"]
+    session = SessionFactory()
+    try:
+        agent = session.get(Agent, an1_id)
+        for _ in range(2):
+            session.add(Cost(ts=get_clock().now(), agent_id=agent.id, pod_id=agent.pod_id,
+                             tokens_in=2**63 - 1, tokens_out=0, usd_cost=0.0))
+        session.commit()
+    finally:
+        session.close()
+    assert client.get("/metrics/leaderboard", headers=H(admin_key)).status_code == 200
+    resp = client.get("/metrics/pod/1", headers=H(admin_key))
+    assert resp.status_code == 200
+    assert resp.json()["cost"]["tokens_in"] >= 2**63
 
 
 @pytest.mark.xfail(strict=True, reason="red-team 0001: usd_cost has no finite upper bound; "
@@ -247,9 +272,9 @@ def test_hole_cost_nan_crashes_server(client, two_desks):
     assert resp.status_code == 422
 
 
-@pytest.mark.xfail(strict=True, reason="red-team 0001: tokens beyond int64 raise an unhandled "
-                   "OverflowError (500) instead of a 422")
-def test_hole_cost_tokens_beyond_int64_500(client, two_desks):
+def test_held_cost_tokens_beyond_int64_422(client, two_desks):
+    """Was a hole (cycle 0001): unhandled OverflowError (500). Fixed in cycle
+    0002 by the same per-report cap as the overflow DoS above."""
     _, an1_key = two_desks["an1"]
     resp = client.post("/costs", headers=H(an1_key),
                        json={"tokens_in": 2**64, "tokens_out": 0, "usd_cost": 0.0})

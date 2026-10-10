@@ -78,6 +78,20 @@ def test_negative_cost_is_refused(client, desk):
     ).status_code == 422
 
 
+def test_token_counts_are_capped_per_report(client, desk):
+    """One report may claim at most MAX_TOKENS_PER_REPORT of each kind: no
+    single unit of work is that big, and an unbounded count let any agent
+    overflow the pod's token sums (red-team 0001)."""
+    from app.metrics.reporting import MAX_TOKENS_PER_REPORT
+
+    _, _, pm_key = desk
+    for field in ("tokens_in", "tokens_out"):
+        ok = {"tokens_in": 1, "tokens_out": 1, field: MAX_TOKENS_PER_REPORT}
+        assert post(client, pm_key, "/costs", usd_cost=0.0, **ok).status_code == 201
+        too_big = {**ok, field: MAX_TOKENS_PER_REPORT + 1}
+        assert post(client, pm_key, "/costs", usd_cost=0.0, **too_big).status_code == 422
+
+
 # --- Tasks ------------------------------------------------------------------
 
 def test_task_start_and_end_records_duration_and_outcome(

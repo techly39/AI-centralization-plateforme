@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
+from app.metrics.reporting import MAX_TOKENS_PER_REPORT
 
 # Roles an operator/management may assign via the API. 'system' is internal-only
 # and is created by the bootstrap CLI, never over HTTP.
@@ -256,8 +257,8 @@ class CostReportRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    tokens_in: int = Field(ge=0)
-    tokens_out: int = Field(ge=0)
+    tokens_in: int = Field(ge=0, le=MAX_TOKENS_PER_REPORT)
+    tokens_out: int = Field(ge=0, le=MAX_TOKENS_PER_REPORT)
     usd_cost: float = Field(ge=0.0)
     task_label: str | None = Field(
         default=None,

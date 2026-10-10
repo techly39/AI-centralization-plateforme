@@ -243,11 +243,15 @@ def _trade_stats(session: Session, pod_id: int) -> tuple[float, float, int, int]
 
 
 def _cost_metrics(session: Session, pod_id: int) -> CostMetrics:
+    # TOTAL, not SUM: SQLite's integer SUM raises on int64 overflow, which made
+    # one agent's absurd report a permanent 500 for management (red-team 0001).
+    # TOTAL is a float and never raises; the per-report cap keeps real sums far
+    # below 2**53, where the float is still exact.
     row = session.execute(
         select(
             func.coalesce(func.sum(Cost.usd_cost), 0.0),
-            func.coalesce(func.sum(Cost.tokens_in), 0),
-            func.coalesce(func.sum(Cost.tokens_out), 0),
+            func.total(Cost.tokens_in),
+            func.total(Cost.tokens_out),
             func.count(Cost.id),
         ).where(Cost.pod_id == pod_id)
     ).one()
