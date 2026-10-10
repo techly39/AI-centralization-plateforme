@@ -27,6 +27,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
+from app.metrics.reporting import MAX_TOKENS_PER_REPORT
 from mcp_server.client import FundAPIError, FundClient
 
 
@@ -365,8 +366,12 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
 
     @api_tool(server, method="POST", path="/costs")
     async def report_cost(
-        tokens_in: Annotated[int, Field(description="Input tokens you consumed.", ge=0)],
-        tokens_out: Annotated[int, Field(description="Output tokens you produced.", ge=0)],
+        tokens_in: Annotated[
+            int, Field(description="Input tokens you consumed.", ge=0, le=MAX_TOKENS_PER_REPORT)
+        ],
+        tokens_out: Annotated[
+            int, Field(description="Output tokens you produced.", ge=0, le=MAX_TOKENS_PER_REPORT)
+        ],
         usd_cost: Annotated[float, Field(description="What that cost, in dollars.", ge=0)],
         task_label: Annotated[
             str | None, Field(description="What the spend was for; reuse stable labels.")
@@ -377,7 +382,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         The fund cannot see your token usage — it runs outside you. If you do
         not report, your pod's returns are measured against a cost of zero and
         it will look better than it is. Report after each substantial unit of
-        work.
+        work. One report may claim at most 100,000,000 tokens each way.
         """
         return await call(
             "POST",
