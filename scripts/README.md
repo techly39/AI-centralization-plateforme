@@ -1,15 +1,18 @@
 # scripts/ — driving the fund by hand
 
-Two operator tools for exercising the system the way a real agent would, without
+Operator tools for exercising the system the way a real agent would, without
 a language model in the loop. They are **clients**, not part of the app: they
 import `mcp`, never `app`, and everything they do goes through the MCP server →
-REST API → bus, hitting every permission check on the way.
+REST API → bus, hitting every permission check on the way. The one exception is
+`survey_probe_physics.py`, a Builder measurement tool that inspects the physics
+from the inside (it imports `app`, on a temporary database only).
 
 | Script | What it is |
 |---|---|
 | `setup_demo_firm.py` | Registers an analyst and a PM, through MCP, as management. Writes their keys to `agents.local.json` (gitignored, mode 600). |
 | `agent_console.py` | One interactive agent. Launches `fund-env-mcp` as a subprocess over stdio, does the MCP handshake, and lets you make the tool calls a model would make. |
 | `smoke_run.py` | Run check outside pytest: builds a database in a temp dir with the real CLI, starts `fund-env serve` on a free port, connects `fund-env-mcp` with the seeded key and calls read tools. Never touches `fund.db`. Exit 0 = everything starts. |
+| `survey_probe_physics.py` | Survey measurements (cycle 4, `state/SURVEY.md` P1–P9): migration drift, unledgered writes, replay order under a moving clock, API edge cases, Sharpe scaling, `mcp_server` imports. Temp DB only; reports, never asserts. |
 
 ## First run
 
