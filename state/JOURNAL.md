@@ -51,3 +51,10 @@ the fix blocks an earlier step — the honest move is to keep its claim (metrics
 test for the inner wall. (2) Editing a module while a subagent runs the suite produces phantom
 flakes; don't edit code that's being red-teamed until it reports.
 Next: S-001 toolchain inventory (the Survey has been waiting two cycles); then B-000d.
+
+## Cycle 0003 — Toolchain inventory + run check (S-001) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: "`state/SURVEY.md` complete with all sections above" — deliverable 1 (toolchain inventory).
+Hypothesis: If I record every tool version and actually start the API and connect the MCP server
+as an agent would, then the Survey has evidence (not belief) that the physics runs outside pytest,
+and any gap between "tests green" and "the thing starts" surfaces before Era I builds on it.
