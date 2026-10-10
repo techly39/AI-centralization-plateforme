@@ -4,8 +4,11 @@
 Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix = remove the marker.
 - [x] **B-000c** (high) Token-sum overflow DoS — cycle 2: per-report cap 1e8 + `TOTAL` sum (ADR-018).
       Also closed the tokens > int64 part of B-000d.
-- [ ] **B-000d** Cost inputs: reject non-finite / absurd `usd_cost` (inf, NaN, 1e308) → clean 422
-      (3 xfail tests: infinity literal, overflow-to-inf, NaN 500). Consider IDEAS "physical-units types".
+- [ ] **B-000d** Non-finite floats: reject inf/NaN/1e308 on **every** float input → clean 422
+      (3 xfail tests on `usd_cost`; SURVEY §4a.7: `limit_price=1e309` is stored and read back as
+      `null`). Likely one fix: `allow_inf_nan=False` on the API schemas. Consider IDEAS "physical-units types".
+- [ ] **B-019** (low) `POST /agents/register` with a missing `pod_id` → 500 (FK error unhandled);
+      PM without pod accepted (can never trade). → 404/422. SURVEY §4a.6, probe P5/P6.
 - [ ] **B-000m** (low) Integer path params ≥ 2⁶³ → 500 (`GET /metrics/pod/{2**63}`; likely every
       `/{id}` route) → `tests/test_redteam_0002.py::test_hole_metrics_pod_id_beyond_int64_500`.
 - [ ] **B-000n** (low) Cost-report rate is unbounded per agent (spam inflates rows; token totals
@@ -28,10 +31,12 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [x] **S-002** Git hygiene — cycle 1: Phase 2 + Bible/harness committed and pushed; flaky
       concurrency test fixed (F-0001); red-team pass recorded (F-0002).
       Remaining .gitignore gap → B-000i.
-- [ ] **S-003** Repo survey: read every file; map to TRD + Bible; list dead code, stale docs,
-      odd files (`test_api.py` at root, empty `ui/`, `.DS_Store`, `legacy/`), gaps.
+- [x] **S-003a** Repo survey, physics: `app/`, `mcp_server/`, `migrations/` — cycle 4: SURVEY §2a–8,
+      9 findings (P1–P9 via `scripts/survey_probe_physics.py`) → B-016…B-021, B-000d/B-002/B-005 widened.
+- [ ] **S-003b** Repo survey, the rest: `tests/`, `scripts/`, `docs/`, `legacy/`, root files; map to
+      TRD + Bible; odd files (`test_api.py` at root, empty `ui/`, `.DS_Store`, `legacy/`).
       Auditor already spotted: `legacy/oms_poc/Logs/oms.log`, `legacy/oms_poc/Processed orders/*.json`,
-      `.vscode/settings.json` tracked.
+      `.vscode/settings.json` tracked. Also: 03_WORLD §2 says "218 tests" (now 267+9) → S-006.
 - [ ] **S-004** Cleanup commits (deletions/moves/renames/doc fixes only, each with a reason).
 - [ ] **S-005** OpenClaw survey per `bible/08_OPENCLAW.md` §1–2: back up `~/.openclaw` to
       `~/firm-openclaw-backups/`, `openclaw --version`, read that version's docs, write
@@ -42,13 +47,30 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 
 ## Era I — The Desk
 - [ ] **B-002** `tests/test_boundaries.py`: dependency law from `bible/03_WORLD.md` §1;
-      `app/` imports no LLM SDK / agent framework.
+      `app/` imports no LLM SDK / agent framework. Place `mcp_server/` in the law: today
+      `import mcp_server.tools` loads 35 `app.*` modules incl. the DB engine, via one constant
+      (`MAX_TOKENS_PER_REPORT`) — SURVEY §4a.9.
 - [ ] **B-003** Halt in physics: `governance/HALT` → every state-changing agent request
       refused (409/423 + logged event); `GET /halt`; MCP tool; tests.
 - [ ] **B-004** TRD Phase 3a: simulated clock, `POST /clock/mode`, `POST /clock/advance`,
-      `run_id` scopes; pending-order monitor runs on every advance.
+      `run_id` scopes; pending-order monitor runs on every advance. Needs B-016 first.
+- [ ] **B-016** Replay order = live order: `rebuild_state` + equity curve replay `(ts, id)`, live
+      folds by `id`; a backwards clock gives 10 phantom shares on rebuild (SURVEY §4a.1, P3).
+      Replay by `id` (or per `run_id`); test with a clock that moves back. Before B-004.
+- [ ] **B-020** `GET /clock` readable by every role (MCP `get_clock` tells all agents to use it;
+      PM/analyst get 403 — P7). `/clock/mode` + `/clock/advance` stay management/system.
 - [ ] **B-005** TRD Phase 3b: look-ahead guard on every market-data route + red-team pass.
+      Must filter bars by their **end** time (a daily bar stamped 00:00 carries that day's close,
+      SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3).
 - [ ] **B-006** TRD Phase 3c: `POST /allocations`, meeting schedule + package endpoints.
+- [ ] **B-017** Sharpe annualisation: equity curve is per calendar day, `annualise` uses √252 →
+      reported annual Sharpe ×0.845 of the true value (P8). Use trading-day points or √365;
+      `sharpe_daily` must say which day it means. Honest-measurement bug (Art. 9).
+- [ ] **B-018** Decide rebuild scope: pod creation + `system` agent write no event (P2);
+      `pods.current_allocation`, `allocations`, `orders`, `messages`, `costs`, `tasks`, `agents`
+      are not rebuilt. ADR: which tables are derived, which are records; before Era II generations.
+- [ ] **B-021** `GET /tasks` + `GET /costs` (own; cross-pod for management) + MCP tools —
+      `list_tasks`/`list_costs` exist unused; a restarted agent cannot find its open task ids.
 - [ ] **B-007** World events table + `system` announcements (law changes, Truman events).
 - [ ] **B-008** Truman v1: local cache of real daily history, prices-only pack, one scripted
       scenario, served via `MarketDataProvider`; pack hashing.

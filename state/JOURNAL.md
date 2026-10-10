@@ -71,3 +71,13 @@ pytest. (2) Loop-mode permissions deny `VAR=x cmd`, `git --version`, `claude --v
 multi-op lines; survey work should be one `uv run python <script>` per check. (3) mcp 2.0 is a
 breaking major — the OpenClaw adapter must be written against 2.x field names.
 Next: S-003 repo survey (read every file, map to TRD + Bible).
+
+## Cycle 0004 — Repo survey, part 1: the physics code (S-003a) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: "`state/SURVEY.md` complete with all sections above" — deliverable 2
+(repo survey), first slice: `app/`, `mcp_server/`, `migrations/` (~7 000 lines). S-003 split:
+S-003b = tests, scripts, docs, legacy, root files.
+Hypothesis: If I read every physics file against the TRD and the Bible and write down, per
+module, what exists, what the TRD asked for, and where they differ, then Era I starts from a map
+instead of from STATE's summary — and the gaps that matter (TRD items silently missing, dead code,
+invariants that the code does not actually enforce) become backlog items with file:line evidence.
