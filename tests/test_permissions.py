@@ -27,10 +27,41 @@ from app.registry.permissions import Action, has_permission
         (AgentRole.management, Action.READ_CROSS_POD, True),
         (AgentRole.management, Action.PLACE_ORDER, False),
         (AgentRole.system, Action.PLACE_ORDER, True),
+        # Phase 2: broadcasting is restricted, but reading your own inbox and
+        # reporting your own cost and work are not privileges (TRD §7).
+        (AgentRole.analyst, Action.BROADCAST, False),
+        (AgentRole.analyst, Action.SEND_MESSAGE, True),
+        (AgentRole.management, Action.BROADCAST, True),
     ],
 )
 def test_matrix(role: AgentRole, action: Action, allowed: bool) -> None:
     assert has_permission(role, action) is allowed
+
+
+@pytest.mark.parametrize(
+    "action", [Action.READ_MESSAGES, Action.REPORT_COST, Action.REPORT_TASK]
+)
+@pytest.mark.parametrize(
+    "role", [AgentRole.analyst, AgentRole.pm, AgentRole.management, AgentRole.system]
+)
+def test_every_agent_may_read_its_inbox_and_report_its_own_work(
+    role: AgentRole, action: Action
+) -> None:
+    assert has_permission(role, action) is True
+
+
+def test_no_role_is_missing_from_the_matrix() -> None:
+    """A new role must be granted permissions deliberately, not by accident.
+
+    ``has_permission`` returns False for an unknown role, so a role added to the
+    enum and forgotten here would silently be able to do nothing — a confusing
+    failure. Failing loudly in the suite instead is cheaper than debugging it.
+    """
+    for role in AgentRole:
+        assert any(has_permission(role, action) for action in Action), (
+            f"role {role.value!r} has no permissions at all — was it added to "
+            "AgentRole without being added to the matrix?"
+        )
 
 
 # --- API-level enforcement --------------------------------------------------

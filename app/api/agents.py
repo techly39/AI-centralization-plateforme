@@ -13,7 +13,7 @@ from app.api.schemas import (
 )
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
-from app.registry.auth import require
+from app.registry.auth import get_current_agent, require
 from app.registry.permissions import Action
 from app.registry.service import (
     RegistryError,
@@ -59,6 +59,23 @@ def register(
         created_at=agent.created_at,
         api_key=api_key,
     )
+
+
+@router.get("/me", response_model=DirectoryEntry)
+def me(actor: Agent = Depends(get_current_agent)) -> DirectoryEntry:
+    """Who the calling API key belongs to: id, name, role, pod, coverage.
+
+    Authentication only — no entry in the permission matrix. Knowing your own
+    identity is not a privilege, and gating it would defeat the point: an agent
+    that cannot ask who it is has to be *told*, in a prompt, which is a second
+    copy of the database that starts drifting the moment anyone is moved
+    between pods.
+
+    Every other endpoint needs what this returns — ``pod_id`` for
+    ``GET /portfolio/{pod_id}``, ``id`` so colleagues can be told how to reply —
+    so a fresh agent's first call should be this one.
+    """
+    return DirectoryEntry.model_validate(actor)
 
 
 @router.get("/agents", response_model=list[DirectoryEntry])

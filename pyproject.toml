@@ -15,17 +15,22 @@ dependencies = [
     "loguru>=0.7",
     "yfinance>=0.2.40",
     "apscheduler>=3.10",
+    "mcp>=2.0.0",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.2",
     "httpx>=0.27",
+    "anyio>=4.14.2",
 ]
 
 # The `app` package lives at the repo root; expose it and the CLI.
 [project.scripts]
 fund-env = "app.cli:main"
+# The MCP server is a separate process: it is a *client* of the API above.
+fund-env-mcp = "mcp_server.server:main"
 
 [build-system]
 requires = ["hatchling"]

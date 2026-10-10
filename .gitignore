@@ -17,6 +17,9 @@ fund.db*
 # Env / secrets
 .env
 *.local.yaml
+# Agent API keys written by scripts/setup_demo_firm.py — shown once, never
+# recoverable, and enough to act as that agent.
+*.local.json
 
 # Claude Code personal/local settings (shared settings.json may be committed)
 .claude/settings.local.json

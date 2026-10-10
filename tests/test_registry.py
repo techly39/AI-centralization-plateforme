@@ -78,3 +78,61 @@ def test_deactivate_flow(client, admin_key, db) -> None:
 def test_deactivate_missing_is_404(client, admin_key) -> None:
     resp = client.post("/agents/9999/deactivate", headers={"X-API-Key": admin_key})
     assert resp.status_code == 404
+
+
+# --- GET /me ----------------------------------------------------------------
+#
+# An agent that cannot ask who it is has to be told in its prompt, and that copy
+# drifts. These tests pin the one property that makes /me worth having: what it
+# returns is the database row behind the key, whoever is holding it.
+
+def test_me_returns_the_identity_behind_the_key(client, admin_key, make_pod) -> None:
+    make_pod(1)
+    created = client.post(
+        "/agents/register",
+        headers={"X-API-Key": admin_key},
+        json={
+            "name": "pm-1",
+            "role": "pm",
+            "pod_id": 1,
+            "research_domains": ["banks"],
+        },
+    ).json()
+
+    resp = client.get("/me", headers={"X-API-Key": created["api_key"]})
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "id": created["id"],
+        "name": "pm-1",
+        "role": "pm",
+        "pod_id": 1,
+        "research_domains": ["banks"],
+        "status": "active",
+    }
+
+
+def test_me_needs_no_privilege_beyond_being_authenticated(
+    client, admin_key, agent_factory, make_pod
+) -> None:
+    """Every role can read its own row — including the analyst, who may do least."""
+    make_pod(1)
+    analyst_id, analyst_key = agent_factory("analyst-1", "analyst", 1)
+
+    assert client.get("/me", headers={"X-API-Key": analyst_key}).json()["id"] == analyst_id
+    # Management belongs to no pod, and says so rather than guessing.
+    assert client.get("/me", headers={"X-API-Key": admin_key}).json()["pod_id"] is None
+
+
+def test_me_is_not_a_way_around_authentication(client) -> None:
+    assert client.get("/me").status_code == 401
+    assert client.get("/me", headers={"X-API-Key": "fk_nonsense"}).status_code == 401
+
+
+def test_me_agrees_with_the_directory(client, admin_key, agent_factory, make_pod) -> None:
+    """The two views of identity must not diverge — same row, same answer."""
+    make_pod(1)
+    agent_id, agent_key = agent_factory("analyst-1", "analyst", 1)
+
+    directory = client.get("/agents", headers={"X-API-Key": agent_key}).json()
+    mine = client.get("/me", headers={"X-API-Key": agent_key}).json()
+    assert mine == next(row for row in directory if row["id"] == agent_id)
