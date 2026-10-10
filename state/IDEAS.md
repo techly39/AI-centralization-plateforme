@@ -20,3 +20,9 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   physical" (inf, NaN, 2⁶³ tokens, 2⁶³ pod id). One shared set of bounded Pydantic types
   (`Tokens`, `Usd`, `DbId`) used by every schema and MCP tool would close the class, not the
   instance — question: does a type-level wall end this whole family of red-team findings? — status: new
+
+- [cycle 3] **The smoke script as the agent's first day** — `smoke_run.py` is a scripted agent
+  doing onboarding (connect, read health/clock/agents/leaderboard/events). Grow it into a
+  deterministic "conformance agent" every OpenClaw firm agent must match tool-for-tool before it
+  wakes (08_OPENCLAW conformance) — question: can one replayable script define "a working agent
+  connection" for every future host (OpenClaw, Agent SDK, others)? — status: new

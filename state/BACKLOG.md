@@ -23,9 +23,8 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-000l** MCP API base URL must be loopback (conformance check for Era I).
 
 ## Era ½ — The Survey (first run: clean and understand — NO features)
-- [ ] **S-001** Toolchain + run check: versions (macOS, uv, Python, Node, openclaw, claude),
-      `fund-env serve` starts, MCP server connects (`scripts/agent_console.py`). Recorded so far:
-      uv 0.11.14, system python3 3.14.4, venv 3.12; origin = github techly39/AI-centralization-plateforme.
+- [x] **S-001** Toolchain + run check — cycle 3: SURVEY §1; `scripts/smoke_run.py` 12/12 PASS.
+      Leftover: `git --version` not captured (loop-mode permission prompt) → note in S-007.
 - [x] **S-002** Git hygiene — cycle 1: Phase 2 + Bible/harness committed and pushed; flaky
       concurrency test fixed (F-0001); red-team pass recorded (F-0002).
       Remaining .gitignore gap → B-000i.
@@ -61,6 +60,8 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       (bootstrap files the installed version supports) from AgentSpec, own agentDir + local auth
       profile + metered key, `fund-env-mcp` per agent key via env, deny-by-default tools, no
       bindings, `firm-` namespace; OCT POC charters → AgentSpec templates.
+- [ ] **B-012a** Adapter written against mcp 2.x (`is_error`, not `isError`); Runtime stops
+      `fund-env serve` with SIGINT (rc 0) — SURVEY §1 findings.
 - [ ] **B-012b** Conformance suite: `fund-runtime openclaw doctor` static checks + live probes
       (skipped while firm cap is null); integration tests skip when OpenClaw is absent.
 - [ ] **B-013** Metering v1: provisioned per-agent keys (fake provider in tests), cost-sync job →
@@ -73,5 +74,7 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **X-001** `state/METRICS.md` summariser script (success rate, turns, durations).
 - [ ] **X-002** Skill: `.claude/skills/new-endpoint/` — checklist for schema + permission +
       MCP tool + tests + docs, from the repo's existing patterns.
+- [ ] **X-004** Run `scripts/smoke_run.py` in the cycle's verify gate (step 5) — needs a
+      `.claude/commands/cycle.md` edit; cheap (~5 s) and catches "tests green, app won't start".
 - [ ] **X-003** Suite-stability + mutation check: run the suite N× and flag flaky tests; for each
       invariant-guarding test, a recorded mutant that must make it fail (F-0001).

@@ -58,3 +58,16 @@ Exit criterion served: "`state/SURVEY.md` complete with all sections above" — 
 Hypothesis: If I record every tool version and actually start the API and connect the MCP server
 as an agent would, then the Survey has evidence (not belief) that the physics runs outside pytest,
 and any gap between "tests green" and "the thing starts" surfaces before Era I builds on it.
+Work: Recorded versions (macOS 26.5.2 arm64, uv 0.11.14, venv Python 3.12.13, Node 22.22.2,
+OpenClaw 2026.5.12, Claude Code 2.1.296, mcp 2.0.0 …) in `state/SURVEY.md` §1. Wrote
+`scripts/smoke_run.py`: temp-dir DB via the real CLI → `fund-env serve` on a free port → MCP client
+launches `fund-env-mcp` with the seeded key → 5 read tools. Never touches the Human's `fund.db`.
+First run crashed in *my* code: mcp 2.0 renamed `isError` → `is_error`. Auditor PASS, 7 notes;
+fixed 1–5 (HALT check, SIGINT stop counted, FUND_* env scrubbed, /docs error as FAIL, stderr shown).
+Measured: SIGTERM → rc 143, SIGINT → rc 0. README tool count 19 → 20.
+Result: merged b77ed42. Smoke 12/12 PASS (3 runs); suite 267 passed + 9 xfailed on branch + main.
+Learned: (1) The physics *does* start and serve an MCP agent end to end — first evidence outside
+pytest. (2) Loop-mode permissions deny `VAR=x cmd`, `git --version`, `claude --version` and most
+multi-op lines; survey work should be one `uv run python <script>` per check. (3) mcp 2.0 is a
+breaking major — the OpenClaw adapter must be written against 2.x field names.
+Next: S-003 repo survey (read every file, map to TRD + Bible).

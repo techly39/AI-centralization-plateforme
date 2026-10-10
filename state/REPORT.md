@@ -1,5 +1,13 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 3: the fund starts for real, not just in tests.** A new check
+(`uv run python scripts/smoke_run.py`) builds a fresh database, starts the API, and connects
+an agent through MCP the way OpenClaw will. Every step passed. It runs in a throwaway folder,
+so your `fund.db` (your August history) is never touched. Tool versions are in
+`state/SURVEY.md`. Next: reading every file in the repo.
+
+---
+
 **2026-10-11 — Cycle 2: the leaderboard can no longer be broken.** The worst red-team hole is
 fixed. One cost report can now claim at most 100M tokens, and the totals can't overflow even if
 bad rows get in some other way (ADR-018). The red-team attacked the fix 12 ways and none worked.
