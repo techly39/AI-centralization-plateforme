@@ -16,8 +16,10 @@ Usage:
 
 from __future__ import annotations
 
+import atexit
 import os
 import random
+import shutil
 import statistics
 import subprocess
 import sys
@@ -27,6 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 _TMP = Path(tempfile.mkdtemp(prefix="fund-probe-"))
+atexit.register(shutil.rmtree, _TMP, ignore_errors=True)
 for key in [k for k in os.environ if k.startswith("FUND_")]:
     del os.environ[key]
 os.environ["FUND_DATABASE_URL"] = f"sqlite:///{_TMP / 'probe.db'}"
@@ -210,7 +213,7 @@ def probe_mcp_imports() -> None:
 
 
 def main() -> int:
-    print(f"probe database: {_TMP / 'probe.db'}")
+    print(f"probe database: {_TMP / 'probe.db'} (deleted on exit)")
     probe_migration_drift()
     probe_unledgered_writes()
     probe_replay_order()

@@ -6,7 +6,9 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       Also closed the tokens > int64 part of B-000d.
 - [ ] **B-000d** Non-finite floats: reject inf/NaN/1e308 on **every** float input → clean 422
       (3 xfail tests on `usd_cost`; SURVEY §4a.7: `limit_price=1e309` is stored and read back as
-      `null`). Likely one fix: `allow_inf_nan=False` on the API schemas. Consider IDEAS "physical-units types".
+      `null`, and its event payload is written as non-standard JSON `Infinity`). Likely one fix:
+      `allow_inf_nan=False` on the API schemas, plus `append_event` refusing non-finite payloads
+      so the ledger stays portable JSON. Consider IDEAS "physical-units types".
 - [ ] **B-019** (low) `POST /agents/register` with a missing `pod_id` → 500 (FK error unhandled);
       PM without pod accepted (can never trade). → 404/422. SURVEY §4a.6, probe P5/P6.
 - [ ] **B-000m** (low) Integer path params ≥ 2⁶³ → 500 (`GET /metrics/pod/{2**63}`; likely every
@@ -49,23 +51,29 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-002** `tests/test_boundaries.py`: dependency law from `bible/03_WORLD.md` §1;
       `app/` imports no LLM SDK / agent framework. Place `mcp_server/` in the law: today
       `import mcp_server.tools` loads 35 `app.*` modules incl. the DB engine, via one constant
-      (`MAX_TOKENS_PER_REPORT`) — SURVEY §4a.9.
+      (`MAX_TOKENS_PER_REPORT`) — SURVEY §4a.9. Place `scripts/` too (clients vs the one
+      in-process probe, `survey_probe_physics.py`).
 - [ ] **B-003** Halt in physics: `governance/HALT` → every state-changing agent request
       refused (409/423 + logged event); `GET /halt`; MCP tool; tests.
 - [ ] **B-004** TRD Phase 3a: simulated clock, `POST /clock/mode`, `POST /clock/advance`,
       `run_id` scopes; pending-order monitor runs on every advance. Needs B-016 first.
 - [ ] **B-016** Replay order = live order: `rebuild_state` + equity curve replay `(ts, id)`, live
       folds by `id`; a backwards clock gives 10 phantom shares on rebuild (SURVEY §4a.1, P3).
-      Replay by `id` (or per `run_id`); test with a clock that moves back. Before B-004.
-- [ ] **B-020** `GET /clock` readable by every role (MCP `get_clock` tells all agents to use it;
-      PM/analyst get 403 — P7). `/clock/mode` + `/clock/advance` stay management/system.
+      Shape: per-`run_id` ledgers with timestamps enforced monotonic at `append_event` (id order
+      alone doesn't fix the equity curve's day buckets); sell reducer must raise on a sell beyond
+      the position, not drop it. Test with a clock that moves back. Before B-004.
+- [ ] **B-020** Clock vs agents: MCP `get_clock` tells all agents to use it; PM/analyst get 403
+      (P7) — and TRD §7 says `/clock` is system/management only. Decide by ADR: widen the read
+      (agents need the simulated date in backtests) or fix the tool docstring. Before B-004.
 - [ ] **B-005** TRD Phase 3b: look-ahead guard on every market-data route + red-team pass.
       Must filter bars by their **end** time (a daily bar stamped 00:00 carries that day's close,
       SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3).
 - [ ] **B-006** TRD Phase 3c: `POST /allocations`, meeting schedule + package endpoints.
+      `fund_pod` (to be reused) validates nothing: add finite `delta`, no withdrawal beyond cash.
 - [ ] **B-017** Sharpe annualisation: equity curve is per calendar day, `annualise` uses √252 →
-      reported annual Sharpe ×0.845 of the true value (P8). Use trading-day points or √365;
-      `sharpe_daily` must say which day it means. Honest-measurement bug (Art. 9).
+      reported annual Sharpe ×0.845 ≈ √(5/7) of the true value (P8, synthetic series). Prefer
+      trading-day points (√365 on calendar points is still ≈1.017× off); `sharpe_daily` must say
+      which day it means. Honest-measurement bug (Art. 9).
 - [ ] **B-018** Decide rebuild scope: pod creation + `system` agent write no event (P2);
       `pods.current_allocation`, `allocations`, `orders`, `messages`, `costs`, `tasks`, `agents`
       are not rebuilt. ADR: which tables are derived, which are records; before Era II generations.

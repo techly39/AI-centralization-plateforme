@@ -99,13 +99,19 @@ in the backlog: an endpoint for an agent to read its own tasks/costs (see §5).
    insertion order (`ledger/apply.py`); `rebuild_state` and the equity curve replay in
    `(ts, id)` order (`ledger/rebuild.py:25`, `metrics/equity.py:199`). Buy at 10 June, then a
    backtest clock at 5 June sells: live has no position, rebuild has **10 phantom shares**.
-   Today the clock never goes back, so it is latent — but Phase 3 (`run_id` scopes, backtests
-   after live) is exactly when it does. Fix with B-004: replay by `id`, or per-`run_id`. → **B-016**
+   Second cause (auditor): the sell reducer silently drops a position that goes *negative*
+   (`ledger/reducers.py:90-92`, `qty <= 1e-9`), so an impossible history is erased instead of
+   caught. Mostly latent — Phase 3 (`run_id` scopes, backtests after live) is when the clock goes
+   back — but `LiveClock` reads `datetime.now` (`clock.py:32`), which is not monotonic, so an NTP
+   step back between two fills could trigger it live. Plain id-order replay is not enough: the
+   equity curve buckets events into days by `ts` (`metrics/equity.py:215`). → **B-016**
 2. **Look-ahead through daily bars** (read). `YFinanceProvider.get_ohlcv` drops bars with
    `ts > as_of` (`yfinance_provider.py:165`), but a daily bar is stamped at its *open*
    (00:00 exchange time) and carries that day's *close*. At simulated 12:00 on day D the agent
-   sees D's close. `StaticProvider` (`static_provider.py:70`) does the same. The equity curve
-   and any Truman provider inherit it. Guard must use the bar's *end* time. → **into B-005**
+   sees D's close. `StaticProvider` has the same comparison (`static_provider.py:70`) but leaks
+   nothing (its bars are flat at the current quote). The equity curve is exposed only when it
+   uses closes for "today" (`live_price=False`, or backtest — `equity.py:154-167`). Any Truman
+   provider built on this guard inherits the leak. Guard must use the bar's *end* time. → **into B-005**
 3. **Live price ignores `as_of` and misstates its timestamp** (read).
    `YFinanceProvider._fetch_price` returns today's quote for any `as_of` and stamps it
    `as_of=<requested time>` (`yfinance_provider.py:100-106`), contradicting `Quote.as_of`
@@ -113,9 +119,11 @@ in the backlog: an endpoint for an agent to read its own tasks/costs (see §5).
    silent look-ahead. B-008 (Truman provider) must not reuse this path. → **into B-005/B-008**
 4. **Annualised Sharpe understated ~15%** (P8, measured). The equity curve has one point per
    *calendar* day (`metrics/equity.py:234-255`; weekends = carried close = 0% return), but
-   `annualise` scales by √252 *trading* days. Same returns: 1.487 true vs **1.256** reported
-   (×0.845). `sharpe_daily` is per calendar day too. Rankings are unchanged (monotone), absolute
-   values are wrong — an honest-measurement bug (Art. 9). → **B-017**
+   `annualise` scales by √252 *trading* days. On a synthetic seeded series (not fund data):
+   1.487 true vs **1.256** reported — ×0.845 ≈ √(5/7). `sharpe_daily` is per calendar day too.
+   √365 on the calendar series would give ≈1.017× the truth, not exactly 1 — trading-day points
+   are the cleaner fix. Rankings are unchanged (monotone), absolute values are wrong — an
+   honest-measurement bug (Art. 9). → **B-017**
 5. **Pod creation and the `system` agent leave no event** (P2, measured: 0 events each).
    `registry/pods.py:27`, `registry/service.py:101`. `pods.current_allocation` and the
    `allocations` rows are mutated in place and not rebuilt by `rebuild_state`; nor are
@@ -123,16 +131,19 @@ in the backlog: an endpoint for an agent to read its own tasks/costs (see §5).
    cash be rebuildable; CLAUDE.md says "every state change is an event". Decide the scope of
    rebuild before Era II's generations reset state. → **B-018**
 6. **`POST /agents/register` with a missing `pod_id` → 500** (P5). FK `IntegrityError` is
-   unhandled (`registry/service.py:57`). Management-only, low. A PM with **no** pod is accepted
+   unhandled (raised by the flush at `registry/service.py:58`). Management-only, low. A PM with **no** pod is accepted
    (P6, 201) and can never trade. → **B-019**
 7. **Non-finite `limit_price` is stored and then misreported** (P4). `1e309` parses to `inf`,
    passes `gt=0`, is stored as a rejected order — and the API returns `limit_price: null`, so it
-   reads back as if it were a market order. Same root cause as B-000d (`allow_inf_nan`). → **widen B-000d**
+   reads back as if it were a market order. The `order_placed` event payload holds the `inf`
+   too, which Python's JSON writes as non-standard `Infinity` — the ledger itself is no longer
+   portable JSON. Same root cause as B-000d (`allow_inf_nan`). → **widen B-000d**
 8. **Agents are told to use a clock they may not read** (P7). `GET /clock` needs
    `read_cross_pod` (`api/clock.py:22`; TRD §7 says management/system), so an analyst or PM gets
    403 — but the MCP `get_clock` tool tells *every* agent "use this rather than your own clock"
    (`mcp_server/tools.py:471-478`). In backtest mode a PM would have no legitimate way to learn the
-   simulated date. → **B-020** (open `GET /clock` read to all roles; keep mode/advance management-only)
+   simulated date. The TRD is explicit here, so this is a decision, not a bug fix: either widen
+   the read (needs an ADR against TRD §7) or correct the tool's docstring. → **B-020**
 9. **`mcp_server` imports the whole physics** (P9: 35 `app.*` modules incl. `app.db.base`, which
    builds an engine on the fund DB URL at import). Cause: `tools.py:30` imports
    `MAX_TOKENS_PER_REPORT` from `app.metrics.reporting`. Contradicts `mcp_server/client.py`'s
@@ -145,7 +156,9 @@ Smaller notes (no backlog item; fix when touching the file): request audit log h
 `GET /events` returns the *oldest* `limit` events with only a time cursor — needs `after_id`
 before backtests (same reason the bus has one); `_pod_events` loads every fill of every pod to
 filter one pod in Python (`metrics/equity.py:196`) — O(pods × fills) per leaderboard call;
-`count_messages_sent_by_pod` attributes by the sender's *current* pod.
+`count_messages_sent_by_pod` attributes by the sender's *current* pod; `fund_pod` validates
+nothing (withdrawal beyond cash, non-finite `delta` — `registry/pods.py:45-80`) and B-006 plans
+to reuse it unchanged; Starlette deprecates `HTTP_422_UNPROCESSABLE_ENTITY` (12 suite warnings).
 
 ## 5. What's dead
 
