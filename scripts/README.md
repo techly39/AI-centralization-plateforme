@@ -9,6 +9,7 @@ REST API → bus, hitting every permission check on the way.
 |---|---|
 | `setup_demo_firm.py` | Registers an analyst and a PM, through MCP, as management. Writes their keys to `agents.local.json` (gitignored, mode 600). |
 | `agent_console.py` | One interactive agent. Launches `fund-env-mcp` as a subprocess over stdio, does the MCP handshake, and lets you make the tool calls a model would make. |
+| `smoke_run.py` | Run check outside pytest: builds a database in a temp dir with the real CLI, starts `fund-env serve` on a free port, connects `fund-env-mcp` with the seeded key and calls read tools. Never touches `fund.db`. Exit 0 = everything starts. |
 
 ## First run
 
@@ -35,7 +36,7 @@ It makes the invisible parts of the bus visible:
   message sit unseen until you ask for it.
 - **Visibility is computed per reader.** Two consoles side by side see different
   subsets of the same `messages` table.
-- **Permissions are the app's, not the client's.** All 19 tools are offered to
+- **Permissions are the app's, not the client's.** All 20 tools are offered to
   every agent; an analyst calling `/send broadcast` gets the real 403.
 - **The app is on the bus too.** Reject an order and the `system` agent messages
   you about it, in the same feed as your colleagues.
