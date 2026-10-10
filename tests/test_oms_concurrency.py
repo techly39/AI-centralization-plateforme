@@ -5,18 +5,51 @@ serialisation, two requests arriving together both read the *old* balance and
 both decide they can afford the trade — the pod ends up overdrawn and the
 portfolio is quietly wrong. ``app.oms.service.OMS_LOCK`` closes that window.
 
-This test is the reason the lock exists, so it should be the first thing to fail
-if someone removes it. It is arranged so the correct answer does not depend on
-which thread wins: the pod can afford exactly four of the ten orders, whatever
-order they arrive in.
+It is arranged so the correct answer does not depend on which thread wins: the
+pod can afford exactly four of the ten orders, whatever order they arrive in.
+
+It runs on its own file-backed database, like production (``app/db/base.py``):
+one connection per thread. The suite's shared in-memory engine (``StaticPool``)
+hands every thread the *same* connection, so one thread closing its session
+rolled back another thread's half-written order (``StaleDataError``) — a flake
+that tested the fixture, not the lock.
+
+What this test does *not* prove: that ``OMS_LOCK`` is needed. ``place_order``
+flushes the order INSERT before it reads cash, so on file-backed SQLite the
+database write lock already serialises read-check-write; with the lock removed
+this test still passes (checked in cycle 0001). The lock becomes load-bearing on
+a backend with row-level concurrency (Postgres) — backlog B-000b.
 """
 
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
-from app.db.models import AgentRole, OrderStatus
+import pytest
+from sqlalchemy import create_engine, event
+
+from app.db.models import AgentRole, Base, OrderStatus
 from app.oms.service import get_cash, place_order
+
+
+@pytest.fixture
+def engine(tmp_path):
+    """Overrides the suite's in-memory engine for this module only."""
+    eng = create_engine(
+        f"sqlite:///{tmp_path / 'concurrency.db'}",
+        connect_args={"check_same_thread": False},
+        future=True,
+    )
+
+    @event.listens_for(eng, "connect")
+    def _fk_on(dbapi_conn, _record):  # noqa: ANN001
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
+
+    Base.metadata.create_all(eng)
+    yield eng
+    eng.dispose()
 
 # 100 shares at $200 = $20,000 notional + $20 fee = $20,020 per order.
 # A $100,000 pod affords four of them ($80,080), never five ($100,100).
