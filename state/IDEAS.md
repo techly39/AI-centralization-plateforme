@@ -26,3 +26,10 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   deterministic "conformance agent" every OpenClaw firm agent must match tool-for-tool before it
   wakes (08_OPENCLAW conformance) — question: can one replayable script define "a working agent
   connection" for every future host (OpenClaw, Agent SDK, others)? — status: new
+
+- [cycle 4] **Time-travel invariant suite** — 3 of 9 survey findings were "fine until the clock
+  moves". Before the backtest clock lands, write one property test that runs the same random
+  firm history under live, frozen, forward-jumping and *backward-jumping* clocks and asserts
+  live state == rebuild == equity-curve end == portfolio total, and that no served datum is
+  stamped after `now` — question: can one generator replace a dozen hand-written time tests and
+  catch the next time bug before an agent does? — status: new

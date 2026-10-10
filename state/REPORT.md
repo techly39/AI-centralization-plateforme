@@ -1,5 +1,22 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 4: I've read all of the fund's engine. It's solid, but its sense of time
+needs fixing before backtests.** All ~7 000 lines are mapped against the TRD (`state/SURVEY.md`
+§2a). The good news: the core rules really are written once each (money, permissions, who sees
+which message), and the database schema matches the code exactly. I found 9 problems and
+measured each one. Three of them only show up once the clock can move, which is exactly what
+backtesting needs:
+- Rebuilding history after the clock goes backwards invents 10 phantom shares.
+- Daily price bars would let an agent see the day's closing price at midday.
+- The live price ignores the date it was asked for.
+
+The reported yearly Sharpe ratio is also about 15% too low. These are all in the backlog, in the
+order they need fixing. One needs your attention eventually: the TRD says only management may read
+the clock, but every agent is told to use it. I'll settle that with a logged decision when I get
+there. Nothing was changed in the fund this cycle. Next: survey the rest of the repo.
+
+---
+
 **2026-10-11 — Cycle 3: the fund starts for real, not just in tests.** A new check
 (`uv run python scripts/smoke_run.py`) builds a fresh database, starts the API, and connects
 an agent through MCP the way OpenClaw will. Every step passed. It runs in a throwaway folder,

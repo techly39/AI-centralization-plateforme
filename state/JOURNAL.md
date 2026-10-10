@@ -81,3 +81,23 @@ Hypothesis: If I read every physics file against the TRD and the Bible and write
 module, what exists, what the TRD asked for, and where they differ, then Era I starts from a map
 instead of from STATE's summary — and the gaps that matter (TRD items silently missing, dead code,
 invariants that the code does not actually enforce) become backlog items with file:line evidence.
+Work: Read all ~7 000 lines of physics against the TRD + 03_WORLD. Turned each suspicion into a
+number with `scripts/survey_probe_physics.py` (temp DB, P1–P9). Wrote SURVEY §2a (module → TRD
+map), §3–8 physics part. Findings: rebuild ≠ live under a backwards clock (10 phantom shares, P3);
+daily-bar look-ahead (bar stamped at open, carries the close); yfinance quote ignores `as_of` and
+stamps the requested time; annual Sharpe ×0.845 (calendar days, √252 — P8); pod creation + system
+agent unledgered (P2); register into a missing pod → 500 (P5); `inf` limit_price stored, read back
+as `null` (P4); `/clock` forbidden to agents the MCP tool tells to use it (P7); `import
+mcp_server.tools` loads 35 `app.*` modules (P9). Migrations == models (P1, 0 diffs). Dead: 5
+exported functions, two of which are a missing "read my tasks/costs" endpoint. Auditor PASS,
+11 notes; fixed 1–9, 11 (second cause of P3 in the sell reducer; StaticProvider overclaim
+removed; `/clock` reframed as a TRD decision needing an ADR). Backlog B-016…B-021 new; B-000d,
+B-002, B-005, B-006 widened.
+Result: merged 3207a72. Suite 267 passed + 9 xfailed on branch (2×) and main. No physics changed.
+Learned: (1) The physics' conventions are real in the code (one money path, one permission matrix,
+one visibility predicate) — its weak spot is *time*: 3 of 9 findings only bite once the clock moves,
+which is Era I's first job, so B-016/B-020 must precede B-004. (2) A reviewer reading my evidence
+found a second cause I missed (the reducer erasing an impossible negative position) — a finding
+with one cause named is often half a finding. (3) Pydantic serialises `inf` as `null`: the API
+can silently disagree with the database; "what came back" is not proof of "what was stored".
+Next: S-003b (tests, scripts, docs, legacy, root files) → S-004 cleanup → S-005 OpenClaw survey.
