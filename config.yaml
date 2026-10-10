@@ -22,6 +22,20 @@ marketdata:
   cache_ttl_seconds: 60        # reuse a quote while the clock moves less than this
   static_prices: {}            # e.g. {AAPL: 200.0, MSFT: 380.0}
 
+# Metrics. Only affects how performance is *reported* — never how it is earned.
+metrics:
+  risk_free_daily: 0.0         # subtracted from daily returns before the Sharpe ratio
+  trading_days_per_year: 252   # used only to annualise the daily Sharpe
+
+# MCP server (mcp_server/). It is a CLIENT of the API above, in its own process.
+# Leave api_key null here and pass it in the environment — this file is
+# committed, and the key is the identity every action is attributed to:
+#   FUND_MCP__API_KEY=<agent key> uv run fund-env-mcp
+mcp:
+  api_base_url: "http://127.0.0.1:8000"
+  api_key: null
+  timeout_seconds: 30
+
 # Logging.
 logging:
   level: "INFO"

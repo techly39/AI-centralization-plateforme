@@ -25,6 +25,12 @@ EVENT_PERMISSION_DENIED = "permission_denied"
 
 EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent_id}
 
+# Self-reported agent activity (TRD §7). Audit only: the app cannot verify these
+# numbers, it can only guarantee they were reported by the agent they name.
+EVENT_COST_REPORTED = "cost_reported"     # payload: {cost_id, tokens_in, tokens_out, usd_cost}
+EVENT_TASK_STARTED = "task_started"       # payload: {task_id, subject}
+EVENT_TASK_ENDED = "task_ended"           # payload: {task_id, subject, seconds, outcome}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

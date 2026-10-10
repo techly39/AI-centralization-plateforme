@@ -15,9 +15,12 @@ from app.db.models import AgentRole
 
 class Action(str, enum.Enum):
     SEND_MESSAGE = "send_message"
+    READ_MESSAGES = "read_messages"        # own inbox; cross-agent needs READ_CROSS_POD
     LIST_AGENTS = "list_agents"
     READ_MARKET_DATA = "read_market_data"
     READ_OWN_PORTFOLIO = "read_own_portfolio"
+    REPORT_COST = "report_cost"            # always about oneself (see app/metrics/reporting.py)
+    REPORT_TASK = "report_task"            # always about oneself
     PLACE_ORDER = "place_order"            # own pod (scope enforced in OMS)
     READ_CROSS_POD = "read_cross_pod"      # other pods' metrics/logs/events
     SET_ALLOCATION = "set_allocation"
@@ -26,9 +29,20 @@ class Action(str, enum.Enum):
     DEACTIVATE_AGENTS = "deactivate_agents"
 
 
+#: Actions the TRD §6 table does not list because they are not privileges at
+#: all: every authenticated agent may read its own inbox and report its own
+#: cost and work. They are still Actions rather than bare "any agent may" checks
+#: so that the matrix below stays a complete description of the API surface —
+#: one place to look, and one place to change.
+_UNIVERSAL: frozenset[Action] = frozenset(
+    {Action.READ_MESSAGES, Action.REPORT_COST, Action.REPORT_TASK}
+)
+
+
 # Role -> set of permitted actions. Mirrors the TRD §6 table exactly.
 _MATRIX: dict[AgentRole, frozenset[Action]] = {
-    AgentRole.analyst: frozenset(
+    AgentRole.analyst: _UNIVERSAL
+    | frozenset(
         {
             Action.SEND_MESSAGE,
             Action.LIST_AGENTS,
@@ -36,7 +50,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.READ_OWN_PORTFOLIO,
         }
     ),
-    AgentRole.pm: frozenset(
+    AgentRole.pm: _UNIVERSAL
+    | frozenset(
         {
             Action.SEND_MESSAGE,
             Action.LIST_AGENTS,
@@ -46,7 +61,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.BROADCAST,
         }
     ),
-    AgentRole.management: frozenset(
+    AgentRole.management: _UNIVERSAL
+    | frozenset(
         {
             Action.SEND_MESSAGE,
             Action.LIST_AGENTS,

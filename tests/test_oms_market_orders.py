@@ -8,7 +8,7 @@ wiring works.
 
 from __future__ import annotations
 
-from app.bus.notify import agent_ref
+from app.bus.refs import agent_ref
 from app.db.models import Message, Order, OrderStatus
 from app.ledger.events import (
     EVENT_ORDER_FILLED,

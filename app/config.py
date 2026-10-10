@@ -50,6 +50,28 @@ class MarketDataConfig(BaseModel):
     static_prices: dict[str, float] = Field(default_factory=dict)
 
 
+class MetricsConfig(BaseModel):
+    # Daily risk-free rate subtracted from returns before the Sharpe ratio.
+    # 0.0 means "Sharpe measured against cash at 0%", which is the honest
+    # default for a simulated fund with no financing model.
+    risk_free_daily: float = Field(default=0.0)
+    # Used only to annualise the daily Sharpe. 252 is the market convention.
+    trading_days_per_year: int = Field(default=252, gt=0)
+
+
+class MCPConfig(BaseModel):
+    """Settings for the MCP server (``mcp_server/``), not for the API itself.
+
+    The MCP server is a *client* of the REST API: it holds one agent's key and
+    forwards it. Put the key in the environment (``FUND_MCP__API_KEY``) rather
+    than in ``config.yaml`` — the file is committed, the environment is not.
+    """
+
+    api_base_url: str = "http://127.0.0.1:8000"
+    api_key: str | None = None
+    timeout_seconds: float = Field(default=30.0, gt=0.0)
+
+
 class LoggingConfig(BaseModel):
     # Accept the natural YAML key "json" while avoiding the shadowed
     # BaseModel.json attribute name internally.
@@ -119,6 +141,8 @@ class Settings(BaseSettings):
     clock: ClockConfig = Field(default_factory=ClockConfig)
     oms: OMSConfig = Field(default_factory=OMSConfig)
     marketdata: MarketDataConfig = Field(default_factory=MarketDataConfig)
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+    mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
 

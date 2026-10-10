@@ -14,7 +14,16 @@ from fastapi import FastAPI, Request, Response
 from loguru import logger
 
 from app import __version__
-from app.api import agents, clock, events, marketdata, orders
+from app.api import (
+    agents,
+    clock,
+    events,
+    marketdata,
+    messages,
+    metrics,
+    orders,
+    reporting,
+)
 from app.clock import get_clock
 from app.config import get_settings
 from app.logging_setup import setup_logging
@@ -69,6 +78,9 @@ def create_app() -> FastAPI:
     app.include_router(clock.router)
     app.include_router(marketdata.router)
     app.include_router(orders.router)
+    app.include_router(messages.router)
+    app.include_router(reporting.router)
+    app.include_router(metrics.router)
 
     logger.info("app created (env database_url={})", settings.database_url)
     return app

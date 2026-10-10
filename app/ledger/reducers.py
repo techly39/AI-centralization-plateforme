@@ -46,6 +46,16 @@ def apply_event(state: DerivedState, event: Event) -> None:
         fn(state, event.payload_json or {})
 
 
+def reducer_event_types() -> frozenset[str]:
+    """Every event type that moves derived state.
+
+    Anything replaying history to reconstruct a portfolio — ``rebuild_state``,
+    the metrics equity curve — should select on this rather than hard-coding a
+    list, so adding a reducer cannot silently leave a replay behind.
+    """
+    return frozenset(_REDUCERS)
+
+
 @reducer(EVENT_ALLOCATION_SET)
 def _apply_allocation(state: DerivedState, payload: dict) -> None:
     pod_id = int(payload["pod_id"])

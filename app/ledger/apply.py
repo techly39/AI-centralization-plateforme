@@ -11,10 +11,13 @@ pod's derived rows into the same :class:`DerivedState` structure
 writes the result back. There is exactly one implementation of the money math
 (``app/ledger/reducers.py``), so live state and replayed state cannot drift.
 
-Scope rule: an event affects derived state only if its payload carries
-``pod_id``. Any future reducer must follow that convention (see
-``app/ledger/events.py``); ``tests/test_oms_replay_consistency.py`` fails loudly
-if one does not.
+Scope rule: **every reducer-backed event must carry ``pod_id`` in its payload**,
+because that is how this module knows which pod's derived rows to load and
+rewrite (see ``app/ledger/events.py``); ``tests/test_oms_replay_consistency.py``
+fails loudly if one does not. The converse is not required — plenty of audit-only
+events (messages, cost reports) carry ``pod_id`` purely so the ledger can be
+filtered by pod, and folding one of those here is a harmless no-op because no
+reducer is registered for it.
 """
 
 from __future__ import annotations

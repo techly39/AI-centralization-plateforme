@@ -20,8 +20,14 @@ an auto-message to the PM, partial sells with realised P&L — and the portfolio
 endpoint. The old file-based OMS was migrated; see
 [docs/oms_migration.md](docs/oms_migration.md).
 
-Phases 2-4 (messaging, cost/task reporting, MCP server, metrics, backtest clock,
-UI) are not built yet — see the TRD's phase plan.
+**Phase 2 — Bus + costs + MCP (complete).** The message bus (agent-to-agent,
+pod, and broadcast, with polling), cost and work self-reporting, management
+metrics — time-weighted return, Sharpe, max drawdown, hit rate, and
+cost-adjusted P&L — and an MCP server exposing every endpoint as a tool. The
+design decisions are in [docs/phase2_bus_costs_mcp.md](docs/phase2_bus_costs_mcp.md).
+
+Phases 3-4 (backtest clock, meetings, allocation endpoint, read-only UI) are not
+built yet — see the TRD's phase plan.
 
 ## Quick start
 
@@ -37,6 +43,14 @@ uv run fund-env serve          # start the API on http://127.0.0.1:8000
 Then open http://127.0.0.1:8000/docs for the interactive API docs.
 
 Authenticate every request with the header `X-API-Key: <key>`.
+
+The key is the identity, so an agent that has one needs nothing else to find out
+who it is:
+
+```bash
+# id, name, role, pod — the arguments every other endpoint asks for.
+curl -H "X-API-Key: <key>" http://127.0.0.1:8000/me
+```
 
 ### Setting up a trading desk
 
@@ -64,6 +78,73 @@ curl -H "X-API-Key: <pm key>" http://127.0.0.1:8000/portfolio/1
 curl -H "X-API-Key: <pm key>" "http://127.0.0.1:8000/orders?status=pending"
 curl -H "X-API-Key: <pm key>" http://127.0.0.1:8000/price/AAPL
 ```
+
+### Talking, reporting, and being measured
+
+Agents communicate only through the app, so there is one record of everything
+said. Addresses are `agent:<id>`, `pod:<id>`, or `broadcast`:
+
+```bash
+# Send. Analysts and PMs may address any agent or pod; only PMs (own pod) and
+# management may broadcast.
+curl -X POST http://127.0.0.1:8000/messages \
+  -H "X-API-Key: <key>" -H "Content-Type: application/json" \
+  -d '{"to":"agent:3","body":"JPM screens cheapest","thread_id":"jpm",
+       "structured_payload":{"ticker":"JPM","conviction":0.8}}'
+
+# Poll. Remember the highest id you saw and pass it back as after_id.
+curl -H "X-API-Key: <key>" "http://127.0.0.1:8000/messages?after_id=42"
+
+# Catch up instead: the newest page in one call, then walk back with before_id.
+curl -H "X-API-Key: <key>" "http://127.0.0.1:8000/messages?latest=true&limit=50"
+curl -H "X-API-Key: <key>" "http://127.0.0.1:8000/messages?before_id=17&limit=50"
+```
+
+Every page comes back oldest-first. `after_id` and `latest`/`before_id` read in
+opposite directions, so asking for both at once is a 422 rather than a silently
+half-honoured request.
+
+The app cannot see what an agent costs to run, so agents report it themselves —
+their charters must tell them to, or the pod's returns get measured against a
+cost of zero:
+
+```bash
+curl -X POST http://127.0.0.1:8000/costs -H "X-API-Key: <key>" \
+  -H "Content-Type: application/json" \
+  -d '{"tokens_in":84000,"tokens_out":6200,"usd_cost":1.34,"task_label":"value screen"}'
+
+curl -X POST http://127.0.0.1:8000/tasks/start -H "X-API-Key: <key>" \
+  -H "Content-Type: application/json" -d '{"subject":"value screen"}'
+curl -X POST http://127.0.0.1:8000/tasks/end -H "X-API-Key: <key>" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":1,"outcome":{"summary":"four names off their highs"}}'
+```
+
+Management reads the results. Statistics with too little history come back as
+`null` rather than `0` — a one-day-old pod has no Sharpe ratio:
+
+```bash
+curl -H "X-API-Key: <management key>" http://127.0.0.1:8000/metrics/pod/1
+curl -H "X-API-Key: <management key>" http://127.0.0.1:8000/metrics/leaderboard
+```
+
+Pods are ranked by **cost-adjusted P&L** — profit minus what the agents cost to
+run. A desk that earns more than a rival can still rank below it.
+
+### Connecting an agent over MCP
+
+The MCP server is a separate process that wraps this API and exposes every
+endpoint as a tool. Start the API first, then:
+
+```bash
+FUND_MCP__API_KEY=<the agent's key> uv run fund-env-mcp
+```
+
+Run **one MCP server per agent**, each with its own key — the key is the identity
+every action is attributed to. The tool list is the same for every role; the API
+returns 403 to whoever is out of bounds, so there is only ever one permission
+matrix. Point any MCP client (OpenClaw, the Claude Agent SDK, Claude Desktop) at
+that command over stdio.
 
 ### Working offline
 
@@ -95,20 +176,20 @@ uv run pytest
 app/
   main.py         FastAPI entrypoint
   config.py       config.yaml + env loader (Pydantic Settings)
-  clock.py        time service (live mode only in Phase 0)
-  cli.py          init-db / seed-admin / serve
-  db/             SQLAlchemy 2.0 Base, session, models
+  clock.py        time service (live mode only until Phase 3)
+  cli.py          init-db / seed-admin / create-pod / serve / rebuild-state
+  db/             SQLAlchemy 2.0 Base, session, models, UTC datetime column type
   scheduler.py    APScheduler background jobs (pending-order monitor)
   ledger/         append-only event store, reducers, rebuild_state(), incremental apply
   registry/       agent identity, API-key auth, permission matrix, pods
   marketdata/     MarketDataProvider interface + yfinance and static implementations
   oms/            order management: service, monitor, portfolio, fee math
+  bus/            messaging: addressing, visibility, system notifications
+  metrics/        cost/task reporting, equity curve, performance stats, leaderboard
   api/            routers, one file per domain
-  bus/            notifications now; full messaging in Phase 2
-  metrics/        (Phase 2)
-mcp_server/       MCP wrapper (Phase 2)
+mcp_server/       MCP wrapper over the API — one tool per endpoint
 ui/               server-rendered UI (Phase 4)
-docs/             design notes (oms_migration.md)
+docs/             design notes (oms_migration.md, phase2_bus_costs_mcp.md)
 legacy/           the pre-Phase-1 file-based OMS, kept for reference only
 tests/
 ```

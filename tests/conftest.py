@@ -29,6 +29,7 @@ from sqlalchemy.pool import StaticPool
 
 from datetime import datetime, timezone
 
+from app.clock import LiveClock, set_clock
 from app.config import get_settings
 from app.db.base import get_session
 from app.db.models import AgentRole, Base, Pod
@@ -36,6 +37,7 @@ from app.main import create_app
 from app.marketdata import StaticProvider, set_provider
 from app.registry.pods import fund_pod
 from app.registry.service import get_or_create_system_agent, register_agent
+from tests.support import FrozenClock
 
 #: Starting prices every test begins from. Tests move them with ``prices.set_price``.
 DEFAULT_PRICES = {"AAPL": 200.0, "MSFT": 400.0, "NVDA": 100.0}
@@ -179,20 +181,49 @@ def fund_pod_cash(SessionFactory):
 
 
 @pytest.fixture
-def pm_factory(client, admin_key):
-    """Factory: register a PM attached to a pod and return ``(id, api_key)``."""
+def agent_factory(client, admin_key):
+    """Factory: register any agent through the API and return ``(id, api_key)``.
 
-    def _make(name: str, pod_id: int) -> tuple[int, str]:
+    Goes through ``POST /agents/register`` rather than the service layer so that
+    fixtures exercise the same path a real operator does — including the key
+    being returned exactly once.
+    """
+
+    def _make(name: str, role: str, pod_id: int | None = None) -> tuple[int, str]:
         resp = client.post(
             "/agents/register",
             headers={"X-API-Key": admin_key},
-            json={"name": name, "role": "pm", "pod_id": pod_id},
+            json={"name": name, "role": role, "pod_id": pod_id},
         )
         assert resp.status_code == 201, resp.text
         body = resp.json()
         return body["id"], body["api_key"]
 
     return _make
+
+
+@pytest.fixture
+def pm_factory(agent_factory):
+    """Factory: register a PM attached to a pod and return ``(id, api_key)``."""
+
+    def _make(name: str, pod_id: int) -> tuple[int, str]:
+        return agent_factory(name, "pm", pod_id)
+
+    return _make
+
+
+@pytest.fixture
+def frozen_clock() -> Iterator[FrozenClock]:
+    """Install a clock the test controls, and put the live one back afterwards.
+
+    Anything that needs more than one day of history needs this: the app reads
+    time from one place (TRD principle 5), so moving that one place is the whole
+    trick.
+    """
+    clock = FrozenClock(datetime(2026, 6, 1, 15, 0, tzinfo=timezone.utc))
+    set_clock(clock)
+    yield clock
+    set_clock(LiveClock())
 
 
 @pytest.fixture
