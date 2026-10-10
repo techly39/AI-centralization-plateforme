@@ -1,5 +1,13 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 2: the leaderboard can no longer be broken.** The worst red-team hole is
+fixed. One cost report can now claim at most 100M tokens, and the totals can't overflow even if
+bad rows get in some other way (ADR-018). The red-team attacked the fix 12 ways and none worked.
+It found one new minor bug (a huge pod number in a URL → server error; management-only). 9 minor
+holes are still open and tracked. Next: back to the Survey (toolchain, repo, OpenClaw).
+
+---
+
 **2026-10-11 — Cycle 1: everything is in git.** Phase 2 and your Bible/harness install are
 committed (the harness byte-for-byte) and pushed to origin. Things you should know:
 

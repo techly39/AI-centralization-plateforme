@@ -29,3 +29,25 @@ Learned: (1) "218 tests green" in STATE was true only some of the time — measu
 invariants. (3) The guard hook matches the substring `loop` (so `state/loop_status.json` reads and
 `cd` commands are blocked) — work via Read tool + bare relative commands; proposed a fix (P-0001).
 Next: S-001 toolchain inventory → S-003 repo survey; B-000c (leaderboard DoS) is the top physics bug.
+
+## Cycle 0002 — Leaderboard token-overflow DoS (2026-10-11)
+Era: ½ — The Survey (physics bug, priority 2 — allowed during the Survey)
+Exit criterion served: "`main` green" + F-0002 follow-up — the worst open physics hole.
+Hypothesis: If one report's token counts are capped and pod totals are summed with a function
+that cannot overflow, then no agent can take the leaderboard down with cost reports, and the
+two red-team xfails for it flip to held. (Written at record time — I skipped the step-3 entry
+before building; noted honestly.)
+Work: `MAX_TOKENS_PER_REPORT` = 1e8 enforced in the `POST /costs` schema, the MCP tool schema, and
+`report_cost` (in-process); `_cost_metrics` uses SQLite `TOTAL` instead of `SUM` (ADR-018). Two
+strict xfails → held tests; the DoS test now asserts the attack is refused (422) and metrics stay
+200, and a new test plants overflowing rows directly to prove the `TOTAL` wall alone
+(mutation-checked: `SUM` fails it). Auditor: PASS, 7 notes — fixed 2–5 (domain guard, MCP `le=`,
+precision comment, ADR). Red-team: 12 attacks held (type coercion, boundaries, volume, MCP path),
+1 new low hole: `GET /metrics/pod/{2**63}` → 500 (pre-existing, management-only) →
+`tests/test_redteam_0002.py`, B-000m.
+Result: merged 685eaf0. Suite 267 passed + 9 xfailed, 3× on branch, 1× on main.
+Learned: (1) An xfail test that encodes the attack's *steps* (201 then 500) can't simply flip when
+the fix blocks an earlier step — the honest move is to keep its claim (metrics stay up) and add a
+test for the inner wall. (2) Editing a module while a subagent runs the suite produces phantom
+flakes; don't edit code that's being red-teamed until it reports.
+Next: S-001 toolchain inventory (the Survey has been waiting two cycles); then B-000d.

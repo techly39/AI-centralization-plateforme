@@ -16,3 +16,7 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   no cross-pod read) ships with a recorded mutant that must make its test fail; the
   Builder's honesty becomes measurable — question: what fraction of our "guards" actually guard? — status: new
 
+- [cycle 2] **Physical-units type layer** — every red-team hole so far is "a number that isn't
+  physical" (inf, NaN, 2⁶³ tokens, 2⁶³ pod id). One shared set of bounded Pydantic types
+  (`Tokens`, `Usd`, `DbId`) used by every schema and MCP tool would close the class, not the
+  instance — question: does a type-level wall end this whole family of red-team findings? — status: new

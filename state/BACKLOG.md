@@ -2,10 +2,14 @@
 
 ## Physics bugs (Art. 8 — Builder's bugs; priority 2, allowed during the Survey)
 Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix = remove the marker.
-- [ ] **B-000c** (high) Token-sum overflow DoS: bound `tokens_in/out` per report and sum safely in
-      `app/metrics/service.py` → `test_hole_metrics_token_overflow_dos`. Do first.
-- [ ] **B-000d** Cost inputs: reject non-finite / absurd `usd_cost` (inf, NaN, 1e308), tokens > int64
-      → clean 422 (4 xfail tests: infinity literal, overflow-to-inf, NaN 500, int64 500).
+- [x] **B-000c** (high) Token-sum overflow DoS — cycle 2: per-report cap 1e8 + `TOTAL` sum (ADR-018).
+      Also closed the tokens > int64 part of B-000d.
+- [ ] **B-000d** Cost inputs: reject non-finite / absurd `usd_cost` (inf, NaN, 1e308) → clean 422
+      (3 xfail tests: infinity literal, overflow-to-inf, NaN 500). Consider IDEAS "physical-units types".
+- [ ] **B-000m** (low) Integer path params ≥ 2⁶³ → 500 (`GET /metrics/pod/{2**63}`; likely every
+      `/{id}` route) → `tests/test_redteam_0002.py::test_hole_metrics_pod_id_beyond_int64_500`.
+- [ ] **B-000n** (low) Cost-report rate is unbounded per agent (spam inflates rows; token totals
+      lose exactness past ~9e7 max-size reports). Decide on a per-agent rate law.
 - [ ] **B-000e** Message `body` + `structured_payload` on the `message_sent` ledger event, so the
       messages table is rebuildable (CLAUDE.md: every state change is an event).
 - [ ] **B-000f** 'system' identity looked up by role/reserved name, not a squattable name.
