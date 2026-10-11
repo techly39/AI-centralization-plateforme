@@ -206,6 +206,20 @@ def test_the_allowlist_is_exact() -> None:
     assert not under, f"fewer raw reads than listed — lower the count: {under}"
 
 
+def test_only_the_backtest_advance_stamps_an_event_at_a_given_moment() -> None:
+    """``append_event(at=...)`` can stamp ahead of the clock: one caller, by law."""
+    callers: dict[str, int] = {}
+    for path in sorted(APP.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Call) and any(k.arg == "at" for k in node.keywords):
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+                if name == "append_event":
+                    rel = path.relative_to(APP).as_posix()
+                    callers[rel] = callers.get(rel, 0) + 1
+    assert callers == {"run_clock.py": 1}, callers
+
+
 @pytest.mark.parametrize("source", [
     "get_clock().now()",
     "f = clock.now",
