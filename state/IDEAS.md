@@ -33,3 +33,9 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   live state == rebuild == equity-curve end == portfolio total, and that no served datum is
   stamped after `now` — question: can one generator replace a dozen hand-written time tests and
   catch the next time bug before an agent does? — status: new
+
+- [cycle 5] **Secrets as physics, not discipline** — the first leak was a key pasted into a tracked
+  file. Instead of only a scan test (B-022), make keys structurally unpasteable: the Runtime injects
+  per-agent keys via env at spawn, keys carry a recognisable prefix the pre-commit guard and the
+  suite both reject, and every key has an expiry + `rotated_at` event — question: can "no agent
+  credential ever exists outside the Runtime process" be a tested invariant? — status: new

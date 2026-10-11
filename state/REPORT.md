@@ -1,5 +1,18 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 5: one thing needs you: a real API key is in the repo.** `test_api.py`
+(your manual try-out script) contains the **management** key of your local `fund.db`, and it is
+pushed to GitHub. The money is fake and the server only listens on your machine, so the risk is
+small. But deleting the file won't revoke the key: git history keeps it, and I don't rewrite
+history. I will remove the file next cycle (S-004). Rotating or revoking the key means writing to
+your database, which I never do on my own, so that's your call (**Q-0003**). Also check whether
+the GitHub repo is public. The rest of the repo survey is done: the 276 tests are hermetic and
+cover every test the TRD asks for. Two honest caveats: the "Phase 2 milestone" was re-run by a
+hand-written script, not by an agent, and the test price feed has the same look-ahead leak as the
+real one.
+
+---
+
 **2026-10-11 — Cycle 4: I've read all of the fund's engine. It's solid, but its sense of time
 needs fixing before backtests.** All ~7 000 lines are mapped against the TRD (`state/SURVEY.md`
 §2a). The good news: the core rules really are written once each (money, permissions, who sees

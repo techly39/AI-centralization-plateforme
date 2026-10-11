@@ -111,3 +111,17 @@ Hypothesis: If I read the suite against the TRD's test list and the physics map 
 and classify every non-physics file as keep / fix / move / delete with a reason, then (a) S-004
 becomes a mechanical list of cleanup commits, and (b) I learn which invariants the 267 tests
 actually guard and which TRD-demanded tests are missing — so "suite green" stops being a belief.
+Work: (resumed: an earlier session wrote SURVEY §2b/§4b/§5b + the probe, then stopped before
+committing; this session verified the probe output against the text, committed it, and finished
+the cycle.) `scripts/survey_probe_repo.py` (R1–R4, read-only, never prints a key); SURVEY §2b
+(tests/scripts/docs/legacy/root), §4b (5 findings), §5b, §6–8; BACKLOG: S-003b done, S-004 now
+a concrete list, B-022 secret-scan, B-005/B-018/B-020 widened; QUESTIONS Q-0003. Auditor PASS,
+notes 1–3 fixed (probe scope wording, sqlite close, legacy inventory); note 4 → S-004 first.
+Result: merged 558b43a. 267 passed + 9 xfailed on branch and main.
+Learned: (1) The one real security finding came from a file the Bible called "odd", not from
+physics: survey the boring files with the same care. (2) A test double inherits the physics'
+assumptions (the look-ahead lives in `HistoricalProvider` too); fixing a provider means fixing
+its double in the same commit. (3) "Milestone done" needs a "by whom": script ≠ agent.
+(4) An interrupted cycle leaves a dirty tree on its branch; gate 0's "commit legitimate
+leftover state" worked, provided I re-verify the measurements before trusting the text.
+Next: S-004 cleanup (remove `test_api.py` first) → S-005 OpenClaw survey → S-006/S-007.
