@@ -1,4 +1,4 @@
-"""The seeded synthetic market (B-004c, ADR-030): a pure function of (seed, symbol, day)."""
+"""The keyed synthetic market (B-004c, ADR-030): a pure function of (key, symbol, day)."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ import math
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+from pydantic import ValidationError
 
 from app.config import MarketDataConfig
 from app.marketdata import base as md_base
 from app.marketdata import InvalidRequestError, SyntheticProvider, UnknownTickerError
 from app.marketdata.synthetic_provider import ORIGIN
+from tests.support import world_key
 
 SYMBOLS = {"SYNA": 100.0, "SYNB": 50.0}
 NOON = datetime(2024, 3, 13, 12, 0, tzinfo=timezone.utc)  # a Wednesday
@@ -20,23 +22,23 @@ def daily(provider, start, end, as_of=NOON, symbol="SYNA"):
     return provider.get_ohlcv(symbol, start=start, end=end, interval="1d", as_of=as_of)
 
 
-def test_same_seed_same_bars_whatever_was_asked_first():
-    late_first = SyntheticProvider(7, SYMBOLS)
+def test_same_key_same_bars_whatever_was_asked_first():
+    late_first = SyntheticProvider(world_key(7), SYMBOLS)
     daily(late_first, date(2024, 3, 1), date(2024, 3, 13))
-    early_only = SyntheticProvider(7, SYMBOLS)
+    early_only = SyntheticProvider(world_key(7), SYMBOLS)
     assert daily(early_only, date(2024, 2, 1), date(2024, 3, 13)) == daily(
         late_first, date(2024, 2, 1), date(2024, 3, 13)
     )
 
 
-def test_another_seed_is_another_market():
-    a = daily(SyntheticProvider(1, SYMBOLS), date(2024, 3, 1), date(2024, 3, 13))
-    b = daily(SyntheticProvider(2, SYMBOLS), date(2024, 3, 1), date(2024, 3, 13))
+def test_another_key_is_another_market():
+    a = daily(SyntheticProvider(world_key(1), SYMBOLS), date(2024, 3, 1), date(2024, 3, 13))
+    b = daily(SyntheticProvider(world_key(2), SYMBOLS), date(2024, 3, 1), date(2024, 3, 13))
     assert [x.close for x in a] != [x.close for x in b]
 
 
 def test_symbols_walk_independently():
-    p = SyntheticProvider(1, {"SYNA": 100.0, "SYNB": 100.0})
+    p = SyntheticProvider(world_key(1), {"SYNA": 100.0, "SYNB": 100.0})
     a = daily(p, date(2024, 3, 1), date(2024, 3, 13), symbol="SYNA")
     b = daily(p, date(2024, 3, 1), date(2024, 3, 13), symbol="SYNB")
     assert [x.close for x in a] != [x.close for x in b]
@@ -48,15 +50,16 @@ def test_the_walk_is_pinned():
     Changing it changes every synthetic backtest ever run — that is an ADR, not
     a test edit.
     """
-    bar = daily(SyntheticProvider(0, {"SYNA": 100.0}), date(2024, 1, 2), date(2024, 1, 3))[0]
-    assert bar.close == pytest.approx(GOLDEN_SEED0_SYNA_2024_01_02, rel=1e-12)
+    provider = SyntheticProvider(world_key(0), {"SYNA": 100.0})
+    bar = daily(provider, date(2024, 1, 2), date(2024, 1, 3))[0]
+    assert bar.close == pytest.approx(GOLDEN_KEY0_SYNA_2024_01_02, rel=1e-12)
 
 
-GOLDEN_SEED0_SYNA_2024_01_02 = 524.2858206783762
+GOLDEN_KEY0_SYNA_2024_01_02 = 87.75369545823659
 
 
 def test_bars_are_well_formed_and_chained():
-    bars = daily(SyntheticProvider(3, SYMBOLS), date(2023, 12, 1), date(2024, 3, 13))
+    bars = daily(SyntheticProvider(world_key(3), SYMBOLS), date(2023, 12, 1), date(2024, 3, 13))
     assert len(bars) == (date(2024, 3, 13) - date(2023, 12, 1)).days
     for prev, bar in zip(bars, bars[1:]):
         assert bar.ts - prev.ts == timedelta(days=1)
@@ -69,14 +72,14 @@ def test_bars_are_well_formed_and_chained():
 
 
 def test_the_first_bar_opens_at_the_start_price():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     first = daily(p, ORIGIN - timedelta(days=5), ORIGIN + timedelta(days=1),
                   as_of=datetime(2000, 1, 2, tzinfo=timezone.utc))
     assert [b.ts.date() for b in first] == [ORIGIN] and first[0].open == 100.0
 
 
 def test_a_quote_is_the_last_ended_close_stamped_at_its_end():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     quote = p.get_price("syna", as_of=NOON)
     yesterday = daily(p, date(2024, 3, 12), date(2024, 3, 14))
     assert [b.ts.date() for b in yesterday] == [date(2024, 3, 12)]  # today not ended
@@ -86,7 +89,7 @@ def test_a_quote_is_the_last_ended_close_stamped_at_its_end():
 
 
 def test_a_quote_at_midnight_sees_the_day_that_just_ended():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     midnight = datetime(2024, 3, 13, tzinfo=timezone.utc)
     quote = p.get_price("SYNA", as_of=midnight)
     assert quote.as_of == midnight
@@ -94,13 +97,13 @@ def test_a_quote_at_midnight_sees_the_day_that_just_ended():
 
 
 def test_a_quote_does_not_depend_on_the_as_of_timezone():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     est = timezone(timedelta(hours=-5))
     assert p.get_price("SYNA", as_of=NOON) == p.get_price("SYNA", as_of=NOON.astimezone(est))
 
 
 def test_weeks_and_months_aggregate_the_days():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     days = daily(p, date(2024, 1, 1), date(2024, 3, 1))
     weeks = p.get_ohlcv("SYNA", start=date(2024, 1, 1), end=date(2024, 3, 1),
                         interval="1wk", as_of=NOON)
@@ -119,7 +122,7 @@ def test_weeks_and_months_aggregate_the_days():
 
 
 def test_a_week_still_running_is_not_served():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     weeks = p.get_ohlcv("SYNA", start=date(2024, 3, 4), end=date(2024, 3, 14),
                         interval="1wk", as_of=NOON)
     assert [w.ts.date() for w in weeks] == [date(2024, 3, 4)]
@@ -127,13 +130,13 @@ def test_a_week_still_running_is_not_served():
 
 def test_there_are_no_intraday_bars():
     with pytest.raises(InvalidRequestError, match="daily bars only"):
-        SyntheticProvider(3, SYMBOLS).get_ohlcv(
+        SyntheticProvider(world_key(3), SYMBOLS).get_ohlcv(
             "SYNA", start=date(2024, 3, 1), end=date(2024, 3, 13), interval="1h", as_of=NOON
         )
 
 
 def test_only_configured_symbols_exist():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     with pytest.raises(UnknownTickerError):
         p.get_price("AAPL", as_of=NOON)
     with pytest.raises(UnknownTickerError):
@@ -141,7 +144,7 @@ def test_only_configured_symbols_exist():
 
 
 def test_nothing_before_the_origin():
-    p = SyntheticProvider(3, SYMBOLS)
+    p = SyntheticProvider(world_key(3), SYMBOLS)
     with pytest.raises(UnknownTickerError):
         p.get_price("SYNA", as_of=datetime(2000, 1, 1, 12, tzinfo=timezone.utc))
 
@@ -153,26 +156,84 @@ def test_the_provider_answers_under_the_look_ahead_law():
 
 
 @pytest.mark.parametrize("kwargs", [
-    {"seed": -1}, {"seed": 1.5}, {"seed": True},
+    # A world key is >= 128 bits of bytes: an int seed, or a short key, is
+    # brute-forceable from served bars (red-team 0010).
+    {"key": 11}, {"key": "00" * 16}, {"key": b"\x00" * 15}, {"key": b""},
+    {"symbols": {}},
     {"symbols": {"SYNA": 0.0}}, {"symbols": {"SYNA": float("nan")}},
     {"symbols": {"SYNA": float("inf")}}, {"symbols": {"": 1.0}},
     {"drift": float("nan")}, {"drift": 0.5}, {"volatility": -0.1},
     {"volatility": float("inf")},
 ])
 def test_refuses_a_bad_world(kwargs):
-    args = {"seed": 1, "symbols": SYMBOLS} | kwargs
-    seed, symbols = args.pop("seed"), args.pop("symbols")
+    args = {"key": world_key(1), "symbols": SYMBOLS} | kwargs
+    key, symbols = args.pop("key"), args.pop("symbols")
     with pytest.raises((ValueError, InvalidRequestError)):
-        SyntheticProvider(seed, symbols, **args)
+        SyntheticProvider(key, symbols, **args)
+
+
+def _build(monkeypatch, cfg):
+    from app import marketdata
+
+    monkeypatch.setattr(marketdata, "get_settings",
+                        lambda: type("S", (), {"marketdata": cfg})())
+    return marketdata._build_default_provider()
 
 
 def test_config_selects_it(monkeypatch):
-    from app import marketdata
-
-    cfg = MarketDataConfig(provider="synthetic", synthetic_seed=5,
+    key = world_key(5)
+    cfg = MarketDataConfig(provider="synthetic", synthetic_key=key.hex(),
                            synthetic_symbols={"ZZZ": 10.0})
-    monkeypatch.setattr(marketdata, "get_settings",
-                        lambda: type("S", (), {"marketdata": cfg})())
-    provider = marketdata._build_default_provider()
-    assert isinstance(provider, SyntheticProvider) and provider.seed == 5
-    assert provider.get_price("ZZZ", as_of=NOON).source == "synthetic"
+    provider = _build(monkeypatch, cfg)
+    assert isinstance(provider, SyntheticProvider)
+    assert provider.get_price("ZZZ", as_of=NOON) == SyntheticProvider(
+        key, {"ZZZ": 10.0}).get_price("ZZZ", as_of=NOON)
+    assert key.hex() not in repr(cfg) and key.hex() not in str(cfg.model_dump())
+
+
+def test_no_key_no_world(monkeypatch):
+    with pytest.raises(ValueError, match="no world key"):
+        _build(monkeypatch, MarketDataConfig(provider="synthetic"))
+
+
+@pytest.mark.parametrize("bad", ["0" * 31, "xyz" * 11, "0" * 129, "11"])
+def test_config_refuses_a_short_or_non_hex_key(bad):
+    with pytest.raises(ValidationError):
+        MarketDataConfig(provider="synthetic", synthetic_key=bad)
+
+
+@pytest.mark.parametrize("prices", [{"SYNA": 0.0}, {"SYNA": -1.0}, {"SYNA": float("nan")}])
+def test_config_refuses_unpriced_symbols(prices):
+    with pytest.raises(ValidationError):
+        MarketDataConfig(synthetic_symbols=prices)
+
+
+def test_wicks_and_volumes_are_not_the_return_stream():
+    """Served noise comes from its own HMAC domain (red-team 0010): the volume
+    is not a function of the uniforms that drive the close."""
+    import hashlib
+    import hmac
+
+    key = world_key(3)
+    bar = daily(SyntheticProvider(key, SYMBOLS), date(2024, 3, 12), date(2024, 3, 13))[0]
+    digest = hmac.new(key, b"return:SYNA:2024-03-12", hashlib.sha256).digest()
+    for i in range(0, 32, 8):
+        u = ((int.from_bytes(digest[i:i + 8], "big") >> 11) + 0.5) / float(1 << 53)
+        assert bar.volume != float(int(1e5 + 9e5 * u))
+
+
+def test_a_running_week_is_never_computed(monkeypatch):
+    """No day after as_of's is evaluated, even internally (auditor, cycle 18)."""
+    p = SyntheticProvider(world_key(3), SYMBOLS)
+    asked: list[date] = []
+    original = p._close_through
+
+    def spy(symbol, day):
+        asked.append(day)
+        return original(symbol, day)
+
+    monkeypatch.setattr(p, "_close_through", spy)
+    for interval in ("1wk", "1mo"):
+        p.get_ohlcv("SYNA", start=date(2024, 1, 1), end=date(2024, 3, 14),
+                    interval=interval, as_of=NOON)
+    assert asked and max(asked) <= NOON.date()

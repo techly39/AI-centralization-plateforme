@@ -12,7 +12,7 @@ real agent would. Management advances the clock one day per step. Nothing reads
 the network: the market is a :class:`~app.marketdata.SyntheticProvider`.
 
 What the test must not be is vacuous, so it also proves the pod really traded,
-the curve really moved, and another seed gives another month.
+the curve really moved, and another world key gives another month.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from app.registry import halt
 from app.registry.pods import create_pod, fund_pod
 from app.registry.service import get_or_create_system_agent, register_agent
 from app.run_clock import start_backtest
+from tests.support import world_key
 
 START = datetime(2024, 1, 2, 14, 30, tzinfo=timezone.utc)
 DAYS = 31
@@ -114,8 +115,8 @@ class ScriptedPM:
         assert resp.json()["status"] == "filled", resp.json()
 
 
-def run_month(seed: int) -> ProbeRun:
-    """A fresh database, a fresh world at ``seed``, one scripted pod, 31 days."""
+def run_month(world: int) -> ProbeRun:
+    """A fresh database, a fresh copy of test world ``world``, one scripted pod, 31 days."""
     began = time.perf_counter()
     _, Sessions = _fresh_database()
     session = Sessions()
@@ -131,7 +132,7 @@ def run_month(seed: int) -> ProbeRun:
     finally:
         session.close()
 
-    set_provider(SyntheticProvider(seed, SYMBOLS))
+    set_provider(SyntheticProvider(world_key(world), SYMBOLS))
     app = create_app()
 
     def _session():
@@ -182,7 +183,7 @@ def _derived(session) -> tuple:
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory):
-    """Seed 11 twice, seed 12 once — each in its own fresh database.
+    """World 11 twice, world 12 once — each in its own fresh database.
 
     Module-scoped (three months of trading, once), so it owns what the autouse
     per-test fixtures would otherwise: the halt file and the background jobs.
@@ -232,6 +233,6 @@ def test_the_same_world_twice_gives_the_same_curve_and_book(runs):
     assert a.metrics == b.metrics
 
 
-def test_another_seed_is_another_month(runs):
+def test_another_world_is_another_month(runs):
     assert runs["other"].curve != runs["a"].curve
     assert runs["other"].ledger != runs["a"].ledger

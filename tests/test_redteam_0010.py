@@ -1,10 +1,16 @@
 """RED-TEAM 0010 — attacks on cycle 0018's seeded synthetic market (B-004c, ADR-030).
 
 Claim under attack: :class:`~app.marketdata.SyntheticProvider` is a sealed
-``MarketDataProvider`` whose day ``D`` is a pure function of
-``sha256("{seed}:{symbol}:{D}")``; it serves a close only once its day has
-ended, never shows a second market on another route, and — because the seed is
-config, not agent-visible — an agent cannot know tomorrow.
+``MarketDataProvider`` whose day ``D`` is a pure function of (world, symbol, D);
+it serves a close only once its day has ended, never shows a second market on
+another route, and — because the world's key is secret — an agent cannot know
+tomorrow.
+
+The hole found here (a small integer seed brute-forced from served volumes) was
+fixed in the same cycle by keying the walk with ≥ 128 random bits through
+HMAC-SHA256 and drawing wicks/volumes from a separate domain (ADR-030
+amendment). The hole test now attacks the fixed law the same way: the attacker
+knows the formula and searches every guessable key.
 
 The attacker is a firm PM with an API key, reaching the market only through
 HTTP (``/price``, ``/ohlcv``, ``POST /orders``). It is assumed to know the
@@ -18,7 +24,9 @@ algorithm (Kerckhoffs: the code is the law, and laws are published, Art. 10).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import secrets
 import time
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta, timezone
@@ -26,12 +34,12 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from app.clock import LiveClock, set_clock
-from app.config import MarketDataConfig
 from app.db.models import AgentRole
 from app.marketdata import SyntheticProvider, set_provider
 from app.registry.pods import create_pod, fund_pod
 from app.registry.service import get_or_create_system_agent, register_agent
 from app.run_clock import start_backtest
+from tests.support import world_key
 
 UTC = timezone.utc
 SYMBOLS = {"SYNA": 100.0, "SYNB": 50.0, "SYNC": 20.0}
@@ -51,8 +59,8 @@ def live_afterwards() -> Iterator[None]:
     set_clock(LiveClock())
 
 
-def _open_world(SessionFactory, *, seed: int, start: datetime) -> dict[str, object]:
-    set_provider(SyntheticProvider(seed, SYMBOLS))
+def _open_world(SessionFactory, *, key: bytes, start: datetime) -> dict[str, object]:
+    set_provider(SyntheticProvider(key, SYMBOLS))
     session = SessionFactory()
     try:
         start_backtest(session, start=start)
@@ -80,22 +88,33 @@ def _advance(client, admin: str, **step) -> None:
 
 # --- The attacker's offline replica of the published law --------------------
 
-def _attacker_volume(seed: int, symbol: str, day: date) -> int:
-    """Volume as the published formula derives it: raw bits of the day's hash."""
-    digest = hashlib.sha256(f"{seed}:{symbol}:{day.isoformat()}".encode()).digest()
-    u4 = ((int.from_bytes(digest[24:32], "big") >> 11) + 0.5) / float(1 << 53)
+def _attacker_volume(key: bytes, symbol: str, day: date) -> int:
+    """Volume as the published formula derives it: bits of the day's noise HMAC."""
+    digest = hmac.new(key, f"noise:{symbol}:{day.isoformat()}".encode(),
+                      hashlib.sha256).digest()
+    u4 = ((int.from_bytes(digest[8:16], "big") >> 11) + 0.5) / float(1 << 53)
     return int(1e5 + 9e5 * u4)
 
 
-def _brute_force_seed(observed: list[tuple[date, int]], symbol: str,
-                      search: int = 1 << 16) -> int | None:
-    """The seed whose hash reproduces every served volume, if a small one does."""
+def _guessable_keys(search: int):
+    """Every key an attacker can enumerate: small ints in the usual encodings,
+    their hashes, and the public test keys."""
+    for n in range(search):
+        yield n.to_bytes(16, "big")
+        yield n.to_bytes(32, "big")
+        yield hashlib.sha256(str(n).encode()).digest()
+        yield world_key(n)
+
+
+def _brute_force_key(observed: list[tuple[date, int]], symbol: str,
+                     search: int = 1 << 12) -> bytes | None:
+    """The key whose noise reproduces every served volume, if a guessable one does."""
     first_day, first_volume = observed[0]
-    for seed in range(search):
-        if _attacker_volume(seed, symbol, first_day) != first_volume:
+    for key in _guessable_keys(search):
+        if _attacker_volume(key, symbol, first_day) != first_volume:
             continue
-        if all(_attacker_volume(seed, symbol, d) == v for d, v in observed[1:]):
-            return seed
+        if all(_attacker_volume(key, symbol, d) == v for d, v in observed[1:]):
+            return key
     return None
 
 
@@ -121,18 +140,17 @@ def _brute_force_seed(observed: list[tuple[date, int]], symbol: str,
 # which management can read via /events); refuse short seeds. Separately
 # derive wick/volume from a different key than the return, so served noise is
 # not a window onto the return generator. Obscurity of the formula is not a fix.
-@pytest.mark.xfail(strict=True, reason="RED-TEAM 0010: synthetic seed recoverable from "
-                   "served volumes; future closes then computable")
-@pytest.mark.parametrize("seed", [MarketDataConfig().synthetic_seed, 11],
-                         ids=["config-default", "probe-seed"])
+# FIXED (cycle 18, ADR-030 amendment): a world is a >= 128-bit secret key
+# (`SyntheticProvider` refuses less; config has no default and reads it from the
+# environment only); returns and noise are separate HMAC domains.
 def test_hole_a_pm_cannot_recover_the_seed_and_compute_tomorrow(
-        seed, SessionFactory, client, live_afterwards):
-    world = _open_world(SessionFactory, seed=seed, start=PROBE_START)
+        SessionFactory, client, live_afterwards):
+    world = _open_world(SessionFactory, key=secrets.token_bytes(32), start=PROBE_START)
     pm = world["pm"]
     bars = _get(client, pm, "/ohlcv/SYNA", interval="1d")["bars"]
     observed = [(datetime.fromisoformat(b["ts"]).date(), int(b["volume"])) for b in bars[-3:]]
 
-    recovered = _brute_force_seed(observed, "SYNA")
+    recovered = _brute_force_key(observed, "SYNA")
     prediction = None
     if recovered is not None:
         # The attacker's own replica of the world, a week ahead of the clock.
@@ -142,9 +160,19 @@ def test_hole_a_pm_cannot_recover_the_seed_and_compute_tomorrow(
     _advance(client, world["admin"], days=7)
     actual = _get(client, pm, "/price/SYNA")["price"]
     assert prediction != actual, (
-        f"seed {recovered} recovered from 3 served volumes; next week's close "
+        f"key {recovered!r} recovered from 3 served volumes; next week's close "
         f"{actual} was known a week early"
     )
+
+
+def test_the_attack_is_real_on_a_guessable_key():
+    """Not vacuous: the same search recovers a public test key from its volumes —
+    which is why a real world's key never comes from tests/support.py."""
+    provider = SyntheticProvider(world_key(7), SYMBOLS)
+    bars = provider.get_ohlcv("SYNA", start=date(2023, 12, 1), end=date(2024, 1, 2),
+                              interval="1d", as_of=PROBE_START)
+    observed = [(b.ts.date(), int(b.volume)) for b in bars[-3:]]
+    assert _brute_force_key(observed, "SYNA") == world_key(7)
 
 
 # =============================================================================
@@ -155,7 +183,7 @@ def test_held_no_close_or_week_before_its_end_at_the_midnight_edge(
         SessionFactory, client, live_afterwards):
     """Sunday 23:59: Sunday's close and the week Mon 4 – Sun 10 are unknown; at
     Monday 00:00 both appear, and /price, /ohlcv 1d, 1wk and the fill agree."""
-    world = _open_world(SessionFactory, seed=5, start=SUNDAY_2359)
+    world = _open_world(SessionFactory, key=world_key(5), start=SUNDAY_2359)
     pm = world["pm"]
     sunday, monday_wk = "2024-03-10", "2024-03-04"
 
@@ -190,7 +218,7 @@ def test_held_no_close_or_week_before_its_end_at_the_midnight_edge(
 def test_held_one_market_on_every_route(SessionFactory, client, live_afterwards):
     """1wk/1mo bars are exact aggregates of the 1d bars served on the same call
     window — no second market to arbitrage between routes."""
-    world = _open_world(SessionFactory, seed=9, start=datetime(2024, 4, 3, 12, tzinfo=UTC))
+    world = _open_world(SessionFactory, key=world_key(9), start=datetime(2024, 4, 3, 12, tzinfo=UTC))
     pm = world["pm"]
     daily = _get(client, pm, "/ohlcv/SYNB", interval="1d", start="2024-01-01")["bars"]
     by_day = {b["ts"][:10]: b for b in daily}
@@ -204,11 +232,11 @@ def test_held_one_market_on_every_route(SessionFactory, client, live_afterwards)
 
 def test_held_errors_do_not_depend_on_the_future(SessionFactory, client, live_afterwards):
     """Unknown symbol, pre-origin window and today-only window: each answer is the
-    same in two worlds that share nothing (different seeds) — no oracle."""
-    pm = _open_world(SessionFactory, seed=1, start=PROBE_START)["pm"]
+    same in two worlds that share nothing (different keys) — no oracle."""
+    pm = _open_world(SessionFactory, key=world_key(1), start=PROBE_START)["pm"]
     answers = []
-    for seed in (1, 2):
-        set_provider(SyntheticProvider(seed, SYMBOLS))
+    for n in (1, 2):
+        set_provider(SyntheticProvider(world_key(n), SYMBOLS))
         row = []
         for path, params in [
             ("/price/NOPE", {}),
@@ -225,10 +253,10 @@ def test_held_errors_do_not_depend_on_the_future(SessionFactory, client, live_af
 
 
 def test_held_no_agent_visible_surface_carries_the_seed(SessionFactory, client, live_afterwards):
-    """Guard for B-037: when run_started records the world, the seed must not
+    """Guard for B-037: when run_started records the world, the key must not
     become readable — management agents read /events."""
-    seed = 987_654_321_987
-    world = _open_world(SessionFactory, seed=seed, start=PROBE_START)
+    secret = secrets.token_bytes(32)
+    world = _open_world(SessionFactory, key=secret, start=PROBE_START)
     seen = []
     for key in (world["pm"], world["admin"]):
         for path, params in [("/clock", {}), ("/price/SYNA", {}),
@@ -237,13 +265,13 @@ def test_held_no_agent_visible_surface_carries_the_seed(SessionFactory, client, 
                              ("/events", {"limit": 1000})]:
             r = client.get(path, headers=H(key), params=params)
             seen.append(r.text)
-    assert not any(str(seed) in text for text in seen)
-    assert not any(json.dumps(seed) in text for text in seen)
+    for spelling in (secret.hex(), secret.hex().upper(), json.dumps(secret.hex())):
+        assert not any(spelling in text for text in seen)
 
 
 def test_held_the_widest_window_is_bounded_work(SessionFactory, client, live_afterwards):
     """start=0001-01-01 on every interval: clamped at ORIGIN, ~10^5 cheap steps."""
-    world = _open_world(SessionFactory, seed=3, start=PROBE_START)
+    world = _open_world(SessionFactory, key=world_key(3), start=PROBE_START)
     pm = world["pm"]
     for interval in ("1d", "1wk", "1mo"):
         began = time.perf_counter()

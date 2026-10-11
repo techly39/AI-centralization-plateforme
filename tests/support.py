@@ -11,6 +11,7 @@ against a second implementation of it is part of what the interface buys us.
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date, datetime, timedelta, timezone
 
 from app.marketdata.base import (
@@ -116,3 +117,13 @@ def straight_line(
 ) -> dict[date, float]:
     """``[100, 101, 99]`` from a start date → a dated series, for readable tests."""
     return {start + timedelta(days=i * step_days): price for i, price in enumerate(closes)}
+
+
+def world_key(n: int) -> bytes:
+    """A 32-byte synthetic-world key named by ``n``, for reproducible tests.
+
+    Public by construction — anyone who reads this file can derive it — so it is
+    for test worlds only; a real world's key is ``secrets.token_bytes(32)``
+    kept out of the repo (red-team 0010).
+    """
+    return hashlib.sha256(f"test-world-{n}".encode()).digest()

@@ -1,13 +1,18 @@
-"""A seeded, offline market: every bar a pure function of (seed, symbol, day).
+"""A keyed, offline market: every bar a pure function of (key, symbol, day).
 
 The backtest's own world (B-004c, ADR-030). The real feed cannot be the ground
 of a determinism test — it needs the network, its history is revised, and Yahoo
 answers the same question differently on different days. This one can:
 
 * **A pure function.** Day ``D``'s log-return for ``symbol`` comes from
-  ``sha256(f"{seed}:{symbol}:{D}")`` (Box-Muller on two 53-bit uniforms), so the
-  answer does not depend on which days were asked before, in what order, by how
-  many processes. No ``random`` module state, no clock, no I/O.
+  ``HMAC-SHA256(key, f"return:{symbol}:{D}")`` (Box-Muller on two 53-bit
+  uniforms), so the answer does not depend on which days were asked before, in
+  what order, by how many processes. No ``random`` module state, no clock, no I/O.
+* **A secret world.** The formula is published law; the key is not. Whoever
+  knows the key knows every future close, so it is ≥ 128 random bits that no
+  agent-visible surface carries (red-team 0010: a small integer seed was
+  brute-forced from three served volumes). Wicks and volumes come from a second
+  HMAC domain (``noise:``), so the noise agents see is no window onto the returns.
 * **A walk with a past.** Closes compound from :data:`ORIGIN` at the configured
   start price (geometric Brownian motion, one step per calendar day — the
   synthetic market never closes). A day's open is the previous close; high and
@@ -27,6 +32,7 @@ on one machine; across platforms ``math.exp`` may differ in the last ulp.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import math
 import threading
 from datetime import date, datetime, time, timedelta, timezone
@@ -43,37 +49,45 @@ from app.marketdata.base import (
 #: The first day the synthetic market has a bar for. Its open is the start price.
 ORIGIN = date(2000, 1, 1)
 
-#: Daily drift and volatility of the log-price (≈ 8 % a year, ≈ 29 % annualised).
+#: Daily drift and volatility of the log-price (≈ 11 % a year before the
+#: volatility drag, ≈ 29 % volatility annualised over 365 days).
 DEFAULT_DRIFT = 0.0003
 DEFAULT_VOLATILITY = 0.015
+
+#: The shortest world key accepted: 128 bits, out of any brute-force reach.
+MIN_KEY_BYTES = 16
 
 _TWO_53 = float(1 << 53)
 
 
-def _uniforms(seed: int, symbol: str, day: date) -> tuple[float, float, float, float]:
-    """Four independent uniforms in (0, 1) for one (seed, symbol, day)."""
-    digest = hashlib.sha256(f"{seed}:{symbol}:{day.isoformat()}".encode()).digest()
-    return tuple(  # type: ignore[return-value]
+def _uniforms(key: bytes, domain: str, symbol: str, day: date) -> tuple[float, ...]:
+    """Four independent uniforms in (0, 1) for one (domain, symbol, day) of a world."""
+    message = f"{domain}:{symbol}:{day.isoformat()}".encode()
+    digest = hmac.new(key, message, hashlib.sha256).digest()
+    return tuple(
         ((int.from_bytes(digest[i : i + 8], "big") >> 11) + 0.5) / _TWO_53
         for i in range(0, 32, 8)
     )
 
 
 class SyntheticProvider(MarketDataProvider):
-    """A deterministic random walk per configured symbol."""
+    """A deterministic random walk per configured symbol, keyed by a secret."""
 
     name = "synthetic"
 
     def __init__(
         self,
-        seed: int,
+        key: bytes,
         symbols: dict[str, float],
         *,
         drift: float = DEFAULT_DRIFT,
         volatility: float = DEFAULT_VOLATILITY,
     ) -> None:
-        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
-            raise ValueError(f"seed must be a non-negative int, got {seed!r}")
+        if not isinstance(key, bytes) or len(key) < MIN_KEY_BYTES:
+            raise ValueError(
+                f"a world key is at least {MIN_KEY_BYTES} random bytes "
+                "(e.g. secrets.token_bytes(32)); a short seed can be brute-forced"
+            )
         if not (math.isfinite(drift) and abs(drift) < 0.1):
             raise ValueError(f"drift must be finite and |drift| < 0.1, got {drift!r}")
         if not (math.isfinite(volatility) and 0 <= volatility < 0.5):
@@ -84,7 +98,9 @@ class SyntheticProvider(MarketDataProvider):
             if not (math.isfinite(price) and price > 0):
                 raise ValueError(f"start price for {raw!r} must be positive and finite")
             starts[normalise_ticker(raw)] = price
-        self.seed = seed
+        if not starts:
+            raise ValueError("a synthetic world needs at least one symbol")
+        self._key = key
         self._starts = starts
         self._drift = drift
         self._volatility = volatility
@@ -104,7 +120,8 @@ class SyntheticProvider(MarketDataProvider):
             price = closes[-1] if closes else self._starts[symbol]
             mu = self._drift - self._volatility**2 / 2
             while len(closes) < needed:
-                u1, u2, _, _ = _uniforms(self.seed, symbol, ORIGIN + timedelta(days=len(closes)))
+                day = ORIGIN + timedelta(days=len(closes))
+                u1, u2, _, _ = _uniforms(self._key, "return", symbol, day)
                 z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
                 price = price * math.exp(mu + self._volatility * z)
                 closes.append(price)
@@ -114,7 +131,7 @@ class SyntheticProvider(MarketDataProvider):
         i = (day - ORIGIN).days
         close = closes[i]
         open_ = closes[i - 1] if i else self._starts[symbol]
-        _, _, u3, u4 = _uniforms(self.seed, symbol, day)
+        u3, u4, _, _ = _uniforms(self._key, "noise", symbol, day)
         wick = self._volatility * u3 / 2
         return Bar(
             ts=datetime.combine(day, time(), tzinfo=timezone.utc),
@@ -173,6 +190,10 @@ class SyntheticProvider(MarketDataProvider):
             )
         bars = []
         for first, stop in anchors:
+            # A period still running at as_of is skipped here, not computed and
+            # dropped by the base: no day after as_of's is ever evaluated.
+            if datetime.combine(stop, time(), tzinfo=timezone.utc) > as_of:
+                continue
             days = self._daily(symbol, first, stop)
             if not days:
                 continue

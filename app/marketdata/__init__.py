@@ -37,7 +37,13 @@ def _build_default_provider() -> MarketDataProvider:
     if cfg.provider == "static":
         return StaticProvider(cfg.static_prices)
     if cfg.provider == "synthetic":
-        return SyntheticProvider(cfg.synthetic_seed, cfg.synthetic_symbols)
+        if cfg.synthetic_key is None:
+            raise ValueError(
+                "marketdata.provider is 'synthetic' but no world key is set: put "
+                "secrets.token_hex(32) in FUND_MARKETDATA__SYNTHETIC_KEY"
+            )
+        key = bytes.fromhex(cfg.synthetic_key.get_secret_value())
+        return SyntheticProvider(key, cfg.synthetic_symbols)
     return YFinanceProvider(cache_ttl_seconds=cfg.cache_ttl_seconds)
 
 

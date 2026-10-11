@@ -563,38 +563,57 @@ the operator CLI (`check-orders`) is the second. Fix candidates: compare the eve
 priced now after the flush and roll back on mismatch, or `BEGIN IMMEDIATE` before the read.
 Mutations: advance's clock moved before the commit → (a) red; cash read after pricing → (c) red.
 
-## ADR-030 — A backtest's world is seeded; the first determinism test is a month, twice   (builder, cycle 18) — accepted
+## ADR-030 — A backtest's world is a secret key; the first determinism test is a month, twice   (builder, cycle 18) — accepted
 Question: TRD Phase 3's milestone is a 1-month backtest in under 10 minutes; Era I wants "one pod
 runs end-to-end" and determinism tests. Against what market? yfinance needs the network, revises
 its history, and rate-limits — a test on it measures Yahoo, not physics. And what does
 "deterministic" have to cover to mean anything?
-Answer from the future: (1) **A seeded synthetic market in physics** (`SyntheticProvider`,
-`marketdata.provider: "synthetic"`, `synthetic_seed`, `synthetic_symbols`): day D's log-return for
-a symbol is Box-Muller on `sha256("{seed}:{symbol}:{D}")` — a pure function, independent of which
-days were asked first or by whom; closes compound from 2000-01-01 at the configured start price
-(GBM, drift 0.0003, vol 0.015 a day, every calendar day); open = previous close; wicks and volume
-hashed. Only configured symbols exist. **Daily bars only** (1wk Monday-anchored and 1mo aggregate
-them); `1h` is refused, because an invented intraday path is a second route showing a second
-market (red-team 0008's arbitrage). A quote is the last ended day's close stamped at its end. It is
-a sealed `MarketDataProvider`, so ADR-028's guard is its law with no code of its own. A golden value
-pins the formula: changing it changes every synthetic backtest ever run — an ADR, not a test edit.
-(2) **Determinism = same ledger, not just same P&L.** The probe (`tests/test_phase3_probe.py`) runs
-a scripted, LLM-free PM (5- vs 20-day average, one third of the book per name) through HTTP only,
-management advancing one day per step for 31 days, in a fresh database per run. Seed 11 twice must
-give the same ledger event for event (id, stamp, actor, type, payload), the same daily
-`/portfolio` curve, the same derived book (which `rebuild_state` must reproduce) and the same
-`/metrics/pod`; seed 12 must differ (not vacuous). (3) **The probe lives in `tests/`**, the pod in
-the test file: agent strategy code never runs inside the App's process (ADR-028 amendment); a
-TestClient is a client.
+Answer from the future: (1) **A keyed synthetic market in physics** (`SyntheticProvider`,
+`marketdata.provider: "synthetic"`, `synthetic_key`, `synthetic_symbols`): day D's log-return for a
+symbol is Box-Muller on `HMAC-SHA256(key, "return:{symbol}:{D}")` — a pure function, independent of
+which days were asked first or by whom; closes compound from 2000-01-01 at the configured start
+price (GBM, drift 0.0003, vol 0.015 a day, every calendar day); open = previous close; wicks and
+volume from a second domain, `"noise:{symbol}:{D}"`. Only configured symbols exist. **Daily bars
+only** (1wk Monday-anchored and 1mo aggregate them, and a period still running is skipped before
+any of its days is computed); `1h` is refused, because an invented intraday path is a second route
+showing a second market (red-team 0008's arbitrage). A quote is the last ended day's close stamped
+at its end. It is a sealed `MarketDataProvider`, so ADR-028's guard is its law with no code of its
+own. A golden value pins the formula: changing it changes every synthetic backtest ever run — an
+ADR, not a test edit. (2) **The world is a secret.** The formula is published law (Art. 10); the
+key is not, because whoever holds it knows every future close. It is ≥ 128 bits (`SyntheticProvider`
+refuses fewer than 16 bytes; config takes 32..128 hex digits as a `SecretStr`), read from the
+environment only (`FUND_MARKETDATA__SYNTHETIC_KEY`, never the committed `config.yaml`), with no
+default: no key, no world. Test worlds use `tests/support.world_key(n)` — public by construction,
+never for a real run. (3) **Determinism = same ledger, not just same P&L.** The probe
+(`tests/test_phase3_probe.py`) runs a scripted, LLM-free PM (5- vs 20-day average, one third of the
+book per name) through HTTP only, management advancing one day per step for 31 days, in a fresh
+database per run. World 11 twice must give the same ledger event for event (id, stamp, actor, type,
+payload), the same daily `/portfolio` curve, the same derived book (which `rebuild_state` must
+reproduce) and the same `/metrics/pod`; world 12 must differ (not vacuous). (4) **The probe lives
+in `tests/`**, the pod in the test file: agent strategy code never runs inside the App's process
+(ADR-028 amendment); a TestClient is a client.
 Why: (1) **Honest measurement** — a backtest is evidence only if it can be re-run to the same
-answer; the ledger, not a summary number, is what an auditor replays. (2) **Deterministic over
-LLM / reuse** — the provider is Truman's first organ (IDEAS c16): any scenario (crash, regime,
-correlated names) is a seed and a parameter, offline. (3) **Smaller & reversible** — one file in
-`app/marketdata`, config-selected; yfinance untouched.
-Not done: the run's `run_started` does not yet record *which* world it ran in (provider, seed,
-symbols, parameters) — B-037; a run's ledger should be enough to re-run it. No cross-machine
-determinism claim (libm `exp`/`log` may differ in the last ulp). No CLI `fund-env backtest` driver
-yet; no correlated names, regimes or jumps.
-Evidence: seed 11, 31 days: 51 events (31 `clock_advanced`, 8 orders placed and filled, 3 round
-trips), $100,000 → $97,567.64, fees $246.67 — identical twice; seed 12 → $106,173.21. ~0.55 s a
-month in-process (budget 600 s). `tests/test_synthetic_provider.py` (27).
+answer; the ledger, not a summary number, is what an auditor replays. (2) **Safer seal** — a world
+an agent can reconstruct is look-ahead with extra steps; key entropy, not formula obscurity, is
+what keeps tomorrow unknown. (3) **Deterministic over LLM / reuse** — the provider is Truman's first
+organ (IDEAS c16): any scenario (crash, regime, correlated names) is a key and a parameter, offline.
+(4) **Smaller & reversible** — one file in `app/marketdata`, config-selected; yfinance untouched.
+Not done: the run's `run_started` does not yet record *which* world it ran in — B-037: provider,
+symbols, parameters and a one-way **fingerprint** of the key (never the key: management reads
+`/events`); a run's ledger plus the operator's key file should be enough to re-run it. Re-running a
+world for an agent that has lived it is not out-of-sample (red-team 0010 note) — B-037 also records
+which worlds which agents have seen. No cross-machine determinism claim (libm `exp`/`log` may differ
+in the last ulp). No CLI backtest driver yet; no correlated names, regimes or jumps.
+Evidence: world 11, 31 days: 49 events (31 `clock_advanced`, 7 orders placed and filled, 3 round
+trips), $100,000 → $99,278.49, fees $227.93 — identical twice; world 12 → $102,739.09. ~0.55 s a
+month in-process (budget 600 s). `tests/test_synthetic_provider.py`, `tests/test_redteam_0010.py`.
+**Amendment (cycle 18, before merge — red-team 0010, 1 high hole, 6 held).** The first version was
+*seeded*: `sha256("{seed}:{symbol}:{D}")` with `synthetic_seed: int = 0`. Every served bar's volume
+is ~20 raw bits of that hash and its wick ~50 more, so three served volumes pinned a small seed in
+a fraction of a second, and the attacker priced SYNA a week ahead exactly. Fixed as (2) above:
+HMAC with a ≥ 128-bit key, noise in its own domain, no default, environment only. The hole test now
+runs the same search (small ints in three encodings, their hashes, the public test keys) against a
+fresh `secrets.token_bytes(32)` world and finds nothing; a companion test shows the same search
+*does* recover a public test key, so the hole test is not vacuous. Auditor WARN (a running week's
+future days were computed then dropped) fixed: skipped before computing, spy-tested, mutation red.
+Lesson: a determinism tool and a secrecy tool are the same function; its input is the secret.
