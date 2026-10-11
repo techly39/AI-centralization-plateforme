@@ -297,3 +297,52 @@ integer parameter and body field in the OpenAPI schema. Held and kept as guards:
 quantities, 50 max-size cost reports, MCP inf/nan. Open, strict-xfail in `tests/test_redteam_0004.py`,
 outside this unit: fee rounds to $0.00 below $5 notional (B-026), non-finite feed prices (B-025,
 with B-005).
+
+## ADR-025 — Replay order is live order: ledger time never runs backwards   (builder, cycle 13) — accepted
+Question: live state folds events in append (id) order (`app/ledger/apply.py`); `rebuild_state`,
+the equity curve and `read_events` replayed in `(ts, id)` order. A clock that steps back (an NTP
+step on `LiveClock`; a rewound backtest clock in Phase 3) gave a rebuild with 10 phantom shares
+(SURVEY §4a.1, P3), and the sell reducer silently erased the impossible position. Which order is
+the truth, and what keeps the day buckets of the equity curve consistent with it?
+Answer from the future: **three laws, each with its own mutation-tested tests**
+(`tests/test_time_order.py`). (1) **Ledger time never runs backwards**: `append_event` stamps
+`max(clock, latest ts in the ledger)`, computed *inside the INSERT* (a scalar subquery in a `CASE`,
+portable to Postgres) so the floor is read under the write lock SQLite already serialises writers
+with. Id order and time order are then one order, and a day bucket never holds an event the live
+fold applied after a later day's. (2) **Every replay folds in id order** — `rebuild_state`,
+`_pod_events` and `read_events` order by `Event.id` — so a ledger written before law 1 still
+rebuilds to what was live; the equity curve buckets each event on the latest day the ledger had
+reached, which equals its own day on a monotonic ledger. (3) **An impossible history is an
+error**: the sell reducer raises on a sell beyond the position (tolerance `QTY_EPSILON`, now
+defined in `app/ledger/reducers.py` below the OMS and re-exported by `app.oms.money`). The OMS
+already refuses such sells, so this only fires on a corrupt or mis-ordered ledger.
+Why hold, not refuse: refusing a write when the clock is behind would turn every NTP step into a
+burst of 500s on a live desk; holding loses at most the size of the step from one timestamp and
+never reorders anything. Why not order by `id` alone: the equity curve buckets by date, so a
+late id with an early stamp would still land in the wrong day.
+Evidence: 11 new tests red before the fix; each law's mutation turns only its own tests red
+(clamp → 6, rebuild order → 1, equity order → 1, equity "reached" day → 1, `read_events` → 1, sell
+raise → 2). The Human's `fund.db` (95 events, August) has 0 backward steps and rebuilds unchanged
+(copy, read-only).
+Consequences — said plainly: (a) A held timestamp is silent: the ledger does not record that the
+clock was behind. (b) The floor is global, so **B-004 must scope it per `run_id`** — a backtest
+started under today's live ledger would otherwise have every event stamped today. Until then a
+rewound clock is held, not honoured. (c) Metrics read `as_of = clock.now()`; when the clock is behind
+the ledger, events stamped later are outside that window (the curve ends before them). That is
+B-004/B-020's question (which "now" an agent and a report see). (d) On Postgres under READ
+COMMITTED two concurrent inserts can each read a stale floor, and sequence ids are not commit
+order; Postgres is not the backend today — revisit with any backend change. (e) Test fixtures must
+freeze the clock before any fixture writes an event (`tests/test_metrics.py` `history` is now
+autouse for that reason): a live-stamped `agent_registered` before a frozen past holds every later
+event at today's date. (f) **A forward step is permanent** (auditor WARN): one clock jump to a far
+future date — an NTP glitch, or a script that sets a frozen clock forward against a real DB — pins
+every later stamp there, and the append-only ledger cannot take it back. Agents cannot cause it:
+nothing outside `app/clock.py` calls `set_clock`, and no route controls the clock (red-team 0005).
+A guard (refuse or log a clock far ahead of the floor) belongs with B-004's clock design.
+Amendment (same cycle, review): red-team 0005 found 2 low holes, both fixed. (1) Rows agents read
+must carry the ledger's time: `Order.created_at` and `filled_at` are now copied from their
+`order_placed` / `order_filled` events (`fund_pod` already did this for `Allocation.ts`), and
+`execute_fill` lost its `at` argument. `Message.ts`, `Cost.ts` and `Task` times still take the raw
+clock → B-028. (2) `QTY_EPSILON` forgives float dust on a position, never a sell of nothing: the OMS
+and the reducer both refuse any sell of a ticker the pod does not hold (a 1e-9 naked sell used to
+fill and credit cash).

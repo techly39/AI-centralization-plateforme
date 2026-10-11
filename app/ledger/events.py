@@ -11,11 +11,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, case, func, literal, select
 from sqlalchemy.orm import Session
 
 from app.clock import get_clock
 from app.db.models import Event
+from app.db.types import UTCDateTime
 from app.finite import json_problem
 from app.limits import MAX_LEDGER_DEPTH
 
@@ -61,12 +62,17 @@ def append_event(
     Raises ``ValueError`` for a payload holding ``NaN``/``±inf`` or an int beyond
     ±2**53 anywhere, or nested deeper than ``MAX_LEDGER_DEPTH``: the ledger stays
     standard JSON that any tool can replay (ADR-024).
+
+    Ledger time never runs backwards (ADR-025): the event is stamped with the
+    clock, or with the latest stamp already in the ledger if the clock is behind
+    it. So id order and time order are one order, and a day bucket never holds an
+    event the live fold applied after a later day's.
     """
     problem = json_problem(payload or {}, max_depth=MAX_LEDGER_DEPTH)
     if problem:
         raise ValueError(f"{problem} in {type!r} event payload")
     event = Event(
-        ts=get_clock().now(),
+        ts=_not_before_latest(get_clock().now()),
         actor_agent_id=actor_agent_id,
         type=type,
         payload_json=payload or {},
@@ -74,6 +80,20 @@ def append_event(
     session.add(event)
     session.flush()
     return event
+
+
+def _not_before_latest(now: datetime) -> ColumnElement[datetime]:
+    """``max(now, latest ts in the ledger)``, evaluated inside the INSERT itself.
+
+    One statement, so the floor is read under the same write lock the row is
+    written with (SQLite serialises writers): no other append can land between
+    reading the latest stamp and using it. ``CASE`` rather than ``max(a, b)``
+    because Postgres spells two-argument max ``GREATEST``. An empty ledger gives
+    ``NULL > now`` → not true → ``now``.
+    """
+    clock_now = literal(now, UTCDateTime)
+    latest = select(func.max(Event.ts)).scalar_subquery()
+    return case((latest > clock_now, latest), else_=clock_now)
 
 
 def read_events(
@@ -84,7 +104,7 @@ def read_events(
     since: datetime | None = None,
     limit: int | None = None,
 ) -> Sequence[Event]:
-    """Query the ledger in deterministic order (ts, then insertion id)."""
+    """Query the ledger in append order — the order live state was folded in."""
     stmt = select(Event)
     if actor_agent_id is not None:
         stmt = stmt.where(Event.actor_agent_id == actor_agent_id)
@@ -92,7 +112,7 @@ def read_events(
         stmt = stmt.where(Event.type == type)
     if since is not None:
         stmt = stmt.where(Event.ts >= since)
-    stmt = stmt.order_by(Event.ts, Event.id)
+    stmt = stmt.order_by(Event.id)
     if limit is not None:
         stmt = stmt.limit(limit)
     return session.execute(stmt).scalars().all()

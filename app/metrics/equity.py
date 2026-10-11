@@ -196,7 +196,7 @@ def _pod_events(session: Session, pod_id: int) -> list[Event]:
         session.execute(
             select(Event)
             .where(Event.type.in_(reducer_event_types()))
-            .order_by(Event.ts, Event.id)
+            .order_by(Event.id)  # append order = live order (ADR-025)
         )
         .scalars()
         .all()
@@ -211,9 +211,16 @@ def _replay_by_day(
     events: list[Event], *, pod_id: int, until: date
 ) -> tuple[list[_DaySnapshot], set[str]]:
     """Fold events into one snapshot per calendar day, inclusive of empty days."""
+    # An event counts from the latest day the ledger had reached when it was
+    # appended. On a ledger whose stamps never run backwards (ADR-025) that is
+    # just its own day; on an older one it keeps every day's fold a prefix of
+    # the live, append-ordered fold.
     by_day: dict[date, list[Event]] = defaultdict(list)
+    reached: date | None = None
     for event in events:
-        by_day[event.ts.date()].append(event)
+        day = event.ts.date()
+        reached = day if reached is None or day > reached else reached
+        by_day[reached].append(event)
 
     start = min(by_day)
     if start > until:

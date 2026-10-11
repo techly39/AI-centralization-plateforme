@@ -20,11 +20,15 @@ from tests.support import HistoricalProvider, straight_line
 DAY_ONE = date(2026, 6, 1)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def history(frozen_clock):
     """A market with a real past, installed as the app's provider.
 
     AAPL rises 100 → 110 over four sessions; MSFT is flat at 400.
+
+    Autouse so the clock is frozen before *any* fixture writes an event: ledger
+    time never runs backwards (ADR-025), so an ``agent_registered`` stamped by
+    the live clock (``admin_key``) would hold every later event at today's date.
     """
     provider = HistoricalProvider(
         {
