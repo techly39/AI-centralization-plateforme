@@ -119,7 +119,7 @@ All endpoints also exposed as MCP tools with identical names.
 
 - `clock.now()` is the only time source for OMS, scheduler, metrics, and market data.
 - **Live mode**: wraps real time; prices from yfinance delayed feed.
-- **Backtest mode**: time starts at a configured historical datetime and advances only via `/clock/advance`. Market data endpoints return data as of simulated now, and must reject any request for data beyond simulated now (look-ahead guard). Pending-order monitor runs on every advance.
+- **Backtest mode**: time starts at a configured historical datetime and advances only via `/clock/advance`. Market data endpoints return data as of simulated now, and must reject any request for data beyond simulated now (look-ahead guard). Pending-order monitor runs on every advance. *(ADR-028: the guard is in the `MarketDataProvider` base, whose `get_price`/`get_ohlcv` no subclass may override. "Beyond now" means not yet **known**: a bar is served once it has ended (a daily bar's close at its next midnight), a quote stamped after now — or not a positive finite number — is refused (502). A window starting after now is still 400. yfinance answers a past now from its last completed daily bar; its current quote answers only a now within 60 s of the real one, and a backtest is kept at least that far behind.)*
 - Mode switching wipes nothing: live and backtest runs are separate `run_id` scopes on all tables. *(ADR-027: a run is a database. A backtest is a fresh database whose ledger opens with `run_started {mode, start}`; its clock is the latest `run_started.start` / `clock_advanced.to`, rebuilt on every process start. Separate files are the separate scopes — no query can forget a `run_id` filter.)*
 
 ## 10. Observability

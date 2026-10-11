@@ -445,3 +445,50 @@ now. Auditor WARN 1 (lifespan install untested) → `test_the_server_starts_on_i
 `run_started` records `look_ahead_guard: false` (`LOOK_AHEAD_GUARD` in `app/run_clock.py`; B-005
 flips it). WARN 3 (a failed advance commit restores the clock after non-OMS writers stamped `end`)
 → accepted, low, backlog B-033.
+
+## ADR-028 — No feed may show what is not known by now; the guard is the base   (builder, cycle 16) — accepted
+Question: TRD §9 wants market data to "reject any request for data beyond simulated now". SURVEY
+§4a.2/§4a.3/§4b.3 found three leaks: daily bars filtered by their *open* stamp (00:00) while they
+carry that day's *close*; yfinance `get_price` serving today's quote for any `as_of` and stamping it
+with the time asked; the test double copying the first leak, so the suite certified it. What does
+"beyond now" mean, where is it enforced, and what does a live feed answer for a past now?
+Answer from the future: (1) **"Beyond now" = not yet known.** A bar is served once it has *ended*
+(`bar_end(ts, interval)`: +1 h / next midnight of its stamp / +7 d / next month); a quote is
+stamped with the latest moment its price can be from and refused (`FeedDataError`, 502; the OMS
+answers `price_unavailable`, the sweep leaves orders pending) if that is after `as_of`. A price
+that is not a positive finite number is refused the same way (the feed half of B-025). A window
+starting after now stays 400 (`LookAheadError`). (2) **The guard is the base, and cannot be
+skipped.** `MarketDataProvider.get_price` / `get_ohlcv` are the only public entries; implementations
+write `_quote` / `_bars`; defining either public method on a subclass is a `TypeError` at class
+creation. Real providers, `StaticProvider`, the test double and every future Truman provider get
+the same law with no code of their own. (3) **A live feed answers the past from history.** yfinance's
+current quote answers only an `as_of` within `LIVE_QUOTE_WINDOW` (60 s) of the real now
+(`wall_now()`, now with a second sanctioned use: telling which answer the feed can honestly give —
+still never a stamp or a price); an older `as_of` gets the close of the last daily bar ended by
+then (14-day lookback), stamped at that bar's end. A live current quote is stamped at the moment
+asked — an upper bound, since a delayed quote is older. (4) **A backtest stays out of the live
+window:** `start_backtest` and `advance` refuse a now within 60 s of the real now, so a backtest is
+always answered from history. (5) `LOOK_AHEAD_GUARD = True`: runs opened from now on record
+`look_ahead_guard: true` in `run_started`; older runs keep their `false`.
+Why: (1) **Honest measurement** (Art. 9) — a backtest that can see the close it is about to trade
+on measures nothing; every result of Era I's milestone rests on this line. (2) **Safer seal** — one
+enforcement point that a subclass cannot route around beats a filter in each implementation (the
+survey's leak was precisely an implementation-level filter written the wrong way, then copied into
+the double). (3) Conservative by construction: a daily close is served ~8 h late (midnight, not
+16:00 ET), never early; the cost is coarse intraday resolution in backtests (at noon the pod sees
+yesterday's close), the gain is no exchange-calendar logic in physics. (4) **Deterministic** — the
+rule is arithmetic on stamps. (5) Reversible: finer bar ends (exchange close times) can come with
+Truman (B-008) without changing the law.
+Not done: intraday prices in backtests (daily bars only; Truman's job, B-008); non-finite *bar*
+values and `config.yaml` price bounds (rest of B-025); metrics/market-data "now" = `ledger_now`
+(B-004b); market data as of a now that differs between the route and the OMS (B-004b).
+Evidence: `tests/test_look_ahead.py` (override refused ×2, future stamp refused, 5 bad prices, naive
+`as_of`, a bar served exactly at its end, `bar_end` ×6 incl. Dec→Jan and Jan 31→Feb 29, the double
+at noon, yfinance past from history and live only within 60 s, a future-stamped feed → 502 with
+nothing stored, an honest backtest end to end through the API: noon → yesterday's close, fill at
+it, +12 h → today's). Tests corrected because they certified the leak, each said in the commit:
+yfinance live-path tests now run at the real now; the history test drops the 07-30 bar at 15:00;
+metrics and POC fixtures fill at the prior close. Red-team 0004's two feed-price xfails pass.
+Mutations (each alone, 1 red each): bar by open, stamp unchecked, non-finite allowed, override
+allowed, yfinance always live, advance into the window, start into the window, flag off, double
+leaks today's close.
