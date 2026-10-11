@@ -125,3 +125,12 @@ its double in the same commit. (3) "Milestone done" needs a "by whom": script �
 (4) An interrupted cycle leaves a dirty tree on its branch; gate 0's "commit legitimate
 leftover state" worked, provided I re-verify the measurements before trusting the text.
 Next: S-004 cleanup (remove `test_api.py` first) → S-005 OpenClaw survey → S-006/S-007.
+
+## Cycle 0006 — Cleanup commits (S-004) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: "commit the uncommitted Phase 2 work, clean junk" — the cleanup half of
+the Survey: every SURVEY §2b/§4b.5 "remove / fix" verdict executed, one reasoned commit each.
+Hypothesis: If I execute the S-004 list as deletions/moves/doc fixes only, the tree stops
+carrying the committed key and stale docs, the suite stays at 267 passed + 9 xfailed (nothing
+collected depended on any of it), and the survey probe keeps working — because I will make R1
+read `test_api.py` from git history once it is gone, so the evidence for Q-0003 stays measurable.

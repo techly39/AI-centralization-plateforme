@@ -38,11 +38,24 @@ def git(*args: str) -> str:
 
 
 def r1_committed_key() -> None:
-    """Is the API key hard-coded in the tracked ``test_api.py`` live in ``fund.db``?"""
+    """Is the API key hard-coded in ``test_api.py`` live in ``fund.db``?
+
+    Cycle 6 (S-004) redacted the key from the tree, but it stays in git history,
+    so when the working copy holds no key the probe reads the version just
+    before the last commit that touched a key line.
+    """
     print("R1  hard-coded key in test_api.py")
-    source = (REPO / "test_api.py").read_text()
-    keys = re.findall(r"\bfk_[A-Za-z0-9_\-]{20,}", source)
-    print(f"    keys found in file: {len(keys)}")
+    pattern = r"\bfk_[A-Za-z0-9_\-]{20,}"
+    path = REPO / "test_api.py"
+    keys = re.findall(pattern, path.read_text()) if path.exists() else []
+    print(f"    keys in the working tree: {len(keys)}")
+    if not keys:
+        # git's -G takes POSIX ERE: no \b.
+        git_pattern = "fk_[A-Za-z0-9_-]{20,}"
+        changed = git("log", "-1", "--format=%H", "-G", git_pattern, "--", "test_api.py").strip()
+        if changed:
+            keys = re.findall(pattern, git("show", f"{changed}^:test_api.py"))
+            print(f"    keys in git history (before {changed[:7]}): {len(keys)}")
     tracked = bool(git("ls-files", "test_api.py").strip())
     print(f"    file tracked by git: {tracked}")
     commits = git("log", "--format=%h", "--", "test_api.py").split()
