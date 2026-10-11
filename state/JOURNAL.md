@@ -339,3 +339,14 @@ paid off immediately: the first route walk found 0 routes and the parametrised t
 skipped.
 Next: B-000d + B-016 (finite floats; replay order = live order) → B-020 → B-004. S-004b (git rm
 `test_api.py`, untrack `.vscode/`) is unblocked by P-0002 — take it as a quick unit soon.
+
+## Cycle 0012 — Finite numbers only (2026-10-11)
+Era: I — The Desk
+Exit criterion served: the ADR-021 physics-hole gate before any agent wakes (B-000d, 3 strict
+xfails), which the Era I exit criteria "one pod runs end-to-end" and "the ledger replays" stand on.
+B-016 split off to its own cycle (both touch `append_event`; this one goes first, as planned).
+Hypothesis: If every float request field is finite and capped, every free JSON field is walked,
+the 422 handler spells NaN as text, and `append_event` refuses non-finite payloads, then every
+`NaN`/`±Infinity`/`1e309` sent to every float or free-JSON request field gets a clean, standard-JSON
+422 that names the field and writes no row and no event; the 3 B-000d xfails pass with their
+markers removed; and removing any one of the three layers turns its own tests red.
