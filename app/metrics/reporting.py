@@ -75,7 +75,6 @@ class TaskAlreadyEndedError(ReportingError):
 
 # --- Costs ------------------------------------------------------------------
 
-# MAX_TOKENS_PER_REPORT lives in app.limits (shared with the MCP wrapper).
 
 def report_cost(
     session: Session,

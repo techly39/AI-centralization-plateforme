@@ -2,7 +2,9 @@
 
     runtime ──HTTP/MCP──▶ app ──imports──▶ quant, truman   (pure libraries)
     ui ──HTTP──▶ app
-    nothing imports runtime;  app never imports runtime, ui, or any LLM SDK
+    mcp_server ──HTTP──▶ app       (imports only app.config + app.limits)
+    scripts ──MCP/HTTP──▶ app      (except named in-process probes)
+    nothing imports runtime or legacy;  app never imports runtime, ui, mcp, or any LLM SDK
     quant and truman never import app
 
 Two detectors, because "0 violations" from one detector is a statement about
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -57,7 +60,7 @@ MCP_SERVER_MAY_IMPORT_FROM_APP = frozenset({"app", "app.config", "app.limits"})
 
 #: Operator scripts that run physics in-process on a throwaway database, by
 #: design. Every other script is a client (HTTP/MCP) and never imports ``app``.
-IN_PROCESS_SCRIPTS = frozenset({"survey_probe_physics.py"})
+IN_PROCESS_SCRIPTS = frozenset({"scripts/survey_probe_physics.py"})
 
 
 @dataclass(frozen=True)
@@ -67,7 +70,7 @@ class Layer:
     forbidden: frozenset[str]
     #: ``app`` modules allowed although ``app`` is forbidden (exact names).
     app_allowlist: frozenset[str] = field(default_factory=frozenset)
-    #: Files exempt from the ``app`` ban (by file name).
+    #: Files exempt from the ``app`` ban (repo-relative POSIX paths).
     app_exempt_files: frozenset[str] = field(default_factory=frozenset)
 
 
@@ -78,8 +81,8 @@ LAYERS = (
     Layer("app", "app", _NOT_PHYSICS | {"mcp"} | LLM_SDKS),
     Layer("migrations", "migrations", _NOT_PHYSICS | {"mcp"} | LLM_SDKS),
     # Pure deterministic libraries physics may import.
-    Layer("quant", "quant", _NOT_PHYSICS | {"app", "truman", "mcp"} | LLM_SDKS),
-    Layer("truman", "truman", _NOT_PHYSICS | {"app", "quant", "mcp"} | LLM_SDKS),
+    Layer("quant", "quant", _NOT_PHYSICS | {"app", "mcp"} | LLM_SDKS),
+    Layer("truman", "truman", _NOT_PHYSICS | {"app", "mcp"} | LLM_SDKS),
     # One agent's doorway: an HTTP client of the App.
     Layer("mcp_server", "mcp_server",
           frozenset({"app", "runtime", "ui", "scripts", "tests", "legacy"}) | LLM_SDKS,
@@ -111,11 +114,16 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
 
     ``from a.b import c`` yields both ``a.b`` and ``a.b.c`` (``c`` may be a
     submodule: ``from google import genai``). Relative imports are resolved
-    against ``module_name``.
+    against ``module_name``. ``__import__("x")`` and ``import_module("x")``
+    with a literal name count too; a computed name cannot be seen statically.
     """
     found: set[str] = set()
     for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Import):
+        if isinstance(node, ast.Call) and _is_dynamic_import(node.func):
+            arg = node.args[0] if node.args else None
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                found.add(arg.value)
+        elif isinstance(node, ast.Import):
             found.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             if node.level:
@@ -132,6 +140,12 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
                 for alias in node.names if alias.name != "*"
             )
     return found
+
+
+def _is_dynamic_import(func: ast.expr) -> bool:
+    if isinstance(func, ast.Name):
+        return func.id in {"__import__", "import_module"}
+    return isinstance(func, ast.Attribute) and func.attr == "import_module"
 
 
 def _matches(module: str, banned: str) -> bool:
@@ -158,7 +172,8 @@ def violations(root: Path, layer: Layer) -> list[str]:
                 if not _matches(module, banned):
                     continue
                 if banned == "app" and (
-                    _allowed(module, layer.app_allowlist) or path.name in layer.app_exempt_files
+                    _allowed(module, layer.app_allowlist)
+                    or rel.as_posix() in layer.app_exempt_files
                 ):
                     continue
                 out.append(f"{rel}: {module}")
@@ -219,9 +234,12 @@ def _loaded_modules(*imports: str) -> list[str]:
         f"for m in {list(imports)!r}: importlib.import_module(m)\n"
         "print(json.dumps(sorted(sys.modules)))\n"
     )
+    # No FUND_* overrides or PYTHONPATH from the caller: the probe sees the repo only.
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("FUND_") and k != "PYTHONPATH"}
     done = subprocess.run(
-        [sys.executable, "-c", code], cwd=REPO_ROOT, capture_output=True, text=True,
-        timeout=120, check=True,
+        [sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True,
+        text=True, timeout=120, check=True,
     )
     return json.loads(done.stdout)
 
@@ -260,7 +278,11 @@ def test_scanner_catches_planted_violations(tmp_path: Path) -> None:
         "app/nested.py": "def f():\n    from openai import OpenAI\n",
         "app/namespace.py": "from google import genai\n",
         "app/sideways.py": "from runtime.spec import AgentSpec\n",
-        "app/sub/__init__.py": "from .. import ledger\n",
+        "app/sub/__init__.py": "from .. import ledger\nfrom .. import runtime\n",  # app.*
+        "app/dynamic.py": (
+            "import importlib\n__import__('openai')\n"
+            "def f():\n    importlib.import_module('runtime.spec')\n"
+        ),
         "app/clean.py": "import sqlalchemy\nfrom app.clock import get_clock\nfrom . import clock\n",
         "mcp_server/tools.py": (
             "from app.limits import X\nfrom app.config import get_settings\n"
@@ -272,6 +294,8 @@ def test_scanner_catches_planted_violations(tmp_path: Path) -> None:
     })
     by_name = {layer.name: layer for layer in LAYERS}
     assert violations(tmp_path, by_name["app"]) == [
+        "app/dynamic.py: openai",
+        "app/dynamic.py: runtime.spec",
         "app/namespace.py: google.genai",
         "app/nested.py: openai",
         "app/nested.py: openai.OpenAI",
@@ -296,3 +320,5 @@ def test_relative_imports_resolve() -> None:
     assert imported_modules("from ..db import base", "app.ledger.rebuild", False) >= {
         "app.db", "app.db.base",
     }
+    # A relative import never leaves its top package: this is app.runtime, not runtime.
+    assert imported_modules("from .. import runtime", "app.sub", True) == {"app", "app.runtime"}
