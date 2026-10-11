@@ -49,7 +49,7 @@ _UNIVERSAL: frozenset[Action] = frozenset(
 )
 
 
-# Role -> set of permitted actions. Mirrors the TRD §6 table exactly.
+# Role -> set of permitted actions: the TRD §6 table plus ``_UNIVERSAL`` (ADR-023, ADR-026).
 _MATRIX: dict[AgentRole, frozenset[Action]] = {
     AgentRole.analyst: _UNIVERSAL
     | frozenset(
