@@ -47,3 +47,10 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   write outside repo), allowed / needs-approval / denied — and have `/cycle` step 2 consult it
   — question: does a world-physics map for the Builder itself cut failed or partial cycles the
   way the survey cut surprises in `app/`? — status: new
+
+- [cycle 7] **Schema-diff as an upgrade tripwire** — OpenClaw's own `config schema` is the only
+  version-true spec, and newer versions loosen seal defaults. Store the installed schema's hash +
+  the seal-key subset (defaults, enums, descriptions) in `runtime/openclaw/`; the Runtime refuses
+  to wake any firm agent when the live schema's seal subset differs, until the Builder re-reads,
+  updates VERSION_NOTES and re-runs conformance — question: can "OpenClaw upgraded under us"
+  become a detected world event instead of a silent change of physics? — status: new

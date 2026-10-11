@@ -1,45 +1,39 @@
 # STATE — rewritten every cycle
 
 **Era:** ½ — The Survey (Launch Pad: Survey → I → II, then the Builder authors the roadmap)
-**Last cycle:** 6 (S-004a cleanup edits — merged 0678d62, 2026-10-11)
+**Last cycle:** 7 (S-005 OpenClaw survey — merged ccc1864, 2026-10-11)
 
 ## What is true now
 - Physics (`app/`) has TRD Phases 0–2: ledger, registry, auth, permissions, OMS, market data,
   bus, cost/task reporting, metrics, MCP server (20 tools). **267 passed + 9 xfailed**.
-- **The physics is mapped** (`state/SURVEY.md` §2a): every module of `app/`, `mcp_server/`,
-  `migrations/` against the TRD. Migrations == models (0 diffs). All §7 v1 endpoints exist
-  except Phase 3's (`/clock/*` writes, `/allocations`, meetings); no `run_id` column anywhere.
-- **The weak spot is time.** Measured (`scripts/survey_probe_physics.py`, P1–P9): rebuild ≠ live
-  if the clock goes backwards (B-016); daily bars leak the day's close (B-005); live quote ignores
-  `as_of`; annual Sharpe ×0.845 (B-017); `/clock` 403 for the agents told to use it (B-020, needs
-  an ADR vs TRD §7). Also: pod creation unledgered (B-018), register 500 (B-019), no "my tasks"
-  endpoint (B-021), `mcp_server` imports all of `app` (B-002).
-- **The whole repo is mapped** (SURVEY §2b, `scripts/survey_probe_repo.py` R1–R4). The suite is
-  hermetic and covers every TRD Phase 0–2 test demand; it does not guard the dependency law,
-  backwards clocks, bar-end look-ahead or determinism. Its price double `HistoricalProvider` has
-  the same look-ahead as yfinance (→ B-005). Phase 2 milestone was met **by script**, not by an agent.
-- **The live management key is out of `main`'s tree** (cycle 6: redacted in `test_api.py`,
-  which now reads `FUND_API_KEY`) but still in git history and still valid in `fund.db`;
-  revocation = the Human's (Q-0003); scan test = B-022. README Layout + phase2 MCP note fixed.
-- **Headless mode cannot delete tracked files** (`git rm` not on the allow list). S-004b
-  (remove `test_api.py`, untrack `.vscode/`) waits on P-0002; never route around it.
+- **The physics is mapped** (`state/SURVEY.md` §2a). Weak spot is **time**: rebuild ≠ live under
+  a backwards clock (B-016), daily-bar look-ahead (B-005), quote ignores `as_of`, Sharpe ×0.845
+  (B-017), `/clock` 403 for agents told to use it (B-020). Also B-018/B-019/B-021, B-002.
+- **The whole repo is mapped** (SURVEY §2b): suite hermetic, covers TRD Phase 0–2 test demands,
+  not the dependency law / backwards clocks / look-ahead / determinism.
+- **OpenClaw is mapped** (SURVEY §9, `runtime/openclaw/VERSION_NOTES.md`, probe O1–O6).
+  Installed **2026.5.12**; online docs describe ≥ 2026.9 (`agents.entries`, looser defaults) —
+  the installed `openclaw config schema` is the source of truth. Seal keys `tools.web`,
+  `tools.sessions`, `tools.agentToAgent`, `tools.profile`, `mcp.servers` are **global only** →
+  ADR-019: firm agents go in their own profile (`--profile firm`), unverified until B-012.
+  Backup: `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (mode 644 — Q-0004).
+  Nothing in OpenClaw was changed; `doctor` not run.
+- **The Human's OpenClaw** (hands off): 4 agents, web on for all, no tool/sandbox policy,
+  `pm`/`analyst` read through to `main`'s auth, an xAI key in a plain workspace file (Q-0004).
+- **The live management key** is out of `main`'s tree but in history and valid in `fund.db` (Q-0003).
+- **Headless limits:** `git rm` and `chmod` need approval (P-0002); never route around them.
+  S-004b waits on P-0002.
 - The system starts outside pytest: `uv run python scripts/smoke_run.py` 12/12 PASS.
-- Toolchain in SURVEY §1 (macOS 26.5.2 arm64, uv 0.11.14, Python 3.12.13, OpenClaw 2026.5.12,
-  **mcp 2.0.0**). `fund.db` at repo root is the Human's August history — never run the CLI
-  against it; use the smoke/probe scripts or `FUND_DATABASE_URL`.
-- `main` = origin/main. Branches `cycle/0001..0006-*` pushed.
-- **9 open value-bound holes** (strict xfail) + the new survey items. Identity/permissions hold.
-- No Runtime, no Truman, no Quant Lab, no Observatory yet.
-- `firm.monthly_llm_usd_cap` is `null` → firm agents may not run live. Build against fakes.
-- Guard hook blocks non-read Bash containing protected dir words (incl. `loop` in
-  `state/loop_status.json`) and `cd`; loop-mode permissions deny `VAR=x cmd`, `--include=*.py`
-  globs and multi-op lines; `git rm` needs approval. The guard also blocks commit messages whose
-  prose names a protected dir. Use Read/Write tools, one simple command per call. P-0001/P-0002.
+- `main` = origin/main. Branches `cycle/0001..0007-*` pushed.
+- No Runtime, no Truman, no Quant Lab, no Observatory yet. `firm.monthly_llm_usd_cap` null.
+- Guard hook blocks non-read Bash naming protected dirs (incl. `loop` in
+  `state/loop_status.json`) and `cd`; `ls governance/` blocked — use Read for HALT. Use
+  Read/Write tools, one simple command per call. P-0001/P-0002.
 
 ## Next 3 moves
-1. S-005 OpenClaw survey (backup first, change nothing; POC lead:
-   `~/.openclaw/workspace/OCT/AI Hedgefund POC/`; look for the "chat restricted to central pod" cause).
-   Check first that the backup (`tar`/`cp`) and `openclaw` reads are allowed headless.
-2. S-006 Bible corrections (living books + PROPOSALS for protected), then S-007 and close Era ½
-   (S-004b listed as residue if P-0002 is still open).
+1. S-006 Bible corrections (living books directly, PROPOSALS for protected): "218 tests",
+   08 §1 (docs ≠ installed version; `doctor` may migrate), 08 §2 (backup born private,
+   firm profile per ADR-019).
+2. S-007 close Era ½: SURVEY complete, IDEAS seeded, backlog reordered (S-004b as residue
+   if P-0002 open).
 3. First Era I moves, in order: B-016 + B-020 before B-004 (clock).

@@ -9,3 +9,4 @@
 | 4 | 2026-10-11 | ½ | S-003a repo survey, physics | merged | ~75 | 267+9xf | ~35 | 9 findings, probe P1–P9; auditor PASS (10 of 11 notes fixed, 1 at record); no red-team (no physics change) |
 | 5 | 2026-10-11 | ½ | S-003b repo survey, the rest | merged | ~40 | 267+9xf | ~15 | resumed interrupted run; live key found (Q-0003); probe R1–R4; auditor PASS (3 notes fixed, 1 → next) ; no red-team (no physics change) |
 | 6 | 2026-10-11 | ½ | S-004a cleanup edits | merged | ~45 | 267+9xf | ~15 | key redacted (git rm denied headless → P-0002, S-004b); auditor PASS (5 notes: 2 fixed, 3 at record); no red-team (no physics change) |
+| 7 | 2026-10-11 | ½ | S-005 OpenClaw survey | merged | ~50 | 267+9xf | ~20 | backup + probe O1–O6; auditor BLOCK ×2 (missed xAI key file, double count) → fixed → PASS (5 notes → backlog); chmod denied headless → Q-0004; no red-team (no physics change) |

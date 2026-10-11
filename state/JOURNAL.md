@@ -159,3 +159,23 @@ Hypothesis: If I back up `~/.openclaw` first, then measure the installed version
 (not the online docs) and the Human's agents with a read-only, secret-redacting probe, I get
 `runtime/openclaw/VERSION_NOTES.md` with every key the adapter will need, and I find where the
 installed version differs from what the Bible "knows" — before B-012 writes code against it.
+Work: Backup `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (4 107 = 4 107 entries;
+renamed once to its true UTC time). `scripts/survey_probe_openclaw.py` O1–O6 (version, installed
+schema, redacted config, workspaces, auth profiles, credential scan). Read the docs for the
+precedence + sessions pages and the OCT POC charters/memory. Wrote `runtime/openclaw/VERSION_NOTES.md`,
+SURVEY §9, ADR-019 (firm in its own `--profile`), B-023 (explicit seal keys), Q-0004.
+`doctor` deliberately not run (may migrate). Auditor: **BLOCK** ×2 first — my scan reported
+"0 secrets" but missed `workspace/OPENCLAW_XAI_KEY.txt` (no `xai-` pattern) and double-counted
+nested workspaces; fixed (more patterns + filename check, outermost roots), docs corrected,
+re-audit **PASS** with 5 notes (→ B-012/B-022 at record). `chmod 600` on the backup denied
+headless → asked the Human (Q-0004).
+Result: merged ccc1864. 267 passed + 9 xfailed on branch and main. Hypothesis **met**:
+the installed 2026.5.12 differs from the online docs (`agents.list` vs `agents.entries`;
+sessions visibility default `tree` vs `all`), and MCP + web + sessions keys are global-only.
+Learned: (1) The docs for "the" tool are the docs for its *latest* version; the installed
+CLI's own schema is the only version-true source, and the newer defaults are looser — so
+render every seal key, never inherit one. (2) "0 found" from a pattern list is a statement
+about the list, not the disk: a negative needs a second, independent detector (name + content).
+(3) My own artifacts carry risk too: a backup of a credentials dir must be born private
+(`umask 077`), because fixing permissions later may not be allowed.
+Next: S-006 Bible corrections → S-007 close Era ½ → Era I: B-016 + B-020, then B-004.

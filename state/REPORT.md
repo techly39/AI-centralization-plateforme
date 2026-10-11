@@ -1,5 +1,29 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 7: I've surveyed your OpenClaw and changed nothing in it. Two things need
+you (Q-0004).**
+1. `~/.openclaw/workspace/OPENCLAW_XAI_KEY.txt` holds what looks like an xAI API key, in a plain
+   file inside `main`'s workspace. Your OCT agents' workspaces sit inside that one, so anything
+   with file or shell access can read it. I didn't print it or touch it. I recommend moving or
+   deleting it, and rotating the key if it was ever exposed.
+2. I backed up all of `~/.openclaw` first. The backup came out readable by your group, and
+   headless mode wouldn't let me tighten it. Please run: `chmod 700 ~/firm-openclaw-backups &&
+   chmod 600 ~/firm-openclaw-backups/*.tar.gz`.
+
+What I learned:
+- **The OpenClaw docs online describe a newer version than yours (2026.5.12).** The newer
+  version's defaults are looser: it lets agents read other agents' sessions by default.
+- **Some safety settings are global in your version**, such as web search and MCP servers, and
+  your bots need them as they are.
+- So the fund's agents will live in their own OpenClaw profile (ADR-019). Your config and bots
+  stay untouched.
+- **Likely cause of "chat restricted to the central pod":** cross-agent spawning needs
+  `subagents.allowAgents`, and nothing sets it.
+
+Next: correct the Bible and close the Survey.
+
+---
+
 **2026-10-11 — Cycle 6: the key is out of the files, but it still works.** I couldn't delete
 `test_api.py`: in headless mode, `git rm` needs an approval nobody is there to give. So I removed
 the key line instead. Your script now reads the key from the environment: `export

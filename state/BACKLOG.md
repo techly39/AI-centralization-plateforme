@@ -29,7 +29,9 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-022** Secret-scan test: no tracked file contains an `fk_…` key, an OpenRouter
       `sk-or-…` key or another credential pattern (SURVEY §4b.1). Before any firm agent holds a key.
       Reuse `survey_probe_openclaw.SECRET_VALUE` + filename check (cycle 7: a pattern list
-      without `xai-` missed a real key file).
+      without `xai-` missed a real key file). Auditor notes (cycle 7): the filename heuristic
+      flags `keynote.md`-style names (refine before reusing); URL redaction misses `user:pass@`;
+      `relative_to(state)` crashes for a workspace outside the state dir.
 
 ## Era ½ — The Survey (first run: clean and understand — NO features)
 - [x] **S-001** Toolchain + run check — cycle 3: SURVEY §1; `scripts/smoke_run.py` 12/12 PASS.
@@ -52,6 +54,9 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       `runtime/openclaw/VERSION_NOTES.md`; SURVEY §9; `scripts/survey_probe_openclaw.py` O1–O6;
       ADR-019 (firm profile). Nothing changed in OpenClaw. `doctor` deliberately not run.
 - [ ] **S-006** Correct the Bible where reality differs (living books + PROPOSALS for protected).
+      From cycle 7: 08 §1 — the online docs are the latest version, not the installed one;
+      `doctor` without `--fix` may still migrate. 08 §2 — backups born private (`umask 077`
+      or `openclaw backup`); firm profile (ADR-019).
 - [ ] **S-007** Write `state/SURVEY.md`; seed `state/IDEAS.md`; re-order this backlog.
 
 ## Era I — The Desk
