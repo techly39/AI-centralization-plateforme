@@ -147,3 +147,18 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - **Fixture time sanity.** A conftest guard that fails a test which freezes the clock before the
   ledger's latest stamp *without* declaring it (`@pytest.mark.step_back`): cycle 14 found three
   tests silently exercising the rewind path.
+
+## Cycle 15
+- **"Read where you stamp" as a static law.** Three cycles found the same bug: a value (`now`,
+  a price, a floor) read before the lock that guards the write. An AST test could flag any
+  `get_clock().now()` / `provider.get_price` call in `app/oms` or `app/ledger` that is not
+  lexically inside `with OMS_LOCK:` (allowlist with reasons). Turns a recurring red-team finding
+  into a detector.
+- **The Phase 3 milestone as a deterministic probe.** A `scripts/` HTTP client that opens a temp
+  backtest DB, runs one rule-based pod (no LLM) for a month with daily advances, and asserts the
+  ledger replays to the same equity curve twice — byte-identical runs = the first determinism test
+  Era I needs, and the timing gives the "< 10 min" number.
+- **Run manifest.** `run_started` already carries `look_ahead_guard`; grow it into a manifest of
+  every physics guard and law version in force (fee model, ADR numbers, git sha). Then the
+  Observatory can refuse to compare runs born under different physics — honest measurement across
+  generations.

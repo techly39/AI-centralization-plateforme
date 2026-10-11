@@ -460,3 +460,29 @@ pending-order sweep, then: live and backtest stamps can never share a ledger (th
 `ledger_now` are per run by construction), a restart resumes at the ledger's simulated now, a limit
 order fills on the advance that crosses it, PMs/analysts get 403, live mode refuses to advance
 (409), and B-029's forward-step risk cannot arise in a backtest.
+Work: ADR-027 (+ amendment). `BacktestClock` + `wall_now()` (`app/clock.py`); `app/run_clock.py`
+(`start_backtest` refuses any non-empty DB / naive / future start; `install_run_clock` from the
+ledger; `advance` under `OMS_LOCK` from `ledger_now`, ≤ real now, appends `clock_advanced`);
+`POST /clock/advance` (`CONTROL_CLOCK`, `{days, minutes}` 1 min..366 d, then the pending sweep) +
+MCP `advance_clock`; lifespan and CLI install the run clock; `fund-env start-backtest`;
+`clock.mode` removed from config; TRD §7/§9 amended. `tests/test_backtest_clock.py` (25). Red-team
+0005's "no clock control" guard rewritten to the new law (not loosened — auditor confirmed).
+Mutations: 7 laws, each red alone. Auditor **PASS** (3 WARN: lifespan untested → test; unguarded
+backtest could pass as honest → `run_started.look_ahead_guard: false`; failed-commit stray stamps →
+B-033). Red-team 0007: **3 medium holes**, 51 held — order priced at the old now but stamped at the
+new; sweep `now` read outside the lock; a running live server stamping today into a file turned
+backtest. All fixed (re-price under lock; read under lock; `append_event` refuses a clock that is
+not its ledger's run → 503), each mutation-red alone. Re-audit **PASS** (WARN: sweep test vacuous
+once fixed → asserts the outcome).
+Result: merged 87ac9b9, pushed. 546+8xf → **628 passed + 8 xfailed**. Hypothesis **met, then
+amended**: run scoping by construction held, but "the clock moves only by advance" was not enough
+— every *reader* of now that acts later (order pricing, sweep, a long-running server) had to read
+it at the moment it writes.
+Learned: (1) The third time the same lesson (cycles 13, 14, 15): a value read outside the lock that
+guards its write is a stale value. Discrete time makes it visible — a live clock hides the gap in
+microseconds, a backtest step makes it a day. Read `now` where you stamp. (2) Choosing scope *by
+construction* (one file per run) deleted a whole class of attacks — red-team found no cross-run
+leak to try, only a process that had not noticed its file changed. (3) A red-team's suggested fix
+can be the less safe one (self-heal vs refuse); judge by the seal, and pin the safer property.
+Next: B-005 look-ahead guard (makes a backtest honest; flips `LOOK_AHEAD_GUARD`) → B-004b metrics/
+market-data "now" = `ledger_now` (IDEAS c14) → S-004b.

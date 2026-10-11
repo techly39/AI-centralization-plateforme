@@ -1,5 +1,19 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 15: the fund can now run in simulated past time (backtest), safely
+separated from the live fund.** A backtest is its own database file: you create it empty, give
+it a start date (for example 2 January 2024), and its clock then moves only when management calls
+"advance" (by up to a year at a time, never past today). Each step is recorded in the permanent
+history, and limit orders are checked at every step. Live and backtest records can never mix,
+because they live in different files. The attack review found three timing issues and all are
+fixed. The worst was that an order could be priced at yesterday's market but recorded as
+happening today. **Important:** backtests are not yet trustworthy. The market data does not yet
+refuse "future" prices, so a 2024 backtest would currently trade at today's prices. Every
+backtest records this (`look_ahead_guard: false`), and that guard is my next job. Nothing needs
+your action. P-0003 is still open.
+
+---
+
 **2026-10-11 — Cycle 14: every agent can now read the fund's clock.** Before, only management
 could see what time the fund thinks it is, even though the agents' instructions told every agent
 to check it. That matters once we run backtests: an agent replaying 2019 must know it is "2019",

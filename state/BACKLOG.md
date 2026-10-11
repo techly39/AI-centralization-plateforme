@@ -56,25 +56,43 @@ feed price ×2).
       not their event's held stamp (red-team 0005; orders fixed cycle 13). Copy `event.ts` like
       `fund_pod`/OMS do. With B-000e (message event carries body).
 - [ ] **B-029** (low, operator-only) A forward clock step is permanent under ADR-025 (f): guard
-      (refuse or log) a clock far ahead of the ledger floor. Design with B-004 (per-`run_id` floor).
+      (refuse or log) a clock far ahead of the ledger floor. Live runs only since ADR-027 (a
+      backtest's steps are bounded and recorded).
 - [ ] **B-030** (low) `GET /events` pages only by `since` (ts ≥) with cap 1000: a long held
       stretch gives >1000 events on one stamp and management cannot page past them → add an
       id cursor (`after_id`). Also: market price + `now` read before `OMS_LOCK`, so an order
-      queued behind a sweep fills at a quote one sweep stale (red-team 0005 notes). With B-005.
+      queued behind a sweep fills at a quote one sweep stale (red-team 0005 notes) — fixed for
+      non-live clocks in cycle 15 (re-price under the lock); live keeps the gap. With B-005.
 - [x] **B-020** Clock vs agents — cycle 14 (ADR-026): every agent reads `/clock`; `now` is the
       ledger's now (`ledger_now`); control stays closed. Red-team 0006: 1 low hole fixed.
-- [ ] **B-004** TRD Phase 3a: simulated clock, `POST /clock/mode`, `POST /clock/advance`,
-      `run_id` scopes; pending-order monitor runs on every advance. **Next.** Must: scope the
-      ADR-025 floor *and* `ledger_now` per `run_id` before any agent runs a backtest (else a
-      backtest sharing a DB sees live stamps as "now" — re-audit, cycle 14); gate control on a
-      non-universal action (red-team 0006 guard); B-029 forward-step guard.
-- [ ] **B-031** (low) `mode` on `/clock` lets agents tell live from backtest (ADR-026 accepts it).
-      If an experiment needs agents blind to the mode, withhold it by role in one place, with the
-      Runtime/Truman controlling what an agent perceives (auditor note, cycle 14).
+- [x] **B-004a** Backtest clock — cycle 15 (ADR-027): a run is a database (`start-backtest`,
+      `run_started`), `POST /clock/advance` (`CONTROL_CLOCK`), sweep on advance, restart resume,
+      `append_event` refuses a wrong-run clock. Red-team 0007: 3 medium holes fixed.
 - [ ] **B-005** TRD Phase 3b: look-ahead guard on every market-data route + red-team pass.
+      **Next — a backtest is not honest until this lands** (`run_started.look_ahead_guard: false`;
+      flip `LOOK_AHEAD_GUARD` in `app/run_clock.py`; red-team 0007 confirmed yfinance `get_price`
+      ignores `as_of`, so a 2024 run fills at today's quote).
       Must filter bars by their **end** time (a daily bar stamped 00:00 carries that day's close,
       SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3). Fix the test double
       `tests/support.py` `HistoricalProvider` the same way (§4b.3), or the suite certifies the leak.
+- [ ] **B-004b** One "now" for physics: metrics `as_of`, market-data defaults, leaderboard read
+      `ledger_now`, not `get_clock().now()` (IDEAS c14); a grep test pins it. Then the Phase 3
+      milestone: one pod, 1-month backtest, < 10 min real time (a scripted probe, no LLM).
+- [ ] **B-032** Clock control belongs to the Runtime, not to a firm agent: before any LLM
+      management agent wakes, move `CONTROL_CLOCK` from `management` to a Runtime/operator
+      identity (ADR-027; Art. 10 — the world's time is not a participant's lever).
+- [ ] **B-033** (low, operator-only) `advance` moves the clock before its commit; if the commit
+      fails, non-OMS writers may already hold stamps at `end` with no `clock_advanced` explaining
+      them (auditor WARN, cycle 15). Also: two concurrent `start-backtest` on one empty file, or a
+      stale live write between its emptiness check and `run_started` (run check and insert are two
+      statements). Fix: one statement, or a file lock for `start-backtest`. Mode check is a string
+      (`!= "backtest"`) — an explicit allowed set if a third clock type appears.
+- [ ] **B-034** (low) Operator CLI commands ignore `governance/HALT` (pre-existing; `start-backtest`
+      copies it). Decide: the Human's own hands (ADR-023 says not gated) vs a Runtime script
+      calling the CLI — if the Runtime ever does, gate it.
+- [ ] **B-031** (low) `mode` on `/clock` lets agents tell live from backtest (ADR-026 accepts it).
+      If an experiment needs agents blind to the mode, withhold it by role in one place, with the
+      Runtime/Truman controlling what an agent perceives (auditor note, cycle 14).
 - [ ] **B-021** `GET /tasks` + `GET /costs` (own; cross-pod for management) + MCP tools —
       `list_tasks`/`list_costs` exist unused; a restarted agent cannot find its open task ids.
 - [ ] **B-017** Sharpe annualisation: equity curve is per calendar day, `annualise` uses √252 →
