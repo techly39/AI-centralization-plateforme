@@ -28,19 +28,28 @@ class Action(str, enum.Enum):
     REGISTER_AGENTS = "register_agents"
     DEACTIVATE_AGENTS = "deactivate_agents"
     READ_HALT = "read_halt"                # is the world halted? (GET /halt)
+    READ_CLOCK = "read_clock"              # the fund's now (GET /clock) — ADR-026
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
 #: all: every authenticated agent may read its own inbox, report its own cost
-#: and work, and ask whether the world is halted. They are still Actions rather than bare "any agent may" checks
+#: and work, ask whether the world is halted, and read the clock (ADR-026: in
+#: backtest the fund's now is a simulated date an agent cannot learn elsewhere).
+#: They are still Actions rather than bare "any agent may" checks
 #: so that the matrix below stays a complete description of the API surface —
 #: one place to look, and one place to change.
 _UNIVERSAL: frozenset[Action] = frozenset(
-    {Action.READ_MESSAGES, Action.REPORT_COST, Action.REPORT_TASK, Action.READ_HALT}
+    {
+        Action.READ_MESSAGES,
+        Action.REPORT_COST,
+        Action.REPORT_TASK,
+        Action.READ_HALT,
+        Action.READ_CLOCK,
+    }
 )
 
 
-# Role -> set of permitted actions. Mirrors the TRD §6 table exactly.
+# Role -> set of permitted actions: the TRD §6 table plus ``_UNIVERSAL`` (ADR-023, ADR-026).
 _MATRIX: dict[AgentRole, frozenset[Action]] = {
     AgentRole.analyst: _UNIVERSAL
     | frozenset(

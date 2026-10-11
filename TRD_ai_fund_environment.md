@@ -103,7 +103,7 @@ All endpoints also exposed as MCP tools with identical names.
 
 **Allocation (management only)**: `POST /allocations` (pod_id, delta, reason)
 
-**Clock (system/management only)**: `GET /clock`, `POST /clock/mode` (`live | backtest`), `POST /clock/advance` (backtest: advance simulated time by N minutes/days)
+**Clock (system/management only; `GET /clock` is readable by every agent and reports the ledger's now, max(clock, latest stamp) — ADR-026)**: `GET /clock`, `POST /clock/mode` (`live | backtest`), `POST /clock/advance` (backtest: advance simulated time by N minutes/days)
 
 **Meetings (Phase 3)**: `POST /meetings/schedule`, `GET /meetings/{id}/package` → assembled context: week's metrics, allocations, firm charter text, flagged anomalies
 

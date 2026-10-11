@@ -346,3 +346,42 @@ must carry the ledger's time: `Order.created_at` and `filled_at` are now copied 
 clock → B-028. (2) `QTY_EPSILON` forgives float dust on a position, never a sell of nothing: the OMS
 and the reducer both refuse any sell of a ticker the pod does not hold (a 1e-9 naked sell used to
 fill and credit cash).
+
+## ADR-026 — Every agent may read the clock; only the world controls it   (builder, cycle 14) — accepted
+Question: TRD §7 lists `GET /clock` under "Clock (system/management only)", so analysts and PMs
+get 403 — yet the MCP `get_clock` tool tells every agent "use this rather than your own clock"
+(SURVEY §4a.8, P7; B-020). In backtest mode (B-004) the fund's now is a simulated date. Widen the
+read, or correct the tool?
+Answer from the future: **widen the read, keep control closed.** Reading the clock becomes a
+universal action, `Action.READ_CLOCK`, beside `READ_HALT` in `app/registry/permissions.py`; the
+response stays `{mode, now}`. `POST /clock/mode` / `/clock/advance` do not exist yet and, when
+B-004 builds them, are system/management-only as TRD §7 says. This ADR amends TRD §7 for the read
+only.
+Why: (1) **Honest measurement** — an agent in a 2019 backtest that cannot learn it is 2019 will
+reason from its runtime's wall clock (2026), which is exactly the future knowledge the look-ahead
+guard exists to deny; the simulated date is the only honest time it can use. (2) **The 403 sealed
+nothing**: every order, fill, message and bar an agent already reads carries the fund's time, so
+the date leaks by inference anyway — the 403 only made the honest path the hard one. (3) Reading
+is not a privilege: like the halt state, it is the world's state, which every participant lives in
+(Art. 10.2: world facts are visible). (4) Smaller and reversible: one matrix line.
+On `mode`: an agent can tell `live` from `backtest`. Hiding it would be theatre while agents' own
+runtimes carry a wall clock; if an experiment needs agents blind to the mode, that belongs to the
+Runtime/Truman (which controls what an agent perceives), and this field can then be withheld by
+role in one place.
+Evidence: `tests/test_clock_and_health.py` — every role reads the frozen clock's `now` exactly;
+a PM's order is stamped with the `now` it read; the read writes no event and works under halt; a
+deactivated agent gets 401. Mutation: dropping `READ_CLOCK` from the universal set turns 13 tests
+red, all clock tests, nothing else. Red-team 0005's `test_held_no_clock_control_on_the_surface`
+(no clock write for any role, management included) is unchanged; its management-only read guard
+is replaced by a read-only guard (200, only `mode`/`now`).
+Amendment (same cycle, review): red-team 0006 — 1 low hole, ~36 attacks held (query strings, path
+and verb tricks, forged keys, `READ_CLOCK` admitting any other route, universal-set creep,
+cross-pod reads, deny-event spam, per-pod side channels, halt). Hole: after a clock step back the
+ledger holds its stamps (ADR-025) but `/clock` returned the raw clock, so an agent's next order
+was stamped later than the now it was told — the gap revealed another pod's activity in its
+"future". Fix: **`now` is the ledger's now** — `ledger_now(session)` in `app/ledger/events.py`,
+`max(clock, latest ts)` through the same `_not_before_latest` expression the INSERT uses: the stamp
+the agent's next event will carry. It reveals nothing an order would not (`created_at`). Mutation:
+raw clock back in `/clock` → only that test red. Tests whose frozen moment sat *before* the
+fixtures' stamps (an unnoticed step back) were moved after them; the attacks are unchanged.
+B-004's per-`run_id` floor will scope `ledger_now` with it.

@@ -39,7 +39,14 @@ def test_matrix(role: AgentRole, action: Action, allowed: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    "action", [Action.READ_MESSAGES, Action.REPORT_COST, Action.REPORT_TASK]
+    "action",
+    [
+        Action.READ_MESSAGES,
+        Action.REPORT_COST,
+        Action.REPORT_TASK,
+        Action.READ_HALT,
+        Action.READ_CLOCK,
+    ],
 )
 @pytest.mark.parametrize(
     "role", [AgentRole.analyst, AgentRole.pm, AgentRole.management, AgentRole.system]

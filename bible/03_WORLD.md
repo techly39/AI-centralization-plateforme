@@ -55,10 +55,10 @@ endpoint (tested against OpenAPI).
 
 **"Works" with known holes (Survey, `state/SURVEY.md` §2a/§4a/§4b; the full list is the
 backlog's physics section), e.g.:** time is the weak spot —
-rebuild ≠ live under a backwards clock (B-016), daily bars leak the day's close (B-005;
+daily bars leak the day's close (B-005;
 the test double `HistoricalProvider` leaks the same way, so the suite would certify it),
-quotes ignore `as_of`, Sharpe is annualised on calendar days (×0.845, B-017), `/clock`
-is 403 for the agents the MCP tool tells to use it (B-020). Pod creation and the `system`
+quotes ignore `as_of`, Sharpe is annualised on calendar days (×0.845, B-017). (Fixed since:
+replay order, B-016/ADR-025; every agent reads `/clock`, B-020/ADR-026.) Pod creation and the `system`
 agent write no event, and several tables are not rebuilt from the ledger (B-018).
 Non-finite floats (`limit_price=1e309`) reach the ledger as `Infinity` (B-000d); a missing
 `pod_id` on register is a 500 (B-019). `mcp_server` imports most of `app/` through one
