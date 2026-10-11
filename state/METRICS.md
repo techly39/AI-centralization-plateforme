@@ -11,3 +11,4 @@
 | 6 | 2026-10-11 | ½ | S-004a cleanup edits | merged | ~45 | 267+9xf | ~15 | key redacted (git rm denied headless → P-0002, S-004b); auditor PASS (5 notes: 2 fixed, 3 at record); no red-team (no physics change) |
 | 7 | 2026-10-11 | ½ | S-005 OpenClaw survey | merged | ~50 | 267+9xf | ~20 | backup + probe O1–O6; auditor BLOCK ×2 (missed xAI key file, double count) → fixed → PASS (5 notes → backlog); chmod denied headless → Q-0004; no red-team (no physics change) |
 | 8 | 2026-10-11 | ½ | S-006 Bible corrections | merged | ~30 | 267+9xf | ~10 | ADR-020; 00/01 no proposal; auditor BLOCK ×2 (tools.profile not global-only — cycle-7 error; docs default counted as measured) → fixed → PASS (3 notes); no red-team (docs only) |
+| 9 | 2026-10-11 | ½→I | S-007 close Era ½ | merged | ~30 | 267+9xf | ~12 | 5/5 exit criteria ticked (SURVEY §10), ADR-021; auditor BLOCK ×1 (physics bugs silently demoted) → fixed → PASS; no red-team (docs only) |

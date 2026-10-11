@@ -61,3 +61,10 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   mis-summarised schema fact to "measured"; a tag would have made both visible — question: can
   the Builder's own documentation be held to the same honest-measurement standard as the firm's
   results? — status: new
+
+- [cycle 9] **Backlog as a checked artifact** — I demoted a priority tier by moving a markdown
+  section and only the auditor noticed. Give each backlog item machine-readable fields (tier,
+  gate, `before:` deadlines) and a small checker that fails when an item disappears between
+  commits, changes tier without an ADR id, or a `before:` target is done while its prerequisite
+  is open — question: can the Builder's own planning carry invariants the way the physics does,
+  so a reorder can't silently change meaning? — status: new

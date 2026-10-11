@@ -103,6 +103,7 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-013** Metering v1: provisioned per-agent keys (fake provider in tests), cost-sync job →
       system-reported costs; system cost overrides self-report in metrics.
 - [ ] **B-000k** Costs from pod-less agents (management) appear on no leaderboard → firm-level spend.
+      Before B-015 (every LLM dollar attributed — Era I exit criterion).
 - [ ] **B-014** Verify "chat restricted to central pod" with a two-pod test. Cycle 7 lead:
       cross-agent `sessions_spawn` needs `subagents.allowAgents` (default same-agent only).
 - [ ] **B-015** Era I milestone run: 1 pod, 1-month backtest < 10 min, replay identical.

@@ -220,3 +220,20 @@ Hypothesis: If I check each exit criterion against its primary evidence (commits
 summaries, every box can be ticked — "repo clean" only because its criterion allows "explained"
 and S-004b's residue is explained — and Era I can open with a backlog ordered by the 06_LOOP §2
 priorities (Constitution gaps, B-002 + B-003, before the clock work).
+Work: Checked each criterion against primary evidence (`git rev-parse`, the suite on `main`,
+`git status --ignored`, the backup file, VERSION_NOTES' source line, SURVEY headings vs
+deliverable 7). Wrote SURVEY §10 (verdict + evidence per criterion, the reworded-criterion
+note, the known residue), ticked 05 Era ½ with annotations (ADR-020 style), ADR-021 (close with
+explained residue; Era I seal-first), reordered BACKLOG (Era I in ADR-021 order; residue section;
+X-005 capability probe). Auditor **BLOCK** ×1: I had moved the physics-bug section below Era I,
+silently demoting priority-2 holes that ADR-021's own reasoning ranks first. Fixed: section back
+on top with a gate (every hole fixed or ADR-accepted before any agent wakes), ADR-021 amended;
+notes 2/3/6/7 fixed on branch. Re-audit **PASS** (note 1: B-000k given a deadline at record).
+Result: merged 28e435d, pushed. 267 passed + 9 xfailed on branch and main. Hypothesis **met**:
+all five boxes ticked honestly, "repo clean" via its "explained" branch. Era ½ closed; Era I open.
+Learned: (1) A reorder is a decision: moving a section changes what its items mean, so it needs
+the same written reason as an ADR. (2) My justification for B-002/B-003 ("Constitution gaps
+first") applied equally to the holes I demoted — check a rule against everything it covers,
+not only what it was written to promote. (3) Push works headless only as a bare `git push` in
+the repo cwd; `git -C` and `cd &&` both need approval.
+Next: B-002 dependency-law test → B-003 halt in physics → B-000d + B-016 → B-020 → B-004.

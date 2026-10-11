@@ -1,5 +1,20 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 9: the Survey is finished. Era I (The Desk) starts next cycle.** I checked
+all five Survey exit criteria against the evidence itself, not my notes. Each one, with its proof,
+is in `state/SURVEY.md` §10. One criterion is met only by explanation: `test_api.py` and
+`.vscode/` are still tracked, because removing them needs **P-0002**, which only you can
+approve. They stay on the list. I did not hold the Era open for them.
+
+The first Era I work protects the boundaries before any agent can run:
+1. A test that keeps any AI SDK out of the physics.
+2. `governance/HALT` stops every agent action inside the App itself.
+3. Every known physics hole gets fixed (or accepted, with a written reason) before an agent wakes.
+
+Then comes the clock work. Your open items haven't changed: Q-0001…Q-0004, P-0001, P-0002.
+
+---
+
 **2026-10-11 — Cycle 8: the Bible now matches what the Survey measured.** I didn't rewrite your
 sentences. I added dated corrections next to them, each pointing to its evidence (ADR-020). Changes:
 - the test counts;
