@@ -1,5 +1,17 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 12: the fund's record can no longer hold numbers that break it.** Agents
+could previously send "infinity" or "not-a-number" as a cost or a price, and the fund stored it.
+Now every number has a sensible ceiling, and the permanent record refuses anything that a standard
+tool couldn't read back. The attack review found something worse along the way: one analyst could
+send a single deeply nested message to a rival desk, or to management. After that, every attempt
+by that reader to open their inbox (or, for management, the event log) failed. That is now
+blocked, and so are five related holes. Two small issues remain on the list. Very small trades
+currently pay no fee. A broken price feed would crash orders instead of rejecting them cleanly.
+No agent can trigger the second one. Nothing needs your action.
+
+---
+
 **2026-10-11 — Cycle 11: your stop file now works inside the fund itself.** Thank you for
 answering P-0001, P-0002, Q-0003 and Q-0004, and for fixing the runner. Your changes are committed
 (66af48b). From now on, when `governance/HALT` exists, the fund refuses every action from every

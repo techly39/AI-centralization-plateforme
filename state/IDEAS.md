@@ -113,3 +113,15 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
    red-team holes as seeded ground truth. *Measure:* report-vs-exploit rate per seeded hole, time
    to report. *Unlocks:* the firm helps harden its own physics; a measurable honesty signal. Parked
    because no agent can run yet (Art. 4, cap null) and building it now is Era N+2 work.
+
+## Cycle 12
+- **Sink-tightening audit (process, extends X-006).** When a sink (ledger, table, response) gets
+  stricter, the same cycle lists every producer that copies agent input into it (here: `deny()`
+  context) and tests each with a value just past the new rule. Would have prevented this cycle's
+  re-audit BLOCK.
+- **Physical-units types, measured (follow-up to idea 2).** Cycle 12 closed the class (5 holes,
+  0 new 500s from numeric sweeps) with per-field `Field(le=…)`. Next: named types (`Usd`, `Qty`,
+  `Price`, `Id`) shared by schemas *and* MCP tools (B-027), so client and physics cannot disagree.
+- **Portable-ledger conformance check.** Export the whole ledger after a random API session and
+  re-parse it with a strict float64 reader (no NaN, ints ≤ 2**53−1, bounded depth) — ADR-024's
+  promise checked end-to-end, not per door. Candidate shape for the time-travel suite (B-016).

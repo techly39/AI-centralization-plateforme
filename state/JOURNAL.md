@@ -350,3 +350,32 @@ the 422 handler spells NaN as text, and `append_event` refuses non-finite payloa
 `NaN`/`±Infinity`/`1e309` sent to every float or free-JSON request field gets a clean, standard-JSON
 422 that names the field and writes no row and no event; the 3 B-000d xfails pass with their
 markers removed; and removing any one of the three layers turns its own tests red.
+Work: `app/finite.py` (`json_problem`, iterative; `json_safe` for the 422 echo); caps in
+`app/limits.py` (`MAX_USD_PER_REPORT` 1e6, `MAX_ORDER_QTY` 1e9, `MAX_PRICE` 1e7, `MAX_JSON_DEPTH` 32,
+`MAX_LEDGER_DEPTH` 36, `MAX_SAFE_INT` = `MAX_ID` = 2**53 − 1); bounded float fields + `FiniteJSON`
+for `structured_payload`/`outcome` + `Id`/`IdPath` and bounded id queries/refs; NaN-safe,
+depth-bounded 422 handler in `app/main.py`; `append_event` refuses non-portable payloads;
+`report_cost` checks `usd_cost`; MCP float caps. `tests/test_finite.py` (68 tests incl. an OpenAPI
+guard that fails on any unbounded float/int, untested free-JSON field, or shape it cannot walk, with
+planted counter-examples). ADR-024 (+ amendment). Mutations: no fix → 49/50 red; handler only →
+35 red; ledger only → 9 red; id bound on orders → 3 red.
+Auditor **PASS** with 2 WARNs (guard blind to arrays/nested models/`Any`; sweep-wide rollback
+undisclosed) → both fixed. Red-team 0004: **6 holes** — deep free JSON (~256+) stored then every
+inbox/`/events` read of it a 500 (**high**, HTTP+MCP, cross-pod), ints like 10**400 in the ledger
+(medium), walker recursion 500, int64 ids from analysts/PMs (low), fee $0.00 below $5 notional
+(low), non-finite feed price → 500 (low, not agent-reachable). First four fixed this cycle; 15
+attacks held. Re-audit **BLOCK**: my new int cap made `deny()` raise on `pod=2**53+1` → 500 and
+the `permission_denied` record lost → every agent-supplied id bounded 1..2**53−1 → re-audit PASS.
+Result: merged a70d2bb, pushed. 334 + 9xf → **461 passed + 8 xfailed** on branch and main; 3
+B-000d xfails + B-000m (red-team 0002) + red-team 0004's int64 hole closed; 2 new open (B-026 fee,
+B-025 feed). Hypothesis **met, then outgrown**: the three layers worked as stated, but "finite" was
+the wrong promise — red-team showed depth and big ints break the same portability.
+Learned: (1) Name the invariant, not the symptom: "finite floats" was a symptom of "the ledger is
+portable JSON a reader can render"; framing it right first would have caught depth and big ints.
+(2) Tightening a sink (ledger) turns every producer that copies agent input into a new 500 path —
+when a sink gets stricter, grep its producers (`deny()` context) the same cycle. (3) A coverage
+guard must classify *every* shape and fail on the unknown, or it certifies only what I thought of.
+(4) Third cycle running where red-team found something the auditor did not, and vice versa — both
+stay mandatory on physics.
+Next: B-016 replay order (with the time-travel invariant suite) → S-004b quick cleanup → B-020 →
+B-004.

@@ -5,28 +5,41 @@
 agent wakes (before B-012's first live conformance probe and before B-015). Order inside the
 tier: B-002 + B-003 first, B-000d with or before B-016 (both touch `append_event`), B-000e with
 B-018, the rest when cheap or blocking.
-Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix = remove the marker.
-- [ ] **B-000d** Non-finite floats: reject inf/NaN/1e308 on **every** float input → clean 422
-      (3 xfail tests on `usd_cost`; SURVEY §4a.7: `limit_price=1e309` is stored and read back as
-      `null`, and its event payload is written as non-standard JSON `Infinity`). Likely one fix:
-      `allow_inf_nan=False` on the API schemas, plus `append_event` refusing non-finite payloads
-      so the ledger stays portable JSON. Consider IDEAS "physical-units types". Before B-016
-      touches `append_event`, or together with it.
+Each red-team hole has a strict-xfail test in `tests/test_redteam_000N.py`; fix = remove the marker.
+Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MCP path; 0004: fee,
+feed price ×2).
+- [ ] **B-025** (low, not agent-reachable) Non-finite or absurd prices from the world: a
+      NaN/inf provider price (yfinance can) or `config.yaml` value (`fee_rate`, `static_prices`)
+      → `append_event` raises → POST /orders 500; in the background sweep one such fill rolls back
+      **every pod's fills that tick**, every tick (`app/oms/monitor.py`). Fix: providers refuse
+      non-finite prices (→ clean `price_unavailable` rejection); settings `allow_inf_nan=False` +
+      upper bounds; sweep isolates per-order failures. Red-team 0004 xfail
+      `test_hole_non_finite_feed_price_is_a_500`. With B-005/B-008.
+- [ ] **B-026** (low) Fee rounds to cents per order → any order under $5 notional pays $0.00;
+      splitting a trade dodges fees; 5e-324-share orders fill. Fix: round fee up (min $0.01/fill)
+      and/or a minimum order notional — an honest-measurement law (cost-adjusted ranking). Red-team
+      0004 xfail `test_hole_small_orders_pay_no_fee`.
+- [ ] **B-027** (low) MCP tool int args (`order_id`, `task_id`, ids, cursors) carry no `ge`/`le`;
+      mirror `MAX_ID` from `app/limits.py` so client and physics agree (re-audit note, cycle 12).
+      Also `fund-pod --pod-id` / `--delta` unbounded in the CLI (operator-only; ledger refuses
+      non-finite).
 - [ ] **B-000e** Message `body` + `structured_payload` on the `message_sent` ledger event, so the
       messages table is rebuildable (CLAUDE.md: every state change is an event). With B-018.
 - [ ] **B-019** (low) `POST /agents/register` with a missing `pod_id` → 500 (FK error unhandled);
       PM without pod accepted (can never trade). → 404/422. SURVEY §4a.6, probe P5/P6.
-- [ ] **B-000m** (low) Integer path params ≥ 2⁶³ → 500 (`GET /metrics/pod/{2**63}`; likely every
-      `/{id}` route) → `tests/test_redteam_0002.py::test_hole_metrics_pod_id_beyond_int64_500`.
 - [ ] **B-000n** (low) Cost-report rate is unbounded per agent (spam inflates rows; token totals
       lose exactness past ~9e7 max-size reports). Decide on a per-agent rate law. With B-013.
 - [ ] **B-000f** 'system' identity looked up by role/reserved name, not a squattable name.
-- [ ] **B-000g** Size caps on `structured_payload` and task `outcome`.
+- [ ] **B-000g** Byte-size caps on `structured_payload` and task `outcome` (depth is capped since
+      cycle 12, size is not — 2 xfails in red-team 0001).
 - [ ] **B-000h** MCP client: URL-escape path params.
 - [ ] **B-000b** A test that proves `OMS_LOCK` is load-bearing (F-0001), e.g. race injected between
       cash read and write, or run against a row-locking backend; or document the lock as defence-in-depth.
 - [ ] **B-000j** Decide whether `state/loop_status.json` is tracked (runner state) — auditor note.
 - [x] **B-000c** (high) Token-sum overflow DoS — cycle 2: per-report cap 1e8 + `TOTAL` sum (ADR-018).
+- [x] **B-000d** Portable JSON — cycle 12 (ADR-024): bounded floats, walked free JSON (finite,
+      ints ≤ 2**53−1, depth ≤ 32), NaN-safe 422, `append_event` refuses; red-team 0004: 4 holes fixed.
+- [x] **B-000m** Int ids ≥ 2⁶³ → 500 — cycle 12: every agent-supplied id is 1..2**53−1 (ADR-024).
 
 ## Era I — The Desk (current; order per ADR-021: seal → time → clock → the rest)
 - [x] **B-002** Dependency-law test — cycle 10 (ADR-022; `app/limits.py`; 2 detectors).
