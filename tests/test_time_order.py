@@ -36,7 +36,7 @@ from app.ledger.events import (
     read_events,
 )
 from app.ledger.rebuild import rebuild_state
-from app.ledger.reducers import DerivedState, apply_event
+from app.ledger.reducers import QTY_EPSILON, DerivedState, apply_event
 from app.metrics.equity import build_equity_curve
 
 T0 = datetime(2026, 6, 10, 15, 0, tzinfo=timezone.utc)
@@ -209,6 +209,12 @@ def test_sell_beyond_the_position_raises():
 def test_sell_with_no_position_raises():
     with pytest.raises(ValueError, match="beyond"):
         apply_event(DerivedState(), _fill("sell", 1))
+
+
+def test_dust_sell_with_no_position_raises():
+    """QTY_EPSILON forgives dust on a position, never a sell of nothing (red-team 0005)."""
+    with pytest.raises(ValueError, match="beyond"):
+        apply_event(DerivedState(), _fill("sell", QTY_EPSILON))
 
 
 def test_sell_of_the_whole_position_within_float_dust_closes_it():

@@ -31,6 +31,7 @@ from app.db.models import AgentRole, Base, CashBalance, Event, Order, Pod, Posit
 from app.ledger.events import (
     EVENT_ALLOCATION_SET,
     EVENT_ORDER_FILLED,
+    EVENT_ORDER_PLACED,
     EVENT_PERMISSION_DENIED,
     append_event,
 )
@@ -427,9 +428,15 @@ def test_order_fill_time_matches_its_ledger_event(frozen_clock, client, desk, db
         e.payload_json["order_id"]: e.ts
         for e in db.scalars(select(Event).where(Event.type == EVENT_ORDER_FILLED))
     }
+    placed = {
+        e.payload_json["order_id"]: e.ts
+        for e in db.scalars(select(Event).where(Event.type == EVENT_ORDER_PLACED))
+    }
     for o in (first, second):
         assert datetime.fromisoformat(o["filled_at"]).replace(tzinfo=timezone.utc) \
             == fills[o["id"]]
+        assert datetime.fromisoformat(o["created_at"]).replace(tzinfo=timezone.utc) \
+            == placed[o["id"]]
     # what agents see must order the fills the way the ledger does
     orders = client.get("/orders", headers=H(pm_key)).json()
     assert [o["id"] for o in orders][:2] == [second["id"], first["id"]]
