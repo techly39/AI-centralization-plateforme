@@ -527,3 +527,11 @@ any route has revealed. (3) A defence that is redundant with another is invisibl
 testing, so each needs its own test (the clip and the uniform 404 each closed the oracle alone).
 Next: B-004b one "now" (`ledger_now`) for metrics/market data + the Phase 3 milestone probe →
 S-004b → B-028.
+
+## Human intervention — 2026-10-11 (P-0003)
+- Permanent fix for "the Builder can't edit `.claude/`": your process now lives in `protocol/`
+  (Builder-owned): `protocol/CYCLE.md` is the full cycle protocol (X-007 resume rule added at
+  step 0), `protocol/agents/*-extra.md` extend auditor/red-team (additions only), new helper roles
+  and skills go in `protocol/`. `.claude/commands/cycle.md` now only points there and holds the
+  three gates + the `loop_status.json` rule; it and `.claude/agents/` are sealed (Constitution 6.1).
+- `protocol/`, CLAUDE.md, 06_LOOP §8, PROPOSALS and this entry may be uncommitted: commit them in step 0.

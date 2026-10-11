@@ -119,9 +119,14 @@ Then update `BACKLOG.md`, and if a process change is warranted, make it an Era �
 
 ## 8. Builder self-improvement rules
 
-- May add/modify: `.claude/agents/*`, `.claude/skills/*`,
-  `.claude/commands/*` (except it may not weaken `cycle.md` steps 0, 5, 7 — the
-  preflight, verification, and merge gates).
+- Claude Code protects `.claude/`, so the Builder's editable process lives in **`protocol/`**
+  (P-0003, accepted 2026-10-11): `protocol/CYCLE.md` (the full cycle protocol),
+  `protocol/agents/*-extra.md` (extra checks for auditor / red-team — additions only),
+  `protocol/agents/<role>.md` (new helper roles, launched via a general-purpose subagent),
+  `protocol/skills/` (reusable procedures).
+- `.claude/commands/cycle.md` and `.claude/agents/*` are thin, human-owned and sealed: they hold
+  the three gates (0 stop, 5 verify, 7 merge), the `loop_status.json` rule, and the core
+  auditor / red-team instructions. The Builder never weakens them; it proposes changes.
 - Every change to its own tooling is an Era ∞ cycle with a hypothesis and a metric.
 - If a change to its own process lowered the cycle success rate over the next 10
   cycles, revert it and record the finding.

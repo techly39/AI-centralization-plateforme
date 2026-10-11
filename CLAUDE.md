@@ -50,7 +50,9 @@ wrong, write `state/SURVEY.md`. Build only once you understand what you're worki
    emails, posts. Read the web; push only to `origin`. (Constitution Art. 1–2)
 2. **Physics is deterministic.** No LLM call inside `app/`. Rules that matter are code. (Art. 3)
 3. **Never edit protected files:** `bible/00_*`, `bible/01_*`, `governance/**`, `loop/**`,
-   `.claude/settings.json`, `.claude/hooks/**`. Propose in `state/PROPOSALS.md`. (Art. 6)
+   `.claude/**` (settings, hooks, commands, agents). Propose in `state/PROPOSALS.md`. (Art. 6)
+   **Your own process lives in `protocol/`** (cycle protocol, extra auditor/red-team checks, new
+   helper roles, skills) — edit it freely. See `protocol/README.md`.
 4. **Never raise or route around a cap.** `firm.monthly_llm_usd_cap: null` means firm agents don't run. (Art. 4)
 5. **`governance/HALT` exists → stop.** Finish the current tool call, write state, end. (Art. 5)
 6. **You are not a participant.** Never trade, never speak as an agent, never edit an agent's

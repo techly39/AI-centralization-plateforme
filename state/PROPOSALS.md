@@ -49,4 +49,4 @@ after the `git status --porcelain` sentence:
 > step 5 — no new unit until it is merged, failed or recorded as abandoned with its reason.
 Risk if rejected: none to safety. The Builder follows the resume rule by judgement (as in cycle 13)
 until it is written down.
-Human decision:
+Human decision: **accepted, done differently** (2026-10-11): the protocol moved to `protocol/CYCLE.md` (Builder-owned, X-007 resume rule included). `.claude/commands` + `.claude/agents` are now thin, human-owned and sealed. See `protocol/README.md`.
