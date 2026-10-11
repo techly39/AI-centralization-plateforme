@@ -59,6 +59,7 @@ from app.ledger.events import (
     EVENT_ORDER_PLACED,
     EVENT_ORDER_REJECTED,
     append_event,
+    ledger_now,
 )
 from app.marketdata import (
     MarketDataError,
@@ -210,7 +211,9 @@ def place_order(
     )
 
     provider = provider or get_provider()
-    now = get_clock().now()
+    # The ledger's now, not the raw clock: the order is stamped with it (ADR-025)
+    # so it is priced at it too, even when the clock is behind the ledger (ADR-029).
+    now = ledger_now(session)
 
     # The reference price: what the order is worth *right now*. A market order
     # fills at it; a limit order is only cash-checked against its own limit
@@ -222,12 +225,11 @@ def place_order(
     )
 
     with OMS_LOCK:
-        clock = get_clock()
-        if clock.mode != "live" and clock.now() != now:
+        if get_clock().mode != "live" and ledger_now(session) != now:
             # A backtest clock advanced while the price was fetched (red-team
             # 0007): the order will be stamped at the new now, so it is priced
             # there too. Only this rare path fetches under the lock.
-            now = clock.now()
+            now = ledger_now(session)
             if price_type is PriceType.market:
                 reference_price = _fetch_price(provider, symbol, now)
         try:

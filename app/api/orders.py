@@ -167,7 +167,7 @@ def read_portfolio(
     actor: Agent = Depends(require(Action.READ_OWN_PORTFOLIO)),
     session: Session = Depends(get_session),
 ) -> PortfolioOut:
-    """Positions, cash, and unrealised P&L for a pod, valued at clock-now."""
+    """Positions, cash, and unrealised P&L for a pod, valued at the ledger's now."""
     _assert_may_read_pod(session, actor, pod_id)
     view = build_portfolio(session, pod_id=pod_id, provider=get_provider())
     return PortfolioOut(

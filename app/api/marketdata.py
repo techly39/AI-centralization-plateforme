@@ -4,9 +4,10 @@ Thin by design: parse, delegate to the provider, translate errors. All three
 roles may read market data (TRD §6), so the gate is just "are you a known
 agent with READ_MARKET_DATA".
 
-Prices are always requested at ``clock.now()``, never at wall-clock now. In live
-mode those are the same thing; in backtest mode (Phase 3) they are emphatically
-not, and this is the line that keeps the simulation honest.
+Prices are always requested at the ledger's now (``ledger_now``: the time on
+``GET /clock`` and on the caller's next order, ADR-026/029), never at wall-clock
+now. In live mode those are the same thing; in backtest mode they are
+emphatically not, and this is the line that keeps the simulation honest.
 """
 
 from __future__ import annotations
@@ -15,10 +16,12 @@ from dataclasses import asdict
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 from app.api.schemas import BarOut, OHLCVOut, PriceOut
-from app.clock import get_clock
+from app.db.base import get_session
 from app.db.models import Agent
+from app.ledger.events import ledger_now
 from app.marketdata import (
     InvalidRequestError,
     LookAheadError,
@@ -50,9 +53,10 @@ def _http_error(exc: MarketDataError) -> HTTPException:
 def read_price(
     ticker: str,
     _: Agent = Depends(require(Action.READ_MARKET_DATA)),
+    session: Session = Depends(get_session),
 ) -> PriceOut:
     try:
-        quote = get_provider().get_price(ticker, as_of=get_clock().now())
+        quote = get_provider().get_price(ticker, as_of=ledger_now(session))
     except MarketDataError as exc:
         raise _http_error(exc)
     return PriceOut(
@@ -71,9 +75,10 @@ def read_ohlcv(
     end: date | None = Query(default=None, description="Exclusive. Defaults to the clock's today."),
     interval: str = Query(default="1d", description="1d | 1wk | 1mo | 1h"),
     _: Agent = Depends(require(Action.READ_MARKET_DATA)),
+    session: Session = Depends(get_session),
 ) -> OHLCVOut:
-    now = get_clock().now()
-    # Defaults come off the injected clock, so a backtest asking for "recent
+    now = ledger_now(session)
+    # Defaults come off the ledger's now, so a backtest asking for "recent
     # history" gets history recent to the *simulation*, not to today.
     resolved_end = end or (now.date() + timedelta(days=1))
     resolved_start = start or (resolved_end - _DEFAULT_LOOKBACK)

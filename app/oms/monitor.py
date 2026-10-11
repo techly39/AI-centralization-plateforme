@@ -27,8 +27,8 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clock import get_clock
 from app.db.models import Order, OrderSide, OrderStatus, PriceType
+from app.ledger.events import ledger_now
 from app.marketdata import MarketDataError, MarketDataProvider, get_provider
 from app.oms.errors import OrderRejected
 from app.oms.service import (
@@ -100,8 +100,9 @@ def check_pending_orders(
         if is_halted():
             return result
         # Read under the lock too: a sweep queued behind a clock advance must
-        # price at the now its fills will be stamped with (red-team 0007).
-        now = get_clock().now()
+        # price at the now its fills will be stamped with (red-team 0007): the
+        # ledger's now, which is that stamp even when the clock is behind it.
+        now = ledger_now(session)
         try:
             orders = pending_limit_orders(session, pod_id=pod_id)
             result.checked = len(orders)

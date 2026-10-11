@@ -34,9 +34,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.bus.messages import count_messages_sent_by_pod
-from app.clock import get_clock
 from app.config import get_settings
 from app.db.models import Cost, Order, OrderSide, OrderStatus, Pod, Task
+from app.ledger.events import ledger_now
 from app.marketdata import MarketDataProvider, get_provider
 from app.metrics.equity import DailyCloseCache, build_equity_curve
 from app.metrics.performance import (
@@ -136,9 +136,9 @@ def compute_pod_metrics(
     provider: MarketDataProvider | None = None,
     closes: DailyCloseCache | None = None,
 ) -> PodMetrics:
-    """Everything the TRD asks for about one pod, valued at clock-now."""
+    """Everything the TRD asks for about one pod, valued at the ledger's now."""
     provider = provider or get_provider()
-    now = get_clock().now()
+    now = ledger_now(session)
     settings = get_settings().metrics
 
     pod = session.get(Pod, pod_id)

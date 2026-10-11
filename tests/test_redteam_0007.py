@@ -394,15 +394,15 @@ def test_held_sweep_prices_at_a_now_the_clock_has_left(
 
     read_now = threading.Event()
 
-    class Spy:
-        mode = "backtest"
+    real_ledger_now = monitor.ledger_now
 
-        def now(self) -> datetime:
-            n = get_clock().now()
-            read_now.set()
-            return n
+    def spy(session) -> datetime:
+        # The sweep's read of now (ledger_now since cycle 17, ADR-029).
+        n = real_ledger_now(session)
+        read_now.set()
+        return n
 
-    monkeypatch.setattr(monitor, "get_clock", lambda: Spy())
+    monkeypatch.setattr(monitor, "ledger_now", spy)
     out: dict = {}
 
     def sweep_a() -> None:

@@ -19,8 +19,8 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clock import get_clock
 from app.db.models import Position
+from app.ledger.events import ledger_now
 from app.marketdata import MarketDataError, MarketDataProvider, get_provider
 from app.oms.money import round_money
 from app.oms.service import get_cash
@@ -61,9 +61,9 @@ def build_portfolio(
     pod_id: int,
     provider: MarketDataProvider | None = None,
 ) -> PortfolioView:
-    """Positions + cash + unrealised P&L for one pod, valued at clock-now."""
+    """Positions + cash + unrealised P&L for one pod, valued at the ledger's now."""
     provider = provider or get_provider()
-    now = get_clock().now()
+    now = ledger_now(session)
 
     rows = (
         session.execute(
