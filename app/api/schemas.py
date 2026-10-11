@@ -12,19 +12,27 @@ from typing import Annotated, Any, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
-from app.finite import first_non_finite
-from app.limits import MAX_ORDER_QTY, MAX_PRICE, MAX_TOKENS_PER_REPORT, MAX_USD_PER_REPORT
+from app.finite import json_problem
+from app.limits import (
+    MAX_JSON_DEPTH,
+    MAX_ORDER_QTY,
+    MAX_PRICE,
+    MAX_TOKENS_PER_REPORT,
+    MAX_USD_PER_REPORT,
+)
 
 
-def _finite_json(value: dict[str, Any]) -> dict[str, Any]:
-    bad = first_non_finite(value)
-    if bad:
-        raise ValueError(f"non-finite number at {bad}: NaN and Infinity are not JSON numbers")
+def _portable_json(value: dict[str, Any]) -> dict[str, Any]:
+    problem = json_problem(value, max_depth=MAX_JSON_DEPTH)
+    if problem:
+        raise ValueError(f"{problem}: not portable JSON (no NaN/Infinity, ints within "
+                         f"±2**53, at most {MAX_JSON_DEPTH} levels deep)")
     return value
 
 
-#: A free JSON object that holds no ``NaN``/``±Infinity`` at any depth (ADR-024).
-FiniteJSON = Annotated[dict, AfterValidator(_finite_json)]
+#: A free JSON object any standard reader can hold: finite numbers, safe
+#: integers, at most MAX_JSON_DEPTH levels (ADR-024).
+FiniteJSON = Annotated[dict, AfterValidator(_portable_json)]
 
 # Roles an operator/management may assign via the API. 'system' is internal-only
 # and is created by the bootstrap CLI, never over HTTP.

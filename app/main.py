@@ -77,9 +77,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         # FastAPI's own handler echoes the bad input; a NaN there made the 422
-        # unrenderable (500, red-team 0001). Same body, spelled as standard JSON.
+        # unrenderable (500, red-team 0001), and so did a ~1000-deep input
+        # (red-team 0004). Same body, spelled as standard JSON, depth-bounded.
         return JSONResponse(
-            status_code=422, content={"detail": json_safe(jsonable_encoder(exc.errors()))}
+            status_code=422, content={"detail": jsonable_encoder(json_safe(exc.errors()))}
         )
 
     @app.get("/health", tags=["meta"])

@@ -28,7 +28,14 @@ from sqlalchemy import func, select
 
 from app.db.models import Cost, Event, Message, Order, Task
 from app.ledger.events import append_event
-from app.limits import MAX_ORDER_QTY, MAX_PRICE, MAX_USD_PER_REPORT
+from app.finite import MAX_SAFE_INT
+from app.limits import (
+    MAX_JSON_DEPTH,
+    MAX_LEDGER_DEPTH,
+    MAX_ORDER_QTY,
+    MAX_PRICE,
+    MAX_USD_PER_REPORT,
+)
 
 
 def H(key: str) -> dict[str, str]:
@@ -161,6 +168,47 @@ def test_append_event_refuses_non_finite_payloads(db, bad, shape):
     before = _counts(db)
     with pytest.raises(ValueError, match="non-finite"):
         append_event(db, type="probe", actor_agent_id=None, payload=payload)
+    db.rollback()
+    assert _counts(db) == before
+
+
+def _nested(depth: int) -> dict:
+    """``depth`` nested dicts: ``_nested(1) == {"a": 1}``."""
+    value: object = 1
+    for _ in range(depth):
+        value = {"a": value}
+    return value  # type: ignore[return-value]
+
+
+def test_free_json_depth_is_capped_exactly(client, desk, db):
+    """MAX_JSON_DEPTH levels pass, one more is a 422 that writes nothing
+    (red-team 0004: ~256 levels were stored and then unrenderable)."""
+    key = desk["an"][1]
+    ok = {"to": "pod:1", "body": "x", "structured_payload": _nested(MAX_JSON_DEPTH)}
+    assert client.post("/messages", headers=H(key), json=ok).status_code == 201
+    before = _counts(db)
+    deep = {**ok, "structured_payload": _nested(MAX_JSON_DEPTH + 1)}
+    _assert_clean_422(client.post("/messages", headers=H(key), json=deep), "structured_payload")
+    assert _counts(db) == before
+
+
+@pytest.mark.parametrize(("value", "ok"), [(MAX_SAFE_INT, True), (-MAX_SAFE_INT, True),
+                                           (MAX_SAFE_INT + 1, False), (10**400, False)])
+def test_free_json_integers_must_fit_a_float64_reader(client, desk, value, ok):
+    body = {"to": "pod:1", "body": "x", "structured_payload": {"n": value, "flag": True}}
+    resp = client.post("/messages", headers=H(desk["an"][1]), json=body)
+    assert resp.status_code == (201 if ok else 422), resp.text
+
+
+def test_append_event_refuses_deep_and_huge_int_payloads(db):
+    before = _counts(db)
+    for payload, why in (({"n": 2**60}, "2\\*\\*53"),
+                         (_nested(MAX_LEDGER_DEPTH + 1), "deeper"),
+                         (_nested(5000), "deeper")):
+        with pytest.raises(ValueError, match=why):
+            append_event(db, type="probe", actor_agent_id=None, payload=payload)
+        db.rollback()
+    append_event(db, type="probe", actor_agent_id=None, payload=_nested(MAX_LEDGER_DEPTH))
     db.rollback()
     assert _counts(db) == before
 

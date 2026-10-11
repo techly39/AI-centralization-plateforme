@@ -277,3 +277,16 @@ provider; NaN never crosses); backlog B-025. Validating provider output belongs 
 B-005/B-008; the CLI's `fund-pod --delta inf` is refused by the ledger, bounded cleanly by B-006.
 Large finite values inside free JSON (`1e300`) pass: they are data, not quantities physics sums.
 Strings such as `"NaN"` are text and pass.
+Amendment (same cycle, red-team 0004): "finite" was the wrong word for the promise. The promise is
+**portable JSON**, and two more shapes broke it: nesting ~256+ deep was walked, stored, and then
+could not be serialised, so every later read of the recipient's inbox (HTTP and MCP) or of
+`GET /events` was a 500 (high — one analyst message poisoned a rival PM's or management's reads);
+an int like `10**400` in free JSON reached the ledger and reads as `Infinity` in float64 tools
+(medium); and the recursive walker raised `RecursionError` (500) at ~1000 levels (low). Fix: one
+**iterative** walker `app.finite.json_problem` refuses non-finite floats, ints beyond ±2**53 and
+nesting beyond `MAX_JSON_DEPTH` = 32 (requests) / `MAX_LEDGER_DEPTH` = 36 (`append_event`); the
+422 echo is depth-bounded. Held and kept as guards: string-encoded `"inf"`, int→float overflow on
+numeric fields, duplicate keys, orders at both caps, subnormal quantities, 50 max-size cost
+reports, MCP inf/nan. Open, strict-xfail in `tests/test_redteam_0004.py`, outside this unit:
+int ids ≥ 2**63 from analysts/PMs → 500 (with B-000m), fee rounds to $0.00 below $5 notional
+(B-026), non-finite feed prices (with B-025/B-005).

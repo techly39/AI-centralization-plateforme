@@ -24,3 +24,12 @@ MAX_ORDER_QTY = 1_000_000_000.0
 
 #: Highest limit price an order may name, in dollars per share.
 MAX_PRICE = 10_000_000.0
+
+#: Deepest nesting a free JSON field (message ``structured_payload``, task
+#: ``outcome``) may have. A thesis needs a handful of levels; ~256 levels was
+#: stored and then could not be rendered, so every read of it was a 500
+#: (red-team 0004).
+MAX_JSON_DEPTH = 32
+
+#: Deepest ledger payload: a free JSON field plus the event's own wrapping.
+MAX_LEDGER_DEPTH = MAX_JSON_DEPTH + 4
