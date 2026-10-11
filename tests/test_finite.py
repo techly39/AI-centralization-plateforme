@@ -133,10 +133,12 @@ def test_non_finite_inside_structured_payload_is_refused(client, desk, db, token
                          ids=["flat", "nested"])
 def test_non_finite_inside_task_outcome_is_refused(client, desk, db, token, shape):
     key = desk["an"][1]
-    client.post("/tasks/start", headers=H(key), json={"subject": "warm-up"})
-    resp = _task_end(client, key, shape.format(t=token))
+    task_id = client.post("/tasks/start", headers=H(key), json={"subject": "s"}).json()["id"]
+    before = _counts(db)
+    resp = _raw(client, key, "POST", "/tasks/end",
+                f'{{"task_id": {task_id}, "outcome": {shape.format(t=token)}}}')
     _assert_clean_422(resp, "outcome")
-    db.expire_all()
+    assert _counts(db) == before
     assert db.scalar(select(func.count()).select_from(Task).where(Task.ended_at.is_not(None))) == 0
 
 
@@ -182,12 +184,48 @@ FREE_JSON_FIELDS = {
     ("MessageSendRequest", "structured_payload"): test_non_finite_inside_structured_payload_is_refused,
     ("TaskEndRequest", "outcome"): test_non_finite_inside_task_outcome_is_refused,
 }
-#: Bounded float request fields and their cap; attacked by the two float tests.
+#: Bounded float request fields: (lower bound, cap). Attacked by the two float tests.
 FLOAT_FIELDS = {
-    ("OrderCreateRequest", "qty"): MAX_ORDER_QTY,
-    ("OrderCreateRequest", "limit_price"): MAX_PRICE,
-    ("CostReportRequest", "usd_cost"): MAX_USD_PER_REPORT,
+    ("OrderCreateRequest", "qty"): (0, MAX_ORDER_QTY),
+    ("OrderCreateRequest", "limit_price"): (0, MAX_PRICE),
+    ("CostReportRequest", "usd_cost"): (0, MAX_USD_PER_REPORT),
 }
+
+#: Leaf types that cannot carry a float: nothing to bound, nothing to walk.
+PLAIN = {"string", "integer", "boolean", "null"}
+
+
+def _classify(prop: dict, components: dict | None = None) -> tuple[str, object]:
+    """One field's schema -> ("plain", None) | ("float", (low, high)) | ("json", None)
+    | ("unclassified", schema). Plain covers strings, ints, bools, enums (also
+    behind a ``$ref``) and arrays of those. Anything else this walk cannot see
+    into — arrays of numbers or objects, nested models, untyped (``Any``) — is
+    unclassified and fails the guard: a new shape must arrive with its own
+    attack, not slip past."""
+    components = components or {}
+    kinds = set()
+    for v in prop.get("anyOf", [prop]):
+        if "$ref" in v:
+            v = components.get(v["$ref"].rsplit("/", 1)[-1], {})
+            if "enum" in v and v.get("type") in PLAIN:
+                continue
+            return ("unclassified", v)
+        t = v.get("type")
+        if t in PLAIN:
+            continue
+        if t == "array" and _classify(v.get("items", {}), components)[0] == "plain":
+            continue
+        if t == "number":
+            low = v.get("minimum", v.get("exclusiveMinimum"))
+            high = v.get("maximum", v.get("exclusiveMaximum"))
+            kinds.add(("float", (low, high)))
+        elif t == "object" and not v.get("properties"):
+            kinds.add(("json", None))
+        else:
+            return ("unclassified", v)
+    if len(kinds) > 1:
+        return ("unclassified", prop)
+    return kinds.pop() if kinds else ("plain", None)
 
 
 def _request_body_schemas(client) -> dict[str, dict]:
@@ -202,35 +240,44 @@ def _request_body_schemas(client) -> dict[str, dict]:
     return {n: spec["components"]["schemas"][n] for n in names}
 
 
-def _variants(prop: dict) -> list[dict]:
-    return prop.get("anyOf", [prop])
-
-
 def test_every_request_float_is_bounded_and_every_free_json_field_is_attacked(client):
     schemas = _request_body_schemas(client)
     assert schemas, "no request bodies found — the walk is broken, not the API safe"
-    floats, dicts = {}, set()
-    for name, schema in schemas.items():
-        for field, prop in schema.get("properties", {}).items():
-            for v in _variants(prop):
-                if v.get("type") == "number":
-                    floats[(name, field)] = v.get("maximum", v.get("exclusiveMaximum"))
-                if v.get("type") == "object":
-                    dicts.add((name, field))
-    assert floats == FLOAT_FIELDS, "a request float without its cap, or an untested one"
-    assert dicts == set(FREE_JSON_FIELDS), "a free JSON request field this file does not attack"
+    components = client.get("/openapi.json").json()["components"]["schemas"]
+    found = {(name, field): _classify(prop, components)
+             for name, schema in schemas.items()
+             for field, prop in schema.get("properties", {}).items()}
+    assert [k for k, (kind, _) in found.items() if kind == "unclassified"] == []
+    assert {k: b for k, (kind, b) in found.items() if kind == "float"} == FLOAT_FIELDS, \
+        "a request float without both bounds, or one these tests do not attack"
+    assert {k for k, (kind, _) in found.items() if kind == "json"} == set(FREE_JSON_FIELDS), \
+        "a free JSON request field this file does not attack"
 
 
-def test_no_query_or_path_parameter_is_a_float_or_object(client):
-    """The walk above covers request bodies only. Today no parameter is a float;
-    the first one must arrive with its own bound and its own attack here."""
+@pytest.mark.parametrize("prop", [
+    {"type": "array", "items": {"type": "number"}},
+    {"type": "array", "items": {"type": "object"}},
+    {"anyOf": [{"$ref": "#/components/schemas/Sub"}, {"type": "null"}]},
+    {},
+    {"type": "number"},
+], ids=["list-float", "list-dict", "nested-model", "any", "unbounded-float"])
+def test_the_guard_sees_shapes_it_cannot_walk(prop):
+    """Planted counter-examples (auditor, cycle 12): the first four are
+    unclassified; an unbounded float is classified with ``None`` bounds, which
+    can never equal ``FLOAT_FIELDS``."""
+    kind, bounds = _classify(prop)
+    assert kind == "unclassified" or bounds == (None, None)
+
+
+def test_no_query_or_path_parameter_can_carry_a_float(client):
+    """The walk above covers request bodies only. Today every parameter is plain;
+    the first one that is not must arrive with its own bound and attack here."""
     spec = client.get("/openapi.json").json()
     offenders = [
         (method, path, param["name"])
         for path, item in spec["paths"].items()
         for method, op in item.items()
         for param in op.get("parameters", [])
-        for v in _variants(param.get("schema", {}))
-        if v.get("type") in ("number", "object")
+        if _classify(param.get("schema", {}), spec["components"]["schemas"])[0] != "plain"
     ]
     assert spec["paths"] and offenders == []
