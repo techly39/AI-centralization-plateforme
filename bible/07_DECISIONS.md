@@ -514,3 +514,29 @@ the feed's inclusive window. Tests corrected, each with its reason: the look-ahe
 returned its daily frame for every interval (Yahoo never does); the one-lookup-per-sweep test
 counted by replacing `get_price` on an instance, now refused — it counts `_quote`. Mutations: each
 of the 9 fixes reverted alone turns its test red.
+
+## ADR-029 — One "now" for physics: every reader of time reads the ledger's now   (builder, cycle 17) — accepted
+Question: ADR-026 made `GET /clock` answer `ledger_now` (`max(clock, latest stamp)`), and ADR-025
+stamps every event with it. But the quote route, the OHLCV defaults, the portfolio valuation, pod
+metrics, the leaderboard's `as_of`, the OMS reference price and the pending-order sweep still read
+the raw clock. After a clock step back an agent was told 10 June, shown 4 June's close and stamped
+10 June — a market order filled at a price from a moment its own stamp says had passed. Which "now"
+does physics answer with?
+Answer from the future: **one: `ledger_now(session)`.** Every physics reader of time uses it; the
+raw `clock.now()` is called only where an allowlist in `tests/test_one_now.py` names the file and
+the reason (the clocks; `append_event`/`ledger_now`, whose floor is applied in SQL; the backtest
+controller; the CLI's start line; the request log). The four row-stamp sites of B-028 are listed
+there as debt and leave the list when B-028 copies `event.ts`; a second test fails on a dead entry.
+Why: (1) **Honest measurement** — price, valuation and stamp of one act must be one moment, or
+P&L is measured across a gap nobody chose. (2) **Safer seal** — a law pinned by an AST test, not
+by review: a new `.now()` in physics is red until someone argues for it. (3) Deterministic and
+small: in a backtest and in an un-stepped live run `ledger_now == clock.now()`, so nothing changes
+there; it differs only after a step back (live, B-029) or a test's frozen clock. (4) Reuse — the
+function already existed (ADR-026). Cost: one indexed `max(ts)` read per quote/valuation.
+Not done: B-028 row stamps (allowlisted); the OMS still fetches the live price *before* `OMS_LOCK`
+in live mode (B-030 note) — unchanged here, only its `now` moved.
+Evidence: `tests/test_one_now.py` — ledger on 10 June, clock stepped back to 5 June: `/price`,
+`/ohlcv` defaults, `/portfolio`, `/metrics/pod`, `/metrics/leaderboard`, a market fill and the sweep
+(a 106 limit the stale 104 would fill stays pending at 109) all answer at 10 June; each was red
+before. Red-team 0007's sweep spy moved from `monitor.get_clock` to `monitor.ledger_now` (the same
+read; the property — fill price at the stamp's moment — unchanged).
