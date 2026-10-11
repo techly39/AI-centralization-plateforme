@@ -23,8 +23,11 @@ deletion of a tracked file "requires approval" and fails. S-004 could not remove
 `git commit`, `mv`, `cp` are already allowed; deleting through git is the reviewable way
 (it shows in the diff the auditor reads).
 Proposal: add `"Bash(git rm *)"` to `allow` and `"Bash(git rm -r*)"`, `"Bash(git rm -rf*)"`
-to `deny` (single files only; directories stay a Human call). Optionally `"Bash(rm *.DS_Store)"`
-for local OS junk.
+to `deny`. Caveat (auditor, cycle 6): prefix patterns do not enforce "single files" — `git rm *`
+still admits several paths, globs, `-f`, and `-r` placed after the path; the deny lines only
+catch a leading `-r`. Every `git rm` is still a commit on a branch the auditor reviews and is
+reversible (`git restore`), which is the real safety. Optionally `"Bash(rm *.DS_Store)"` for
+local OS junk.
 Risk if rejected: none to safety; tracked junk stays tracked. The Builder will not route around
 the denial with `mv`/`git update-index`.
 Human decision:

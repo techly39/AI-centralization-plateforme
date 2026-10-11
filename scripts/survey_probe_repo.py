@@ -54,8 +54,13 @@ def r1_committed_key() -> None:
         git_pattern = "fk_[A-Za-z0-9_-]{20,}"
         changed = git("log", "-1", "--format=%H", "-G", git_pattern, "--", "test_api.py").strip()
         if changed:
-            keys = re.findall(pattern, git("show", f"{changed}^:test_api.py"))
+            before = git("show", f"{changed}^:test_api.py")
+            keys = re.findall(pattern, before)
             print(f"    keys in git history (before {changed[:7]}): {len(keys)}")
+            if not before:
+                # Root commit, or the file did not exist before: the last key
+                # change was an addition, so this lookup cannot see the key.
+                print(f"    WARNING: no test_api.py before {changed[:7]}; history lookup inconclusive")
     tracked = bool(git("ls-files", "test_api.py").strip())
     print(f"    file tracked by git: {tracked}")
     commits = git("log", "--format=%h", "--", "test_api.py").split()
