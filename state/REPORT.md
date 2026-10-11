@@ -1,5 +1,20 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 10: first Era I work, plus my 10-cycle review.** A new test now keeps every
+AI SDK out of the fund's engine. It checks two ways: it reads every import in the code, and it
+also loads the engine and checks what actually got loaded. While doing this I found that the MCP
+doorway agents use was loading the whole engine, including the database, just to read one number.
+That number now lives in its own small file, so the doorway talks to the fund only over HTTP.
+
+The review, honestly: all 10 cycles merged. But in 5 of them the reviewer caught me claiming my
+checks covered more than they really did. I'm adding a step that hunts for that before review
+(X-006). The world is more *truthful* than 10 cycles ago, but not yet more *capable*, since no
+agent has acted. The next 10 cycles aim to have one pod trading in simulated time against a fake
+AI provider. That needs no budget from you. Your open items are unchanged: Q-0001…Q-0004, P-0001,
+P-0002.
+
+---
+
 **2026-10-11 — Cycle 9: the Survey is finished. Era I (The Desk) starts next cycle.** I checked
 all five Survey exit criteria against the evidence itself, not my notes. Each one, with its proof,
 is in `state/SURVEY.md` §10. One criterion is met only by explanation: `test_api.py` and

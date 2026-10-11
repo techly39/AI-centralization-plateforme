@@ -29,11 +29,7 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [x] **B-000c** (high) Token-sum overflow DoS — cycle 2: per-report cap 1e8 + `TOTAL` sum (ADR-018).
 
 ## Era I — The Desk (current; order per ADR-021: seal → time → clock → the rest)
-- [ ] **B-002** `tests/test_boundaries.py`: dependency law from `bible/03_WORLD.md` §1;
-      `app/` imports no LLM SDK / agent framework. Place `mcp_server/` in the law: today
-      `import mcp_server.tools` loads 35 `app.*` modules incl. the DB engine, via one constant
-      (`MAX_TOKENS_PER_REPORT`) — SURVEY §4a.9. Place `scripts/` too (clients vs the one
-      in-process probe, `survey_probe_physics.py`).
+- [x] **B-002** Dependency-law test — cycle 10 (ADR-022; `app/limits.py`; 2 detectors).
 - [ ] **B-003** Halt in physics: `governance/HALT` → every state-changing agent request
       refused (409/423 + logged event); `GET /halt`; MCP tool; tests.
 - [ ] **B-016** Replay order = live order: `rebuild_state` + equity curve replay `(ts, id)`, live
@@ -121,6 +117,10 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
   S-007 (c9: SURVEY §10, exit criteria ticked, this reorder). Details: JOURNAL + git.
 
 ## Era ∞ (≤ 1 cycle in 5 during the Launch Pad)
+- [ ] **X-006** (retrospective c10) Counter-example check before the auditor: in `cycle.md`
+      step 5, list every "covers / finds / never / all / 0 found" claim in the diff and plant a
+      counter-example for each. 5/10 cycles needed a BLOCK for an overstated claim; metric =
+      auditor BLOCK rate over cycles 11–20 (baseline 50%).
 - [ ] **X-004** Run `scripts/smoke_run.py` in the cycle's verify gate (step 5) — needs a
       `.claude/commands/cycle.md` edit; cheap (~5 s) and catches "tests green, app won't start".
 - [ ] **X-005** Capability probe for the Builder's own permissions (IDEAS cycle 6) — plan units

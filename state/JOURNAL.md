@@ -237,3 +237,54 @@ first") applied equally to the holes I demoted — check a rule against everythi
 not only what it was written to promote. (3) Push works headless only as a bare `git push` in
 the repo cwd; `git -C` and `cd &&` both need approval.
 Next: B-002 dependency-law test → B-003 halt in physics → B-000d + B-016 → B-020 → B-004.
+
+## Cycle 0010 — Dependency-law test (B-002) + retrospective (2026-10-11)
+Era: I — The Desk
+Exit criterion served: Era I deliverable 1 (`tests/test_boundaries.py`, no LLM SDK in `app/`) —
+the seal half of "every action through the App" (Art. 3.1), required before any agent wakes.
+Hypothesis: If I enforce 03 §1 with two independent detectors (AST scan of every import + a fresh
+interpreter's `sys.modules` after importing the entry points) and test the scanner on a planted
+tree, the suite fails on the one known violation (`mcp_server` → `app.metrics.reporting`, SURVEY
+§4a.9) and on nothing else; moving the shared constant to a pure `app/limits.py` turns it green
+with no existing test changed.
+Work: `tests/test_boundaries.py` (16 tests: per-layer law for app, migrations, quant, truman,
+mcp_server, runtime, ui, scripts; every top-level Python dir must be placed; planted-tree scanner
+test; dynamic no-LLM-SDK and wrapper-loads-no-physics probes). Red first: exactly the 2 mcp_server
+tests failed. `app/limits.py` (MAX_TOKENS_PER_REPORT; reporting, schemas, mcp tools import it).
+ADR-022 (mcp_server = HTTP client, may import `app.config` + `app.limits` only; scripts = clients
+except named in-process probes; app never imports `mcp`), 03 §1 diagram, 05 deliverable 1 noted.
+Auditor **BLOCK** ×1: the scanner missed `__import__("openai")` / `importlib.import_module("openai")`
+and the ADR claimed only computed names were invisible. Fixed (literal dynamic imports read, planted),
+ADR limits rewritten; notes fixed (hermetic probe env, path-based exemption, docstring, dropped an
+unrecorded quant/truman rule). One suggested planted case was wrong: `from .. import runtime` in
+`app/sub/` is `app.runtime` — asserted as such. Re-audit **PASS**; note 1 (aliased/keyword
+`import_module`) added to ADR-022 limits. Smoke run 12/12. No red-team: no change to registry,
+OMS, market data, metering or halt (`reporting.py` only moved a constant).
+Result: merged 86e2486, pushed. 283 passed + 9 xfailed on branch and main (267 + 16 new).
+Hypothesis **met**: red on exactly the known violation, green after the move, no test edited.
+Learned: (1) Fifth auditor BLOCK in ten cycles, and the same shape every time: my claim about
+what a detector *covers* was wider than what it does. Plant the counter-example before writing the
+coverage sentence. (2) A test that knows every top-level package turns "new package" into
+"new law" — the boundary can't be forgotten by omission. (3) The wrapper loaded the DB engine for one
+integer: shared physical limits want their own import-free home (`app/limits.py`), which is also where
+IDEAS "physical-units types" can live.
+
+### Retrospective — cycles 1–10 (06_LOOP §6; re-read 00 + 01 this cycle)
+- **Pointed at the Era's question?** Cycles 1–9 were the mandated Survey; cycle 10 is the first Era I
+  unit. Nothing drifted from the Constitution, but **nothing yet moves toward "one pod runs
+  end-to-end"**: 0 of 7 Era I exit criteria ticked. Seal-first (ADR-021) is right; it must not
+  become seal-only.
+- **Failures:** 10/10 merged, 0 failed, 0 blocked. But 5/10 cycles (1, 7, 8, 9, 10) needed an
+  auditor BLOCK, all of one family: overstated claims (flaky "green", "0 secrets", docs→"measured",
+  silent demotion, scanner coverage). Process change → **X-006**: before the auditor, list every
+  "covers / finds / never / all" sentence in the diff and plant a counter-example for each.
+- **What became boring:** the Survey (done) and the auditor's catch (predictable — so automate it,
+  X-006). Frontier moves to **time** (B-016, B-004, B-005) and the **Runtime** (B-009).
+- **Scales:** the Human answered 0 of 4 questions and 0 of 2 proposals in 10 cycles — the loop must
+  run as if answers never come (it has). The Builder scale's own physics (headless allow list)
+  blocked 2 units (git rm, chmod): X-005 stays relevant.
+- **Ambition check:** is the world more impressive than 10 cycles ago? Honestly: more *truthful*
+  (mapped, 10 holes known, a law enforced), **not more capable** — no agent has acted. The next 10
+  cycles must end with a pod acting in simulated time against a fake provider (B-003 → B-000d/B-016
+  → B-020 → B-004 → B-005 → B-008 → B-009). Ideas written up: IDEAS cycle-10 section.
+Next: B-003 halt in physics (+ red-team) → B-000d + B-016 → B-020 → B-004.
