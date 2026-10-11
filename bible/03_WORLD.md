@@ -26,17 +26,21 @@ firm app/                      (git: origin = AI-centralization-plateforme)
   TRD_ai_fund_environment.md   detailed spec for physics (still authoritative for app/)
 ```
 
-### Dependency law (enforced by `tests/test_boundaries.py`, which the Builder writes in Era I)
+### Dependency law (enforced by `tests/test_boundaries.py` since cycle 10, ADR-022)
 
 ```
 runtime ──HTTP/MCP──▶ app ──imports──▶ quant, truman   (pure, deterministic libraries)
 ui ──HTTP──▶ app
-nothing imports runtime;  app never imports runtime, ui, or any LLM SDK
+mcp_server ──HTTP──▶ app       (imports only app.config + app.limits — ADR-022)
+scripts ──MCP/HTTP──▶ app      (except named in-process probes on a throwaway DB)
+nothing imports runtime or legacy;  app never imports runtime, ui, mcp, or any LLM SDK
 quant and truman never import app
 ```
 
 `app/` must never import `anthropic`, `openai`, `openrouter`, or any agent framework.
-The test fails the build if it does.
+The test fails the build if it does — statically (every import in the source) and
+dynamically (what importing physics actually loads). Every top-level Python directory
+must be placed in the law, or the test fails.
 
 ## 2. Physics (`app/`) — what exists and what it must grow
 

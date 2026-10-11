@@ -37,6 +37,7 @@ from app.ledger.events import (
     EVENT_TASK_STARTED,
     append_event,
 )
+from app.limits import MAX_TOKENS_PER_REPORT
 
 
 class ReportingError(Exception):
@@ -74,11 +75,6 @@ class TaskAlreadyEndedError(ReportingError):
 
 # --- Costs ------------------------------------------------------------------
 
-#: Most tokens one report may claim, per direction. A report is one unit of
-#: work; even a full million-token context re-read a hundred times fits. The cap
-#: exists because the counts are summed per pod: unbounded, two int64-max
-#: reports overflowed the sum and took the leaderboard down (red-team 0001).
-MAX_TOKENS_PER_REPORT = 100_000_000
 
 def report_cost(
     session: Session,

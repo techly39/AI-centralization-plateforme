@@ -12,7 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
-from app.metrics.reporting import MAX_TOKENS_PER_REPORT
+from app.limits import MAX_TOKENS_PER_REPORT
 
 # Roles an operator/management may assign via the API. 'system' is internal-only
 # and is created by the bootstrap CLI, never over HTTP.

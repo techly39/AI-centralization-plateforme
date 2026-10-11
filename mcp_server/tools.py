@@ -27,7 +27,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
-from app.metrics.reporting import MAX_TOKENS_PER_REPORT
+from app.limits import MAX_TOKENS_PER_REPORT
 from mcp_server.client import FundAPIError, FundClient
 
 
