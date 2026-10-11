@@ -1,5 +1,33 @@
 # BACKLOG — ordered. Each item serves an exit criterion of the current Era.
 
+## Physics bugs (Art. 8 — Builder's bugs; priority 2, same tier as B-002/B-003 — ADR-021)
+**Gate:** every open hole below is fixed, or accepted by an ADR with its reason, before any
+agent wakes (before B-012's first live conformance probe and before B-015). Order inside the
+tier: B-002 + B-003 first, B-000d with or before B-016 (both touch `append_event`), B-000e with
+B-018, the rest when cheap or blocking.
+Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix = remove the marker.
+- [ ] **B-000d** Non-finite floats: reject inf/NaN/1e308 on **every** float input → clean 422
+      (3 xfail tests on `usd_cost`; SURVEY §4a.7: `limit_price=1e309` is stored and read back as
+      `null`, and its event payload is written as non-standard JSON `Infinity`). Likely one fix:
+      `allow_inf_nan=False` on the API schemas, plus `append_event` refusing non-finite payloads
+      so the ledger stays portable JSON. Consider IDEAS "physical-units types". Before B-016
+      touches `append_event`, or together with it.
+- [ ] **B-000e** Message `body` + `structured_payload` on the `message_sent` ledger event, so the
+      messages table is rebuildable (CLAUDE.md: every state change is an event). With B-018.
+- [ ] **B-019** (low) `POST /agents/register` with a missing `pod_id` → 500 (FK error unhandled);
+      PM without pod accepted (can never trade). → 404/422. SURVEY §4a.6, probe P5/P6.
+- [ ] **B-000m** (low) Integer path params ≥ 2⁶³ → 500 (`GET /metrics/pod/{2**63}`; likely every
+      `/{id}` route) → `tests/test_redteam_0002.py::test_hole_metrics_pod_id_beyond_int64_500`.
+- [ ] **B-000n** (low) Cost-report rate is unbounded per agent (spam inflates rows; token totals
+      lose exactness past ~9e7 max-size reports). Decide on a per-agent rate law. With B-013.
+- [ ] **B-000f** 'system' identity looked up by role/reserved name, not a squattable name.
+- [ ] **B-000g** Size caps on `structured_payload` and task `outcome`.
+- [ ] **B-000h** MCP client: URL-escape path params.
+- [ ] **B-000b** A test that proves `OMS_LOCK` is load-bearing (F-0001), e.g. race injected between
+      cash read and write, or run against a row-locking backend; or document the lock as defence-in-depth.
+- [ ] **B-000j** Decide whether `state/loop_status.json` is tracked (runner state) — auditor note.
+- [x] **B-000c** (high) Token-sum overflow DoS — cycle 2: per-report cap 1e8 + `TOTAL` sum (ADR-018).
+
 ## Era I — The Desk (current; order per ADR-021: seal → time → clock → the rest)
 - [ ] **B-002** `tests/test_boundaries.py`: dependency law from `bible/03_WORLD.md` §1;
       `app/` imports no LLM SDK / agent framework. Place `mcp_server/` in the law: today
@@ -40,7 +68,8 @@
 - [ ] **B-008** Truman v1: local cache of real daily history, prices-only pack, one scripted
       scenario, served via `MarketDataProvider`; pack hashing. Must not reuse yfinance's
       `_fetch_price` path (SURVEY §4a.3).
-- [ ] **B-000i** `.gitignore`: cassettes + `experiments/*/runs/` — before B-010 records anything.
+- [ ] **B-000i** `.gitignore`: cassettes + `experiments/*/runs/` before Era I records anything
+      (first writer expected: B-010 cassettes; earlier if an experiment run lands first).
 - [ ] **B-009** Runtime skeleton (`runtime/`, `uv run fund-runtime`): AgentSpec, scheduler on
       the App clock, halt + cap checks, fake LLM provider for tests.
 - [ ] **B-010** Runtime: cassette recording + replay mode.
@@ -79,30 +108,6 @@
 - [ ] **B-015** Era I milestone run: 1 pod, 1-month backtest < 10 min, replay identical.
       Needs a firm cap → ask in QUESTIONS when reached.
 
-## Physics bugs (Art. 8 — Builder's bugs; take between Era I items when one blocks or is cheap)
-Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix = remove the marker.
-- [ ] **B-000d** Non-finite floats: reject inf/NaN/1e308 on **every** float input → clean 422
-      (3 xfail tests on `usd_cost`; SURVEY §4a.7: `limit_price=1e309` is stored and read back as
-      `null`, and its event payload is written as non-standard JSON `Infinity`). Likely one fix:
-      `allow_inf_nan=False` on the API schemas, plus `append_event` refusing non-finite payloads
-      so the ledger stays portable JSON. Consider IDEAS "physical-units types". Before B-016
-      touches `append_event`, or together with it.
-- [ ] **B-000e** Message `body` + `structured_payload` on the `message_sent` ledger event, so the
-      messages table is rebuildable (CLAUDE.md: every state change is an event). With B-018.
-- [ ] **B-019** (low) `POST /agents/register` with a missing `pod_id` → 500 (FK error unhandled);
-      PM without pod accepted (can never trade). → 404/422. SURVEY §4a.6, probe P5/P6.
-- [ ] **B-000m** (low) Integer path params ≥ 2⁶³ → 500 (`GET /metrics/pod/{2**63}`; likely every
-      `/{id}` route) → `tests/test_redteam_0002.py::test_hole_metrics_pod_id_beyond_int64_500`.
-- [ ] **B-000n** (low) Cost-report rate is unbounded per agent (spam inflates rows; token totals
-      lose exactness past ~9e7 max-size reports). Decide on a per-agent rate law. With B-013.
-- [ ] **B-000f** 'system' identity looked up by role/reserved name, not a squattable name.
-- [ ] **B-000g** Size caps on `structured_payload` and task `outcome`.
-- [ ] **B-000h** MCP client: URL-escape path params.
-- [ ] **B-000b** A test that proves `OMS_LOCK` is load-bearing (F-0001), e.g. race injected between
-      cash read and write, or run against a row-locking backend; or document the lock as defence-in-depth.
-- [ ] **B-000j** Decide whether `state/loop_status.json` is tracked (runner state) — auditor note.
-- [x] **B-000c** (high) Token-sum overflow DoS — cycle 2: per-report cap 1e8 + `TOTAL` sum (ADR-018).
-
 ## Residue of Era ½ (closed cycle 9, ADR-021)
 - [ ] **S-004b** Cleanup, the deletions — **blocked on P-0002** (headless `git rm` needs
       approval): `git rm test_api.py`; `git rm --cached .vscode/settings.json` + ignore `.vscode/`;
@@ -110,8 +115,9 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       the denial. Run it the cycle P-0002 is answered.
 - [ ] **S-001r** `git --version`, `claude --version`, origin visibility — need loop-mode
       permission prompts; capture in an interactive session or when allowed.
-- Done: S-001 (c3), S-002 (c1), S-003a (c4), S-003b (c5), S-004a (c6), S-005 (c7), S-006 (c8),
-  S-007 (c9: SURVEY §10, exit criteria ticked, this reorder).
+- Done: S-001 (c3), S-002 (c1; .gitignore gap → B-000i), S-003a (c4), S-003b (c5),
+  S-004a (c6; keep `legacy/`), S-005 (c7; `doctor` deliberately not run), S-006 (c8),
+  S-007 (c9: SURVEY §10, exit criteria ticked, this reorder). Details: JOURNAL + git.
 
 ## Era ∞ (≤ 1 cycle in 5 during the Launch Pad)
 - [ ] **X-004** Run `scripts/smoke_run.py` in the cycle's verify gate (step 5) — needs a

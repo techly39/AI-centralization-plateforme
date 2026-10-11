@@ -345,8 +345,8 @@ Each Era ½ exit criterion checked against its primary evidence on 2026-10-11 (n
 | Exit criterion (`05_ERAS.md`) | Verdict | Evidence |
 |---|---|---|
 | SURVEY complete with all sections | ✅ | §1–§8 = deliverable 7's seven headings (exists · works · broken · dead · risks · surprises · backlog) + toolchain §1 + OpenClaw §9 |
-| Phase 2 committed; `main` green; pushed | ✅ | `1317af0` (Phase 2) merged in `f45eecf`; `uv run pytest` on `main` @ `1d35bc2`: **267 passed, 9 xfailed**; `git rev-parse main origin/main` equal |
-| Repo clean: no junk, every odd file resolved or explained | ✅ *with residue* | `git status --porcelain` empty at cycle start; every odd file has a verdict in §2b; the four not yet executed are explained below |
+| Phase 2 committed; `main` green; pushed | ✅ | `1317af0` (Phase 2) merged in `f45eecf`; `uv run pytest` on `main` @ `1d35bc2`: **267 passed, 9 xfailed**; `git rev-parse main origin/main` equal (local remote-tracking ref; the remote itself not queried — `git ls-remote` needs approval) |
+| Repo clean: no junk, every odd file resolved or explained | ✅ *with residue* | `git status --porcelain` empty at cycle start; every odd file has a verdict in §2b, except `app/.DS_Store` (found this cycle, same verdict as the other two); those not yet executed are explained below |
 | `~/.openclaw` backed up; VERSION_NOTES from the installed schema | ✅ | `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (35.8 MB, present); `runtime/openclaw/VERSION_NOTES.md` cites `openclaw config schema` of 2026.5.12 as source of truth |
 | Backlog re-ordered from the survey's findings | ✅ | `state/BACKLOG.md` (cycle 9): Era I ordered by 06_LOOP §2 priorities; every §4 finding has an item (§8) |
 

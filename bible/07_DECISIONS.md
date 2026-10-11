@@ -163,3 +163,9 @@ must exist before any agent can wake. The time work (B-016, B-020) still precede
 clock (B-004), as decided in cycle 4. Alternatives rejected: keep Era ½ open until P-0002 is
 answered (idles on cosmetics); start with B-016 (time is the weakest spot, but no agent can
 exploit it before the clock moves, whereas the seal is a standing rule).
+Amended after audit (cycle 9): the open red-team holes (BACKLOG "Physics bugs", Art. 8.2) are
+the **same priority tier** as B-002/B-003, not below Era I. They are not urgent today only
+because no agent can run (`monthly_llm_usd_cap: null`); that is a reason for ordering inside
+the tier, not for demotion. Gate: every open hole is fixed or accepted by an ADR with its reason
+before any agent wakes (before B-012's first live probe and before B-015). B-000d (non-finite
+floats in event payloads) goes with or before B-016, since both touch `append_event`.
