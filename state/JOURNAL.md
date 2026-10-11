@@ -150,3 +150,12 @@ the goal behind it (no secret in the tree) often has a smaller allowed path — 
 log the denied action as a proposal instead of finding a back door. (3) The guard still trips
 on prose in commit messages (P-0001); twice this cycle.
 Next: S-005 OpenClaw survey (backup first, change nothing) → S-006 Bible corrections → S-007.
+
+## Cycle 0007 — OpenClaw survey (S-005) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: "inventory the toolchain and OpenClaw (back it up, change nothing)" —
+the OpenClaw half; `08_OPENCLAW.md` §1 steps 1–3 and §6 (OCT POC inventory).
+Hypothesis: If I back up `~/.openclaw` first, then measure the installed version's own schema
+(not the online docs) and the Human's agents with a read-only, secret-redacting probe, I get
+`runtime/openclaw/VERSION_NOTES.md` with every key the adapter will need, and I find where the
+installed version differs from what the Bible "knows" — before B-012 writes code against it.

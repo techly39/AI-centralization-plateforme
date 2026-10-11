@@ -113,3 +113,20 @@ totals are summed with SQLite `TOTAL` (float, never raises) instead of `SUM` (ra
 overflow). Two walls because the red-team showed one agent could 500 the leaderboard for the whole
 run with two reports (F-0002, B-000c). Cost: totals above 2⁵³ tokens round. Alternatives rejected:
 summing in Python (loads every row); a cap alone (a future in-process writer could still bypass it).
+
+## ADR-019 — Firm agents live in their own OpenClaw profile   (builder, cycle 7) — accepted, verify in B-012
+The firm's OpenClaw agents go in a separate profile (`openclaw --profile firm …` → state and
+config under `~/.openclaw-firm`), not in the Human's `~/.openclaw/openclaw.json`. Why: in the
+installed 2026.5.12 several seal keys are **global only** — `tools.web.*` (search + fetch are
+on for every agent today), `tools.profile`, `tools.sessions.visibility`, `tools.agentToAgent`,
+and `mcp.servers` (no per-agent MCP key) — and the Human's bots need them as they are
+(`runtime/openclaw/VERSION_NOTES.md`). Per-agent deny would probably cover tools, but every
+firm spawn would still write the Human's config and share its gateway, channels and defaults;
+one upgrade that widens a default (docs ≥ 2026.9: sessions visibility `all`) would reach the
+firm through the Human's file. A profile gives: zero writes to the Human's OpenClaw (08 §2
+holds by construction), global seal keys set for the firm alone, no channels, a backup that
+is just the firm's. The `firm-` namespace (08 §2) still applies inside it.
+Alternatives rejected: firm agents in the Human's config with per-agent deny lists (shares
+globals, every change touches the Human's file); a second OpenClaw install (more to pin, no gain).
+Open: whether a second profile needs its own Gateway process/port for `openclaw agent`, or
+whether the Runtime wakes agents with `--local`; settle it in B-012 with a dry run.

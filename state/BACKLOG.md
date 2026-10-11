@@ -46,10 +46,9 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       approval): `git rm test_api.py`; `git rm --cached .vscode/settings.json` + ignore `.vscode/`;
       local empty `ui/` and `.DS_Store` ×3 (untracked, ignored — harmless). Do not route around
       the denial. If P-0002 stays open, close Era ½ with these listed as known residue.
-- [ ] **S-005** OpenClaw survey per `bible/08_OPENCLAW.md` §1–2: back up `~/.openclaw` to
-      `~/firm-openclaw-backups/`, `openclaw --version`, read that version's docs, write
-      `runtime/openclaw/VERSION_NOTES.md`, list agents/bindings/models (no secrets), inventory
-      OCT POC workspaces. Change nothing in OpenClaw.
+- [x] **S-005** OpenClaw survey — cycle 7: backup `20261011T0129Z-cycle0007.tar.gz`;
+      `runtime/openclaw/VERSION_NOTES.md`; SURVEY §9; `scripts/survey_probe_openclaw.py` O1–O6;
+      ADR-019 (firm profile). Nothing changed in OpenClaw. `doctor` deliberately not run.
 - [ ] **S-006** Correct the Bible where reality differs (living books + PROPOSALS for protected).
 - [ ] **S-007** Write `state/SURVEY.md`; seed `state/IDEAS.md`; re-order this backlog.
 
@@ -99,13 +98,22 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       (bootstrap files the installed version supports) from AgentSpec, own agentDir + local auth
       profile + metered key, `fund-env-mcp` per agent key via env, deny-by-default tools, no
       bindings, `firm-` namespace; OCT POC charters → AgentSpec templates.
+      Cycle 7 (VERSION_NOTES): target the `firm` profile (ADR-019); MCP servers are global only
+      → one named server per agent + allowlist glob of its own server; key via SecretRef, not
+      a literal; check which bootstrap files 2026.5.12 loads (`TOOLS.md`/`HEARTBEAT.md`?).
+- [ ] **B-023** Render every seal key explicitly, never rely on a default (newer OpenClaw
+      loosens them): `tools.web.*` off, `tools.sessions.visibility: self`,
+      `tools.agentToAgent.enabled: false`, `tools.profile: minimal`, per-agent deny list,
+      `subagents.allowAgents: []`. Conformance check reads `openclaw config schema` of the
+      installed version and fails on any seal key missing from the rendered config.
 - [ ] **B-012a** Adapter written against mcp 2.x (`is_error`, not `isError`); Runtime stops
       `fund-env serve` with SIGINT (rc 0) — SURVEY §1 findings.
 - [ ] **B-012b** Conformance suite: `fund-runtime openclaw doctor` static checks + live probes
       (skipped while firm cap is null); integration tests skip when OpenClaw is absent.
 - [ ] **B-013** Metering v1: provisioned per-agent keys (fake provider in tests), cost-sync job →
       system-reported costs; system cost overrides self-report in metrics.
-- [ ] **B-014** Verify "chat restricted to central pod" with a two-pod test.
+- [ ] **B-014** Verify "chat restricted to central pod" with a two-pod test. Cycle 7 lead:
+      cross-agent `sessions_spawn` needs `subagents.allowAgents` (default same-agent only).
 - [ ] **B-015** Era I milestone run: 1 pod, 1-month backtest < 10 min, replay identical.
       Needs a firm cap → ask in QUESTIONS when reached.
 

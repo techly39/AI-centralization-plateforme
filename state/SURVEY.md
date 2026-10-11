@@ -285,6 +285,8 @@ script), empty `ui/`, `.DS_Store` ×2. `legacy/` is archive, not dead (§2b).
 - The one real secret leak was in the file the Bible flagged only as "odd" (`test_api.py`).
 - "Phase 2 milestone done" meant "done by a hand-written script"; no model has yet traded
   through this app.
+- OpenClaw's online docs describe a newer version than the one installed, and the newer
+  defaults are *looser* (§9). "Verify, never remember" also means "never trust the docs' version".
 
 ## 8. What this changes in the backlog
 New: B-016 replay order · B-017 Sharpe annualisation · B-018 rebuild scope · B-019 register
@@ -296,3 +298,35 @@ S-003b (cycle 5): New **B-022** secret-scan test. **S-004** now has a concrete l
 §4b.5 docs). Widened: B-005 (`tests/support.py` `HistoricalProvider`), B-018 (`conftest.make_pod`),
 B-020 (`test_clock_forbidden_for_analyst` changes only with the ADR). New question **Q-0003**
 (revoke the committed key). S-006 gets the "218 tests" corrections.
+
+S-005 (cycle 7): New **B-023** pin seal keys explicitly. Widened: B-012 (profile per ADR-019,
+global-only MCP, bootstrap file names), B-012b (conformance reads the installed schema),
+B-014 (cause located in config). Details in §9.
+
+## 9. OpenClaw (S-005, cycle 7) — read-only, nothing changed
+Full notes: `runtime/openclaw/VERSION_NOTES.md`. Evidence: `scripts/survey_probe_openclaw.py`
+(O1–O6, reads `~/.openclaw` + `openclaw config schema`, writes nothing, prints no secret).
+Backup first: `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (4 107/4 107 entries).
+- **Version** 2026.5.12 (f066dd2). `config validate` → valid. `doctor` not run (may migrate).
+- **Docs ≠ installed version.** docs.openclaw.ai is the latest (≥ 2026.9): roster key
+  `agents.entries` there, `agents.list` here; sessions visibility default `all` there, `tree`
+  here. An upgrade can widen what an agent reads → never rely on defaults (B-023).
+- **Seal keys that are global only:** `tools.web`, `tools.profile`, `tools.sessions`,
+  `tools.agentToAgent`, `mcp.servers` (no per-agent MCP). → ADR-019: firm in its own profile.
+- **The Human's setup** (4 agents: `main`, `rachel`/Orchestrator, `pm`, `analyst`; 2 Telegram
+  bindings; 0 MCP servers): no agent has `tools` or `sandbox`; web search + fetch on for all;
+  OCT workspaces nested inside `main`'s; `pm`/`analyst` have empty auth profiles (read-through
+  to `main`). Hands off — recorded, not proposed for change (none of it touches the firm).
+- **Workspace secrets:** 0 credential patterns in 118 text files.
+- **OCT POC** (`~/.openclaw/workspace/OCT/AI Hedgefund POC/`): Orchestrator relays PM ↔ Analyst
+  via `sessions_spawn`; file-inbox OMS (`OMS/OMS.py`) run by the Orchestrator through `exec`;
+  `Skills/price_fetcher.py` via `exec`. Charters = 6 bootstrap files per agent → AgentSpec
+  templates in B-012 (Orchestrator role dropped: the Runtime is S3).
+- **"Chat restricted to central pod"** — likely cause: cross-agent `sessions_spawn` needs
+  `subagents.allowAgents` (default same-agent only), unset here; the Orchestrator's memory
+  records the denial. Not tested live (no budget, not our agents).
+- **Prompt ≠ policy — a hint, not a measurement.** In May the Human's test "Analyst" used
+  `web_search` for prices (2 runs, 0 `exec`) — but the Orchestrator then found the test
+  subagent had loaded the *Orchestrator's* workspace, not the Analyst's, so the run is
+  confounded. What stands: `web_search` is reachable by every agent and no config denies it.
+  The firm's seal must be enforced by the tool layer (08 §4) and proven by live probe 7.
