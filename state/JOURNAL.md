@@ -413,3 +413,13 @@ step 0 should compare `loop_status` with branches ahead of `main` and resume, no
 here by judgement; worth writing into the protocol (X-007 in IDEAS).
 Next: B-020 clock-vs-agents ADR → B-004 simulated clock (per-`run_id` floor, B-029 guard) →
 S-004b if P-0002's answer covers headless `git rm`.
+
+## Cycle 0014 — Every agent may read the clock (2026-10-11)
+Era: I — The Desk
+Exit criterion served: "one pod runs end-to-end" in backtest (Era I, TRD Phase 3): a PM must be
+able to learn the simulated date; B-020 had to be decided before B-004 builds clock control.
+Hypothesis: If reading the clock becomes a universal action (like `READ_HALT`) while clock
+control stays absent (B-004 will gate it to system/management), then every role reads the same
+`now` the OMS and market data use, the read writes no event and works during halt, no clock
+write appears on the surface for any role, the MCP `get_clock` promise becomes true, and
+reverting the one matrix line turns only the new read tests red.
