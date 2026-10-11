@@ -101,3 +101,13 @@ found a second cause I missed (the reducer erasing an impossible negative positi
 with one cause named is often half a finding. (3) Pydantic serialises `inf` as `null`: the API
 can silently disagree with the database; "what came back" is not proof of "what was stored".
 Next: S-003b (tests, scripts, docs, legacy, root files) → S-004 cleanup → S-005 OpenClaw survey.
+
+## Cycle 0005 — Repo survey, part 2: tests, scripts, docs, legacy, root (S-003b) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: "`state/SURVEY.md` complete with all sections above" — deliverable 2
+(repo survey), second and last slice: everything outside `app/`, `mcp_server/`, `migrations/`,
+`bible/`, `state/` (~6 800 lines: 24 test files, 4 scripts, 2 docs, legacy POC, root files).
+Hypothesis: If I read the suite against the TRD's test list and the physics map from cycle 4,
+and classify every non-physics file as keep / fix / move / delete with a reason, then (a) S-004
+becomes a mechanical list of cleanup commits, and (b) I learn which invariants the 267 tests
+actually guard and which TRD-demanded tests are missing — so "suite green" stops being a belief.

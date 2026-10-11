@@ -83,6 +83,57 @@ Missing against the TRD (all known Phase 3/4 work, already in BACKLOG B-004…B-
 clock + `/clock/*`, `run_id` scopes, allocation endpoint, meetings, UI. Missing and *not*
 in the backlog: an endpoint for an agent to read its own tasks/costs (see §5).
 
+### 2b. Everything else — tests, scripts, docs, legacy, root (S-003b, cycle 5)
+
+Every file read (~6 800 lines). Measurements: `uv run python scripts/survey_probe_repo.py`
+(the probe itself imports no `app` and writes nothing — R2's `pytest --collect-only` subprocess
+does import it; opens `fund.db` only `mode=ro&immutable=1`, prints no key) —
+results quoted as **R1–R4**.
+
+**Tests** — 276 collected = 267 + 9 strict-xfail (R2). Per area:
+
+| Area | Files (tests collected) | TRD demand | Verdict |
+|---|---|---|---|
+| Phase 0 | `test_permissions` (36), `test_registry` (10), `test_ledger_replay` (3), `test_config` (6), `test_clock_and_health` (3) | permissions, ledger replay | ✅ |
+| Phase 1 | `test_oms_market_orders` (18), `_limit_orders` (14), `_fees` (12), `_permissions` (7), `_replay_consistency` (3), `_concurrency` (1), `test_portfolio` (11), `test_marketdata` (18) | market fill, limit fill, rejection, partial sell, fee math | ✅ all five |
+| Phase 2 | `test_messaging` (22), `test_reporting` (13), `test_metrics` (14), `test_performance_math` (16), `test_mcp_server` (11), `test_poc_milestone` (2) | bus, costs, metrics, MCP; POC re-run | ✅ — but see the milestone note below |
+| Red team | `test_redteam_0001` (43), `_0002` (13) | — (Bible) | 56 tests = 20% of the suite; 9 strict xfails = the open holes |
+| Fixtures | `conftest.py`, `support.py` (`FrozenClock`, `HistoricalProvider`) | — | in-memory SQLite + StaticPool, offline prices, scheduler off: no test touches the network or `fund.db` |
+
+What the suite does **not** guard (no test anywhere): the dependency law (B-002); a clock that
+moves backwards (B-016); bar-*end* look-ahead (B-005); determinism of a run; "the app starts"
+(only `smoke_run.py`, outside the suite — X-004); endpoint coverage is asserted for MCP tools
+only, never measured for tests (no coverage tool installed).
+
+**Scripts** — `agent_console.py` (769), `setup_demo_firm.py` (136), `smoke_run.py` (143) import
+`mcp` + stdlib only: true clients, as `scripts/README.md` says. `survey_probe_physics.py` and
+`survey_probe_repo.py` are Builder measurement tools. ✅
+
+**Docs** — `oms_migration.md` (POC → Phase 1 mapping) ✅ accurate.
+`phase2_bus_costs_mcp.md` ✅ except one sentence made false in cycle 2: "it imports nothing from
+`app` except the settings object" (P9). Root `README.md`: Phase 0–2 status accurate; its Layout
+omits `bible/ state/ governance/ loop/ scripts/ experiments/`, and lists `ui/` as if it existed.
+
+**Legacy** — `legacy/README.md` + `legacy/oms_poc/` (`OMS.py` 322, requirements, `Portfolio.json`,
+a pending-order template, one processed order + result, a 148-byte log). Not imported anywhere. **Keep** (05_ERAS: archive unless there is a
+reason): `test_poc_milestone.py` cites its fills as the milestone's ground truth, and
+`Logs/oms.log` records where the OpenClaw POC lived —
+`~/.openclaw/workspace/OCT/AI Hedgefund POC/OMS/` — a lead for S-005.
+
+**Root files** — `pyproject.toml`, `uv.lock`, `alembic.ini`, `config.yaml`, `.python-version`,
+`.gitignore` ✅ (`httpx` listed in both main and dev deps — harmless). Odd files:
+
+| File | Tracked | What it is | S-004 verdict |
+|---|---|---|---|
+| `test_api.py` | yes | Human's manual try-out script (its own header says "in no case a viable test"); `requests` is not a declared dependency, only transitive via yfinance (R3); outside `testpaths`, never collected (R2). **Contains a hard-coded API key** — §4b.1 | remove from the tree |
+| `.vscode/settings.json` | yes | one personal editor setting | untrack, ignore `.vscode/` |
+| `ui/` | no (empty dir) | Phase 4 placeholder; git cannot see it | delete locally; README stops listing it |
+| `.DS_Store`, `legacy/.DS_Store` | no (ignored) | Finder junk | delete locally |
+| `agents.local.json` | no (ignored, mode 600) | demo agent keys from `setup_demo_firm.py` (not read) | keep — the Human's |
+| `fund.db` | no (ignored) | the Human's August history | keep, never write |
+
+R4: no tracked file is excluded by the current `.gitignore`.
+
 ## 3. What works (evidence)
 - Suite: 267 passed + 9 strict-xfail (cycles 1–3, ≥3 runs each).
 - Starts and serves outside pytest: `scripts/smoke_run.py` 12/12 (§1).
@@ -91,6 +142,8 @@ in the backlog: an endpoint for an agent to read its own tasks/costs (see §5).
   never the body (read: `oms/service.py`, `metrics/reporting.py`, `bus/messages.py`); red-team
   0001/0002 found no impersonation or permission bypass.
 - One money implementation: live fills and `rebuild_state` share `ledger/reducers.py`.
+- The suite is hermetic: in-memory DB per test, offline prices, no scheduler (§2b); every TRD
+  Phase 0–2 test demand has named tests.
 
 ## 4. What's broken
 
@@ -160,6 +213,42 @@ filter one pod in Python (`metrics/equity.py:196`) — O(pods × fills) per lead
 nothing (withdrawal beyond cash, non-finite `delta` — `registry/pods.py:45-80`) and B-006 plans
 to reuse it unchanged; Starlette deprecates `HTTP_422_UNPROCESSABLE_ENTITY` (12 suite warnings).
 
+### 4b. Everything else (S-003b)
+1. **A live management key is committed and pushed** (R1, measured). `test_api.py:10` holds an
+   `fk_…` key whose SHA-256 matches agent `id=1 name='management' role=management
+   status=active` in the Human's `fund.db`; the file is in one commit, reachable from origin.
+   Blast radius is small — the key opens only the Human's local August database, through a
+   server bound to 127.0.0.1, holding fake money — but anyone with repo access holds a
+   management identity for that DB, and the pattern (a key pasted into a tracked file) is
+   exactly what must never happen once firm agents hold keys. Removing it from `main` does not
+   revoke it (history keeps it; no force-push, Art. 7). Revocation means writing `fund.db` —
+   the Human's call (Q-0003). Origin's visibility (public/private) not verified: `gh repo view`
+   needs a permission prompt in loop mode. → **S-004** (remove), **B-022** (secret-scan test).
+2. **The Phase 2 milestone is scripted, not agent-run** (read). TRD: "re-run the existing
+   OpenClaw single-pod POC **through the app only**". `test_poc_milestone.py` replays the POC's
+   four fills as HTTP calls written by hand — no OpenClaw, no model. It proves the app can carry
+   the POC's day; it does not prove an agent can. Honest status: Phase 2 milestone **met by
+   script**; the agent half is Era I's (B-012/B-014/B-015).
+3. **The test price feed has the same look-ahead as yfinance** (read). `tests/support.py`
+   `HistoricalProvider.get_price` returns the close of `as_of.date()` at any hour (`:82`) and stamps
+   it with the requested time (`:85`); `get_ohlcv` stamps bars at 00:00 (`:104`) and filters
+   `ts <= as_of` (`:114`) — §4a.2/§4a.3 in the test double. Its docstring promises "a test cannot
+   accidentally prove something using tomorrow's price" — true for tomorrow, not for today's
+   close. Metrics tests and the POC milestone run on it. → **into B-005**: fix the double with the
+   real providers, or tests will certify the leak.
+4. **Tests that encode a decision still open** (read). `test_clock_and_health.py:22`
+   (`test_clock_forbidden_for_analyst`) is TRD §7 written as a test; if B-020's ADR widens the read,
+   that test changes *with the ADR as its reason*, not to go green. `test_performance_math.py:89`
+   checks √252 on `annualise` alone — still right after B-017 if the curve moves to trading days.
+5. **Stale words** (read). `docs/phase2_bus_costs_mcp.md:139-140` (MCP imports only settings — false
+   since cycle 2); README Layout (§2b); `bible/03_WORLD.md:43` and `bible/05_ERAS.md:33` say "218
+   tests" (276 collected). → S-004 (docs), S-006 (Bible).
+
+Smaller: `conftest.py` `make_pod` inserts pods directly with the system clock (`:145`), bypassing
+`create_pod` — consistent with P2 (pods unledgered) today, but B-018 must update it if pod
+creation becomes an event; `test_marketdata.py:245` uses the system clock to build "the future"
+(fine while the clock is live).
+
 ## 5. What's dead
 
 ### 5a. Physics (S-003a)
@@ -168,6 +257,11 @@ Exported, never called: `registry.service.count_agents`, `metrics.reporting.list
 are not dead ideas — they are a **missing endpoint**: an agent that restarts cannot find its
 own open task ids. Keep; expose in Era I (→ **B-021**). Nothing to delete in `app/`.
 
+### 5b. Everything else (S-003b)
+No dead code in `tests/` or `scripts/` (every helper in `support.py`/`conftest.py` is used).
+Dead weight: `test_api.py` (never collected, superseded by `agent_console.py` and the smoke
+script), empty `ui/`, `.DS_Store` ×2. `legacy/` is archive, not dead (§2b).
+
 ## 6. Risks (physics)
 - Floats for money everywhere (cash, qty, prices). Fine at today's scale; P3-style replay
   checks compare floats with tolerances. Revisit if a `Decimal` boundary is ever needed.
@@ -175,6 +269,10 @@ own open task ids. Keep; expose in Era I (→ **B-021**). Nothing to delete in `
   `app` binds to `FUND_DATABASE_URL` *at that moment* (why the probe sets env vars first).
 - The ledger is append-only by convention, not by mechanism (no trigger, no hash chain).
   Agents cannot write SQL, so this is a Builder-discipline risk, not an agent one.
+- Credentials in tracked files (§4b.1). Today: one key, local DB, fake money. In Era I every firm
+  agent holds a key and an OpenRouter key exists — nothing in the repo stops a paste. → B-022.
+- Test doubles inherit the physics' assumptions (§4b.3): a fix to a provider that skips the
+  double leaves the suite certifying the old behaviour.
 
 ## 7. Surprises
 - The physics is better than "Phase 2 done" suggests: one money implementation, one permission
@@ -182,9 +280,17 @@ own open task ids. Keep; expose in Era I (→ **B-021**). Nothing to delete in `
   are real in the code.
 - Its weak spot is **time**: three of the nine findings (replay order, daily-bar look-ahead,
   live price ignoring `as_of`) only bite once the clock can move — Era I's first job.
+- The one real secret leak was in the file the Bible flagged only as "odd" (`test_api.py`).
+- "Phase 2 milestone done" meant "done by a hand-written script"; no model has yet traded
+  through this app.
 
 ## 8. What this changes in the backlog
 New: B-016 replay order · B-017 Sharpe annualisation · B-018 rebuild scope · B-019 register
 pod validation · B-020 clock readable by all roles · B-021 own tasks/costs endpoint.
 Widened: B-000d (all non-finite floats), B-005 (bar-end look-ahead; quote `as_of`), B-002
 (`mcp_server` placement). Rest of repo (tests, scripts, docs, legacy, root files) → S-003b.
+
+S-003b (cycle 5): New **B-022** secret-scan test. **S-004** now has a concrete list (§2b table +
+§4b.5 docs). Widened: B-005 (`tests/support.py` `HistoricalProvider`), B-018 (`conftest.make_pod`),
+B-020 (`test_clock_forbidden_for_analyst` changes only with the ADR). New question **Q-0003**
+(revoke the committed key). S-006 gets the "218 tests" corrections.
