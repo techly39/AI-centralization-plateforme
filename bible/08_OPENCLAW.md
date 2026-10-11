@@ -23,12 +23,22 @@ OpenClaw changes fast. Example: in the Oct 2026 docs the agent roster key is
 navigation lists `TOOLS.md` and `HEARTBEAT.md` as **retired** workspace files — while the
 OCT POC was built with `TOOLS.md`. Anything you "know" about OpenClaw may be stale.
 
+**The docs are not your version** (Survey, cycle 7 — `runtime/openclaw/VERSION_NOTES.md`):
+`docs.openclaw.ai` serves the *latest* release only. The Mac mini runs **2026.5.12**, whose
+roster key is still `agents.list`, while the docs (≥ 2026.9) say `agents.entries` — and the
+newer defaults are **looser** (`tools.sessions.visibility` `tree` → `all`,
+`tools.agentToAgent.enabled` on). So an upgrade can silently widen what an agent sees:
+render every seal key explicitly, never inherit a default (B-023).
+
 Before writing any OpenClaw integration code:
-1. `openclaw --version` and `openclaw doctor` (read-only first; no `--fix` until you've
-   backed up — §2).
-2. Read the docs **for that version** (docs.openclaw.ai): multi-agent, agent workspace,
-   configuration / per-agent entries, tools & sandbox, MCP, auth profiles, how to run a
-   turn for one agent from CLI or gateway.
+1. `openclaw --version` and `openclaw config schema` (the installed CLI's own schema is the
+   source of truth for keys). **Not** `openclaw doctor` at first: even without `--fix` it
+   may apply "safe migrations" to the config. Run it only after a fresh backup (§2), and
+   only against the firm's profile (ADR-019).
+2. Read the docs (docs.openclaw.ai): multi-agent, agent workspace, configuration /
+   per-agent entries, tools & sandbox, MCP, auth profiles, how to run a turn for one agent
+   from CLI or gateway — and check every key you take from them against the installed
+   schema. Where they disagree, the schema wins; record the difference.
 3. Write `runtime/openclaw/VERSION_NOTES.md`: version, every config key and CLI command the
    adapter relies on, with doc links, and anything that surprised you.
 4. Pin the version the adapter was verified against. On upgrade: re-read, update the
@@ -42,6 +52,10 @@ agent's profiles, `openclaw agents add <id> --workspace --model --agent-dir --no
 `openclaw agents list --bindings`, `tools.allow` / `tools.deny` (deny wins; each layer
 can only restrict), MCP tools named `<server>__<tool>` and filterable with globs,
 `sandbox.mode` / `workspaceAccess`.
+*Measured on 2026.5.12 (cycle 7):* `mcp.servers`, `tools.web`, `tools.sessions`,
+`tools.agentToAgent` and `tools.profile` are **global only** — there is no per-agent MCP
+key. Hence one named MCP server per firm agent, admitted by that agent's allowlist glob
+alone, inside the firm's own profile (§2, ADR-019). Details: VERSION_NOTES.
 
 ## 2. Rule one — never break the Human's OpenClaw
 
@@ -50,6 +64,13 @@ Telegram bots).
 - **Back up first:** before the first change, archive `~/.openclaw` (config, agents,
   workspaces — exclude nothing) to `~/firm-openclaw-backups/<timestamp>.tar.gz`. Back up
   again before every config migration. Never print secrets from it.
+  **Born private:** the archive holds credentials, so create it under `umask 077` (or with
+  `openclaw backup`) in a `700` directory — fixing permissions afterwards may not be
+  allowed to a headless Builder (cycle 7's tarball came out `644`, Q-0004).
+- **Own profile (ADR-019):** because the seal keys are global, firm agents do not live in
+  the Human's config at all: they live in a separate OpenClaw profile
+  (`openclaw --profile firm` → `~/.openclaw-firm`), so firm seal settings never change the
+  Human's agents and vice versa. Unverified until the adapter (B-012) proves it.
 - **Namespace:** firm agents are `firm-<podslug>-<role>-<name>` (management:
   `firm-mgmt-<role>-<name>`). The adapter only creates, changes, or retires agents with
   the `firm-` prefix.
