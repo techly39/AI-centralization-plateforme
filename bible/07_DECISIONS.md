@@ -283,10 +283,17 @@ could not be serialised, so every later read of the recipient's inbox (HTTP and 
 `GET /events` was a 500 (high — one analyst message poisoned a rival PM's or management's reads);
 an int like `10**400` in free JSON reached the ledger and reads as `Infinity` in float64 tools
 (medium); and the recursive walker raised `RecursionError` (500) at ~1000 levels (low). Fix: one
-**iterative** walker `app.finite.json_problem` refuses non-finite floats, ints beyond ±2**53 and
-nesting beyond `MAX_JSON_DEPTH` = 32 (requests) / `MAX_LEDGER_DEPTH` = 36 (`append_event`); the
-422 echo is depth-bounded. Held and kept as guards: string-encoded `"inf"`, int→float overflow on
-numeric fields, duplicate keys, orders at both caps, subnormal quantities, 50 max-size cost
-reports, MCP inf/nan. Open, strict-xfail in `tests/test_redteam_0004.py`, outside this unit:
-int ids ≥ 2**63 from analysts/PMs → 500 (with B-000m), fee rounds to $0.00 below $5 notional
-(B-026), non-finite feed prices (with B-025/B-005).
+**iterative** walker `app.finite.json_problem` refuses non-finite floats, ints beyond
+±`MAX_SAFE_INT` (2**53 − 1, JavaScript's safe-integer bound) and nesting beyond `MAX_JSON_DEPTH` = 32
+(requests) / `MAX_LEDGER_DEPTH` = 36 (`append_event`); the 422 echo is depth-bounded.
+**Ids are bounded too** (re-audit BLOCK, same cycle): with the ledger refusing big ints, a cross-pod
+read naming `pod=2**53+1` made `deny()` raise — a 500 instead of a 403, and the
+`permission_denied` record lost. Every id an agent can send — path (`IdPath`), query (`pod`,
+`actor`, `after_id`, `before_id`), body (`Id`: `task_id`, `pod_id`) and message refs
+(`agent:<id>`/`pod:<id>`) — is now 1..`MAX_ID` (= `MAX_SAFE_INT`) → 422 beyond. That also closes
+B-000m (red-team 0002) and red-team 0004's int64-id hole. A test requires an upper bound on every
+integer parameter and body field in the OpenAPI schema. Held and kept as guards: string-encoded
+`"inf"`, int→float overflow on numeric fields, duplicate keys, orders at both caps, subnormal
+quantities, 50 max-size cost reports, MCP inf/nan. Open, strict-xfail in `tests/test_redteam_0004.py`,
+outside this unit: fee rounds to $0.00 below $5 notional (B-026), non-finite feed prices (B-025,
+with B-005).

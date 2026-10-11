@@ -11,8 +11,9 @@ Every attack uses only what a firm agent holds: an API key, REST, MCP tools.
 * ``xfail(strict=True)``: a hole. When the Builder fixes it, strict mode fails
   the run and the marker must come off.
 
-Fixed in cycle 0012, before merge (ADR-024): the five ``test_held_*`` tests under
-the three HOLE headings below were holes — deep free JSON (stored, then every
+Fixed in cycle 0012, before merge (ADR-024): the int64-id test (now bounded by
+``MAX_ID``) and the five ``test_held_*`` tests under the three HOLE headings below
+were holes — deep free JSON (stored, then every
 read of it a 500), integers beyond ±2**53 in free JSON, and the recursive
 walker's RecursionError. One iterative walker (``app.finite.json_problem``) now
 refuses all three, in the schemas and in ``append_event``.
@@ -148,11 +149,9 @@ def test_held_walker_recursion_is_a_500(client, two_desks, db):
     assert resp.status_code in (400, 413, 422), resp.status_code
 
 
-@pytest.mark.xfail(strict=True, reason="red-team 0004 LOW: unbounded int ids reach SQLite and "
-                   "raise OverflowError (500) — reachable by analysts (task_id body, after_id) and "
-                   "PMs (DELETE /orders/{id}), not only management as in red-team 0002")
 @pytest.mark.parametrize("attack", ["task_id_body", "cancel_order_path", "after_id_query"])
-def test_hole_int64_overflow_ids_from_non_management(client, two_desks, attack):
+def test_held_int64_overflow_ids_from_non_management(client, two_desks, attack):
+    """Was a hole; fixed in cycle 0012 before merge by ``MAX_ID`` on every id."""
     c = _soft(client)
     an1, pm1 = two_desks["an1"][1], two_desks["pm1"][1]
     big = 2**63

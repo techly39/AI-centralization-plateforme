@@ -16,7 +16,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import LeaderboardOut, LeaderboardRowOut, PodMetricsOut
+from app.api.schemas import IdPath, LeaderboardOut, LeaderboardRowOut, PodMetricsOut
 from app.clock import get_clock
 from app.db.base import get_session
 from app.db.models import Agent, Pod
@@ -46,7 +46,7 @@ def _row(metrics: PodMetrics) -> LeaderboardRowOut:
 
 @router.get("/pod/{pod_id}", response_model=PodMetricsOut)
 def read_pod_metrics(
-    pod_id: int,
+    pod_id: IdPath,
     _: Agent = Depends(require(Action.READ_CROSS_POD)),
     session: Session = Depends(get_session),
 ) -> PodMetricsOut:

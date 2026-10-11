@@ -16,16 +16,16 @@ from __future__ import annotations
 import math
 from typing import Any
 
-#: Largest integer every float64 JSON reader holds exactly.
-MAX_SAFE_INT = 2**53
+from app.limits import MAX_SAFE_INT
 
 
 def json_problem(value: Any, *, max_depth: int) -> str | None:
     """Describe the first thing in ``value`` that is not portable JSON, or None.
 
-    Refuses non-finite floats, integers beyond ±2**53, and containers nested
-    deeper than ``max_depth`` (the top-level container is depth 1). Iterative,
-    so no input can exhaust the interpreter's stack. Strings such as ``"NaN"``
+    Refuses non-finite floats, integers beyond ±(2**53 - 1), and containers
+    nested deeper than ``max_depth`` (the top-level container is depth 1). The
+    walk itself is iterative, so no depth can exhaust the stack here (JSON
+    parsing and pydantic before it still recurse). Strings such as ``"NaN"``
     are text, not numbers, and pass; ``bool`` is not a number here.
     """
     stack: list[tuple[Any, str, int]] = [(value, "$", 0)]
@@ -38,7 +38,7 @@ def json_problem(value: Any, *, max_depth: int) -> str | None:
                 return f"non-finite number at {path}"
         elif isinstance(item, int):
             if abs(item) > MAX_SAFE_INT:
-                return f"integer beyond ±2**53 at {path}"
+                return f"integer beyond ±(2**53 - 1) at {path}"
         elif isinstance(item, (dict, list, tuple)):
             if depth + 1 > max_depth:
                 return f"nesting deeper than {max_depth} at {path}"

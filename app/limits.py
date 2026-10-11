@@ -25,6 +25,17 @@ MAX_ORDER_QTY = 1_000_000_000.0
 #: Highest limit price an order may name, in dollars per share.
 MAX_PRICE = 10_000_000.0
 
+#: Largest integer every JSON reader holds exactly (JavaScript's
+#: ``Number.MAX_SAFE_INTEGER``). The ledger holds no larger int (ADR-024).
+MAX_SAFE_INT = 2**53 - 1
+
+#: Largest id an agent may name in a path, query or body. Ids are
+#: autoincrement and never get near it; the bound exists because an unbounded id
+#: overflowed SQLite (500) or, copied into a ``permission_denied`` event, broke
+#: the portable-ledger rule and lost the violation record (red-team 0002/0004,
+#: auditor cycle 12).
+MAX_ID = MAX_SAFE_INT
+
 #: Deepest nesting a free JSON field (message ``structured_payload``, task
 #: ``outcome``) may have. A thesis needs a handful of levels; ~256 levels was
 #: stored and then could not be rendered, so every read of it was a 500

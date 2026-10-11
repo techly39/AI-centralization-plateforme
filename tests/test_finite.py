@@ -28,12 +28,13 @@ from sqlalchemy import func, select
 
 from app.db.models import Cost, Event, Message, Order, Task
 from app.ledger.events import append_event
-from app.finite import MAX_SAFE_INT
 from app.limits import (
+    MAX_ID,
     MAX_JSON_DEPTH,
     MAX_LEDGER_DEPTH,
     MAX_ORDER_QTY,
     MAX_PRICE,
+    MAX_SAFE_INT,
     MAX_USD_PER_REPORT,
 )
 
@@ -211,6 +212,52 @@ def test_append_event_refuses_deep_and_huge_int_payloads(db):
     append_event(db, type="probe", actor_agent_id=None, payload=_nested(MAX_LEDGER_DEPTH))
     db.rollback()
     assert _counts(db) == before
+
+
+@pytest.mark.parametrize("path", ["/orders?pod={}", "/portfolio/{}"])
+def test_cross_pod_probe_with_a_huge_id_is_refused_not_a_500(client, desk, db, path):
+    """Auditor BLOCK, cycle 12: once the ledger refused ints beyond 2**53, a
+    cross-pod read naming one made ``deny()`` raise — 500, and the
+    ``permission_denied`` record was lost. Ids are now bounded at the door."""
+    key = desk["an"][1]
+    before = _counts(db)
+    for big in (MAX_ID + 1, 2**60, 2**63):
+        assert client.get(path.format(big), headers=H(key)).status_code == 422
+    assert _counts(db) == before
+    resp = client.get(path.format(MAX_ID), headers=H(key))
+    assert resp.status_code == 403
+    db.expire_all()
+    denied = db.scalars(select(Event).where(Event.type == "permission_denied")).all()
+    assert [e.payload_json["pod_id"] for e in denied] == [MAX_ID]
+
+
+@pytest.mark.parametrize("ref", [f"agent:{MAX_ID + 1}", f"pod:{2**63}", "agent:" + "9" * 27])
+def test_huge_recipient_ids_are_a_clean_422(client, desk, db, ref):
+    before = _counts(db)
+    resp = client.post("/messages", headers=H(desk["an"][1]), json={"to": ref, "body": "x"})
+    assert resp.status_code == 422, resp.text
+    assert _counts(db) == before
+
+
+def test_every_integer_parameter_and_body_id_has_an_upper_bound(client):
+    """No int an agent sends can reach SQLite or the ledger unbounded."""
+    spec = client.get("/openapi.json").json()
+    unbounded = [
+        (path, param["name"])
+        for path, item in spec["paths"].items()
+        for op in item.values()
+        for param in op.get("parameters", [])
+        for v in param.get("schema", {}).get("anyOf", [param.get("schema", {})])
+        if v.get("type") == "integer" and "maximum" not in v
+    ]
+    unbounded += [
+        (name, field)
+        for name, schema in _request_body_schemas(client).items()
+        for field, prop in schema.get("properties", {}).items()
+        for v in prop.get("anyOf", [prop])
+        if v.get("type") == "integer" and "maximum" not in v
+    ]
+    assert unbounded == []
 
 
 def test_report_cost_refuses_non_finite_in_process(db, desk):

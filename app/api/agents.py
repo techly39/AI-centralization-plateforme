@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
+    IdPath,
     AgentCreatedResponse,
     AgentRegisterRequest,
     DeactivateResponse,
@@ -88,7 +89,7 @@ def directory(
 
 @router.post("/agents/{agent_id}/deactivate", response_model=DeactivateResponse)
 def deactivate(
-    agent_id: int,
+    agent_id: IdPath,
     actor: Agent = Depends(require(Action.DEACTIVATE_AGENTS)),
     session: Session = Depends(get_session),
 ) -> DeactivateResponse:

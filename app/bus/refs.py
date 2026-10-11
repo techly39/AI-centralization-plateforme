@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from app.bus.errors import InvalidRecipientError
+from app.limits import MAX_ID
 
 #: The literal ``to_ref`` value meaning "everyone in the firm".
 BROADCAST = "broadcast"
@@ -87,9 +88,9 @@ def parse_ref(raw: str) -> Recipient:
                 raise InvalidRecipientError(
                     f"{prefix}<id> needs a whole number, got {suffix!r}"
                 ) from None
-            if target_id <= 0:
+            if not 0 < target_id <= MAX_ID:
                 raise InvalidRecipientError(
-                    f"{prefix}<id> must be positive, got {target_id}"
+                    f"{prefix}<id> must be 1..{MAX_ID}, got {target_id}"
                 )
             return Recipient(kind=kind, id=target_id)  # type: ignore[arg-type]
 

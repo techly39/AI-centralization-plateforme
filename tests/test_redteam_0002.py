@@ -122,10 +122,9 @@ def test_held_podless_reporter_does_not_break_leaderboard(client, two_desks, adm
 # HOLE — /metrics/pod/{id} path param overflow
 # =============================================================================
 
-@pytest.mark.xfail(strict=True, reason="red-team 0002: GET /metrics/pod/{2**63} raises "
-                   "OverflowError in session.get (500, not 404/422); pod_id path param unbounded")
-def test_hole_metrics_pod_id_beyond_int64_500(client, two_desks, admin_key):
-    """Management-only (READ_CROSS_POD runs first, so other roles get 403), and no
+def test_held_metrics_pod_id_beyond_int64_500(client, two_desks, admin_key):
+    """Was a hole (cycle 0002); fixed in cycle 0012 by one bounded id on every
+    path, query and body id (``MAX_ID``, ADR-024). Management-only (READ_CROSS_POD runs first, so other roles get 403), and no
     data is corrupted — but an unhandled 500 on attacker-chosen input. The same
     unbounded-int path pattern likely exists on other ``/{id}`` routes."""
     c = TestClient(client.app, raise_server_exceptions=False)

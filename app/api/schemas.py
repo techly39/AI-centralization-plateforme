@@ -9,11 +9,13 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
+from fastapi import Path
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
 from app.finite import json_problem
 from app.limits import (
+    MAX_ID,
     MAX_JSON_DEPTH,
     MAX_ORDER_QTY,
     MAX_PRICE,
@@ -26,13 +28,19 @@ def _portable_json(value: dict[str, Any]) -> dict[str, Any]:
     problem = json_problem(value, max_depth=MAX_JSON_DEPTH)
     if problem:
         raise ValueError(f"{problem}: not portable JSON (no NaN/Infinity, ints within "
-                         f"±2**53, at most {MAX_JSON_DEPTH} levels deep)")
+                         f"±(2**53 - 1), at most {MAX_JSON_DEPTH} levels deep)")
     return value
 
 
 #: A free JSON object any standard reader can hold: finite numbers, safe
 #: integers, at most MAX_JSON_DEPTH levels (ADR-024).
 FiniteJSON = Annotated[dict, AfterValidator(_portable_json)]
+
+#: An id an agent names in a body: positive and at most MAX_ID, so it can
+#: neither overflow SQLite nor break the portable ledger (ADR-024).
+Id = Annotated[int, Field(ge=1, le=MAX_ID)]
+#: The same bound for an id in a URL path.
+IdPath = Annotated[int, Path(ge=1, le=MAX_ID)]
 
 # Roles an operator/management may assign via the API. 'system' is internal-only
 # and is created by the bootstrap CLI, never over HTTP.
@@ -42,7 +50,7 @@ RegisterableRole = Literal["analyst", "pm", "management"]
 class AgentRegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     role: RegisterableRole
-    pod_id: int | None = None
+    pod_id: Id | None = None
     charter_ref: str | None = Field(default=None, max_length=256)
     research_domains: list[str] | None = None
 
@@ -326,7 +334,7 @@ class TaskStartRequest(BaseModel):
 class TaskEndRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    task_id: int
+    task_id: Id
     outcome: FiniteJSON = Field(
         description=(
             "Structured result — TRD §10 requires JSON, not free text alone. "
