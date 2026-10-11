@@ -92,12 +92,14 @@ def check_pending_orders(
     While the world is halted it fills nothing and returns an empty result.
     """
     result = MonitorResult()
-    if is_halted():
-        return result
     provider = provider or get_provider()
     now = get_clock().now()
 
     with OMS_LOCK:
+        # Checked under the lock, not before it: a sweep queued behind the lock
+        # must not wake up and fill orders in a world halted while it waited.
+        if is_halted():
+            return result
         try:
             orders = pending_limit_orders(session, pod_id=pod_id)
             result.checked = len(orders)

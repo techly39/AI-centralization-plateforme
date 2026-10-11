@@ -50,6 +50,11 @@ def is_halted() -> bool:
     return HALT_FILE.exists()
 
 
+def _route_template(request: Request) -> str:
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or "<unmatched>"
+
+
 def refuse_if_halted(request: Request, session: Session, agent: Agent) -> None:
     """Raise 423 (after logging the attempt) for a write while halted."""
     if request.method in READ_METHODS or not is_halted():
@@ -60,7 +65,10 @@ def refuse_if_halted(request: Request, session: Session, agent: Agent) -> None:
         actor_agent_id=agent.id,
         payload={
             "method": request.method,
-            "path": request.url.path,
+            # The route template, never the raw URL: a path parameter is agent-chosen
+            # text (validated only after this gate), and storing it would give a halted
+            # agent a channel into the ledger (red-team cycle 11).
+            "path": _route_template(request),
             "role": agent.role.value,
         },
     )

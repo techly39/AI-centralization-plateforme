@@ -113,7 +113,8 @@ def test_every_write_route_is_refused_while_halted_for_every_role(
     events = db.scalars(select(Event).where(Event.id > before)).all()
     # The refusal is the only thing that happened.
     assert [e.type for e in events] == [EVENT_HALT_REFUSED]
-    assert events[0].payload_json == {"method": method, "path": _concrete(path), "role": role}
+    # The route template, not the URL: agent-chosen path text never reaches the ledger.
+    assert events[0].payload_json == {"method": method, "path": path, "role": role}
 
 
 def test_a_halted_pm_cannot_trade_and_nothing_changes(client, desk, db, halt_file):

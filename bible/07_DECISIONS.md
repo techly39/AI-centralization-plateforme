@@ -210,10 +210,15 @@ every request — no cache, no restart; lifting the halt is deleting the file. T
 in `app.registry.auth.get_current_agent`, which every endpoint except `/health` depends on: any
 method other than GET/HEAD/OPTIONS from any authenticated agent — **every role, management and
 `system` included** (the gate has no role branch; analyst, PM and management are tested on
-every write route, `system` is not — it has no API key in the tests) — gets **423 Locked** and one `halt_refused` event `{method, path, role}`.
+every write route, `system` is not — it has no API key in the tests) — gets **423 Locked** and one
+`halt_refused` event `{method, path, role}` where `path` is the **route template**
+(`/orders/{order_id}`), never the URL: the gate runs before path params are validated, so a raw
+path would let a halted agent write free text into the ledger (red-team cycle 11, medium, fixed).
 Unauthenticated requests stay 401 and log nothing (no identity to attribute). Reads keep working:
-a halted world must stay observable. `check_pending_orders` fills nothing while halted, so both
-of its triggers (live scheduler, future `/clock/advance`) obey. `GET /halt` → `{halted}` is a
+a halted world must stay observable. `check_pending_orders` fills nothing while halted — checked
+**under `OMS_LOCK`**, so a sweep queued behind the lock cannot fill after a halt that began while
+it waited (red-team cycle 11, low, fixed) — and both of its triggers (live scheduler, future
+`/clock/advance`) obey. `GET /halt` → `{halted}` is a
 universal action (`READ_HALT`), MCP tool `get_halt`. The path is a **constant**
 (`app.registry.halt.HALT_FILE` = `governance/HALT` under the repo root), not a setting: Art. 5
 names that file, and a `config.yaml` key or `FUND_*` variable that moved it would be a route
