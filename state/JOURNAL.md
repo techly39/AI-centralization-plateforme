@@ -379,3 +379,37 @@ guard must classify *every* shape and fail on the unknown, or it certifies only 
 stay mandatory on physics.
 Next: B-016 replay order (with the time-travel invariant suite) → S-004b quick cleanup → B-020 →
 B-004.
+
+## Cycle 0013 — Replay order = live order (2026-10-11)
+Era: I — The Desk
+Exit criterion served: "the ledger replays" (Era I) and the ADR-021 physics-hole gate: B-016 had to
+close before B-004 (simulated clock) can rewind time.
+Hypothesis (written at verify time: the build session ended after its first commit, before the
+journal; the content is what ADR-025 states): If ledger time never runs backwards (stamped in the
+INSERT), every replay folds by id, and an impossible sell raises instead of being dropped, then under
+a clock that steps back and forth live state == `rebuild_state` == the equity curve's last point,
+the SURVEY P3 phantom-shares case is gone, and each law's mutation turns only its own tests red.
+Work: e689a72 (prior session) — `_not_before_latest` CASE subquery in `append_event`; id order in
+`rebuild_state`, `read_events`, `_pod_events`; "latest day reached" buckets in `_replay_by_day`;
+sell reducer raises; `QTY_EPSILON` moved below the OMS; `tests/test_time_order.py`; ADR-025. This
+session: found the branch unmerged with `loop_status` still at 12 → resumed at step 5 instead of
+starting a new unit. Read-only fold of the Human's `fund.db` (95 events, 0 backward stamps) under the
+new reducer: clean. Auditor **PASS** (WARN: a forward clock step is now permanent → ADR-025 (f),
+B-029). Red-team 0005: **2 low holes**, 9 attacks held (agent-supplied stamps, clock control,
+reducer-event forgery, 8 racing on-disk writers with ±3-day clocks, a writer waiting on an
+uncommitted later stamp, 6 racing full sells, 60-order churn with clock steps): (1) a 1e-9 sell of
+a never-held ticker filled within `QTY_EPSILON` → OMS and reducer refuse any sell without a
+position; (2) `Order.created_at`/`filled_at` took the raw clock while their events were held →
+copied from the events, `execute_fill` loses `at`. Re-audit **PASS**; its 2 coverage notes closed
+(reducer dust-sell test — mutation red alone; `created_at` checked against `order_placed`).
+Result: merged 0c522eb, pushed. 461+8xf → **489 passed + 8 xfailed**. Hypothesis **met**; red-team
+showed the law covered the ledger but not the rows agents read beside it.
+Learned: (1) A truth source is only as good as its mirrors: holding the ledger's time without
+holding `Order.created_at` gave agents a fill history that contradicted the ledger — when a sink
+gets a new law, every row that *copies* the sink must inherit it (the converse of cycle 12's
+lesson 2). (2) A tolerance is a law too: `QTY_EPSILON` meant "forgive dust" but was written as
+"allow 1e-9 of anything". Say what a tolerance forgives. (3) Interrupted cycles are now real:
+step 0 should compare `loop_status` with branches ahead of `main` and resume, not restart — done
+here by judgement; worth writing into the protocol (X-007 in IDEAS).
+Next: B-020 clock-vs-agents ADR → B-004 simulated clock (per-`run_id` floor, B-029 guard) →
+S-004b if P-0002's answer covers headless `git rm`.

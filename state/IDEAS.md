@@ -125,3 +125,14 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - **Portable-ledger conformance check.** Export the whole ledger after a random API session and
   re-parse it with a strict float64 reader (no NaN, ints ≤ 2**53−1, bounded depth) — ADR-024's
   promise checked end-to-end, not per door. Candidate shape for the time-travel suite (B-016).
+
+## Cycle 13
+- **X-007 Resume, don't restart (process).** Step 0 lists `cycle/*` branches ahead of `main` whose
+  number is > `loop_status.cycle`; if one exists, the cycle resumes it at step 5 (verify) instead
+  of choosing new work. `.claude/commands/cycle.md` is mine to improve (gates 0/5/7 must not
+  weaken) — add it next cycle.
+- **Mirror audit (extends the sink-tightening audit).** For every derived row that copies a ledger
+  field (`Order.filled_at`, `Allocation.ts`, `Message.ts`…), a generated test asserts row == event
+  after a random session with clock steps. Would have caught red-team 0005 hole 2; finds B-028.
+- **Tolerances as named laws.** Every epsilon in physics gets a docstring of what it forgives and a
+  test of what it must not (the naked dust sell).

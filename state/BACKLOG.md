@@ -50,12 +50,17 @@ feed price ×2).
       the first time a request/sweep sees the file change state. With B-007 (world events).
 - [ ] **B-024** (low) `test_held_monitor_sweep_queued_on_lock_does_not_fill_after_halt` waits a
       fixed 1 s; give the monitor a test hook (or a lock-acquired event) so it needn't.
-- [ ] **B-016** Replay order = live order: `rebuild_state` + equity curve replay `(ts, id)`, live
-      folds by `id`; a backwards clock gives 10 phantom shares on rebuild (SURVEY §4a.1, P3).
-      Shape: per-`run_id` ledgers with timestamps enforced monotonic at `append_event` (id order
-      alone doesn't fix the equity curve's day buckets); sell reducer must raise on a sell beyond
-      the position, not drop it. Test with a clock that moves back. Before B-004.
-      Consider IDEAS "time-travel invariant suite" (cycle 4) as its test shape.
+- [x] **B-016** Replay order = live order — cycle 13 (ADR-025): monotonic ts held in the INSERT,
+      every replay folds by id, sell beyond/without position raises; red-team 0005: 2 holes fixed.
+- [ ] **B-028** (low) `Message.ts`, `Cost.ts`, `Task.started_at/ended_at` take the raw clock,
+      not their event's held stamp (red-team 0005; orders fixed cycle 13). Copy `event.ts` like
+      `fund_pod`/OMS do. With B-000e (message event carries body).
+- [ ] **B-029** (low, operator-only) A forward clock step is permanent under ADR-025 (f): guard
+      (refuse or log) a clock far ahead of the ledger floor. Design with B-004 (per-`run_id` floor).
+- [ ] **B-030** (low) `GET /events` pages only by `since` (ts ≥) with cap 1000: a long held
+      stretch gives >1000 events on one stamp and management cannot page past them → add an
+      id cursor (`after_id`). Also: market price + `now` read before `OMS_LOCK`, so an order
+      queued behind a sweep fills at a quote one sweep stale (red-team 0005 notes). With B-005.
 - [ ] **B-020** Clock vs agents: MCP `get_clock` tells all agents to use it; PM/analyst get 403
       (P7) — and TRD §7 says `/clock` is system/management only. Decide by ADR: widen the read
       (agents need the simulated date in backtests) or fix the tool docstring. Before B-004.

@@ -1,5 +1,22 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 13: the fund's history now replays exactly as it happened.** The fund
+keeps one permanent record of every event, and its state can be rebuilt from that record at any
+time. Before this change, that rebuild sorted events by their timestamps. If the computer's clock
+ever stepped backwards, the rebuild could disagree with what actually happened, for example by
+inventing shares. Now the record's time only moves forward, and every rebuild follows the order
+in which events actually happened. A rebuilt history that is impossible now raises a loud error
+instead of being quietly "corrected". Your existing `fund.db` (95 events) still rebuilds
+unchanged; I checked a read-only view of it. The attack review found two small issues, and both are
+fixed: an agent could sell a tiny amount (1e-9) of a stock it never owned and get cash for it, and
+the order list could show fill times that disagreed with the record. One thing to know: if the
+machine's clock ever jumps far into the future, the record's time stays there, because the record
+is permanent. Agents cannot cause that; only the operating system clock or an operator script
+can. A previous session was interrupted after building this. This session checked and finished it
+rather than starting over. Nothing needs your action.
+
+---
+
 **2026-10-11 — Cycle 12: the fund's record can no longer hold numbers that break it.** Agents
 could previously send "infinity" or "not-a-number" as a cost or a price, and the fund stored it.
 Now every number has a sensible ceiling, and the permanent record refuses anything that a standard
