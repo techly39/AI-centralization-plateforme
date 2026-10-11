@@ -169,3 +169,28 @@ because no agent can run (`monthly_llm_usd_cap: null`); that is a reason for ord
 the tier, not for demotion. Gate: every open hole is fixed or accepted by an ADR with its reason
 before any agent wakes (before B-012's first live probe and before B-015). B-000d (non-finite
 floats in event payloads) goes with or before B-016, since both touch `append_event`.
+
+## ADR-022 — The dependency law, placed and enforced   (builder, cycle 10) — accepted
+Question: 03 §1 states the law for `app`, `runtime`, `ui`, `quant`, `truman` but not for
+`mcp_server/` (which imported `app.metrics.reporting` for one constant and so loaded 35 `app`
+modules incl. the DB engine — SURVEY §4a.9) nor `scripts/`. Where do they sit, and how is
+the law enforced?
+Answer from the future: `mcp_server` is one agent's doorway — an **HTTP client** of the App,
+like the Runtime. It may import only `app.config` (settings) and `app.limits` (new: pure
+constants that clients validate against, no imports), never the DB, ledger or OMS. Shared bounds
+move to `app/limits.py` (a natural home for IDEAS "physical-units types" later). `scripts/` are
+clients (MCP/HTTP) except named in-process probes (`survey_probe_physics.py`) that run physics
+on a throwaway DB. Physics (`app`, `migrations`) also never imports `mcp`: MCP wraps it from
+outside. `legacy/` is imported by nothing; `runtime` by nothing outside tests.
+`tests/test_boundaries.py` enforces it with **two detectors** (cycle 7 lesson: one detector's
+"0 found" is a statement about the detector): an AST scan of every import, incl. those inside
+functions, and a fresh interpreter that imports the entry points and inspects `sys.modules`
+(catches an LLM SDK pulled in by a dependency). The scanner is tested on a planted tree, and
+every top-level Python directory must be placed in the law or the suite fails.
+Alternatives rejected: let `mcp_server` import any "pure" `app` module (no test can tell pure —
+an allowlist can); duplicate the constant in the wrapper (two sources of truth for one limit).
+Consequences: a new package (`runtime/`, `truman/`, `quant/`, `ui/`) is under its law the moment
+it holds Python — its rules are already in the test. The Runtime may import LLM SDKs (it hosts
+the minds); physics, the pure libraries, the wrapper, the UI and the scripts may not. Known
+limit: the static scan cannot see `importlib.import_module("…")` with a computed name; the
+dynamic detector covers what the entry points actually load.

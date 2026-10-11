@@ -90,6 +90,7 @@ compressed time, reproducibly, with real per-agent costs?
 
 Deliverables:
 1. Commit Phase 2; add `tests/test_boundaries.py` (dependency law, no LLM SDK in `app/`).
+   *(Done: Phase 2 committed in the Survey; boundary test cycle 10, ADR-022.)*
 2. Halt in physics (`governance/HALT` → agent writes refused; `GET /halt`).
 3. TRD Phase 3: simulated clock, `/clock/advance`, look-ahead guard, `run_id` scopes,
    allocation endpoint, meeting packages.
