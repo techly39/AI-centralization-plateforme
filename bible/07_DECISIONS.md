@@ -193,8 +193,9 @@ Consequences: a new package (`runtime/`, `truman/`, `quant/`, `ui/`) is under it
 it holds Python — its rules are already in the test. The Runtime may import LLM SDKs (it hosts
 the minds); physics, the pure libraries, the wrapper, the UI and the scripts may not. Known
 limits (corrected after audit, cycle 10): the static scan reads `import`, `from … import`, and
-`__import__("x")` / `import_module("x")` with a **literal** name; it cannot see a computed name
-(`import_module(f"…")`, `getattr`-built calls, `exec`). The dynamic detector sees only what
+`__import__("x")` / `import_module("x")` with a **literal** first positional name; it cannot
+see a computed name (`import_module(f"…")`, `getattr`-built calls, `exec`), an aliased importer
+(`from importlib import import_module as im`), or the keyword form `import_module(name="x")`. The dynamic detector sees only what
 importing `app.main`, `app.cli`, `app.scheduler` (and the wrapper's entry points) loads — not an
 import buried in a function that has not run. Code that hides an import from both is a
 review matter (auditor), not something this test can prove absent. `quant` and `truman` may
