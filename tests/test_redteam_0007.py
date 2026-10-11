@@ -430,6 +430,13 @@ def test_held_sweep_prices_at_a_now_the_clock_has_left(
         assert fill.payload_json["fill_price"] == feed.price_at("AAPL", fill.ts), (
             f"order {placed['id']} filled at {fill.payload_json['fill_price']} "
             f"stamped {fill.ts}, market then {feed.price_at('AAPL', fill.ts)}")
+    # The outcome itself (re-audit, cycle 15): sweep A ran, priced at T2 (200,
+    # not crossing 150) and left the order pending — not a vacuous empty loop.
+    assert not t.is_alive()
+    assert out["result"].checked == 1 and out["result"].filled == []
+    assert fills == []
+    db.expire_all()
+    assert db.get(Order, placed["id"]).status == OrderStatus.pending
 
 
 # Was HOLE (medium): a server already serving a fresh file kept LiveClock after
