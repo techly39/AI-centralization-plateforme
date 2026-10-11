@@ -120,6 +120,18 @@ def test_every_write_route_is_refused_while_halted(
     assert [e.type for e in events] == [EVENT_HALT_REFUSED]
 
 
+@pytest.mark.parametrize("role", ["analyst", "pm", "management"])
+def test_no_role_outranks_the_halt(client, agent_factory, make_pod, db, halt_file, role):
+    # A universal write (self-report) so the role matrix cannot be what refuses it.
+    pod_id = make_pod(1)
+    _, key = agent_factory(f"{role}-w", role, pod_id if role != "management" else None)
+    halt_file.touch()
+    resp = client.post("/tasks/start", headers={"X-API-Key": key}, json={"subject": "s"})
+    assert resp.status_code == 423, resp.text
+    event = db.scalars(select(Event).where(Event.type == EVENT_HALT_REFUSED)).one()
+    assert event.payload_json["role"] == role
+
+
 def test_a_halted_pm_cannot_trade_and_nothing_changes(client, desk, db, halt_file):
     pod_id, _, pm_key = desk
     halt_file.touch()

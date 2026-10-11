@@ -209,7 +209,8 @@ Answer from the future: **existence of the file is the switch** (an empty file h
 every request — no cache, no restart; lifting the halt is deleting the file. The gate is one call
 in `app.registry.auth.get_current_agent`, which every endpoint except `/health` depends on: any
 method other than GET/HEAD/OPTIONS from any authenticated agent — **every role, management and
-`system` included** — gets **423 Locked** and one `halt_refused` event `{method, path, role}`.
+`system` included** (the gate has no role branch; analyst, PM and management are tested over
+HTTP, `system` is not — it has no API key in the tests) — gets **423 Locked** and one `halt_refused` event `{method, path, role}`.
 Unauthenticated requests stay 401 and log nothing (no identity to attribute). Reads keep working:
 a halted world must stay observable. `check_pending_orders` fills nothing while halted, so both
 of its triggers (live scheduler, future `/clock/advance`) obey. `GET /halt` → `{halted}` is a
