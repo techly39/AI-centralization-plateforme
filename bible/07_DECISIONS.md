@@ -227,7 +227,7 @@ constant through an autouse fixture, so the real file never leaks into the suite
 once at the start of each request and each monitor sweep; a request or sweep already past it
 finishes ("the current tool call", Art. 5.2). Operator CLI commands (`seed-admin`, `create-pod`,
 `fund-pod`) are the Human's own hands, not agent requests, and are not gated. Halt start/end are
-not ledger events (the file is the Human's; see IDEAS).
+not ledger events (the file is the Human's; backlog B-023).
 Alternatives rejected: a per-router dependency (a new router could forget it — the auth
 dependency cannot be dropped without losing auth); exempting management/`system` (the halt is the
 Human's, nothing in the firm outranks it); 503 (says "broken"; the world is deliberately stopped —

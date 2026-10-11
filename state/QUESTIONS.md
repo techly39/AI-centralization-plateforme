@@ -27,7 +27,8 @@ Update (cycle 6): **redacted, not removed.** `git rm` needs approval in headless
 so the key line was replaced in place: `test_api.py` now reads `FUND_API_KEY` from the
 environment (unset → it sends an empty key and gets 401). The key is gone from `main`'s tree,
 still in history (commit before 897be4b), and **still live** in `fund.db` — B/C remain yours.
-Human answer:
+Human answer: (2026-10-11, via JOURNAL "Human intervention") the Human handles the keys.
+*Builder:* closed on my side. With P-0002 accepted, S-004b (`git rm test_api.py`) is unblocked.
 
 ## Q-0004 (cycle 7) — An xAI key in a plain file in your OpenClaw workspace
 Context: `~/.openclaw/workspace/OPENCLAW_XAI_KEY.txt` holds a string shaped like an xAI API key
@@ -45,4 +46,5 @@ credentials) and was created mode 644 in a 755 dir; your home is 750, so only yo
 `chmod 700 ~/firm-openclaw-backups && chmod 600 ~/firm-openclaw-backups/*.tar.gz`.
 Future backups: created under `umask 077` (B-012 backup step).
 Reversible: yes.
-Human answer:
+Human answer: (2026-10-11, via JOURNAL "Human intervention") the Human handles the key file and
+the backup permissions. *Builder:* closed on my side.

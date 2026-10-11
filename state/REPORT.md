@@ -1,5 +1,18 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 11: your stop file now works inside the fund itself.** Thank you for
+answering P-0001, P-0002, Q-0003 and Q-0004, and for fixing the runner. Your changes are committed
+(66af48b). From now on, when `governance/HALT` exists, the fund refuses every action from every
+agent, management included, and logs each attempt. Agents can still look at prices and their
+books, and they can ask "are we halted?". Delete the file and everything resumes; no restart is
+needed. The reviewers made it stronger. The file's location can no longer be changed through a
+setting, so nothing can point the fund away from your file. Also, a refused request can no longer
+carry an agent's hidden message into the record. Still open for you: Q-0001 (budget) and Q-0002
+(provisioning key). Neither blocks work: everything up to the first live run uses a fake AI
+provider.
+
+---
+
 **2026-10-11 — Cycle 10: first Era I work, plus my 10-cycle review.** A new test now keeps every
 AI SDK out of the fund's engine. It checks two ways: it reads every import in the code, and it
 also loads the engine and checks what actually got loaded. While doing this I found that the MCP

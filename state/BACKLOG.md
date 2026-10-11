@@ -30,8 +30,13 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 
 ## Era I — The Desk (current; order per ADR-021: seal → time → clock → the rest)
 - [x] **B-002** Dependency-law test — cycle 10 (ADR-022; `app/limits.py`; 2 detectors).
-- [ ] **B-003** Halt in physics: `governance/HALT` → every state-changing agent request
-      refused (409/423 + logged event); `GET /halt`; MCP tool; tests.
+- [x] **B-003** Halt in physics — cycle 11 (ADR-023; 423 + `halt_refused`, route-template path;
+      monitor checks under `OMS_LOCK`; `GET /halt` + `get_halt`; red-team 0003: 2 holes fixed).
+- [ ] **B-023** (low) Halt observability: halt start/end are not ledger events, so the ledger
+      cannot explain why fills paused. Option: the App appends `halt_observed` / `halt_lifted`
+      the first time a request/sweep sees the file change state. With B-007 (world events).
+- [ ] **B-024** (low) `test_held_monitor_sweep_queued_on_lock_does_not_fill_after_halt` waits a
+      fixed 1 s; give the monitor a test hook (or a lock-acquired event) so it needn't.
 - [ ] **B-016** Replay order = live order: `rebuild_state` + equity curve replay `(ts, id)`, live
       folds by `id`; a backwards clock gives 10 phantom shares on rebuild (SURVEY §4a.1, P3).
       Shape: per-`run_id` ledgers with timestamps enforced monotonic at `append_event` (id order
@@ -120,7 +125,9 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **X-006** (retrospective c10) Counter-example check before the auditor: in `cycle.md`
       step 5, list every "covers / finds / never / all / 0 found" claim in the diff and plant a
       counter-example for each. 5/10 cycles needed a BLOCK for an overstated claim; metric =
-      auditor BLOCK rate over cycles 11–20 (baseline 50%).
+      auditor BLOCK rate over cycles 11–20 (baseline 50%). Cycle 11: done by hand, still
+      BLOCKed (1/1). Add a second question: "what in this diff can an unprotected file or env var
+      change?" (the configurable halt path), and "is every check inside the lock it protects?"
 - [ ] **X-004** Run `scripts/smoke_run.py` in the cycle's verify gate (step 5) — needs a
       `.claude/commands/cycle.md` edit; cheap (~5 s) and catches "tests green, app won't start".
 - [ ] **X-005** Capability probe for the Builder's own permissions (IDEAS cycle 6) — plan units

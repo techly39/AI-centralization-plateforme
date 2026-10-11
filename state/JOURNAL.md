@@ -312,3 +312,30 @@ the pending monitor fills nothing, and deleting the file resumes the world — w
 test changed. A mutation that disables the gate must turn every one of those tests red.
 *(Audit correction: as first written the test ran every route for management only, and the
 monitor test catches a mutation of the monitor's own check, not of the API gate. Fixed below.)*
+Work: Step 0 committed the Human's intervention (P-0001/P-0002 applied, runner fix) as 66af48b.
+`app/registry/halt.py` (constant `HALT_FILE`, `is_halted`, `refuse_if_halted`), one call in
+`get_current_agent`; `GET /halt` (`app/api/halt.py`, universal `READ_HALT`), MCP `get_halt`;
+`check_pending_orders` checks the halt under `OMS_LOCK`; event `halt_refused` {method, route
+template, role}. `tests/test_halt.py` (8 OpenAPI write routes × analyst/PM/management, reads,
+resume-without-restart, 401, monitor) + MCP test; autouse `halt_file` fixture in conftest.
+ADR-023; 03 §2 / 05 deliverable 2 marked. Mutation of the gate: 11/11 behaviour tests red.
+Auditor **BLOCK ×2**: (1) the halt path was a setting — `config.yaml` / `FUND_*` could move it
+away from the file Art. 5 names → now a constant, no setting; (2) the hypothesis claimed every
+role on every route while the test ran management only → role × route. Red-team 0003: **2 holes**,
+both fixed this cycle and kept as guards — `halt_refused` stored the raw URL (agent free text
+into the ledger while the bus was halted, medium) → route template; the monitor checked before
+taking the lock (a queued sweep filled after the halt, low) → check under the lock. 13 attacks
+held (method overrides, odd methods, path tricks, malformed body, rebuild). Re-audit **PASS**.
+Smoke 12/12 (on the branch and again on main after merge).
+Result: merged ffc418a, pushed. 334 passed + 9 xfailed on branch and main (283 → 334, no existing
+test weakened). Hypothesis: **met after correction** — as first written it overstated coverage
+(the sixth auditor BLOCK of that shape) and missed two holes; the final code and tests meet it.
+Learned: (1) X-006 caught one overstatement before audit (per-role) but not the other: I checked
+my *coverage* sentences, not my *configuration* surface. Add to X-006: "what in this diff can an
+unprotected file or env var change?" (2) An audit record that copies request input is an output
+channel — refusal ≠ silence. (3) Any check outside the lock it protects is a TOCTOU; physics
+checks belong inside the critical section. (4) The `test_the_write_surface_is_not_empty` guard
+paid off immediately: the first route walk found 0 routes and the parametrised test was silently
+skipped.
+Next: B-000d + B-016 (finite floats; replay order = live order) → B-020 → B-004. S-004b (git rm
+`test_api.py`, untrack `.vscode/`) is unblocked by P-0002 — take it as a quick unit soon.

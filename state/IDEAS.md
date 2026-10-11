@@ -75,6 +75,18 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   does the measured import graph converge to the designed one, or does the system grow edges the
   Bible never drew? — status: new
 
+- [cycle 11] **Refusals are a channel too** — the red-team turned a *refusal record* into a covert
+  ledger channel (raw URL in `halt_refused`). Every audit event that copies agent input
+  (`permission_denied` detail, rejection reasons, future world-event acks) is a potential side
+  channel. A test that sweeps every event type for agent-controlled free text, and a law "audit
+  payloads hold only templates, enums, ids and bounded numbers" — question: how many bits per
+  request can a halted / sandboxed agent still push into what management reads? — status: new
+- [cycle 11] **Halt as an experiment, not only a brake** — once the Runtime exists, halting mid-run
+  is a perturbation: measure how each agent behaves on 423s (retries, waits on `get_halt`, tries
+  other routes, escalates). Halt-obedience as a per-agent conformance metric (08_OPENCLAW) and as
+  Era II "society" data — question: do agents respect a stop signal they can see but not argue
+  with? — status: new (needs B-009; B-023 makes the halt itself visible in the ledger)
+
 ### Retrospective write-ups (cycle 10) — the 3 most promising
 1. **Time-travel invariant suite** (cycle 4) — **adopted** → test shape of B-016, reused by B-004/B-005.
    *Question:* can one property-based generator of firm histories, run under live, frozen,
