@@ -10,11 +10,13 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import Path
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
 from app.finite import json_problem
 from app.limits import (
+    MAX_ADVANCE_DAYS,
+    MAX_ADVANCE_MINUTES,
     MAX_ID,
     MAX_JSON_DEPTH,
     MAX_ORDER_QTY,
@@ -106,6 +108,35 @@ class EventOut(BaseModel):
 class ClockOut(BaseModel):
     mode: str
     now: datetime
+
+
+class ClockAdvanceIn(BaseModel):
+    """One forward step of a backtest clock: ``days`` and/or ``minutes``, > 0 in total."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    days: int = Field(default=0, ge=0, le=MAX_ADVANCE_DAYS)
+    minutes: int = Field(default=0, ge=0, le=MAX_ADVANCE_MINUTES)
+
+    @property
+    def total_minutes(self) -> int:
+        return self.days * 24 * 60 + self.minutes
+
+    @model_validator(mode="after")
+    def _one_bounded_step(self) -> ClockAdvanceIn:
+        if not 0 < self.total_minutes <= MAX_ADVANCE_MINUTES:
+            raise ValueError(f"a step is 1..{MAX_ADVANCE_MINUTES} minutes in total")
+        return self
+
+
+class ClockAdvanceOut(BaseModel):
+    """Where the clock went, and what the pending-order sweep did on arrival."""
+
+    mode: str
+    previous: datetime
+    now: datetime
+    filled_order_ids: list[int]
+    rejected_order_ids: list[int]
 
 
 class HaltOut(BaseModel):

@@ -29,6 +29,7 @@ class Action(str, enum.Enum):
     DEACTIVATE_AGENTS = "deactivate_agents"
     READ_HALT = "read_halt"                # is the world halted? (GET /halt)
     READ_CLOCK = "read_clock"              # the fund's now (GET /clock) — ADR-026
+    CONTROL_CLOCK = "control_clock"        # advance a backtest clock — ADR-027
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -83,6 +84,7 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.BROADCAST,
             Action.REGISTER_AGENTS,
             Action.DEACTIVATE_AGENTS,
+            Action.CONTROL_CLOCK,
         }
     ),
     # 'system' is the internal/bootstrap identity and may do anything.

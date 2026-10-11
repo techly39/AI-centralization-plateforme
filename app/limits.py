@@ -44,3 +44,11 @@ MAX_JSON_DEPTH = 32
 
 #: Deepest ledger payload: a free JSON field plus the event's own wrapping.
 MAX_LEDGER_DEPTH = MAX_JSON_DEPTH + 4
+
+#: Longest single step of a backtest clock (``POST /clock/advance``), in days.
+#: A year per step covers any honest schedule; the bound keeps one call from
+#: skipping a run past everything the pods were meant to live through (ADR-027).
+MAX_ADVANCE_DAYS = 366
+
+#: The same bound in minutes, for a step given in minutes.
+MAX_ADVANCE_MINUTES = MAX_ADVANCE_DAYS * 24 * 60

@@ -5,6 +5,7 @@
     uv run fund-env create-pod       # create a trading pod and fund it
     uv run fund-env fund-pod         # change a pod's allocation
     uv run fund-env check-orders     # run one pending-limit-order sweep now
+    uv run fund-env start-backtest --start 2024-01-02T14:30:00Z   # empty DB → backtest run
     uv run fund-env rebuild-state    # rebuild derived tables from the ledger
     uv run fund-env serve            # start the API server
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 
 from alembic import command
 from alembic.config import Config as AlembicConfig
@@ -30,6 +32,11 @@ from app.registry.service import (
     get_or_create_system_agent,
     register_agent,
 )
+from app.run_clock import RunClockError, install_run_clock, start_backtest
+
+#: Commands that do not run on the database's clock: ``init-db`` may find no
+#: schema yet, ``start-backtest`` creates the clock, ``serve`` installs it itself.
+_NO_RUN_CLOCK = frozenset({"init-db", "start-backtest", "serve"})
 
 
 def _alembic_config() -> AlembicConfig:
@@ -126,6 +133,26 @@ def cmd_check_orders(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_start_backtest(args: argparse.Namespace) -> int:
+    """Open a backtest run in an empty database (ADR-027)."""
+    try:
+        start = datetime.fromisoformat(args.start)
+    except ValueError:
+        print(f"Error: --start {args.start!r} is not an ISO-8601 time", file=sys.stderr)
+        return 1
+    with session_scope() as session:
+        try:
+            clock = start_backtest(session, start=start)
+        except RunClockError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        now = clock.now()
+
+    print(f"Backtest run started: the clock is at {now.isoformat()}.")
+    print("It moves only by POST /clock/advance (management). Seed agents and pods next.")
+    return 0
+
+
 def cmd_rebuild_state(_: argparse.Namespace) -> int:
     with session_scope() as session:
         state = rebuild_state(session)
@@ -180,6 +207,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_check.set_defaults(func=cmd_check_orders)
 
+    p_bt = sub.add_parser(
+        "start-backtest", help="open a backtest run in an empty database"
+    )
+    p_bt.add_argument(
+        "--start", required=True,
+        help="simulated start, ISO-8601 with timezone (e.g. 2024-01-02T14:30:00Z)",
+    )
+    p_bt.set_defaults(func=cmd_start_backtest)
+
     p_rebuild = sub.add_parser("rebuild-state", help="rebuild derived tables from events")
     p_rebuild.set_defaults(func=cmd_rebuild_state)
 
@@ -195,6 +231,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     setup_logging()
     args = build_parser().parse_args(argv)
+    if args.command not in _NO_RUN_CLOCK:
+        # A backtest database's operator commands stamp the run's simulated now,
+        # never today's: one live stamp would hold every later event (ADR-025).
+        with session_scope() as session:
+            install_run_clock(session)
     return args.func(args)
 
 

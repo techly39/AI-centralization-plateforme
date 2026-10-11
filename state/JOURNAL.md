@@ -447,3 +447,16 @@ a read can *shrink* the ledger: analysts' `/clock` calls used to append `permiss
 every time.
 Next: B-004 simulated clock (per-`run_id` floor scoping `ledger_now` and stamps; B-029 guard;
 control endpoints never on a universal action — red-team 0006 guards it) → S-004b → B-028.
+
+## Cycle 0015 — The backtest clock: a run is a database, its time a ledger fact (2026-10-11)
+Era: I — The Desk
+Exit criterion served: "one pod runs end-to-end" in backtest (Era I, TRD Phase 3 milestone: a
+1-month backtest in under 10 minutes) — B-004 slice a: simulated time that only moves forward,
+only by a privileged advance, and survives a restart.
+Hypothesis: If a backtest is a fresh database whose first event `run_started` fixes its mode and
+start, and its clock moves only through `POST /clock/advance` (a non-universal `CONTROL_CLOCK`,
+bounded, forward-only, never past the real now) which appends `clock_advanced` and then runs the
+pending-order sweep, then: live and backtest stamps can never share a ledger (the ADR-025 floor and
+`ledger_now` are per run by construction), a restart resumes at the ledger's simulated now, a limit
+order fills on the advance that crosses it, PMs/analysts get 403, live mode refuses to advance
+(409), and B-029's forward-step risk cannot arise in a backtest.

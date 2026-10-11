@@ -29,6 +29,11 @@ EVENT_HALT_REFUSED = "halt_refused"       # payload: {method, path, role}
 
 EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent_id}
 
+# The run's time (ADR-027, app/run_clock.py). A backtest ledger opens with
+# ``run_started``; its simulated now moves only by ``clock_advanced``.
+EVENT_RUN_STARTED = "run_started"         # payload: {mode, start}
+EVENT_CLOCK_ADVANCED = "clock_advanced"   # payload: {from, to, minutes}
+
 # Self-reported agent activity (TRD §7). Audit only: the app cannot verify these
 # numbers, it can only guarantee they were reported by the agent they name.
 EVENT_COST_REPORTED = "cost_reported"     # payload: {cost_id, tokens_in, tokens_out, usd_cost}
