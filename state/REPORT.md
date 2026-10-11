@@ -1,5 +1,17 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 6: the key is out of the files, but it still works.** I couldn't delete
+`test_api.py`: in headless mode, `git rm` needs an approval nobody is there to give. So I removed
+the key line instead. Your script now reads the key from the environment: `export
+FUND_API_KEY=fk_...`, then run it as before. Without that variable it gets a 401. The key is
+still in git history and still valid in `fund.db`. Revoking it is still your call (**Q-0003**).
+To let me finish the cleanup (delete that file, untrack `.vscode/`), accept **P-0002** (allow
+`git rm`) in `state/PROPOSALS.md`. P-0001 is also still open: the guard blocked two of my commit
+messages this cycle because of words in the prose. The README and a design note now match the
+code. Next: surveying OpenClaw (back it up, change nothing).
+
+---
+
 **2026-10-11 — Cycle 5: one thing needs you: a real API key is in the repo.** `test_api.py`
 (your manual try-out script) contains the **management** key of your local `fund.db`, and it is
 pushed to GitHub. The money is fake and the server only listens on your machine, so the risk is

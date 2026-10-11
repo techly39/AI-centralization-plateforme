@@ -134,3 +134,19 @@ Hypothesis: If I execute the S-004 list as deletions/moves/doc fixes only, the t
 carrying the committed key and stale docs, the suite stays at 267 passed + 9 xfailed (nothing
 collected depended on any of it), and the survey probe keeps working — because I will make R1
 read `test_api.py` from git history once it is gone, so the evidence for Q-0003 stays measurable.
+Work: `git rm` and `git rm --cached` were refused ("requires approval" — not on the headless
+allow list). Did not route around it (no `mv`/`update-index`). Instead: redacted the key in place
+(`test_api.py` reads `FUND_API_KEY`); probe R1 finds the key in history via `git log -G` and
+still matches it to agent id=1 in `fund.db`; README Layout matches the tree; phase2 note on MCP
+imports corrected (b110303); P-0002 proposes allowing `git rm`. Auditor PASS, 5 notes: 2–3 fixed
+on branch (probe warns on inconclusive lookup; P-0002 caveat on prefix patterns), 1/4/5 at record
+(Q-0003 update, behaviour change told to the Human, partial scope recorded here).
+Result: merged 0678d62. 267 passed + 9 xfailed on branch and main. Hypothesis **partly met**: the
+key left the tree and the probe survived, but the file is not gone and `.vscode/` is still
+tracked — S-004b, blocked on P-0002.
+Learned: (1) The headless allow list is part of the world's physics for me: plan units against
+it (deletions are not available) or they half-fail. (2) When the intended action is denied,
+the goal behind it (no secret in the tree) often has a smaller allowed path — take that, and
+log the denied action as a proposal instead of finding a back door. (3) The guard still trips
+on prose in commit messages (P-0001); twice this cycle.
+Next: S-005 OpenClaw survey (backup first, change nothing) → S-006 Bible corrections → S-007.

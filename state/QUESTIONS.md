@@ -23,4 +23,8 @@ needs a write to `fund.db`, which the Builder never does on its own / C rotate t
 Chosen: A now (S-004). B/C are yours: the Builder does not write your August database.
 Also worth checking yourself: whether origin is public (`gh repo view`).
 Reversible: yes.
+Update (cycle 6): **redacted, not removed.** `git rm` needs approval in headless mode (P-0002),
+so the key line was replaced in place: `test_api.py` now reads `FUND_API_KEY` from the
+environment (unset → it sends an empty key and gets 401). The key is gone from `main`'s tree,
+still in history (commit before 897be4b), and **still live** in `fund.db` — B/C remain yours.
 Human answer:

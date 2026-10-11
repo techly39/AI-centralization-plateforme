@@ -224,6 +224,8 @@ to reuse it unchanged; Starlette deprecates `HTTP_422_UNPROCESSABLE_ENTITY` (12 
    revoke it (history keeps it; no force-push, Art. 7). Revocation means writing `fund.db` —
    the Human's call (Q-0003). Origin's visibility (public/private) not verified: `gh repo view`
    needs a permission prompt in loop mode. → **S-004** (remove), **B-022** (secret-scan test).
+   *Cycle 6:* redacted in place (key line → `FUND_API_KEY` env var), not removed — `git rm`
+   needs approval headless (P-0002, S-004b). R1 now reads the key from history; still live.
 2. **The Phase 2 milestone is scripted, not agent-run** (read). TRD: "re-run the existing
    OpenClaw single-pod POC **through the app only**". `test_poc_milestone.py` replays the POC's
    four fills as HTTP calls written by hand — no OpenClaw, no model. It proves the app can carry

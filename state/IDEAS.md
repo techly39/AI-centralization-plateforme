@@ -39,3 +39,11 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   per-agent keys via env at spawn, keys carry a recognisable prefix the pre-commit guard and the
   suite both reject, and every key has an expiry + `rotated_at` event — question: can "no agent
   credential ever exists outside the Runtime process" be a tested invariant? — status: new
+
+- [cycle 6] **Capability map before planning** — half of this cycle's unit was impossible
+  because `git rm` is not on the headless allow list, and I only learned it by hitting it. Write
+  a probe (`scripts/capability_probe.py`) that reads `.claude/settings.json` + the guard's
+  rules and prints, for each verb a cycle typically needs (delete, rename, push, run server,
+  write outside repo), allowed / needs-approval / denied — and have `/cycle` step 2 consult it
+  — question: does a world-physics map for the Builder itself cut failed or partial cycles the
+  way the survey cut surprises in `app/`? — status: new

@@ -39,13 +39,13 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       9 findings (P1–P9 via `scripts/survey_probe_physics.py`) → B-016…B-021, B-000d/B-002/B-005 widened.
 - [x] **S-003b** Repo survey, the rest — cycle 5: SURVEY §2b/§4b/§5b (R1–R4 via
       `scripts/survey_probe_repo.py`); committed live management key found (§4b.1, Q-0003).
-- [ ] **S-004** Cleanup commits (deletions/moves/renames/doc fixes only, each with a reason).
-      Concrete list (SURVEY §2b table, §4b.5): `git rm test_api.py` (hard-coded key; not
-      collected); untrack `.vscode/settings.json` + ignore `.vscode/`; delete local empty `ui/`
-      and `.DS_Store` ×2; README Layout (add `bible/ state/ governance/ loop/ scripts/
-      experiments/`, drop `ui/`); `docs/phase2_bus_costs_mcp.md:139-140` (MCP imports more than
-      settings since cycle 2). Keep `legacy/` (archive; POC location lead for S-005).
+- [x] **S-004a** Cleanup, the edits — cycle 6: key redacted from `test_api.py` (env var now);
+      probe R1 reads it from history; README Layout; phase2 MCP-import note. Keep `legacy/`.
       "218 tests" in `03_WORLD`/`05_ERAS` → S-006.
+- [ ] **S-004b** Cleanup, the deletions — **blocked on P-0002** (headless `git rm` needs
+      approval): `git rm test_api.py`; `git rm --cached .vscode/settings.json` + ignore `.vscode/`;
+      local empty `ui/` and `.DS_Store` ×3 (untracked, ignored — harmless). Do not route around
+      the denial. If P-0002 stays open, close Era ½ with these listed as known residue.
 - [ ] **S-005** OpenClaw survey per `bible/08_OPENCLAW.md` §1–2: back up `~/.openclaw` to
       `~/firm-openclaw-backups/`, `openclaw --version`, read that version's docs, write
       `runtime/openclaw/VERSION_NOTES.md`, list agents/bindings/models (no secrets), inventory
