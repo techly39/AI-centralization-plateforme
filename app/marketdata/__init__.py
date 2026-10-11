@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from app.config import get_settings
 from app.marketdata.base import (
+    LIVE_QUOTE_WINDOW,
     VALID_INTERVALS,
     Bar,
+    FeedDataError,
     Interval,
     InvalidRequestError,
     LookAheadError,
@@ -19,6 +21,7 @@ from app.marketdata.base import (
     MarketDataProvider,
     Quote,
     UnknownTickerError,
+    bar_end,
     normalise_ticker,
     validate_window,
 )
@@ -50,8 +53,10 @@ def set_provider(provider: MarketDataProvider | None) -> None:
 
 
 __all__ = [
+    "LIVE_QUOTE_WINDOW",
     "VALID_INTERVALS",
     "Bar",
+    "FeedDataError",
     "Interval",
     "InvalidRequestError",
     "LookAheadError",
@@ -61,6 +66,7 @@ __all__ = [
     "StaticProvider",
     "UnknownTickerError",
     "YFinanceProvider",
+    "bar_end",
     "get_provider",
     "normalise_ticker",
     "set_provider",

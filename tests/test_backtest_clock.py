@@ -77,9 +77,10 @@ def test_a_backtest_opens_with_run_started_at_its_start(SessionFactory, db):
     assert get_clock() is clock and clock.mode == "backtest" and clock.now() == START
     [event] = _events(db)
     assert event.type == EVENT_RUN_STARTED and event.ts == START
-    # Until B-005 a run says it has no look-ahead guard (auditor, cycle 15).
+    # A run records whether its market data had the look-ahead guard (auditor,
+    # cycle 15): False before B-005, True since (ADR-028).
     assert event.payload_json == {"mode": "backtest", "start": START.isoformat(),
-                                  "look_ahead_guard": False}
+                                  "look_ahead_guard": True}
 
 
 def test_a_backtest_refuses_a_database_that_holds_anything(SessionFactory, db, admin_key):
@@ -95,6 +96,7 @@ def test_a_backtest_refuses_a_database_that_holds_anything(SessionFactory, db, a
 @pytest.mark.parametrize("start", [
     START.replace(tzinfo=None),                 # no timezone
     wall_now() + timedelta(days=1),             # the future has no data
+    wall_now() - timedelta(seconds=30),         # inside the live-quote window
 ])
 def test_a_backtest_refuses_a_bad_start(SessionFactory, db, start):
     session = SessionFactory()
@@ -202,6 +204,22 @@ def test_a_backtest_cannot_pass_the_real_now(SessionFactory, client, db):
     assert resp.status_code == 409 and "real now" in resp.json()["detail"]
     assert get_clock().now() == near.astimezone(timezone.utc)
     assert all(e.type != EVENT_CLOCK_ADVANCED for e in _events(db))
+
+
+def test_a_backtest_stays_out_of_the_live_quote_window(SessionFactory, client, db):
+    """Within a minute of the real now a live feed gives its current quote, so
+    a backtest's clock may not step there (ADR-028): it would see its future."""
+    near = wall_now() - timedelta(minutes=2)
+    session = SessionFactory()
+    start_backtest(session, start=near)
+    _, admin = register_agent(session, name="management", role=AgentRole.management)
+    session.commit()
+    session.close()
+    resp = client.post("/clock/advance", headers=H(admin), json={"minutes": 2})
+    assert resp.status_code == 409 and "real now" in resp.json()["detail"]
+    assert get_clock().now() == near.astimezone(timezone.utc)
+    assert client.post("/clock/advance", headers=H(admin),
+                       json={"minutes": 1}).status_code == 200
 
 
 def test_a_halted_world_does_not_advance(bt_client, backtest, halt_file, db):

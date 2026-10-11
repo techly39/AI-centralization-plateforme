@@ -486,3 +486,16 @@ leak to try, only a process that had not noticed its file changed. (3) A red-tea
 can be the less safe one (self-heal vs refuse); judge by the seal, and pin the safer property.
 Next: B-005 look-ahead guard (makes a backtest honest; flips `LOOK_AHEAD_GUARD`) → B-004b metrics/
 market-data "now" = `ledger_now` (IDEAS c14) → S-004b.
+
+## Cycle 0016 — The look-ahead guard: no feed may show the future (2026-10-11)
+Era: I — The Desk
+Exit criterion served: "one pod runs end-to-end" in backtest (Era I, TRD Phase 3b): a backtest
+whose market data can see past the simulated now measures nothing.
+Hypothesis: If the guard lives in the `MarketDataProvider` base as the only public entry
+(`get_price`/`get_ohlcv` final; implementations write `_quote`/`_bars`), a bar is visible only
+once it has *ended* (`bar_end(ts, interval) <= as_of`), a quote stamped after `as_of` (or
+non-finite / non-positive) is refused, yfinance answers a past `as_of` from history instead of
+today's quote, and the test double obeys the same law, then: no provider — real, static or test
+— can serve D's close before D ends or today's quote to 2024; tests that certified the leak turn
+red and are corrected with the reason; red-team 0004's two feed-price xfails pass; and
+`LOOK_AHEAD_GUARD` can be flipped to True.

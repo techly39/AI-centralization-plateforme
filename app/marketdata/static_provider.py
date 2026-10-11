@@ -8,7 +8,8 @@ Two real uses:
 * **Deterministic tests.** Prices can be moved from test code via
   :meth:`set_price`, which is how the limit-order tests make a price "cross".
 
-It is not a simulation: prices only change when something sets them.
+It is not a simulation: prices only change when something sets them. A static
+price has no time of its own, so a quote is stamped at the moment asked.
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ from app.marketdata.base import (
     Quote,
     UnknownTickerError,
     normalise_ticker,
-    validate_window,
 )
 
 
@@ -41,17 +41,16 @@ class StaticProvider(MarketDataProvider):
         with self._lock:
             self._prices[normalise_ticker(ticker)] = float(price)
 
-    def get_price(self, ticker: str, *, as_of: datetime) -> Quote:
-        symbol = normalise_ticker(ticker)
+    def _quote(self, symbol: str, *, as_of: datetime) -> Quote:
         with self._lock:
             price = self._prices.get(symbol)
         if price is None:
             raise UnknownTickerError(f"no static price configured for {symbol!r}")
         return Quote(ticker=symbol, price=price, as_of=as_of, source=self.name)
 
-    def get_ohlcv(
+    def _bars(
         self,
-        ticker: str,
+        symbol: str,
         *,
         start: date,
         end: date,
@@ -59,24 +58,21 @@ class StaticProvider(MarketDataProvider):
         as_of: datetime,
     ) -> list[Bar]:
         """Flat daily candles at the configured price — shape, not realism."""
-        symbol = normalise_ticker(ticker)
-        validate_window(start, end, interval, as_of)
         quote = self.get_price(symbol, as_of=as_of)
 
         bars: list[Bar] = []
         cursor = start
         while cursor < end:
             ts = datetime.combine(cursor, datetime.min.time(), tzinfo=as_of.tzinfo)
-            if ts <= as_of:
-                bars.append(
-                    Bar(
-                        ts=ts,
-                        open=quote.price,
-                        high=quote.price,
-                        low=quote.price,
-                        close=quote.price,
-                        volume=0.0,
-                    )
+            bars.append(
+                Bar(
+                    ts=ts,
+                    open=quote.price,
+                    high=quote.price,
+                    low=quote.price,
+                    close=quote.price,
+                    volume=0.0,
                 )
+            )
             cursor += timedelta(days=1)
         return bars
