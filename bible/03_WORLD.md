@@ -41,7 +41,7 @@ The test fails the build if it does.
 ## 2. Physics (`app/`) — what exists and what it must grow
 
 **Exists and works (218 tests green at Bible writing; 267 passed + 9 strict xfails at the
-Survey, cycle 4–5):** config, injected clock (live),
+Survey, SURVEY §2b):** config, injected clock (live),
 append-only event ledger + `rebuild_state()`, registry + API-key auth + permission
 matrix, `GET /me`, OMS (market/limit, fees, rejections with auto-message, partial
 sells, realised P&L), market data (yfinance + static), bus (agent/pod/broadcast,
@@ -49,11 +49,18 @@ sells, realised P&L), market data (yfinance + static), bus (agent/pod/broadcast,
 max DD, hit rate, cost-adjusted P&L, leaderboard), MCP server with one tool per
 endpoint (tested against OpenAPI).
 
-**"Works" with known holes (Survey, `state/SURVEY.md` §2a):** time is the weak spot —
-rebuild ≠ live under a backwards clock (B-016), daily bars leak the day's close (B-005),
+**"Works" with known holes (Survey, `state/SURVEY.md` §2a/§4a/§4b; the full list is the
+backlog's physics section), e.g.:** time is the weak spot —
+rebuild ≠ live under a backwards clock (B-016), daily bars leak the day's close (B-005;
+the test double `HistoricalProvider` leaks the same way, so the suite would certify it),
 quotes ignore `as_of`, Sharpe is annualised on calendar days (×0.845, B-017), `/clock`
 is 403 for the agents the MCP tool tells to use it (B-020). Pod creation and the `system`
 agent write no event, and several tables are not rebuilt from the ledger (B-018).
+Non-finite floats (`limit_price=1e309`) reach the ledger as `Infinity` (B-000d); a missing
+`pod_id` on register is a 500 (B-019). `mcp_server` imports most of `app/` through one
+constant (SURVEY §4a.9 — B-002 places it in the dependency law). The Phase 2 milestone
+("re-run the POC through the app") was met **by a hand-written script**, not by an agent
+(SURVEY §4b.2): no model has traded through the App yet.
 
 **Must grow (by Era):**
 

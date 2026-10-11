@@ -41,8 +41,10 @@ CLI's own schema (`openclaw config schema`) as the source of truth, docs second.
   own server's glob. The key goes in that server's `env` (config, not workspace) — prefer a
   SecretRef (`openclaw secrets`, `config set … --ref-source env`) over a literal.
 - Global-only seal keys (not per agent): `tools.sessions.visibility` ∈ {`self`,`tree`,`agent`,`all`},
-  `tools.agentToAgent` {`enabled`, `allow`}, `tools.web.*`, `tools.profile`
-  ∈ {`minimal`,`coding`,`messaging`,`full`}.
+  `tools.agentToAgent` {`enabled`, `allow`}, `tools.web.*`.
+  `tools.profile` ∈ {`minimal`,`coding`,`messaging`,`full`} is global **and** per agent
+  (`agents.list[].tools.profile`, "Per-agent override") — corrected cycle 8 (auditor; cycle 7
+  listed it as global only, contradicting the per-agent key list above).
 
 ## CLI commands the adapter will rely on
 

@@ -33,7 +33,8 @@ TRD Phases 0–2: skeleton, ledger, registry, auth, permissions, OMS, market dat
 costs, metrics, MCP. 218 tests green at Bible writing. ~~Phase 2 is uncommitted in git.~~
 *(Survey correction, cycle 8: Phase 2 committed in cycle 1; at the Survey the suite was
 276 collected = 267 passed + 9 strict xfails, the xfails being open red-team holes —
-`state/SURVEY.md` §2b.)*
+`state/SURVEY.md` §2b. The Phase 2 milestone was met by a hand-written script, not an agent
+(§4b.2).)*
 
 ---
 
