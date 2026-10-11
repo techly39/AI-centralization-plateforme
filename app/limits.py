@@ -11,3 +11,16 @@ validates the same bound before calling the API.
 #: exists because the counts are summed per pod: unbounded, two int64-max
 #: reports overflowed the sum and took the leaderboard down (red-team 0001).
 MAX_TOKENS_PER_REPORT = 100_000_000
+
+#: Most dollars one cost report may claim. A frontier model at list price
+#: would need billions of tokens to reach it; the cap exists because costs are
+#: summed per pod, and two 1e308 reports summed to ``inf`` and turned the
+#: ranking number into ``null`` (red-team 0001, B-000d).
+MAX_USD_PER_REPORT = 1_000_000.0
+
+#: Largest order, in shares. With :data:`MAX_PRICE` it keeps every notional
+#: (qty × price ≤ 1e16) finite; no real order comes near either bound.
+MAX_ORDER_QTY = 1_000_000_000.0
+
+#: Highest limit price an order may name, in dollars per share.
+MAX_PRICE = 10_000_000.0

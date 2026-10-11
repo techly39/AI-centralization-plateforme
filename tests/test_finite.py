@@ -1,0 +1,236 @@
+"""Every number that enters the world is finite (B-000d, ADR-024).
+
+Python's ``json`` reads the non-standard literals ``NaN``, ``Infinity`` and
+``-Infinity``, and an overflowing literal such as ``1e309`` becomes ``inf``.
+None of them is a quantity of shares or dollars, and none of them is standard
+JSON, so a ledger holding one cannot be read back by another tool. Three layers
+keep them out:
+
+* request schemas: every float field is bounded and finite, every free JSON
+  field is walked — a clean 422 that names the field, nothing written;
+* the validation-error handler answers 422 even when the offending input is
+  itself ``NaN`` (it used to crash rendering it: 500);
+* ``append_event`` refuses a non-finite payload, so no in-process caller can
+  write one either.
+
+The OpenAPI walk at the bottom makes the first layer hard to forget: a new float
+field without an upper bound, or a new free JSON field this file does not
+attack, turns the suite red.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+
+import pytest
+from sqlalchemy import func, select
+
+from app.db.models import Cost, Event, Message, Order, Task
+from app.ledger.events import append_event
+from app.limits import MAX_ORDER_QTY, MAX_PRICE, MAX_USD_PER_REPORT
+
+
+def H(key: str) -> dict[str, str]:
+    return {"X-API-Key": key}
+
+
+@pytest.fixture
+def desk(client, make_pod, fund_pod_cash, pm_factory, agent_factory):
+    make_pod(1)
+    fund_pod_cash(1, 100_000.0)
+    return {"pm": pm_factory("pm-1", 1), "an": agent_factory("analyst-1", "analyst", 1)}
+
+
+#: Raw JSON tokens, sent as text so the client cannot normalise them first.
+NON_FINITE = ["NaN", "Infinity", "-Infinity", "1e309", "-1e309"]
+
+
+def _raw(client, key, method, path, body: str):
+    return client.request(method, path, content=body,
+                          headers={**H(key), "Content-Type": "application/json"})
+
+
+def _counts(db) -> tuple[int, ...]:
+    db.expire_all()
+    return tuple(db.scalar(select(func.count()).select_from(t)) for t in (Event, Cost, Order, Message, Task))
+
+
+def _assert_clean_422(resp, field: str) -> None:
+    assert resp.status_code == 422, resp.text
+    json.loads(resp.text)  # standard JSON: no NaN/Infinity in the error itself
+    assert any(field in [str(p) for p in err["loc"]] for err in resp.json()["detail"]), resp.text
+
+
+# --- Float fields -----------------------------------------------------------
+
+def _order_body(qty: str = "1", limit_price: str = "100") -> str:
+    return ('{"ticker": "AAPL", "side": "buy", "price_type": "limit", "justification": "t", '
+            f'"qty": {qty}, "limit_price": {limit_price}}}')
+
+
+def _cost_body(usd: str) -> str:
+    return f'{{"tokens_in": 1, "tokens_out": 1, "usd_cost": {usd}}}'
+
+
+FLOAT_CASES = [
+    ("pm", "/orders", "qty", lambda v: _order_body(qty=v)),
+    ("pm", "/orders", "limit_price", lambda v: _order_body(limit_price=v)),
+    ("an", "/costs", "usd_cost", _cost_body),
+]
+
+
+@pytest.mark.parametrize("token", NON_FINITE)
+@pytest.mark.parametrize(("who", "path", "field", "make"), FLOAT_CASES,
+                         ids=[c[2] for c in FLOAT_CASES])
+def test_non_finite_float_is_a_clean_422_and_writes_nothing(client, desk, db, who, path, field,
+                                                            make, token):
+    before = _counts(db)
+    _assert_clean_422(_raw(client, desk[who][1], "POST", path, make(token)), field)
+    assert _counts(db) == before
+
+
+@pytest.mark.parametrize(("who", "path", "field", "make", "cap"), [
+    ("pm", "/orders", "qty", lambda v: _order_body(qty=v), MAX_ORDER_QTY),
+    ("pm", "/orders", "limit_price", lambda v: _order_body(limit_price=v), MAX_PRICE),
+    ("an", "/costs", "usd_cost", _cost_body, MAX_USD_PER_REPORT),
+], ids=["qty", "limit_price", "usd_cost"])
+def test_float_fields_are_bounded_at_their_cap(client, desk, db, who, path, field, make, cap):
+    """Finite is not enough: two 1e308 costs sum to inf (red-team 0001). The cap
+    itself is accepted, the next representable float above it is not."""
+    before = _counts(db)
+    _assert_clean_422(_raw(client, desk[who][1], "POST", path, make(repr(math.nextafter(cap, math.inf)))),
+                      field)
+    _assert_clean_422(_raw(client, desk[who][1], "POST", path, make("1e308")), field)
+    assert _counts(db) == before
+    assert _raw(client, desk[who][1], "POST", path, make(repr(cap))).status_code == 201
+
+
+# --- Free JSON fields -------------------------------------------------------
+
+def _message_body(payload: str) -> str:
+    return f'{{"to": "pod:1", "body": "hi", "structured_payload": {payload}}}'
+
+
+def _task_end(client, key, payload: str):
+    task_id = client.post("/tasks/start", headers=H(key), json={"subject": "s"}).json()["id"]
+    return _raw(client, key, "POST", "/tasks/end",
+                f'{{"task_id": {task_id}, "outcome": {payload}}}')
+
+
+@pytest.mark.parametrize("token", NON_FINITE)
+@pytest.mark.parametrize("shape", ['{{"x": {t}}}', '{{"a": [1, {{"b": [{t}]}}]}}'],
+                         ids=["flat", "nested"])
+def test_non_finite_inside_structured_payload_is_refused(client, desk, db, token, shape):
+    before = _counts(db)
+    resp = _raw(client, desk["an"][1], "POST", "/messages", _message_body(shape.format(t=token)))
+    _assert_clean_422(resp, "structured_payload")
+    assert _counts(db) == before
+
+
+@pytest.mark.parametrize("token", NON_FINITE)
+@pytest.mark.parametrize("shape", ['{{"x": {t}}}', '{{"a": [1, {{"b": [{t}]}}]}}'],
+                         ids=["flat", "nested"])
+def test_non_finite_inside_task_outcome_is_refused(client, desk, db, token, shape):
+    key = desk["an"][1]
+    client.post("/tasks/start", headers=H(key), json={"subject": "warm-up"})
+    resp = _task_end(client, key, shape.format(t=token))
+    _assert_clean_422(resp, "outcome")
+    db.expire_all()
+    assert db.scalar(select(func.count()).select_from(Task).where(Task.ended_at.is_not(None))) == 0
+
+
+def test_finite_free_json_still_works(client, desk):
+    """The walk refuses only non-finite numbers, not numbers."""
+    key = desk["an"][1]
+    payload = '{"conviction": 0.7, "big": 1e300, "neg": -2, "nested": [{"x": 1.5}], "s": "NaN"}'
+    assert _raw(client, key, "POST", "/messages", _message_body(payload)).status_code == 201
+    assert _task_end(client, key, payload).status_code == 200
+
+
+# --- The ledger itself ------------------------------------------------------
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize("shape", ["flat", "nested", "tuple"])
+def test_append_event_refuses_non_finite_payloads(db, bad, shape):
+    payload = {"flat": {"x": bad},
+               "nested": {"a": [1, {"b": [bad]}]},
+               "tuple": {"a": (1.0, bad)}}[shape]
+    before = _counts(db)
+    with pytest.raises(ValueError, match="non-finite"):
+        append_event(db, type="probe", actor_agent_id=None, payload=payload)
+    db.rollback()
+    assert _counts(db) == before
+
+
+def test_report_cost_refuses_non_finite_in_process(db, desk):
+    """The schema refuses first (422); this guards in-process callers (Runtime)."""
+    from app.db.models import Agent
+    from app.metrics.reporting import report_cost
+
+    an = db.get(Agent, desk["an"][0])
+    for bad in (math.nan, math.inf, -1.0, MAX_USD_PER_REPORT * 2):
+        with pytest.raises(ValueError, match="usd_cost"):
+            report_cost(db, reporter=an, tokens_in=1, tokens_out=1, usd_cost=bad)
+        db.rollback()
+
+
+# --- Coverage guard: the schema surface cannot grow past these tests -------
+
+#: Free JSON (``dict``) request fields and the test above that attacks each one.
+FREE_JSON_FIELDS = {
+    ("MessageSendRequest", "structured_payload"): test_non_finite_inside_structured_payload_is_refused,
+    ("TaskEndRequest", "outcome"): test_non_finite_inside_task_outcome_is_refused,
+}
+#: Bounded float request fields and their cap; attacked by the two float tests.
+FLOAT_FIELDS = {
+    ("OrderCreateRequest", "qty"): MAX_ORDER_QTY,
+    ("OrderCreateRequest", "limit_price"): MAX_PRICE,
+    ("CostReportRequest", "usd_cost"): MAX_USD_PER_REPORT,
+}
+
+
+def _request_body_schemas(client) -> dict[str, dict]:
+    spec = client.get("/openapi.json").json()
+    names = set()
+    for item in spec["paths"].values():
+        for op in item.values():
+            ref = (op.get("requestBody", {}).get("content", {})
+                   .get("application/json", {}).get("schema", {}).get("$ref"))
+            if ref:
+                names.add(ref.rsplit("/", 1)[-1])
+    return {n: spec["components"]["schemas"][n] for n in names}
+
+
+def _variants(prop: dict) -> list[dict]:
+    return prop.get("anyOf", [prop])
+
+
+def test_every_request_float_is_bounded_and_every_free_json_field_is_attacked(client):
+    schemas = _request_body_schemas(client)
+    assert schemas, "no request bodies found — the walk is broken, not the API safe"
+    floats, dicts = {}, set()
+    for name, schema in schemas.items():
+        for field, prop in schema.get("properties", {}).items():
+            for v in _variants(prop):
+                if v.get("type") == "number":
+                    floats[(name, field)] = v.get("maximum", v.get("exclusiveMaximum"))
+                if v.get("type") == "object":
+                    dicts.add((name, field))
+    assert floats == FLOAT_FIELDS, "a request float without its cap, or an untested one"
+    assert dicts == set(FREE_JSON_FIELDS), "a free JSON request field this file does not attack"
+
+
+def test_no_query_or_path_parameter_is_a_float_or_object(client):
+    """The walk above covers request bodies only. Today no parameter is a float;
+    the first one must arrive with its own bound and its own attack here."""
+    spec = client.get("/openapi.json").json()
+    offenders = [
+        (method, path, param["name"])
+        for path, item in spec["paths"].items()
+        for method, op in item.items()
+        for param in op.get("parameters", [])
+        for v in _variants(param.get("schema", {}))
+        if v.get("type") in ("number", "object")
+    ]
+    assert spec["paths"] and offenders == []

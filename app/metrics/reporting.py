@@ -37,7 +37,7 @@ from app.ledger.events import (
     EVENT_TASK_STARTED,
     append_event,
 )
-from app.limits import MAX_TOKENS_PER_REPORT
+from app.limits import MAX_TOKENS_PER_REPORT, MAX_USD_PER_REPORT
 
 
 class ReportingError(Exception):
@@ -90,6 +90,9 @@ def report_cost(
     for name, value in (("tokens_in", tokens_in), ("tokens_out", tokens_out)):
         if not 0 <= value <= MAX_TOKENS_PER_REPORT:
             raise ValueError(f"{name}={value} outside 0..{MAX_TOKENS_PER_REPORT}")
+    # Also refuses NaN, which fails every comparison.
+    if not 0.0 <= usd_cost <= MAX_USD_PER_REPORT:
+        raise ValueError(f"usd_cost={usd_cost} outside 0..{MAX_USD_PER_REPORT}")
     cost = Cost(
         ts=get_clock().now(),
         agent_id=reporter.id,

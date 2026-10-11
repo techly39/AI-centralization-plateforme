@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.clock import get_clock
 from app.db.models import Event
+from app.finite import first_non_finite
 
 # --- Canonical event types --------------------------------------------------
 # Lifecycle / audit events (no derived-state effect):
@@ -55,7 +56,13 @@ def append_event(
 
     The caller owns the transaction (commit/rollback). We flush so the event's
     ``id`` is populated for anyone who needs it in the same unit of work.
+
+    Raises ``ValueError`` for a payload holding ``NaN``/``±inf`` anywhere: the
+    ledger stays standard JSON that any tool can replay (ADR-024).
     """
+    bad = first_non_finite(payload or {})
+    if bad:
+        raise ValueError(f"non-finite number at {bad} in {type!r} event payload")
     event = Event(
         ts=get_clock().now(),
         actor_agent_id=actor_agent_id,
