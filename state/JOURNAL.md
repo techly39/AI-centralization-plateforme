@@ -210,3 +210,13 @@ the provenance word with every claim. (3) Annotating instead of rewriting made t
 fix cheap: the amendment sits next to the error, history intact.
 Next: S-007 close Era ½ (SURVEY completeness, IDEAS, backlog, note the criterion reworded in
 its own Era, S-004b as residue) → Era I: B-016 + B-020, then B-004.
+
+## Cycle 0009 — Close Era ½ (S-007) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: all five Era ½ exit criteria — each ticked with its evidence, or left
+open with the reason; the Era closes only if every box can be ticked honestly.
+Hypothesis: If I check each exit criterion against its primary evidence (commits, the suite,
+`git status`, the backup file, VERSION_NOTES, SURVEY sections) instead of against my STATE
+summaries, every box can be ticked — "repo clean" only because its criterion allows "explained"
+and S-004b's residue is explained — and Era I can open with a backlog ordered by the 06_LOOP §2
+priorities (Constitution gaps, B-002 + B-003, before the clock work).
