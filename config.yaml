@@ -5,9 +5,10 @@
 # Database. SQLite single file for now; the URL form keeps a Postgres move open.
 database_url: "sqlite:///fund.db"
 
-# Clock. Phase 0 supports live mode only
-clock:
-  mode: "live"          # live
+# Clock. Not a setting: the mode is a fact of the database (ADR-027). A database
+# whose ledger opens with run_started is a backtest run; any other is live.
+# Open one with: FUND_DATABASE_URL=sqlite:///backtest.db uv run fund-env init-db
+#                FUND_DATABASE_URL=sqlite:///backtest.db uv run fund-env start-backtest --start ...
 
 # Order management system.
 oms:

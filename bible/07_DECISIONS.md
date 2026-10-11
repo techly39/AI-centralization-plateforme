@@ -385,3 +385,63 @@ the agent's next event will carry. It reveals nothing an order would not (`creat
 raw clock back in `/clock` → only that test red. Tests whose frozen moment sat *before* the
 fixtures' stamps (an unnoticed step back) were moved after them; the attacks are unchanged.
 B-004's per-`run_id` floor will scope `ledger_now` with it.
+
+## ADR-027 — A run is a database; a backtest's time is a ledger fact   (builder, cycle 15) — accepted
+Question: TRD §9 wants backtest mode (simulated time advanced only by `/clock/advance`), a mode
+switch (`POST /clock/mode`), and "live and backtest runs are separate `run_id` scopes on all
+tables". ADR-025's floor and ADR-026's `ledger_now` are global: a backtest in a ledger that holds
+today's stamps would be stamped today forever. How are runs scoped, where does backtest time live,
+and who moves it?
+Answer from the future: (1) **A run is a database.** A backtest is a *fresh* database opened by
+`fund-env start-backtest --start <ISO>`, whose first event is `run_started {mode, start}`; any
+database whose ledger does not open with it is live. `start_backtest` refuses a database with a
+row in any table, a naive start, or a start in the future. (2) **Backtest time is a ledger fact.**
+`BacktestClock` (`app/clock.py`) is the process's copy of the latest `run_started.start` /
+`clock_advanced.to`; `install_run_clock` rebuilds it on every server start (lifespan, through
+`get_session`) and before every operator CLI command, so a restart resumes and an operator's
+`create-pod` stamps simulated time. (3) **Only `POST /clock/advance` moves it** —
+`Action.CONTROL_CLOCK` (management, system; never universal), body `{days, minutes}` with 1
+minute..366 days per step (`MAX_ADVANCE_*` in `app/limits.py`, mirrored by the MCP tool), from
+`ledger_now` forward, under `OMS_LOCK`, never past the real now (`wall_now()`: the world has no data
+from the future), recorded as `clock_advanced {from, to, minutes}` stamped `to`, then the same
+pending-order sweep the live scheduler runs. Live → 409; halt → 423. (4) **No `POST /clock/mode`**,
+and `clock.mode` leaves `config.yaml`: a mode that a setting or a request could flip mid-ledger is
+the mixing this ADR forbids; the database is the only authority.
+Why: (1) **Safer seal** — scoping by file means no query anywhere can forget a `run_id` filter
+(every table, every reader, every future feature); a `run_id` column would make each of the ~40
+queries a potential cross-run leak, i.e. look-ahead from a live ledger into a backtest. The ADR-025
+floor and `ledger_now` are per run with zero code. (2) **Honest measurement** — a run's ledger
+holds exactly its own history; replay, metrics and equity curves need no filter to be right.
+(3) **Deterministic** — the clock is derived from events, so a restart and a replay agree on now;
+B-029's permanent forward step cannot arise in a backtest (every step is bounded and recorded).
+(4) **More general** — parallel backtests (Quant Lab, Era III+) are parallel files/processes, no
+shared lock. (5) Reversible: a `run_id` column can still be added if one database ever has to hold
+many runs. Cost: comparing runs means opening several files — the Observatory's job, not physics'.
+Not done (next slices): look-ahead guard on market data (B-005 — until then a backtest run is
+**not** honest: providers may serve post-`now` data); metrics `as_of` and market data still read the
+raw clock (equal to `ledger_now` in a backtest); management as clock controller is the TRD's
+choice — if management becomes an LLM agent, control moves to a Runtime identity (B-032). B-029
+(live forward step) stays open.
+Evidence: `tests/test_backtest_clock.py` (24): opening, refusals, every role reads the simulated
+now, advance + record, every event of the run inside [start, now], a limit order fills on the
+advance that crosses it (live = replay), only `CONTROL_CLOCK` advances, 9 malformed/unbounded steps
+→ 422, the real-now bound, halt, restart resume, operator stamps, CLI refusal. Red-team 0005's
+"no clock control" guard now pins `/clock/mode`, `PUT/POST/PATCH /clock` absent and a live clock
+unmovable by any role. Mutations (each alone): sweep dropped → 1 red; CLI install dropped → 1;
+wall bound dropped → 1; used-DB check dropped → 2; `CONTROL_CLOCK` universal → 5 (incl. 3 red-team
+0006 guards); restart reads the oldest event → 1.
+Amendment (same cycle, review): auditor **PASS** (3 WARN); red-team 0007 — **3 medium holes**, 51
+attacks held. All fixed, each mutation-checked alone (1 red each): (1) `place_order` priced before
+`OMS_LOCK`, so an advance in between gave a fill at the old now's price stamped at the new now →
+under the lock, a moved non-live clock re-prices at the new now (only that rare path fetches under
+the lock). (2) The pending sweep read `now` before the lock → read under it. (3) A server already
+running on a file that `start-backtest` then opened kept its live clock and stamped today into the
+backtest (and bricked it) → **`append_event` refuses a clock that is not its ledger's run clock**
+(`RunClockMismatch`, one indexed read per append; API 503 "restart the server"). The red-team's
+test expected the stale server to self-heal; refusing is the safer seal (a live scheduler would
+still be sweeping), so the test pins: no live stamp, 503/409, and a restart resumes at the run's
+now. Auditor WARN 1 (lifespan install untested) → `test_the_server_starts_on_its_databases_clock`
+(mutation → red alone). WARN 2 (an unguarded backtest could later pass as honest) →
+`run_started` records `look_ahead_guard: false` (`LOOK_AHEAD_GUARD` in `app/run_clock.py`; B-005
+flips it). WARN 3 (a failed advance commit restores the clock after non-OMS writers stamped `end`)
+→ accepted, low, backlog B-033.

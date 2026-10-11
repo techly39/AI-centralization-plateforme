@@ -29,6 +29,11 @@ EVENT_HALT_REFUSED = "halt_refused"       # payload: {method, path, role}
 
 EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent_id}
 
+# The run's time (ADR-027, app/run_clock.py). A backtest ledger opens with
+# ``run_started``; its simulated now moves only by ``clock_advanced``.
+EVENT_RUN_STARTED = "run_started"         # payload: {mode, start}
+EVENT_CLOCK_ADVANCED = "clock_advanced"   # payload: {from, to, minutes}
+
 # Self-reported agent activity (TRD §7). Audit only: the app cannot verify these
 # numbers, it can only guarantee they were reported by the agent they name.
 EVENT_COST_REPORTED = "cost_reported"     # payload: {cost_id, tokens_in, tokens_out, usd_cost}
@@ -71,8 +76,10 @@ def append_event(
     problem = json_problem(payload or {}, max_depth=MAX_LEDGER_DEPTH)
     if problem:
         raise ValueError(f"{problem} in {type!r} event payload")
+    clock = get_clock()
+    _refuse_wrong_run_clock(session, type, clock.mode)
     event = Event(
-        ts=_not_before_latest(get_clock().now()),
+        ts=_not_before_latest(clock.now()),
         actor_agent_id=actor_agent_id,
         type=type,
         payload_json=payload or {},
@@ -80,6 +87,28 @@ def append_event(
     session.add(event)
     session.flush()
     return event
+
+
+class RunClockMismatch(RuntimeError):
+    """This process's clock is not its database's run clock (ADR-027)."""
+
+
+def _refuse_wrong_run_clock(session: Session, type: str, mode: str) -> None:
+    """A backtest ledger takes only backtest stamps, and a live one none.
+
+    A process learns its run's clock when it starts; a server already running
+    on a file that ``start-backtest`` then opened would otherwise stamp today
+    into a 2024 run, for good (red-team 0007). One indexed read per append.
+    """
+    first = session.scalar(select(Event.type).order_by(Event.id).limit(1))
+    backtest_ledger = first == EVENT_RUN_STARTED or (
+        first is None and type == EVENT_RUN_STARTED
+    )
+    if backtest_ledger != (mode == "backtest"):
+        raise RunClockMismatch(
+            f"the {mode} clock of this process does not belong to this database's "
+            f"{'backtest' if backtest_ledger else 'live'} run: restart the server"
+        )
 
 
 def ledger_now(session: Session) -> datetime:

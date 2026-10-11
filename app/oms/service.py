@@ -222,6 +222,14 @@ def place_order(
     )
 
     with OMS_LOCK:
+        clock = get_clock()
+        if clock.mode != "live" and clock.now() != now:
+            # A backtest clock advanced while the price was fetched (red-team
+            # 0007): the order will be stamped at the new now, so it is priced
+            # there too. Only this rare path fetches under the lock.
+            now = clock.now()
+            if price_type is PriceType.market:
+                reference_price = _fetch_price(provider, symbol, now)
         try:
             order = Order(
                 pod_id=pod_id,

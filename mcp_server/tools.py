@@ -27,7 +27,14 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
-from app.limits import MAX_ORDER_QTY, MAX_PRICE, MAX_TOKENS_PER_REPORT, MAX_USD_PER_REPORT
+from app.limits import (
+    MAX_ADVANCE_DAYS,
+    MAX_ADVANCE_MINUTES,
+    MAX_ORDER_QTY,
+    MAX_PRICE,
+    MAX_TOKENS_PER_REPORT,
+    MAX_USD_PER_REPORT,
+)
 from mcp_server.client import FundAPIError, FundClient
 
 
@@ -476,6 +483,18 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         is a simulated date, and every price you are served is stamped from it.
         """
         return await call("GET", "/clock")
+
+    @api_tool(server, method="POST", path="/clock/advance")
+    async def advance_clock(
+        days: Annotated[int, Field(description="Whole days to move forward.", ge=0, le=MAX_ADVANCE_DAYS)] = 0,
+        minutes: Annotated[int, Field(description="Minutes to move forward.", ge=0, le=MAX_ADVANCE_MINUTES)] = 0,
+    ) -> Any:
+        """Move a backtest's simulated clock forward. Management only; backtest runs only.
+
+        Time never goes back, and never past today. Pending limit orders are
+        checked on arrival; the answer lists the ones that filled or were rejected.
+        """
+        return await call("POST", "/clock/advance", body={"days": days, "minutes": minutes})
 
     @api_tool(server, method="GET", path="/halt")
     async def get_halt() -> Any:

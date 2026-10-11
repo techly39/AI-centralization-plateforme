@@ -103,7 +103,7 @@ All endpoints also exposed as MCP tools with identical names.
 
 **Allocation (management only)**: `POST /allocations` (pod_id, delta, reason)
 
-**Clock (system/management only; `GET /clock` is readable by every agent and reports the ledger's now, max(clock, latest stamp) — ADR-026)**: `GET /clock`, `POST /clock/mode` (`live | backtest`), `POST /clock/advance` (backtest: advance simulated time by N minutes/days)
+**Clock (system/management only; `GET /clock` is readable by every agent and reports the ledger's now, max(clock, latest stamp) — ADR-026)**: `GET /clock`, `POST /clock/advance` (backtest runs only: `{days, minutes}`, 1 minute..366 days per step, never past the real now; then the pending-order sweep; live → 409 — ADR-027). *No `POST /clock/mode`* (ADR-027): the mode is a fact of the run's database, fixed by `fund-env start-backtest` on an empty database.
 
 **Meetings (Phase 3)**: `POST /meetings/schedule`, `GET /meetings/{id}/package` → assembled context: week's metrics, allocations, firm charter text, flagged anomalies
 
@@ -120,7 +120,7 @@ All endpoints also exposed as MCP tools with identical names.
 - `clock.now()` is the only time source for OMS, scheduler, metrics, and market data.
 - **Live mode**: wraps real time; prices from yfinance delayed feed.
 - **Backtest mode**: time starts at a configured historical datetime and advances only via `/clock/advance`. Market data endpoints return data as of simulated now, and must reject any request for data beyond simulated now (look-ahead guard). Pending-order monitor runs on every advance.
-- Mode switching wipes nothing: live and backtest runs are separate `run_id` scopes on all tables.
+- Mode switching wipes nothing: live and backtest runs are separate `run_id` scopes on all tables. *(ADR-027: a run is a database. A backtest is a fresh database whose ledger opens with `run_started {mode, start}`; its clock is the latest `run_started.start` / `clock_advanced.to`, rebuilt on every process start. Separate files are the separate scopes — no query can forget a `run_id` filter.)*
 
 ## 10. Observability
 

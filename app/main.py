@@ -28,21 +28,37 @@ from app.api import (
     orders,
     reporting,
 )
-from app.clock import get_clock
+from app.clock import get_clock, set_clock
 from app.config import get_settings
+from app.db.base import get_session
 from app.finite import json_safe
+from app.ledger.events import RunClockMismatch
 from app.logging_setup import setup_logging
+from app.run_clock import install_run_clock
 from app.scheduler import shutdown_scheduler, start_scheduler
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Own the background jobs for exactly as long as the server runs."""
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Put the server on its database's clock, and own the background jobs.
+
+    The clock first: the scheduler starts only for a live run (ADR-027). The
+    session comes through ``get_session`` (or its override), so the clock is
+    read from the same database every request will use.
+    """
+    previous = get_clock()
+    sessions = app.dependency_overrides.get(get_session, get_session)()
+    try:
+        installed = install_run_clock(next(sessions))
+    finally:
+        sessions.close()
     start_scheduler()
     try:
         yield
     finally:
         shutdown_scheduler()
+        if installed is not None and get_clock() is installed:
+            set_clock(previous)
 
 
 def create_app() -> FastAPI:
@@ -82,6 +98,12 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=422, content={"detail": jsonable_encoder(json_safe(exc.errors()))}
         )
+
+    @app.exception_handler(RunClockMismatch)
+    async def wrong_run_clock(_: Request, exc: RunClockMismatch) -> JSONResponse:
+        # The database became another run under this process (ADR-027): nothing
+        # is written until the server restarts on the database's own clock.
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     @app.get("/health", tags=["meta"])
     def health() -> dict[str, object]:

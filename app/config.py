@@ -26,10 +26,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = REPO_ROOT / "config.yaml"
 
 
-class ClockConfig(BaseModel):
-    mode: Literal["live", "backtest"] = "live"
-
-
 class OMSConfig(BaseModel):
     # Flat simulated fee as a fraction of notional (0.1% default), TRD §8.2.
     fee_rate: float = Field(default=0.001, ge=0.0)
@@ -138,7 +134,6 @@ class Settings(BaseSettings):
         )
 
     database_url: str = "sqlite:///fund.db"
-    clock: ClockConfig = Field(default_factory=ClockConfig)
     oms: OMSConfig = Field(default_factory=OMSConfig)
     marketdata: MarketDataConfig = Field(default_factory=MarketDataConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
