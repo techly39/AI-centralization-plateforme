@@ -430,3 +430,18 @@ advance that crosses it (live = replay), only `CONTROL_CLOCK` advances, 9 malfor
 unmovable by any role. Mutations (each alone): sweep dropped → 1 red; CLI install dropped → 1;
 wall bound dropped → 1; used-DB check dropped → 2; `CONTROL_CLOCK` universal → 5 (incl. 3 red-team
 0006 guards); restart reads the oldest event → 1.
+Amendment (same cycle, review): auditor **PASS** (3 WARN); red-team 0007 — **3 medium holes**, 51
+attacks held. All fixed, each mutation-checked alone (1 red each): (1) `place_order` priced before
+`OMS_LOCK`, so an advance in between gave a fill at the old now's price stamped at the new now →
+under the lock, a moved non-live clock re-prices at the new now (only that rare path fetches under
+the lock). (2) The pending sweep read `now` before the lock → read under it. (3) A server already
+running on a file that `start-backtest` then opened kept its live clock and stamped today into the
+backtest (and bricked it) → **`append_event` refuses a clock that is not its ledger's run clock**
+(`RunClockMismatch`, one indexed read per append; API 503 "restart the server"). The red-team's
+test expected the stale server to self-heal; refusing is the safer seal (a live scheduler would
+still be sweeping), so the test pins: no live stamp, 503/409, and a restart resumes at the run's
+now. Auditor WARN 1 (lifespan install untested) → `test_the_server_starts_on_its_databases_clock`
+(mutation → red alone). WARN 2 (an unguarded backtest could later pass as honest) →
+`run_started` records `look_ahead_guard: false` (`LOOK_AHEAD_GUARD` in `app/run_clock.py`; B-005
+flips it). WARN 3 (a failed advance commit restores the clock after non-OMS writers stamped `end`)
+→ accepted, low, backlog B-033.

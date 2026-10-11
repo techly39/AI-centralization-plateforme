@@ -32,6 +32,7 @@ from app.clock import get_clock, set_clock
 from app.config import get_settings
 from app.db.base import get_session
 from app.finite import json_safe
+from app.ledger.events import RunClockMismatch
 from app.logging_setup import setup_logging
 from app.run_clock import install_run_clock
 from app.scheduler import shutdown_scheduler, start_scheduler
@@ -97,6 +98,12 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=422, content={"detail": jsonable_encoder(json_safe(exc.errors()))}
         )
+
+    @app.exception_handler(RunClockMismatch)
+    async def wrong_run_clock(_: Request, exc: RunClockMismatch) -> JSONResponse:
+        # The database became another run under this process (ADR-027): nothing
+        # is written until the server restarts on the database's own clock.
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     @app.get("/health", tags=["meta"])
     def health() -> dict[str, object]:

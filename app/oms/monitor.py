@@ -93,13 +93,15 @@ def check_pending_orders(
     """
     result = MonitorResult()
     provider = provider or get_provider()
-    now = get_clock().now()
 
     with OMS_LOCK:
         # Checked under the lock, not before it: a sweep queued behind the lock
         # must not wake up and fill orders in a world halted while it waited.
         if is_halted():
             return result
+        # Read under the lock too: a sweep queued behind a clock advance must
+        # price at the now its fills will be stamped with (red-team 0007).
+        now = get_clock().now()
         try:
             orders = pending_limit_orders(session, pod_id=pod_id)
             result.checked = len(orders)

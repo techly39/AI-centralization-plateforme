@@ -77,7 +77,9 @@ def test_a_backtest_opens_with_run_started_at_its_start(SessionFactory, db):
     assert get_clock() is clock and clock.mode == "backtest" and clock.now() == START
     [event] = _events(db)
     assert event.type == EVENT_RUN_STARTED and event.ts == START
-    assert event.payload_json == {"mode": "backtest", "start": START.isoformat()}
+    # Until B-005 a run says it has no look-ahead guard (auditor, cycle 15).
+    assert event.payload_json == {"mode": "backtest", "start": START.isoformat(),
+                                  "look_ahead_guard": False}
 
 
 def test_a_backtest_refuses_a_database_that_holds_anything(SessionFactory, db, admin_key):
@@ -234,6 +236,32 @@ def cli_on_test_db(SessionFactory, monkeypatch) -> None:
             s.close()
 
     monkeypatch.setattr(cli, "session_scope", scope)
+
+
+def test_the_server_starts_on_its_databases_clock(backtest, SessionFactory):
+    """The lifespan installs the run's clock: a fresh server process on a backtest
+    database reads and stamps simulated time, never the live clock it booted with."""
+    from fastapi.testclient import TestClient
+
+    from app.db.base import get_session
+    from app.main import create_app
+
+    set_clock(LiveClock())                       # a fresh server process
+    app = create_app()
+
+    def _session() -> Iterator:
+        s = SessionFactory()
+        try:
+            yield s
+        finally:
+            s.close()
+
+    app.dependency_overrides[get_session] = _session
+    with TestClient(app) as c:
+        body = c.get("/clock", headers=H(backtest["pm"])).json()
+        assert body["mode"] == "backtest"
+        assert datetime.fromisoformat(body["now"]) == START
+    assert get_clock().mode == "live"            # put back on shutdown
 
 
 def test_operator_commands_stamp_the_runs_now(SessionFactory, cli_on_test_db, db):

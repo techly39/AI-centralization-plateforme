@@ -38,6 +38,12 @@ from app.limits import MAX_ADVANCE_MINUTES
 from app.oms.service import OMS_LOCK
 
 
+#: Does market data refuse anything after the simulated now? Not yet (B-005):
+#: a run opened today records that its results cannot be trusted as a backtest,
+#: so no later reader mistakes them for one. B-005 sets this to True.
+LOOK_AHEAD_GUARD = False
+
+
 class RunClockError(Exception):
     """The clock cannot do that in this run (live mode, a bad step, a used DB)."""
 
@@ -66,7 +72,11 @@ def start_backtest(session: Session, *, start: datetime) -> BacktestClock:
         session,
         type=EVENT_RUN_STARTED,
         actor_agent_id=None,
-        payload={"mode": clock.mode, "start": _iso(start)},
+        payload={
+            "mode": clock.mode,
+            "start": _iso(start),
+            "look_ahead_guard": LOOK_AHEAD_GUARD,
+        },
     )
     return clock
 
