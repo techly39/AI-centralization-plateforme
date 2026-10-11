@@ -38,7 +38,7 @@ costs, metrics, MCP. 218 tests green at Bible writing. ~~Phase 2 is uncommitted 
 
 ---
 
-## Era ½ — The Survey (the first run: clean and understand)
+## Era ½ — The Survey (the first run: clean and understand) ✅ (cycles 1–9)
 
 **Question:** what exactly are we working with — what exists, what works, what is
 broken, what is dead, and what in the Bible is wrong about it?
@@ -70,14 +70,16 @@ Deliverables:
    what's dead · risks · surprises · what this changes in the backlog.
 8. **First ideas:** seed `state/IDEAS.md` with what the survey made you think.
 
-Exit criteria:
-- [ ] `state/SURVEY.md` complete with all sections above.
-- [ ] Phase 2 committed; `main` green; pushed.
-- [ ] Repo clean: no junk files, every odd file resolved or explained.
-- [ ] `~/.openclaw` backed up; `runtime/openclaw/VERSION_NOTES.md` written from the
+Exit criteria *(closed cycle 9 — evidence per box in `state/SURVEY.md` §10; ADR-021)*:
+- [x] `state/SURVEY.md` complete with all sections above.
+- [x] Phase 2 committed; `main` green; pushed.
+- [x] Repo clean: no junk files, every odd file resolved or explained. *(Explained, not all
+      resolved: `test_api.py` + `.vscode/` untracking waits on P-0002 — S-004b.)*
+- [x] `~/.openclaw` backed up; `runtime/openclaw/VERSION_NOTES.md` written from the
       installed version's own schema (`openclaw config schema`) — the online docs only
-      describe the latest release (cycle 8 correction, `08_OPENCLAW.md` §1).
-- [ ] Backlog re-ordered from the survey's findings.
+      describe the latest release (cycle 8 correction, `08_OPENCLAW.md` §1). *(Reworded in
+      cycle 8, inside its own Era, to be stricter; cycle 7's notes already met it.)*
+- [x] Backlog re-ordered from the survey's findings.
 
 ---
 

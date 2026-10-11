@@ -1,7 +1,11 @@
 # SURVEY — Era ½ (written section by section; complete when every section is filled)
 
+**Status: complete (cycle 9).** Every section required by `05_ERAS.md` Era ½ deliverable 7 is
+filled; §10 ticks the exit criteria with evidence and lists the known residue. From here on
+this file is a record of what was true at the Survey — later changes go to STATE/JOURNAL, not here.
+
 Sections: 1 Toolchain · 2 What exists · 3 What works · 4 What's broken · 5 What's dead ·
-6 Risks · 7 Surprises · 8 What this changes in the backlog.
+6 Risks · 7 Surprises · 8 What this changes in the backlog · 9 OpenClaw · 10 Close-out.
 
 ## 1. Toolchain (cycle 3, 2026-10-11)
 
@@ -334,3 +338,32 @@ Backup first: `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (4 107/4
   subagent had loaded the *Orchestrator's* workspace, not the Analyst's, so the run is
   confounded. What stands: `web_search` is reachable by every agent and no config denies it.
   The firm's seal must be enforced by the tool layer (08 §4) and proven by live probe 7.
+
+## 10. Close-out (S-007, cycle 9)
+Each Era ½ exit criterion checked against its primary evidence on 2026-10-11 (not against STATE).
+
+| Exit criterion (`05_ERAS.md`) | Verdict | Evidence |
+|---|---|---|
+| SURVEY complete with all sections | ✅ | §1–§8 = deliverable 7's seven headings (exists · works · broken · dead · risks · surprises · backlog) + toolchain §1 + OpenClaw §9 |
+| Phase 2 committed; `main` green; pushed | ✅ | `1317af0` (Phase 2) merged in `f45eecf`; `uv run pytest` on `main` @ `1d35bc2`: **267 passed, 9 xfailed**; `git rev-parse main origin/main` equal |
+| Repo clean: no junk, every odd file resolved or explained | ✅ *with residue* | `git status --porcelain` empty at cycle start; every odd file has a verdict in §2b; the four not yet executed are explained below |
+| `~/.openclaw` backed up; VERSION_NOTES from the installed schema | ✅ | `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (35.8 MB, present); `runtime/openclaw/VERSION_NOTES.md` cites `openclaw config schema` of 2026.5.12 as source of truth |
+| Backlog re-ordered from the survey's findings | ✅ | `state/BACKLOG.md` (cycle 9): Era I ordered by 06_LOOP §2 priorities; every §4 finding has an item (§8) |
+
+**Note on the fourth criterion.** It was reworded in cycle 8 (S-006) — inside its own Era — to
+add "from the installed version's own schema". The rewording made it *stricter*, not easier, and
+VERSION_NOTES already met the stricter form when written (cycle 7). Recorded so nobody reads it
+as moving the goalposts after the fact (auditor note 8, cycle 8).
+
+**Known residue** (explained, not resolved — the criterion's "or explained" branch):
+- `test_api.py` still tracked (key redacted to `FUND_API_KEY`, cycle 6) and `.vscode/settings.json`
+  still tracked: removal needs headless `git rm` → **P-0002** open → **S-004b**.
+- Local, untracked and ignored: empty `ui/`, `.DS_Store` ×3 (root, `app/`, `legacy/`). Invisible
+  to git, harmless; deleting them needs `rm`, which the Builder does not route around either.
+- Not captured: `git --version`, `claude --version`, origin's visibility (`gh repo view`) — each
+  needs a permission prompt in loop mode (§1). None blocks Era I.
+- The Human's open items: Q-0003 (committed key still live in `fund.db`), Q-0004 (xAI key file;
+  backup still mode 644 — measured this cycle).
+
+**Era ½ is closed.** `governance/human.yaml: approvals.era_gates` is `false`, so the Builder
+continues into Era I without an `ERA_REVIEW.md` stop.
