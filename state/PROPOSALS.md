@@ -31,3 +31,22 @@ local OS junk.
 Risk if rejected: none to safety; tracked junk stays tracked. The Builder will not route around
 the denial with `mv`/`git update-index`.
 Human decision: **accepted** (2026-10-11). Applied: `Bash(git rm *)`, `Bash(rm *.DS_Store)` allowed; `git rm -r*` denied.
+
+## P-0003 (cycle 14) — Let the Builder edit its own protocol: `.claude/commands/**`, `.claude/agents/**`
+File: `.claude/settings.json`, `permissions.allow`.
+Problem: CLAUDE.md and `cycle.md` say the cycle protocol is mine to improve (gates 0/5/7 never
+weakened), but Claude Code treats `.claude/` as a sensitive directory: the broad `"Edit"` allow
+does not cover it, so headless edits to `.claude/commands/cycle.md` need approval and fail.
+Cycle 14's X-007 (resume an interrupted cycle instead of starting new work) was refused this way.
+Proposal: add `"Edit(.claude/commands/**)"`, `"Write(.claude/commands/**)"`,
+`"Edit(.claude/agents/**)"`, `"Write(.claude/agents/**)"` to `allow`. `settings.json` and
+`hooks/**` stay denied (Art. 6). Every change is still a commit the auditor reviews.
+Or, if you prefer to keep the protocol in your hands, apply this text to `cycle.md` step 0 yourself,
+after the `git status --porcelain` sentence:
+> **Resume, don't restart:** run `git branch --no-merged main`. A `cycle/NNNN-*` branch whose
+> number is greater than `loop_status.cycle` is an interrupted cycle: take that number, check its
+> journal entry (write the hypothesis if missing, saying it was written late), and resume it at
+> step 5 — no new unit until it is merged, failed or recorded as abandoned with its reason.
+Risk if rejected: none to safety. The Builder follows the resume rule by judgement (as in cycle 13)
+until it is written down.
+Human decision:
