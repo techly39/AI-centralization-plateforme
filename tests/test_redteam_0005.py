@@ -156,9 +156,13 @@ def test_held_no_clock_control_on_the_surface(client, two_desks, admin_key, meth
         assert resp.status_code in (404, 405), (method, path, resp.status_code)
 
 
-def test_held_clock_read_is_management_only(client, two_desks):
+def test_held_clock_read_is_a_read_only(client, two_desks):
+    """Every agent may read the clock (ADR-026, was management-only); reading it
+    must reveal nothing but ``mode`` and ``now`` — control is the test above."""
     for who in ("pm1", "an1"):
-        assert client.get("/clock", headers=H(two_desks[who][1])).status_code == 403
+        resp = client.get("/clock", headers=H(two_desks[who][1]))
+        assert resp.status_code == 200
+        assert set(resp.json()) == {"mode", "now"}
 
 
 def test_held_agent_cannot_append_reducer_events(
