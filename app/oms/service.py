@@ -238,7 +238,7 @@ def place_order(
             session.add(order)
             session.flush()  # populates order.id
 
-            append_event(
+            placed = append_event(
                 session,
                 type=EVENT_ORDER_PLACED,
                 actor_agent_id=actor.id,
@@ -254,6 +254,8 @@ def place_order(
                     "justification": justification,
                 },
             )
+            # Stamped like its event: the clock may be behind the ledger (ADR-025).
+            order.created_at = placed.ts
 
             try:
                 # Affordability is checked for both order types at submission
@@ -277,7 +279,6 @@ def place_order(
                     session,
                     order,
                     price=reference_price,
-                    at=now,
                     actor_agent_id=actor.id,
                 )
             else:
@@ -341,7 +342,8 @@ def assert_affordable(
 
     position = get_position(session, pod_id, ticker)
     held = position.qty if position is not None else 0.0
-    if qty > held + QTY_EPSILON:
+    # QTY_EPSILON forgives float dust on a position, never a sell of nothing.
+    if position is None or qty > held + QTY_EPSILON:
         raise InsufficientPositionError(
             f"cannot sell {qty:g} {ticker}: pod {pod_id} holds {held:g}",
             detail={"ticker": ticker, "requested": qty, "held": held},
@@ -355,7 +357,6 @@ def execute_fill(
     order: Order,
     *,
     price: float,
-    at: datetime,
     actor_agent_id: int | None,
 ) -> None:
     """Execute ``order`` at ``price``: emit the event, then move the state.
@@ -398,7 +399,9 @@ def execute_fill(
     apply_event_to_db(session, event)
 
     order.status = OrderStatus.filled
-    order.filled_at = at
+    # The ledger's (held) time, not the clock's: the row agents read must
+    # agree with the event that is the truth (ADR-025).
+    order.filled_at = event.ts
     order.fill_price = price
     order.fee = fee
     order.realized_pnl = booked_pnl

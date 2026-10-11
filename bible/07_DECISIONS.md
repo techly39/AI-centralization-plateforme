@@ -334,4 +334,15 @@ COMMITTED two concurrent inserts can each read a stale floor, and sequence ids a
 order; Postgres is not the backend today — revisit with any backend change. (e) Test fixtures must
 freeze the clock before any fixture writes an event (`tests/test_metrics.py` `history` is now
 autouse for that reason): a live-stamped `agent_registered` before a frozen past holds every later
-event at today's date.
+event at today's date. (f) **A forward step is permanent** (auditor WARN): one clock jump to a far
+future date — an NTP glitch, or a script that sets a frozen clock forward against a real DB — pins
+every later stamp there, and the append-only ledger cannot take it back. Agents cannot cause it:
+nothing outside `app/clock.py` calls `set_clock`, and no route controls the clock (red-team 0005).
+A guard (refuse or log a clock far ahead of the floor) belongs with B-004's clock design.
+Amendment (same cycle, review): red-team 0005 found 2 low holes, both fixed. (1) Rows agents read
+must carry the ledger's time: `Order.created_at` and `filled_at` are now copied from their
+`order_placed` / `order_filled` events (`fund_pod` already did this for `Allocation.ts`), and
+`execute_fill` lost its `at` argument. `Message.ts`, `Cost.ts` and `Task` times still take the raw
+clock → B-028. (2) `QTY_EPSILON` forgives float dust on a position, never a sell of nothing: the OMS
+and the reducer both refuse any sell of a ticker the pod does not hold (a 1e-9 naked sell used to
+fill and credit cash).

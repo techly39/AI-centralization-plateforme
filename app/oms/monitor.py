@@ -148,7 +148,6 @@ def check_pending_orders(
                     session,
                     order,
                     price=price,
-                    at=now,
                     actor_agent_id=order.created_by,
                 )
                 result.filled.append(order.id)

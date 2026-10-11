@@ -91,9 +91,10 @@ def _apply_order_filled(state: DerivedState, payload: dict) -> None:
         pos["qty"] = new_qty
         state.positions[key] = pos
     elif side == "sell":
-        if qty > pos["qty"] + QTY_EPSILON:
-            # The OMS never fills such a sell, so a history holding one is
-            # corrupt or replayed out of order: say so, never erase it (ADR-025).
+        if key not in state.positions or qty > pos["qty"] + QTY_EPSILON:
+            # The OMS never fills such a sell (nor any sell of a ticker the pod
+            # does not hold), so a history holding one is corrupt or replayed
+            # out of order: say so, never erase it (ADR-025).
             raise ValueError(
                 f"sell of {qty:g} {ticker} beyond pod {pod_id}'s position "
                 f"of {pos['qty']:g}"

@@ -383,15 +383,11 @@ def test_held_agent_churn_with_clock_steps_replays_to_live(
 
 
 # =============================================================================
-# HOLE (low) — a sell beyond position, up to QTY_EPSILON, is filled and recorded
+# HOLE (low), CLOSED cycle 13 — a sell up to QTY_EPSILON of a ticker never held
+# was filled (shared tolerance `qty > held + QTY_EPSILON`, cash from nothing).
+# Now the OMS and the reducer both refuse any sell with no position.
 # =============================================================================
 
-@pytest.mark.xfail(strict=True, reason=(
-    "RED-TEAM 0005 HOLE (low): the OMS and the reducer share the same tolerance "
-    "`qty > held + QTY_EPSILON`, so a sell of <= 1e-9 shares of a ticker the pod "
-    "has NEVER held is filled and credited cash from nothing; ADR-025's law 3 "
-    "('a sell beyond position is an error') records it as valid. Tolerance should "
-    "only forgive float dust on an existing position, not a naked short."))
 def test_naked_dust_sell_of_unheld_ticker_is_refused(frozen_clock, client, desk, db):
     pod_id, _, pm_key = desk
     frozen_clock.set(T0)
@@ -405,16 +401,12 @@ def test_naked_dust_sell_of_unheld_ticker_is_refused(frozen_clock, client, desk,
 
 
 # =============================================================================
-# HOLE (low) — ledger time is held, but the rows agents read are not
+# HOLE (low), CLOSED cycle 13 for orders — Order.created_at/filled_at took the raw
+# clock while their events were held at the ledger's latest time. Now both are
+# copied from their events, as fund_pod does for Allocation.ts. Message.ts,
+# Cost.ts and Task times still take the raw clock: B-028.
 # =============================================================================
 
-@pytest.mark.xfail(strict=True, reason=(
-    "RED-TEAM 0005 HOLE (low): append_event holds the event stamp at the ledger's "
-    "latest time, but Order.created_at/filled_at (and Message.ts, Cost.ts, "
-    "Task.started_at/ended_at) take the raw clock, captured before OMS_LOCK. After a "
-    "clock step back GET /orders says the fill happened days before the ledger's "
-    "order_filled event — and before a fill the ledger records as earlier. "
-    "fund_pod already copies event.ts into Allocation.ts; the OMS does not."))
 def test_order_fill_time_matches_its_ledger_event(frozen_clock, client, desk, db):
     pod_id, _, pm_key = desk
     frozen_clock.set(T0)
