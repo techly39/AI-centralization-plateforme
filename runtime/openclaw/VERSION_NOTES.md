@@ -69,7 +69,12 @@ CLI's own schema (`openclaw config schema`) as the source of truth, docs second.
 - Auth: `main` and `rachel` have local profiles (openrouter + xai api_key); `pm` and `analyst`
   have an **empty** `auth-profiles.json` → they read through to `main`'s keys (the exact case
   08 §4 forbids for firm agents).
-- 118 workspace text files scanned: **0** credential patterns.
+- Workspace credential scan (116 unique files under `~/.openclaw/workspace`, 115 read, 1 `.pyc`
+  skipped): **1 file** — `workspace/OPENCLAW_XAI_KEY.txt` holds an xAI-key-shaped string
+  (matched by name and by pattern; contents never printed). `main` can read it, and so can
+  anything with `read`/`exec` in the nested OCT workspaces. The Human's file → Q-0004, untouched.
+  (A first probe run missed it: no `xai-` pattern, and it double-counted nested roots — the
+  auditor caught both. Lesson for B-022 and conformance check 4: scan by filename too.)
 - Workspace bootstrap files in use: `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `TOOLS.md`,
   `HEARTBEAT.md` (+ `MEMORY.md`, custom `PRICE_FETCHER_DIRECTIVE.md`). Which ones 2026.5.12
   still loads is **unverified** (docs list `TOOLS.md`/`HEARTBEAT.md` as retired in the newer

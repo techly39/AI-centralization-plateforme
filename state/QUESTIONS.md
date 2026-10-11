@@ -28,3 +28,21 @@ so the key line was replaced in place: `test_api.py` now reads `FUND_API_KEY` fr
 environment (unset → it sends an empty key and gets 401). The key is gone from `main`'s tree,
 still in history (commit before 897be4b), and **still live** in `fund.db` — B/C remain yours.
 Human answer:
+
+## Q-0004 (cycle 7) — An xAI key in a plain file in your OpenClaw workspace
+Context: `~/.openclaw/workspace/OPENCLAW_XAI_KEY.txt` holds a string shaped like an xAI API key
+(found by name + pattern; the Builder never printed it). It sits in `main`'s workspace, which
+also contains the three OCT workspaces, so any of your agents with `read`/`exec` can read it —
+and `main` has web tools and a Telegram binding. Your `auth-profiles.json` already holds an xAI
+key for `main`/`rachel`, so the file may be a leftover.
+Options: A leave it / B delete or move it outside `~/.openclaw/workspace` (and rotate the key if
+it was ever exposed).
+Chosen: nothing — it is your OpenClaw (08 §2, hands off). Recommended: B. A copy is also in
+the backup `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz`.
+**Also yours, one command:** that backup holds all of `~/.openclaw` (config, auth profiles,
+credentials) and was created mode 644 in a 755 dir; your home is 750, so only your group
+(`staff`) can reach it. The Builder's `chmod 600` needs approval headless — please run
+`chmod 700 ~/firm-openclaw-backups && chmod 600 ~/firm-openclaw-backups/*.tar.gz`.
+Future backups: created under `umask 077` (B-012 backup step).
+Reversible: yes.
+Human answer:

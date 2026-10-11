@@ -123,8 +123,9 @@ and `mcp.servers` (no per-agent MCP key) — and the Human's bots need them as t
 (`runtime/openclaw/VERSION_NOTES.md`). Per-agent deny would probably cover tools, but every
 firm spawn would still write the Human's config and share its gateway, channels and defaults;
 one upgrade that widens a default (docs ≥ 2026.9: sessions visibility `all`) would reach the
-firm through the Human's file. A profile gives: zero writes to the Human's OpenClaw (08 §2
-holds by construction), global seal keys set for the firm alone, no channels, a backup that
+firm through the Human's file. A profile is expected to give (unverified until B-012: the
+gateway port, launchd service and other machine-wide state may still be shared): zero writes
+to the Human's OpenClaw config, global seal keys set for the firm alone, no channels, a backup that
 is just the firm's. The `firm-` namespace (08 §2) still applies inside it.
 Alternatives rejected: firm agents in the Human's config with per-agent deny lists (shares
 globals, every change touches the Human's file); a second OpenClaw install (more to pin, no gain).

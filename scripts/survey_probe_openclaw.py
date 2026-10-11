@@ -32,18 +32,28 @@ SECRET_VALUE = {
     "anthropic/openai": re.compile(r"sk-(ant-)?[A-Za-z0-9\-_]{20,}"),
     "fund-env": re.compile(r"\bfk_[A-Za-z0-9_\-]{20,}"),
     "telegram-bot": re.compile(r"\b\d{8,10}:[A-Za-z0-9_\-]{35}\b"),
+    "xai": re.compile(r"\bxai-[A-Za-z0-9]{20,}"),
+    "google": re.compile(r"\bAIza[A-Za-z0-9_\-]{30,}"),
+    "github": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}"),
+    "aws": re.compile(r"\bAKIA[A-Z0-9]{16}\b"),
+    "private-key": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 }
-# Files O6 reads when scanning workspaces for credentials.
-TEXT_SUFFIXES = {".md", ".txt", ".json", ".json5", ".yaml", ".yml", ".toml", ".env", ".py", ".sh"}
+# A file whose *name* says it holds a credential counts even if no pattern matches.
+SECRET_FILENAME = re.compile(r"(key|token|secret|credential|password)", re.I)
+# Values under these config keys are always redacted, whatever their own key says.
+SECRET_CONTAINERS = {"env", "headers"}
+SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".gz", ".sqlite", ".db", ".pyc"}
 
 
 def openclaw(*args: str) -> str:
     return subprocess.run(
-        ["openclaw", *args], capture_output=True, text=True, check=False
+        ["openclaw", *args], capture_output=True, text=True, check=False, timeout=120
     ).stdout
 
 
 def redact(value: Any, key: str = "") -> Any:
+    if key in SECRET_CONTAINERS and isinstance(value, dict):
+        return {k: "<redacted>" for k in value}
     if isinstance(value, dict):
         return {k: redact(v, k) for k, v in value.items()}
     if isinstance(value, list):
@@ -52,6 +62,8 @@ def redact(value: Any, key: str = "") -> Any:
         p.search(value) for p in SECRET_VALUE.values()
     )):
         return "<redacted>"
+    if isinstance(value, str) and key == "url" and "?" in value:
+        return value.split("?", 1)[0] + "?<redacted>"
     return value
 
 
@@ -94,7 +106,8 @@ def o3_config(cfg: dict) -> list[dict]:
     servers = cfg.get("mcp", {}).get("servers", {})
     print(f"    mcp.servers: {len(servers)}")
     for name, s in servers.items():
-        print(f"    - {name}: command={s.get('command')!r} url={s.get('url')!r} env_keys={sorted(s.get('env', {}))}")
+        url = redact(s.get("url"), "url")
+        print(f"    - {name}: command={s.get('command')!r} url={url!r} env_keys={sorted(s.get('env', {}))}")
     print(f"    channels: {sorted(cfg.get('channels', {}))}")
     print(f"    bindings: {len(bindings)} -> {dict(per_agent)}")
     return agents
@@ -141,20 +154,30 @@ def o5_auth(state: Path, agents: list[dict]) -> None:
 
 def o6_secret_scan(state: Path, agents: list[dict]) -> None:
     """Credentials written in workspace files (standard: never)."""
-    print("O6  credential patterns in workspace files (path + pattern only)")
-    roots = {Path(a.get("workspace") or state / "workspace").expanduser() for a in agents}
-    hits: Counter[tuple[str, str]] = Counter()
+    print("O6  credentials in workspace files (path + pattern name only, never the match)")
+    roots = {Path(a.get("workspace") or state / "workspace").expanduser().resolve() for a in agents}
+    # Nested workspaces (OCT inside main's) would be scanned twice: keep outermost roots only.
+    roots = {r for r in roots if not any(o != r and r.is_relative_to(o) for o in roots)}
+    files = {p.resolve() for r in roots for p in r.rglob("*") if p.is_file()}
+    hits: set[tuple[str, str]] = set()
+    skipped = Counter()
     scanned = 0
-    for root in roots:
-        for p in root.rglob("*"):
-            if not p.is_file() or p.suffix.lower() not in TEXT_SUFFIXES or p.stat().st_size > 2_000_000:
-                continue
-            scanned += 1
-            text = p.read_text(errors="ignore")
-            for name, rx in SECRET_VALUE.items():
-                if rx.search(text):
-                    hits[(str(p.relative_to(state)), name)] += 1
-    print(f"    text files scanned: {scanned}; files with a credential pattern: {len(hits)}")
+    for p in sorted(files):
+        if p.suffix.lower() in SKIP_SUFFIXES or p.stat().st_size > 2_000_000:
+            skipped[p.suffix.lower() or "<none>"] += 1
+            continue
+        scanned += 1
+        rel = str(p.relative_to(state.resolve()))
+        if SECRET_FILENAME.search(p.name):
+            hits.add((rel, "filename"))
+        text = p.read_text(errors="ignore")
+        for name, rx in SECRET_VALUE.items():
+            if rx.search(text):
+                hits.add((rel, name))
+    print(f"    roots: {sorted(str(r) for r in roots)}")
+    print(f"    files: {len(files)} unique; scanned {scanned} (all suffixes, incl. dotfiles/.log); "
+          f"skipped binary/large: {dict(skipped) or 'none'}")
+    print(f"    files flagged: {len({h[0] for h in hits})}")
     for (path, name) in sorted(hits):
         print(f"    - {path}: {name}")
 

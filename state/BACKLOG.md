@@ -28,6 +28,8 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-000l** MCP API base URL must be loopback (conformance check for Era I).
 - [ ] **B-022** Secret-scan test: no tracked file contains an `fk_…` key, an OpenRouter
       `sk-or-…` key or another credential pattern (SURVEY §4b.1). Before any firm agent holds a key.
+      Reuse `survey_probe_openclaw.SECRET_VALUE` + filename check (cycle 7: a pattern list
+      without `xai-` missed a real key file).
 
 ## Era ½ — The Survey (first run: clean and understand — NO features)
 - [x] **S-001** Toolchain + run check — cycle 3: SURVEY §1; `scripts/smoke_run.py` 12/12 PASS.
@@ -101,6 +103,8 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       Cycle 7 (VERSION_NOTES): target the `firm` profile (ADR-019); MCP servers are global only
       → one named server per agent + allowlist glob of its own server; key via SecretRef, not
       a literal; check which bootstrap files 2026.5.12 loads (`TOOLS.md`/`HEARTBEAT.md`?).
+      Backup step: `openclaw backup` (exists in 2026.5.12) or tar under `umask 077` — the
+      cycle-7 tarball came out 644 (Q-0004). Plan `doctor` (conformance check 5): firm profile only.
 - [ ] **B-023** Render every seal key explicitly, never rely on a default (newer OpenClaw
       loosens them): `tools.web.*` off, `tools.sessions.visibility: self`,
       `tools.agentToAgent.enabled: false`, `tools.profile: minimal`, per-agent deny list,

@@ -317,7 +317,10 @@ Backup first: `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (4 107/4
   bindings; 0 MCP servers): no agent has `tools` or `sandbox`; web search + fetch on for all;
   OCT workspaces nested inside `main`'s; `pm`/`analyst` have empty auth profiles (read-through
   to `main`). Hands off — recorded, not proposed for change (none of it touches the firm).
-- **Workspace secrets:** 0 credential patterns in 118 text files.
+- **Workspace secrets: 1.** `~/.openclaw/workspace/OPENCLAW_XAI_KEY.txt` holds an
+  xAI-key-shaped string (116 unique files, 115 read; contents never printed). In `main`'s
+  workspace, which contains the OCT workspaces. The Human's → Q-0004, hands off. The first
+  probe run reported 0 (no `xai-` pattern, nested roots counted twice) — caught by the auditor.
 - **OCT POC** (`~/.openclaw/workspace/OCT/AI Hedgefund POC/`): Orchestrator relays PM ↔ Analyst
   via `sessions_spawn`; file-inbox OMS (`OMS/OMS.py`) run by the Orchestrator through `exec`;
   `Skills/price_fetcher.py` via `exec`. Charters = 6 bootstrap files per agent → AgentSpec
