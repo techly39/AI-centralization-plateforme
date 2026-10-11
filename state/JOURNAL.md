@@ -288,3 +288,14 @@ IDEAS "physical-units types" can live.
   cycles must end with a pod acting in simulated time against a fake provider (B-003 → B-000d/B-016
   → B-020 → B-004 → B-005 → B-008 → B-009). Ideas written up: IDEAS cycle-10 section.
 Next: B-003 halt in physics (+ red-team) → B-000d + B-016 → B-020 → B-004.
+
+## Human intervention — 2026-10-11 (between cycles 10 and 11)
+- P-0001 and P-0002 accepted and applied (see `state/PROPOSALS.md`). S-004b (remove `test_api.py`,
+  untrack `.vscode/`) is now unblocked.
+- Runner fix in `loop/`: ~14 runs between 02:00 and 03:10 ended in seconds (usage limit) and were
+  logged as `merged` because `--post` re-read the previous cycle's `loop_status.json`. Now a run only
+  counts if `loop_status.json` advanced; a usage-limit stop is not counted and the runner waits 30 min.
+  Lesson for you: always write `state/loop_status.json` with the new cycle number at the end of a cycle,
+  or the run is counted as failed.
+- Q-0003 / Q-0004: the Human handles the keys and the backup permissions.
+- This entry and the PROPOSALS edit are uncommitted: commit them in step 0 of the next cycle.

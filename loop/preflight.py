@@ -7,7 +7,10 @@ Usage (from the repo root, via `uv run python loop/preflight.py ...`):
                   10 go, but run a DIAGNOSIS cycle (failure limit reached)
                   20 wait (daily cycle limit reached)
                   1  stop the loop (halt, seal broken, open incident, repeated failure)
-  --post        after a cycle: read state/loop_status.json, update the failure counter
+  --post N LOG  after a run: N = last cycle number before the run, LOG = its output file.
+                Counts the run only if state/loop_status.json advanced; a usage/rate-limit
+                stop exits 30 and is not counted (the runner waits instead).
+  --last-cycle  print the cycle number in state/loop_status.json
   --get a.b.c   print a value from governance/human.yaml
 
 Reference hashes live OUTSIDE the repo ($FIRM_HOME/protected.sha256, default ~/.firm),
@@ -19,6 +22,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -116,15 +120,50 @@ def check() -> None:
     print("PREFLIGHT: go")
 
 
-def post() -> None:
+LIMIT_MARKERS = re.compile(
+    r"usage limit|rate.?limit|limit reached|limit will reset|resets at|429|overloaded|quota",
+    re.IGNORECASE,
+)
+
+
+def last_cycle() -> int:
+    status_file = ROOT / "state" / "loop_status.json"
+    try:
+        return int(json.loads(status_file.read_text()).get("cycle", 0))
+    except (OSError, json.JSONDecodeError, ValueError, TypeError):
+        return 0
+
+
+def post(before: int, logfile: str | None) -> None:
+    """Classify the run that just ended. Exit codes:
+         0  a real cycle ran (merged / failed / blocked) — counted toward the daily cap
+         30 no cycle ran because of a usage/rate limit — not counted, the runner waits
+    A run that did not advance state/loop_status.json is NEVER counted as merged.
+    """
     FIRM_HOME.mkdir(parents=True, exist_ok=True)
     status_file = ROOT / "state" / "loop_status.json"
-    result = "failed"
-    if status_file.exists():
+    after = last_cycle()
+    log_text = ""
+    if logfile:
+        try:
+            log_text = Path(logfile).read_text(errors="replace")[-20000:]
+        except OSError:
+            pass
+
+    if after > before:
         try:
             result = json.loads(status_file.read_text()).get("result", "failed")
-        except json.JSONDecodeError:
-            pass
+        except (OSError, json.JSONDecodeError):
+            result = "failed"
+    elif LIMIT_MARKERS.search(log_text):
+        print("POST: no cycle ran — usage/rate limit hit. Not counted; waiting.")
+        sys.exit(30)
+    else:
+        result = "failed"
+        print("POST: the run did not advance state/loop_status.json — counted as failed.")
+
+    with CYCLES_LOG.open("a") as fh:
+        fh.write(f"{dt.date.today().isoformat()} cycle={after} result={result}\n")
     failures = int(FAILURES.read_text()) if FAILURES.exists() else 0
     failures = 0 if result == "merged" else failures + 1
     FAILURES.write_text(str(failures))
@@ -133,7 +172,9 @@ def post() -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--post":
-        post()
+        post(int(sys.argv[2]) if len(sys.argv) > 2 else 0, sys.argv[3] if len(sys.argv) > 3 else None)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--last-cycle":
+        print(last_cycle())
     elif len(sys.argv) > 2 and sys.argv[1] == "--get":
         print(get(sys.argv[2]))
     elif len(sys.argv) > 1 and sys.argv[1] == "--hashes":

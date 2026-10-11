@@ -13,7 +13,7 @@ Proposal: match path tokens — e.g. `re.search(r"(^|[\s'\"/=])(governance/|loop
 and add `cd`, `pwd`, `git -C` to the read-only set. Keeps every real protection.
 Risk if rejected: none to safety; costs Builder turns and may push it toward phrasing tricks,
 which is exactly the habit a guard should not train.
-Human decision:
+Human decision: **accepted** (2026-10-11). Applied by the Human: path-token match, `cd`/`pwd`/`git -C` read-only, `-m` commit prose ignored.
 
 ## P-0002 (cycle 6) — Allow `git rm` in `.claude/settings.json`
 File: `.claude/settings.json`, `permissions.allow`.
@@ -30,4 +30,4 @@ reversible (`git restore`), which is the real safety. Optionally `"Bash(rm *.DS_
 local OS junk.
 Risk if rejected: none to safety; tracked junk stays tracked. The Builder will not route around
 the denial with `mv`/`git update-index`.
-Human decision:
+Human decision: **accepted** (2026-10-11). Applied: `Bash(git rm *)`, `Bash(rm *.DS_Store)` allowed; `git rm -r*` denied.

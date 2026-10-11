@@ -28,15 +28,21 @@ while true; do
   esac
 
   ts="$(date +%Y%m%dT%H%M%S)"
-  echo "$(date +%F) $ts" >> "$FIRM_HOME/cycles.log"
-  echo "[$ts] cycle starting"
+  log="$FIRM_HOME/logs/cycle-$ts.json"
+  before="$(uv run --quiet python loop/preflight.py --last-cycle)"
+  echo "[$ts] cycle starting (last finished cycle: $before)"
   claude -p "$prompt" \
     --permission-mode acceptEdits \
     --max-turns "$(cfg builder.max_turns_per_cycle)" \
     --output-format json \
-    > "$FIRM_HOME/logs/cycle-$ts.json" 2>&1
+    > "$log" 2>&1
   echo "[$(date +%H:%M:%S)] cycle ended (exit $?)"
 
-  uv run --quiet python loop/preflight.py --post
+  uv run --quiet python loop/preflight.py --post "$before" "$log"
+  if [ $? -eq 30 ]; then
+    echo "[$(date +%H:%M:%S)] usage limit — sleeping 30 min before retrying"
+    sleep 1800
+    continue
+  fi
   sleep "$(cfg builder.cycle_sleep_seconds)"
 done
