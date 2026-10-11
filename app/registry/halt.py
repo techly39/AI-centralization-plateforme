@@ -1,9 +1,15 @@
 """Halt in physics (Constitution Art. 5, 03_WORLD §2).
 
-The Human halts the world by creating one file (``governance.halt_file`` in the
-settings, ``governance/HALT`` by default). Physics only reads it, on every
-request, so creating or deleting it takes effect on the next call — no restart,
-no cache.
+The Human halts the world by creating one file, ``governance/HALT`` at the repo
+root. The path is a constant, not a setting: Art. 5 names that file, and a path
+that ``config.yaml`` or a ``FUND_*`` variable could move would be a way around
+the halt. Physics only reads it, at the start of every request and every
+monitor sweep, so creating or deleting it takes effect on the next call — no
+restart, no cache. A request or sweep already past the check finishes ("the
+current tool call", Art. 5.2).
+
+Operator CLI commands (``fund-env seed-admin`` / ``create-pod`` / ``fund-pod``)
+are the Human's own hands, not agent requests, and are not gated.
 
 While halted:
 
@@ -24,9 +30,12 @@ from __future__ import annotations
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.config import REPO_ROOT
 from app.db.models import Agent
 from app.ledger.events import EVENT_HALT_REFUSED, append_event
+
+#: Tests point this at a temporary path (tests/conftest.py); nothing else may.
+HALT_FILE = REPO_ROOT / "governance" / "HALT"
 
 READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -38,7 +47,7 @@ HALTED_DETAIL = (
 
 
 def is_halted() -> bool:
-    return get_settings().governance.halt_file.exists()
+    return HALT_FILE.exists()
 
 
 def refuse_if_halted(request: Request, session: Session, agent: Agent) -> None:

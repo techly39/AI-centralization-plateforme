@@ -6,38 +6,33 @@ state-changing request from every agent is refused with 423 and a
 see the world), ``GET /halt`` says so, and the pending-order monitor fills
 nothing. Deleting the file resumes the world without a restart.
 
-The "every write" claim is checked against the app's own route table, not a
-hand-written list, so a write endpoint added later is covered the day it lands.
+The "every write" claim is checked against the app's own OpenAPI route table,
+not a hand-written list, so a write endpoint added later is covered the day it
+lands — for each of the analyst, PM and management roles. ``system`` has no API
+key in the tests and is not exercised over HTTP; the gate has no role branch.
+
+The ``halt_file`` fixture (tests/conftest.py, autouse) points physics at a temp
+path for every test, so the real halt file never leaks into the suite.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
-from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
 
-from app.config import get_settings
+from app.config import REPO_ROOT, Settings
 from app.db.models import AgentRole, Event, Message, Order, OrderStatus
 from app.ledger.events import EVENT_HALT_REFUSED
 from app.main import create_app
 from app.oms.monitor import check_pending_orders
 from app.registry.halt import is_halted
 from app.registry.permissions import Action, has_permission
+from tests.conftest import REAL_HALT_FILE
 
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
-
-
-@pytest.fixture
-def halt_file(tmp_path: Path) -> Iterator[Path]:
-    """Point physics at a HALT file the test owns (absent until created)."""
-    cfg = get_settings().governance
-    previous = cfg.halt_file
-    cfg.halt_file = tmp_path / "HALT"
-    yield cfg.halt_file
-    cfg.halt_file = previous
+ROLES = ["analyst", "pm", "management"]
 
 
 def _write_routes() -> list[tuple[str, str]]:
@@ -59,6 +54,12 @@ def _count(db, model, *where) -> int:
     return db.scalar(select(func.count()).select_from(model).where(*where))
 
 
+def _agent(agent_factory, make_pod, role: str, suffix: str) -> str:
+    pod_id = make_pod(1)
+    _, key = agent_factory(f"{role}-{suffix}", role, pod_id if role != "management" else None)
+    return key
+
+
 def test_the_write_surface_is_not_empty():
     # Guards the parametrised test below against silently testing nothing.
     assert {("POST", "/orders"), ("POST", "/messages"), ("DELETE", "/orders/{order_id}")} <= set(
@@ -66,15 +67,15 @@ def test_the_write_surface_is_not_empty():
     )
 
 
-def test_a_relative_halt_path_is_anchored_at_the_repo_root_not_the_cwd():
-    from app.config import REPO_ROOT, GovernanceConfig
-
-    assert GovernanceConfig().halt_file == REPO_ROOT / "governance" / "HALT"
-    assert GovernanceConfig(halt_file="governance/HALT").halt_file == REPO_ROOT / "governance" / "HALT"
-    assert GovernanceConfig(halt_file="/tmp/X").halt_file == Path("/tmp/X")
+def test_the_halt_path_is_the_constitutions_file_and_no_setting_moves_it():
+    # Art. 5 names one file. A config.yaml key or FUND_* variable that moved it
+    # would be a way around the halt (auditor BLOCK, cycle 11).
+    assert REAL_HALT_FILE == REPO_ROOT / "governance" / "HALT"
+    assert not any("halt" in name or "governance" in name for name in Settings.model_fields)
 
 
 def test_halt_is_off_without_the_file(client, admin_key, halt_file):
+    assert not halt_file.exists()
     assert not is_halted()
     resp = client.get("/halt", headers={"X-API-Key": admin_key})
     assert resp.status_code == 200
@@ -86,50 +87,33 @@ def test_every_role_may_read_the_halt_state():
         assert has_permission(role, Action.READ_HALT), role
 
 
-@pytest.mark.parametrize("role", ["analyst", "pm", "management"])
+@pytest.mark.parametrize("role", ROLES)
 def test_get_halt_reports_halted_to_every_role(
     client, agent_factory, make_pod, halt_file, role
 ):
-    pod_id = make_pod(1)
-    _, key = agent_factory(f"{role}-x", role, pod_id if role != "management" else None)
+    key = _agent(agent_factory, make_pod, role, "x")
     halt_file.write_text("stop\n")
     resp = client.get("/halt", headers={"X-API-Key": key})
     assert resp.status_code == 200
     assert resp.json() == {"halted": True}
 
 
+@pytest.mark.parametrize("role", ROLES)
 @pytest.mark.parametrize(("method", "path"), _write_routes())
-def test_every_write_route_is_refused_while_halted(
-    client, admin_key, db, halt_file, method, path
+def test_every_write_route_is_refused_while_halted_for_every_role(
+    client, agent_factory, make_pod, db, halt_file, method, path, role
 ):
+    key = _agent(agent_factory, make_pod, role, "r")
     halt_file.write_text("")  # an empty file halts too: existence is the switch
     before = db.scalar(select(func.max(Event.id))) or 0
-    resp = client.request(
-        method, _concrete(path), headers={"X-API-Key": admin_key}, json={}
-    )
+    resp = client.request(method, _concrete(path), headers={"X-API-Key": key}, json={})
     assert resp.status_code == 423, resp.text
     assert "halted" in resp.json()["detail"].lower()
     db.expire_all()
     events = db.scalars(select(Event).where(Event.id > before)).all()
-    refused = [e for e in events if e.type == EVENT_HALT_REFUSED]
-    assert len(refused) == 1
-    assert refused[0].payload_json["method"] == method
-    assert refused[0].payload_json["path"] == _concrete(path)
-    assert refused[0].payload_json["role"] == "management"
     # The refusal is the only thing that happened.
     assert [e.type for e in events] == [EVENT_HALT_REFUSED]
-
-
-@pytest.mark.parametrize("role", ["analyst", "pm", "management"])
-def test_no_role_outranks_the_halt(client, agent_factory, make_pod, db, halt_file, role):
-    # A universal write (self-report) so the role matrix cannot be what refuses it.
-    pod_id = make_pod(1)
-    _, key = agent_factory(f"{role}-w", role, pod_id if role != "management" else None)
-    halt_file.touch()
-    resp = client.post("/tasks/start", headers={"X-API-Key": key}, json={"subject": "s"})
-    assert resp.status_code == 423, resp.text
-    event = db.scalars(select(Event).where(Event.type == EVENT_HALT_REFUSED)).one()
-    assert event.payload_json["role"] == role
+    assert events[0].payload_json == {"method": method, "path": _concrete(path), "role": role}
 
 
 def test_a_halted_pm_cannot_trade_and_nothing_changes(client, desk, db, halt_file):
@@ -166,6 +150,8 @@ def test_unauthenticated_write_while_halted_is_still_401(client, halt_file, db):
 
 
 def test_pending_monitor_fills_nothing_while_halted(client, desk, db, prices, halt_file):
+    # The monitor checks the halt itself (it is not behind the API gate): this
+    # test catches a mutation of that check, not of the auth gate.
     _, _, pm_key = desk
     order = {
         "ticker": "AAPL",

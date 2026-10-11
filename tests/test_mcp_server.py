@@ -305,15 +305,11 @@ async def test_a_rejected_order_is_a_result_not_a_tool_failure(
 
 @pytest.mark.anyio
 async def test_a_halted_world_tells_the_agent_why(
-    mcp_client_factory, admin_key, make_pod, fund_pod_cash, monkeypatch, tmp_path
+    mcp_client_factory, admin_key, make_pod, fund_pod_cash, halt_file
 ):
     """A halt is a tool failure the agent can read, and ``get_halt`` explains it."""
-    from app.config import get_settings
-
     pod_id = make_pod(1)
     fund_pod_cash(pod_id, 100_000.0)
-    halt_file = tmp_path / "HALT"
-    monkeypatch.setattr(get_settings().governance, "halt_file", halt_file)
 
     async with mcp_client_factory(admin_key) as admin_conn:
         pm = await call(

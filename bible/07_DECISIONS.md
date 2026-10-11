@@ -209,14 +209,20 @@ Answer from the future: **existence of the file is the switch** (an empty file h
 every request — no cache, no restart; lifting the halt is deleting the file. The gate is one call
 in `app.registry.auth.get_current_agent`, which every endpoint except `/health` depends on: any
 method other than GET/HEAD/OPTIONS from any authenticated agent — **every role, management and
-`system` included** (the gate has no role branch; analyst, PM and management are tested over
-HTTP, `system` is not — it has no API key in the tests) — gets **423 Locked** and one `halt_refused` event `{method, path, role}`.
+`system` included** (the gate has no role branch; analyst, PM and management are tested on
+every write route, `system` is not — it has no API key in the tests) — gets **423 Locked** and one `halt_refused` event `{method, path, role}`.
 Unauthenticated requests stay 401 and log nothing (no identity to attribute). Reads keep working:
 a halted world must stay observable. `check_pending_orders` fills nothing while halted, so both
 of its triggers (live scheduler, future `/clock/advance`) obey. `GET /halt` → `{halted}` is a
-universal action (`READ_HALT`), MCP tool `get_halt`. The path is `governance.halt_file` in
-settings (default: `governance/HALT` under the repo root; a relative override is anchored at the
-repo root, not the cwd).
+universal action (`READ_HALT`), MCP tool `get_halt`. The path is a **constant**
+(`app.registry.halt.HALT_FILE` = `governance/HALT` under the repo root), not a setting: Art. 5
+names that file, and a `config.yaml` key or `FUND_*` variable that moved it would be a route
+around the halt (auditor BLOCK, cycle 11 — the first draft had a setting). Tests repoint the
+constant through an autouse fixture, so the real file never leaks into the suite. The check runs
+once at the start of each request and each monitor sweep; a request or sweep already past it
+finishes ("the current tool call", Art. 5.2). Operator CLI commands (`seed-admin`, `create-pod`,
+`fund-pod`) are the Human's own hands, not agent requests, and are not gated. Halt start/end are
+not ledger events (the file is the Human's; see IDEAS).
 Alternatives rejected: a per-router dependency (a new router could forget it — the auth
 dependency cannot be dropped without losing auth); exempting management/`system` (the halt is the
 Human's, nothing in the firm outranks it); 503 (says "broken"; the world is deliberately stopped —

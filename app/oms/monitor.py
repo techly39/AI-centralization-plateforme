@@ -31,13 +31,13 @@ from app.clock import get_clock
 from app.db.models import Order, OrderSide, OrderStatus, PriceType
 from app.marketdata import MarketDataError, MarketDataProvider, get_provider
 from app.oms.errors import OrderRejected
-from app.registry.halt import is_halted
 from app.oms.service import (
     OMS_LOCK,
     assert_affordable,
     execute_fill,
     record_rejection,
 )
+from app.registry.halt import is_halted
 
 
 @dataclass

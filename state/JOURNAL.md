@@ -310,3 +310,5 @@ uses (`get_current_agent`), then a test generated from the OpenAPI schema shows 
 (8 today) refused with 423 + exactly one `halt_refused` event for every role, reads keep working,
 the pending monitor fills nothing, and deleting the file resumes the world — with no existing
 test changed. A mutation that disables the gate must turn every one of those tests red.
+*(Audit correction: as first written the test ran every route for management only, and the
+monitor test catches a mutation of the monitor's own check, not of the API gate. Fixed below.)*
