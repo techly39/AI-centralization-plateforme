@@ -7,7 +7,8 @@ OMS testable without touching the network.
 
 Two rules every implementation must honour:
 
-1. **Time is injected.** Callers pass ``as_of`` (always ``clock.now()``); the
+1. **Time is injected.** Callers pass ``as_of`` (always ``ledger_now(session)``,
+   ADR-029); the
    provider must never read the system clock to decide what "now" is.
 2. **No look-ahead** (ADR-028, B-005). Nothing known only after ``as_of`` is
    served: a bar is visible once it has *ended* (:func:`bar_end`), not once it

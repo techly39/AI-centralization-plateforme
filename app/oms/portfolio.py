@@ -19,11 +19,11 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.clock import get_clock
 from app.db.models import Position
+from app.ledger.events import ledger_now
 from app.marketdata import MarketDataError, MarketDataProvider, get_provider
 from app.oms.money import round_money
-from app.oms.service import get_cash
+from app.oms.service import OMS_LOCK, get_cash
 
 
 @dataclass(slots=True)
@@ -60,46 +60,56 @@ def build_portfolio(
     *,
     pod_id: int,
     provider: MarketDataProvider | None = None,
+    now: datetime | None = None,
 ) -> PortfolioView:
-    """Positions + cash + unrealised P&L for one pod, valued at clock-now."""
-    provider = provider or get_provider()
-    now = get_clock().now()
+    """Positions + cash + unrealised P&L for one pod, valued at the ledger's now.
 
-    rows = (
-        session.execute(
-            select(Position)
-            .where(Position.pod_id == pod_id)
-            .order_by(Position.ticker)
-        )
-        .scalars()
-        .all()
-    )
+    ``now`` lets a caller valuing several things at one moment (pod metrics, the
+    leaderboard) pass the moment it reports, instead of a second read that an
+    advance could land between (red-team 0009).
+    """
+    provider = provider or get_provider()
+    if now is None:
+        now = ledger_now(session)
+
+    # The book at one moment: positions and cash read together under OMS_LOCK
+    # (every fill writes both under it), then priced outside it — a fill landing
+    # mid-pricing must not be counted as shares *and* as proceeds (red-team 0009).
+    with OMS_LOCK:
+        held = [
+            (row.ticker, row.qty, row.avg_cost)
+            for row in session.execute(
+                select(Position)
+                .where(Position.pod_id == pod_id)
+                .order_by(Position.ticker)
+            ).scalars()
+        ]
+        cash = round_money(get_cash(session, pod_id))
 
     views: list[PositionView] = []
     pricing_errors: list[str] = []
     positions_value = 0.0
     unrealized = 0.0
 
-    for row in rows:
+    for ticker, qty, avg_cost in held:
         view = PositionView(
-            ticker=row.ticker,
-            qty=row.qty,
-            avg_cost=round_money(row.avg_cost),
-            cost_basis=round_money(row.qty * row.avg_cost),
+            ticker=ticker,
+            qty=qty,
+            avg_cost=round_money(avg_cost),
+            cost_basis=round_money(qty * avg_cost),
         )
         try:
-            price = provider.get_price(row.ticker, as_of=now).price
+            price = provider.get_price(ticker, as_of=now).price
         except MarketDataError:
-            pricing_errors.append(row.ticker)
+            pricing_errors.append(ticker)
         else:
             view.last_price = price
-            view.market_value = round_money(row.qty * price)
-            view.unrealized_pnl = round_money(row.qty * (price - row.avg_cost))
+            view.market_value = round_money(qty * price)
+            view.unrealized_pnl = round_money(qty * (price - avg_cost))
             positions_value += view.market_value
             unrealized += view.unrealized_pnl
         views.append(view)
 
-    cash = round_money(get_cash(session, pod_id))
     return PortfolioView(
         pod_id=pod_id,
         as_of=now,

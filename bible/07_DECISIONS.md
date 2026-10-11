@@ -514,3 +514,51 @@ the feed's inclusive window. Tests corrected, each with its reason: the look-ahe
 returned its daily frame for every interval (Yahoo never does); the one-lookup-per-sweep test
 counted by replacing `get_price` on an instance, now refused — it counts `_quote`. Mutations: each
 of the 9 fixes reverted alone turns its test red.
+
+## ADR-029 — One "now" for physics: every reader of time reads the ledger's now   (builder, cycle 17) — accepted
+Question: ADR-026 made `GET /clock` answer `ledger_now` (`max(clock, latest stamp)`), and ADR-025
+stamps every event with it. But the quote route, the OHLCV defaults, the portfolio valuation, pod
+metrics, the leaderboard's `as_of`, the OMS reference price and the pending-order sweep still read
+the raw clock. After a clock step back an agent was told 10 June, shown 4 June's close and stamped
+10 June — a market order filled at a price from a moment its own stamp says had passed. Which "now"
+does physics answer with?
+Answer from the future: **one: `ledger_now(session)`.** Every physics reader of time uses it; the
+raw clock is read only where an allowlist in `tests/test_one_now.py` names the file, the exact
+number of reads and the reason (the clocks; `append_event`/`ledger_now`, whose floor is applied in
+SQL; the backtest controller; yfinance's 60 s live window; the CLI's start line; the request log).
+A "read" is any spelling the AST shows: `.now`/`.utcnow`/`.today` called or not, `getattr(x,
+"now")`, anything off the `time` module, `wall_now`. The row-stamp sites of B-028 are listed as
+debt and leave the list when B-028 copies `event.ts`; a count above or below the list is red.
+Why: (1) **Honest measurement** — price, valuation and stamp of one act must be one moment, or
+P&L is measured across a gap nobody chose. (2) **Safer seal** — a law pinned by an AST test, not
+by review: a new `.now()` in physics is red until someone argues for it. (3) Deterministic and
+small: in a backtest and in an un-stepped live run `ledger_now == clock.now()`, so nothing changes
+there; it differs only after a step back (live, B-029) or a test's frozen clock. (4) Reuse — the
+function already existed (ADR-026). Cost: one indexed `max(ts)` read per quote/valuation.
+Not done: B-028 row stamps (allowlisted); the OMS still fetches the live price *before* `OMS_LOCK`
+in live mode (B-030 note) — unchanged here, only its `now` moved.
+Evidence: `tests/test_one_now.py` — ledger on 10 June, clock stepped back to 5 June: `/price`,
+`/ohlcv` defaults, `/portfolio`, `/metrics/pod`, `/metrics/leaderboard`, a market fill and the sweep
+(a 106 limit the stale 104 would fill stays pending at 109) all answer at 10 June; each was red
+before. Red-team 0007's sweep spy moved from `monitor.get_clock` to `monitor.ledger_now` (the same
+read; the property — fill price at the stamp's moment — unchanged).
+**Amendment (cycle 17, red-team 0009 — 6 findings; 4 fixed + detector widened, 1 open).** "One now"
+is not only *which* now but *how many reads* of it one answer takes, and *when the now becomes
+visible*. (a) **Medium — a failed advance had shown its prices:** `advance` moved the process clock
+before `clock_advanced` committed; lock-free reads (`/clock`, `/price`) answered at the new now, and
+a failed commit took the day back after an agent had seen it. Now the event is stamped `at=end`
+(`append_event(..., at=)`, still under the floor; only the advance uses it) and committed first;
+the clock moves after. (b) **Low ×2 — two reads of now in one report:** pod metrics and the
+leaderboard read now once and pass it down (`build_portfolio(now=)`, `compute_pod_metrics(now=)`,
+`compute_leaderboard(now=)`). (c) **Low — a book counted twice:** `build_portfolio` read positions,
+priced them (network), then read cash; a fill in between was counted as shares and proceeds. Now
+positions and cash are read first, together, under `OMS_LOCK`, then priced. The test pins the order
+of reads; the lock (cross-thread) is defence-in-depth, untested like B-000b. (d) **Low — detector:**
+also sees `import time` under any name, `from time import …`, imported/attribute `wall_now`, `_now`,
+`current_timestamp`, computed `getattr`, `methodcaller`. Per-file counts cannot tell a diagnostic
+read from a physics one swapped for it — review's job. **Open (B-036, 2 strict xfails):** `OMS_LOCK`
+is a per-process lock; an advance committed by a second process between the in-lock read of now and
+the fill's INSERT prices a fill at the old now and stamps it at the new. The TRD runs one process;
+the operator CLI (`check-orders`) is the second. Fix candidates: compare the event's stamp with the
+priced now after the flush and roll back on mismatch, or `BEGIN IMMEDIATE` before the read.
+Mutations: advance's clock moved before the commit → (a) red; cash read after pricing → (c) red.

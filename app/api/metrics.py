@@ -17,9 +17,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.schemas import IdPath, LeaderboardOut, LeaderboardRowOut, PodMetricsOut
-from app.clock import get_clock
 from app.db.base import get_session
 from app.db.models import Agent, Pod
+from app.ledger.events import ledger_now
 from app.metrics.service import PodMetrics, compute_leaderboard, compute_pod_metrics
 from app.registry.auth import require
 from app.registry.permissions import Action
@@ -62,5 +62,7 @@ def read_leaderboard(
     session: Session = Depends(get_session),
 ) -> LeaderboardOut:
     """Every pod ranked by cost-adjusted P&L — profit net of what it cost to run."""
-    rows = [_row(m) for m in compute_leaderboard(session)]
-    return LeaderboardOut(as_of=get_clock().now(), rows=rows)
+    # One now, read first: the rows are valued at the moment as_of reports.
+    now = ledger_now(session)
+    rows = [_row(m) for m in compute_leaderboard(session, now=now)]
+    return LeaderboardOut(as_of=now, rows=rows)
