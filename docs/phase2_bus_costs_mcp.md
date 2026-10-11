@@ -136,8 +136,12 @@ already followed.
 
 ### The MCP server is a client, not a second implementation
 
-`mcp_server/` makes ordinary HTTP calls with an ordinary API key. It imports
-nothing from `app` except the settings object. That is why the tool list is
+`mcp_server/` makes ordinary HTTP calls with an ordinary API key. It was
+written to import nothing from `app` except the settings object; since cycle 2
+it also imports `MAX_TOKENS_PER_REPORT` from `app.metrics.reporting`, which
+loads most of `app` (SURVEY §4a.9 — the dependency-law test B-002 will decide
+where that constant lives). Either way it never calls physics in-process: every
+action is an HTTP request. That is why the tool list is
 identical for an analyst and for management: **permissions are the API's job**,
 and an analyst calling `place_order` gets the API's own 403 text back. Filtering
 the tool list per role would create a second permission model to keep in sync.

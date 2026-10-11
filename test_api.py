@@ -1,4 +1,6 @@
 #this is a file created by the user to test the api system by himself. It is in no case a viable test, it's only to try.
+import os
+
 import requests
 
 # Root of the API. The endpoints (/agents, /clock, /health) hang directly off
@@ -6,8 +8,10 @@ import requests
 # not put it here, or every request 404s.
 BASE_URL = "http://127.0.0.1:8000"
 
-# Replace this with the management/admin key provided by your dev or found in config.yaml
-API_KEY = "fk_ebrsBBkgP0cRzT57UokxfOxq9dXHMLDSxhlM2AQN85M"
+# Your management key, from the environment: `export FUND_API_KEY=fk_...`.
+# Never write a key into this file — it is tracked by git (Builder, cycle 6:
+# the key that used to sit here is still in history; see state/QUESTIONS.md Q-0003).
+API_KEY = os.environ.get("FUND_API_KEY", "")
 
 # The TRD specifies static API keys per agent but doesn't dictate the exact header name. 
 # "X-API-Key" is standard, but you might need to change it to "Authorization": f"Bearer {API_KEY}" 

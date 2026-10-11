@@ -188,8 +188,17 @@ app/
   metrics/        cost/task reporting, equity curve, performance stats, leaderboard
   api/            routers, one file per domain
 mcp_server/       MCP wrapper over the API — one tool per endpoint
-ui/               server-rendered UI (Phase 4)
+migrations/       Alembic schema migrations
 docs/             design notes (oms_migration.md, phase2_bus_costs_mcp.md)
+scripts/          clients and probes run with `uv run python` (see scripts/README.md)
 legacy/           the pre-Phase-1 file-based OMS, kept for reference only
 tests/
+bible/            the project's law and roadmap (start at CLAUDE.md)
+state/            the Builder's working memory: STATE, JOURNAL, BACKLOG, SURVEY, ...
+governance/       the Human's controls (HALT, budgets) — protected
+loop/             the headless Builder runner — protected
+experiments/      one directory per experiment: spec + results
+.claude/          the Builder's commands, subagents and guard hook
 ```
+
+The read-only UI (TRD Phase 4) does not exist yet.
