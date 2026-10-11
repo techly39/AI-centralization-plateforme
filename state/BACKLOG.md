@@ -26,6 +26,8 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-000j** Decide whether `state/loop_status.json` is tracked (runner state) — auditor note.
 - [ ] **B-000k** Costs from pod-less agents (management) appear on no leaderboard → firm-level spend.
 - [ ] **B-000l** MCP API base URL must be loopback (conformance check for Era I).
+- [ ] **B-022** Secret-scan test: no tracked file contains an `fk_…` key, an OpenRouter
+      `sk-or-…` key or another credential pattern (SURVEY §4b.1). Before any firm agent holds a key.
 
 ## Era ½ — The Survey (first run: clean and understand — NO features)
 - [x] **S-001** Toolchain + run check — cycle 3: SURVEY §1; `scripts/smoke_run.py` 12/12 PASS.
@@ -35,11 +37,15 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
       Remaining .gitignore gap → B-000i.
 - [x] **S-003a** Repo survey, physics: `app/`, `mcp_server/`, `migrations/` — cycle 4: SURVEY §2a–8,
       9 findings (P1–P9 via `scripts/survey_probe_physics.py`) → B-016…B-021, B-000d/B-002/B-005 widened.
-- [ ] **S-003b** Repo survey, the rest: `tests/`, `scripts/`, `docs/`, `legacy/`, root files; map to
-      TRD + Bible; odd files (`test_api.py` at root, empty `ui/`, `.DS_Store`, `legacy/`).
-      Auditor already spotted: `legacy/oms_poc/Logs/oms.log`, `legacy/oms_poc/Processed orders/*.json`,
-      `.vscode/settings.json` tracked. Also: 03_WORLD §2 says "218 tests" (now 267+9) → S-006.
+- [x] **S-003b** Repo survey, the rest — cycle 5: SURVEY §2b/§4b/§5b (R1–R4 via
+      `scripts/survey_probe_repo.py`); committed live management key found (§4b.1, Q-0003).
 - [ ] **S-004** Cleanup commits (deletions/moves/renames/doc fixes only, each with a reason).
+      Concrete list (SURVEY §2b table, §4b.5): `git rm test_api.py` (hard-coded key; not
+      collected); untrack `.vscode/settings.json` + ignore `.vscode/`; delete local empty `ui/`
+      and `.DS_Store` ×2; README Layout (add `bible/ state/ governance/ loop/ scripts/
+      experiments/`, drop `ui/`); `docs/phase2_bus_costs_mcp.md:139-140` (MCP imports more than
+      settings since cycle 2). Keep `legacy/` (archive; POC location lead for S-005).
+      "218 tests" in `03_WORLD`/`05_ERAS` → S-006.
 - [ ] **S-005** OpenClaw survey per `bible/08_OPENCLAW.md` §1–2: back up `~/.openclaw` to
       `~/firm-openclaw-backups/`, `openclaw --version`, read that version's docs, write
       `runtime/openclaw/VERSION_NOTES.md`, list agents/bindings/models (no secrets), inventory
@@ -65,9 +71,11 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-020** Clock vs agents: MCP `get_clock` tells all agents to use it; PM/analyst get 403
       (P7) — and TRD §7 says `/clock` is system/management only. Decide by ADR: widen the read
       (agents need the simulated date in backtests) or fix the tool docstring. Before B-004.
+      `test_clock_forbidden_for_analyst` changes only with that ADR as its reason (§4b.4).
 - [ ] **B-005** TRD Phase 3b: look-ahead guard on every market-data route + red-team pass.
       Must filter bars by their **end** time (a daily bar stamped 00:00 carries that day's close,
-      SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3).
+      SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3). Fix the test double
+      `tests/support.py` `HistoricalProvider` the same way (§4b.3), or the suite certifies the leak.
 - [ ] **B-006** TRD Phase 3c: `POST /allocations`, meeting schedule + package endpoints.
       `fund_pod` (to be reused) validates nothing: add finite `delta`, no withdrawal beyond cash.
 - [ ] **B-017** Sharpe annualisation: equity curve is per calendar day, `annualise` uses √252 →
@@ -77,6 +85,7 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [ ] **B-018** Decide rebuild scope: pod creation + `system` agent write no event (P2);
       `pods.current_allocation`, `allocations`, `orders`, `messages`, `costs`, `tasks`, `agents`
       are not rebuilt. ADR: which tables are derived, which are records; before Era II generations.
+      `conftest.make_pod` inserts pods directly with the system clock — update it with the ADR.
 - [ ] **B-021** `GET /tasks` + `GET /costs` (own; cross-pod for management) + MCP tools —
       `list_tasks`/`list_costs` exist unused; a restarted agent cannot find its open task ids.
 - [ ] **B-007** World events table + `system` announcements (law changes, Truman events).
