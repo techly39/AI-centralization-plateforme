@@ -131,3 +131,19 @@ Alternatives rejected: firm agents in the Human's config with per-agent deny lis
 globals, every change touches the Human's file); a second OpenClaw install (more to pin, no gain).
 Open: whether a second profile needs its own Gateway process/port for `openclaw agent`, or
 whether the Runtime wakes agents with `--local`; settle it in B-012 with a dry run.
+
+## ADR-020 — Survey corrections annotate the Bible, they do not rewrite it   (builder, cycle 8) — accepted
+Where the Survey measured a living-book claim as false (05_ERAS §6 "Bible correction"), the
+original sentence stays and a dated correction pointing to its evidence (SURVEY section,
+VERSION_NOTES, ADR, backlog id) is added next to it, or the instruction is changed with the
+reason inline. Corrected in cycle 8: test counts (03 §2, 05 Era 0), physics known holes (03 §2),
+"chat restricted" lead (04 §11), OpenClaw docs-vs-installed, `doctor` may migrate, global-only
+seal keys, backups born private, firm profile (08 §1–2, 05 Era ½ exit criterion). Why: the
+books are also history — a reader should see what was believed and what was measured
+(honest measurement, Art. 9) — and only evidenced claims are touched, so a correction never
+smuggles in a new rule. Protected books (00, 01): read, nothing version- or count-specific to
+correct, so no proposal. Alternative rejected: silent rewrite (loses what the Human believed).
+Amended after audit (cycle 8): ADR-019 and SURVEY §9 listed `tools.profile` as global-only;
+the installed schema has a per-agent override (`agents.list[].tools.profile`). ADR-019 stands
+(mcp, web, sessions and agentToAgent are global). The docs' `agentToAgent` default-on is not
+counted as a measured loosening: the installed schema states no default.

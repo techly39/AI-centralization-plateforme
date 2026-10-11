@@ -179,3 +179,14 @@ about the list, not the disk: a negative needs a second, independent detector (n
 (3) My own artifacts carry risk too: a backup of a credentials dir must be born private
 (`umask 077`), because fixing permissions later may not be allowed.
 Next: S-006 Bible corrections → S-007 close Era ½ → Era I: B-016 + B-020, then B-004.
+
+## Cycle 0008 — Bible corrections (S-006) (2026-10-11)
+Era: ½ — The Survey
+Exit criterion served: "correct the Bible where it is wrong" — every Bible claim the Survey
+(SURVEY §2a/§2b/§9, VERSION_NOTES) measured as false is corrected in the living books, or
+proposed in `state/PROPOSALS.md` if it sits in a protected book.
+Hypothesis: If I correct only claims that have Survey evidence behind them (test counts,
+OpenClaw version/doctor/backup facts, the "chat restricted" lead, the physics' known time
+weaknesses) and point each correction to its evidence, the books stop contradicting the
+measured world without me inventing new rules — and no protected book needs a proposal,
+because 00/01 make no version- or count-specific claims.

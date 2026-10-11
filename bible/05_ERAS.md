@@ -30,7 +30,11 @@ Era boundary, writes `state/ERA_REVIEW.md`, and waits. If `false`, it continues.
 ## Era 0 — Foundation ✅ (done before the Bible)
 
 TRD Phases 0–2: skeleton, ledger, registry, auth, permissions, OMS, market data, bus,
-costs, metrics, MCP. 218 tests green. **Phase 2 is uncommitted in git.**
+costs, metrics, MCP. 218 tests green at Bible writing. ~~Phase 2 is uncommitted in git.~~
+*(Survey correction, cycle 8: Phase 2 committed in cycle 1; at the Survey the suite was
+276 collected = 267 passed + 9 strict xfails, the xfails being open red-team holes —
+`state/SURVEY.md` §2b. The Phase 2 milestone was met by a hand-written script, not an agent
+(§4b.2).)*
 
 ---
 
@@ -71,7 +75,8 @@ Exit criteria:
 - [ ] Phase 2 committed; `main` green; pushed.
 - [ ] Repo clean: no junk files, every odd file resolved or explained.
 - [ ] `~/.openclaw` backed up; `runtime/openclaw/VERSION_NOTES.md` written from the
-      installed version's docs.
+      installed version's own schema (`openclaw config schema`) — the online docs only
+      describe the latest release (cycle 8 correction, `08_OPENCLAW.md` §1).
 - [ ] Backlog re-ordered from the survey's findings.
 
 ---

@@ -177,7 +177,7 @@ Per pod, per agent, per generation:
 | "2% [manager only bought, ?]" | Timing/selection component in attribution (§10). |
 | "From what capital the strategy [kills itself]" | Capacity: capital at which market impact eats the alpha (§4). |
 | "Different degrees of [noise]" | Truman noise level on data packs (`03_WORLD.md` §5). |
-| "Chat seems restricted to the central pod" | Bus supports agent/pod/broadcast addressing since Phase 2. Verify with a live multi-pod test in Era I; if real, it is a physics bug. |
+| "Chat seems restricted to the central pod" | Bus supports agent/pod/broadcast addressing since Phase 2; the Survey found no such restriction in physics (SURVEY §2a). Lead (SURVEY §9): OpenClaw itself — cross-agent `sessions_spawn` needs `subagents.allowAgents` (default: same agent only) and session visibility defaults to `tree`. Verify with a two-pod test in Era I (B-014). |
 | "Agent can't know who he is" | Solved: `GET /me` / `whoami` (Phase 2). |
 | "No command for last n messages" | Solved: `latest=true&limit=n`, `before_id` (Phase 2). |
 | "Stay with app × OpenClaw or own architecture?" | Hybrid — ADR-001. |

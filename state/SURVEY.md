@@ -311,8 +311,9 @@ Backup first: `~/firm-openclaw-backups/20261011T0129Z-cycle0007.tar.gz` (4 107/4
 - **Docs ≠ installed version.** docs.openclaw.ai is the latest (≥ 2026.9): roster key
   `agents.entries` there, `agents.list` here; sessions visibility default `all` there, `tree`
   here. An upgrade can widen what an agent reads → never rely on defaults (B-023).
-- **Seal keys that are global only:** `tools.web`, `tools.profile`, `tools.sessions`,
-  `tools.agentToAgent`, `mcp.servers` (no per-agent MCP). → ADR-019: firm in its own profile.
+- **Seal keys that are global only:** `tools.web`, `tools.sessions`, `tools.agentToAgent`,
+  `mcp.servers` (no per-agent MCP). → ADR-019: firm in its own profile. *(Cycle 8 correction:
+  `tools.profile` was listed here too, but it has a per-agent override; ADR-019 still holds.)*
 - **The Human's setup** (4 agents: `main`, `rachel`/Orchestrator, `pm`, `analyst`; 2 Telegram
   bindings; 0 MCP servers): no agent has `tools` or `sandbox`; web search + fetch on for all;
   OCT workspaces nested inside `main`'s; `pm`/`analyst` have empty auth profiles (read-through
