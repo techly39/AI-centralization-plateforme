@@ -53,11 +53,13 @@ Each red-team hole has a strict-xfail test in `tests/test_redteam_0001.py`; fix 
 - [x] **S-005** OpenClaw survey — cycle 7: backup `20261011T0129Z-cycle0007.tar.gz`;
       `runtime/openclaw/VERSION_NOTES.md`; SURVEY §9; `scripts/survey_probe_openclaw.py` O1–O6;
       ADR-019 (firm profile). Nothing changed in OpenClaw. `doctor` deliberately not run.
-- [ ] **S-006** Correct the Bible where reality differs (living books + PROPOSALS for protected).
-      From cycle 7: 08 §1 — the online docs are the latest version, not the installed one;
-      `doctor` without `--fix` may still migrate. 08 §2 — backups born private (`umask 077`
-      or `openclaw backup`); firm profile (ADR-019).
-- [ ] **S-007** Write `state/SURVEY.md`; seed `state/IDEAS.md`; re-order this backlog.
+- [x] **S-006** Bible corrections — cycle 8: 03 §2, 04 §11, 05 Era 0/½, 08 §1/§2/§5; ADR-020
+      (annotate, never rewrite); 00/01 need no proposal. Also fixed cycle 7's `tools.profile`
+      "global only" error in VERSION_NOTES + SURVEY §9 (auditor).
+- [ ] **S-007** Close Era ½: `state/SURVEY.md` complete per 05 Era ½ deliverable 7; seed
+      `state/IDEAS.md`; re-order this backlog; tick the exit criteria with evidence; say the
+      VERSION_NOTES criterion was reworded during its own Era (cycle 8, auditor note 8);
+      S-004b + `git --version` (S-001) as known residue if P-0002 is open.
 
 ## Era I — The Desk
 - [ ] **B-002** `tests/test_boundaries.py`: dependency law from `bible/03_WORLD.md` §1;

@@ -54,3 +54,10 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   to wake any firm agent when the live schema's seal subset differs, until the Builder re-reads,
   updates VERSION_NOTES and re-runs conformance — question: can "OpenClaw upgraded under us"
   become a detected world event instead of a silent change of physics? — status: new
+
+- [cycle 8] **Claim provenance tags** — every factual sentence in the Bible/SURVEY carries a tag:
+  `measured(<probe id>)`, `docs(<url>)`, `inferred`, `unverified`. A small script lists untagged
+  claims and claims whose probe no longer reproduces. Cycle 8 promoted a docs claim and a
+  mis-summarised schema fact to "measured"; a tag would have made both visible — question: can
+  the Builder's own documentation be held to the same honest-measurement standard as the firm's
+  results? — status: new

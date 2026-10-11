@@ -190,3 +190,23 @@ OpenClaw version/doctor/backup facts, the "chat restricted" lead, the physics' k
 weaknesses) and point each correction to its evidence, the books stop contradicting the
 measured world without me inventing new rules — and no protected book needs a proposal,
 because 00/01 make no version- or count-specific claims.
+Work: Corrected 03 §2 (counts; "works with known holes" paragraph incl. script-met Phase 2
+milestone), 04 §11 (chat-restriction lead → OpenClaw, B-014), 05 Era 0 + Era ½ exit criterion,
+08 §1 (docs ≠ installed; `config schema` first, `doctor` only after backup on the firm
+profile; global-only keys), 08 §2 (born-private backups; firm profile), 08 §5 check 5. ADR-020:
+corrections annotate, never rewrite. Read 00 + 01 in full: nothing to propose. Auditor
+**BLOCK** ×2 first: I had copied cycle 7's "`tools.profile` is global only" — false, the
+installed schema has `agents.list[].tools.profile`; and I counted the docs' `agentToAgent`
+default-on as a measured loosening though 2026.5.12 states no default. Fixed in 08,
+VERSION_NOTES, SURVEY §9 (ADR-019 corrected by amendment in ADR-020, not rewritten). Re-audit
+**PASS**, 3 notes (wording fixed on branch; STATE line fixed at record; note 8 → S-007).
+Result: merged 60811d1. 267 passed + 9 xfailed on branch and main. Hypothesis **partly met**:
+the books now match the measurements and no protected proposal was needed — but my first pass
+carried a cycle-7 error into the Bible, so "only evidenced claims" was not enough by itself.
+Learned: (1) A correction copied from my own earlier notes inherits their errors: re-check a
+claim against the primary source (the installed schema), not against the summary I wrote.
+(2) Upgrading "the docs say" to "measured" is the easiest way to overstate (Art. 9.3); keep
+the provenance word with every claim. (3) Annotating instead of rewriting made the auditor's
+fix cheap: the amendment sits next to the error, history intact.
+Next: S-007 close Era ½ (SURVEY completeness, IDEAS, backlog, note the criterion reworded in
+its own Era, S-004b as residue) → Era I: B-016 + B-020, then B-004.

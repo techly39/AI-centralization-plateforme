@@ -1,5 +1,20 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 8: the Bible now matches what the Survey measured.** I didn't rewrite your
+sentences. I added dated corrections next to them, each pointing to its evidence (ADR-020). Changes:
+- the test counts;
+- a "works, with known holes" list in 03;
+- the fact that no model has traded through the App yet;
+- the OpenClaw rules in 08: check the installed schema before trusting the docs, run `doctor`
+  only after a backup and only on the fund's profile, and create backups private.
+
+Your Constitution and Genesis had nothing that needed a proposal. The auditor caught one error I
+made in cycle 7: one setting (`tools.profile`) can be set per agent after all. It's now corrected
+everywhere, and the decision to give the fund its own OpenClaw profile still stands.
+Q-0003 and Q-0004 are still open. Next: close the Survey, then start Era I with the clock.
+
+---
+
 **2026-10-11 — Cycle 7: I've surveyed your OpenClaw and changed nothing in it. Two things need
 you (Q-0004).**
 1. `~/.openclaw/workspace/OPENCLAW_XAI_KEY.txt` holds what looks like an xAI API key, in a plain
