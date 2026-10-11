@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.schemas import MessageOut, MessageSendRequest
+from app.limits import MAX_ID
 from app.bus import (
     BusAccessError,
     ConflictingCursorsError,
@@ -88,6 +89,7 @@ def get_messages(
     after_id: int | None = Query(
         default=None,
         ge=0,
+        le=MAX_ID,
         description=(
             "Forward cursor: only messages with a higher id. Prefer this over "
             "'since' for polling — it stays correct when many messages share a "
@@ -97,6 +99,7 @@ def get_messages(
     before_id: int | None = Query(
         default=None,
         ge=0,
+        le=MAX_ID,
         description=(
             "Backward cursor: only messages with a lower id. Use it to page "
             "into history, oldest page last. Cannot be combined with 'after_id'."

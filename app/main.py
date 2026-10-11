@@ -11,6 +11,9 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app import __version__
@@ -27,6 +30,7 @@ from app.api import (
 )
 from app.clock import get_clock
 from app.config import get_settings
+from app.finite import json_safe
 from app.logging_setup import setup_logging
 from app.scheduler import shutdown_scheduler, start_scheduler
 
@@ -69,6 +73,15 @@ def create_app() -> FastAPI:
             client=request.client.host if request.client else None,
         ).info("request")
         return response
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+        # FastAPI's own handler echoes the bad input; a NaN there made the 422
+        # unrenderable (500, red-team 0001), and so did a ~1000-deep input
+        # (red-team 0004). Same body, spelled as standard JSON, depth-bounded.
+        return JSONResponse(
+            status_code=422, content={"detail": jsonable_encoder(json_safe(exc.errors()))}
+        )
 
     @app.get("/health", tags=["meta"])
     def health() -> dict[str, object]:

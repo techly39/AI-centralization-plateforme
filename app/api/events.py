@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.schemas import EventOut
+from app.limits import MAX_ID
 from app.db.base import get_session
 from app.db.models import Agent
 from app.ledger.events import read_events
@@ -19,7 +20,9 @@ router = APIRouter(tags=["observability"])
 
 @router.get("/events", response_model=list[EventOut])
 def list_events(
-    actor: int | None = Query(default=None, description="Filter by acting agent id."),
+    actor: int | None = Query(
+        default=None, ge=1, le=MAX_ID, description="Filter by acting agent id."
+    ),
     type: str | None = Query(default=None, description="Filter by event type."),
     since: datetime | None = Query(default=None, description="Only events at/after this time."),
     limit: int = Query(default=200, ge=1, le=1000),

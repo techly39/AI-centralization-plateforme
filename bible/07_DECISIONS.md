@@ -241,3 +241,59 @@ lands; a write endpoint that skipped `get_current_agent` would escape the gate (
 the generated test would catch it, since it expects 423 from each). Not done here: stopping agent
 *wakes* within one tick — Era I exit criterion "creating HALT mid-run stops the run within one
 tick" — needs the Runtime (B-009).
+
+## ADR-024 — Finite numbers only: bounded floats, walked JSON, a ledger that refuses   (builder, cycle 12) — accepted
+Question: Python's `json` reads `NaN`, `Infinity`, `-Infinity`, and turns `1e309` into `inf`.
+Red-team 0001 stored `Infinity` as a cost, crashed the 422 handler with `NaN` (500), and made the
+ranking number `null` with two finite 1e308 costs. Where do non-finite numbers stop, and is
+"finite" enough?
+Answer from the future: **three layers, each tested on its own** (removing the schema checks, the
+handler or the ledger check each turns its own tests red). (1) **Request schemas**: every float
+request field is **bounded** by a cap (`le` alone already refuses NaN/inf; `allow_inf_nan=False` is
+kept as a second, untested-by-mutation statement of intent) in `app/limits.py` — `MAX_USD_PER_REPORT` 1e6, `MAX_ORDER_QTY` 1e9,
+`MAX_PRICE` 1e7 — because finite is not enough when values are summed or multiplied (caps keep
+every order notional ≤ 1e16; a cost sum stays finite for any count of reports the API could
+accept). Every free JSON field (`structured_payload`, task `outcome`) is walked to any depth by
+`app.finite.first_non_finite`. The MCP tools carry the same caps (they may import `app.limits`,
+ADR-022). (2) **The 422 handler** echoes rejected input with non-finite floats spelled as text
+(`"NaN"`), so the error is standard JSON. (3) **`append_event` refuses** (`ValueError`) any payload
+with a non-finite float at any depth: the ledger stays standard JSON that any tool can replay,
+whatever an in-process caller (Runtime, CLI, a provider) hands it. `report_cost` checks `usd_cost`
+in-process like it checks tokens. A test walks the OpenAPI schema: a new float request field
+without both bounds, a new free JSON field `tests/test_finite.py` does not attack, any request field
+the walk cannot see into (arrays of numbers/objects, nested models, untyped `Any` — auditor WARN,
+cycle 12), or any query/path parameter that is not plain turns the suite red.
+Alternatives rejected: an engine-level `json_serializer(allow_nan=False)` (the test engine is built
+separately, so it would be untested; and it fails as 500 at flush, after the 422 chance has gone);
+a custom body parser rejecting the non-standard literals (`1e309` is standard JSON and still
+becomes `inf`); finiteness without caps (1e308 + 1e308 = inf).
+Consequences — what this does *not* cover, said plainly: numbers the world itself produces. A
+market-data provider returning `NaN` (yfinance can) or a non-finite setting (`fee_rate`,
+`static_prices` in `config.yaml`) now makes the fill's `append_event` raise, so that request fails
+with 500 and writes nothing, instead of storing `NaN` — and in the background limit-order sweep one
+such fill rolls back the **whole sweep** (every pod's fills that tick) and repeats each tick
+(`app/oms/monitor.py`; auditor WARN, cycle 12). Not agent-reachable (prices come from config or the
+provider; NaN never crosses); backlog B-025. Validating provider output belongs to
+B-005/B-008; the CLI's `fund-pod --delta inf` is refused by the ledger, bounded cleanly by B-006.
+Large finite values inside free JSON (`1e300`) pass: they are data, not quantities physics sums.
+Strings such as `"NaN"` are text and pass.
+Amendment (same cycle, red-team 0004): "finite" was the wrong word for the promise. The promise is
+**portable JSON**, and two more shapes broke it: nesting ~256+ deep was walked, stored, and then
+could not be serialised, so every later read of the recipient's inbox (HTTP and MCP) or of
+`GET /events` was a 500 (high — one analyst message poisoned a rival PM's or management's reads);
+an int like `10**400` in free JSON reached the ledger and reads as `Infinity` in float64 tools
+(medium); and the recursive walker raised `RecursionError` (500) at ~1000 levels (low). Fix: one
+**iterative** walker `app.finite.json_problem` refuses non-finite floats, ints beyond
+±`MAX_SAFE_INT` (2**53 − 1, JavaScript's safe-integer bound) and nesting beyond `MAX_JSON_DEPTH` = 32
+(requests) / `MAX_LEDGER_DEPTH` = 36 (`append_event`); the 422 echo is depth-bounded.
+**Ids are bounded too** (re-audit BLOCK, same cycle): with the ledger refusing big ints, a cross-pod
+read naming `pod=2**53+1` made `deny()` raise — a 500 instead of a 403, and the
+`permission_denied` record lost. Every id an agent can send — path (`IdPath`), query (`pod`,
+`actor`, `after_id`, `before_id`), body (`Id`: `task_id`, `pod_id`) and message refs
+(`agent:<id>`/`pod:<id>`) — is now 1..`MAX_ID` (= `MAX_SAFE_INT`) → 422 beyond. That also closes
+B-000m (red-team 0002) and red-team 0004's int64-id hole. A test requires an upper bound on every
+integer parameter and body field in the OpenAPI schema. Held and kept as guards: string-encoded
+`"inf"`, int→float overflow on numeric fields, duplicate keys, orders at both caps, subnormal
+quantities, 50 max-size cost reports, MCP inf/nan. Open, strict-xfail in `tests/test_redteam_0004.py`,
+outside this unit: fee rounds to $0.00 below $5 notional (B-026), non-finite feed prices (B-025,
+with B-005).

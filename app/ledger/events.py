@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 
 from app.clock import get_clock
 from app.db.models import Event
+from app.finite import json_problem
+from app.limits import MAX_LEDGER_DEPTH
 
 # --- Canonical event types --------------------------------------------------
 # Lifecycle / audit events (no derived-state effect):
@@ -55,7 +57,14 @@ def append_event(
 
     The caller owns the transaction (commit/rollback). We flush so the event's
     ``id`` is populated for anyone who needs it in the same unit of work.
+
+    Raises ``ValueError`` for a payload holding ``NaN``/``±inf`` or an int beyond
+    ±2**53 anywhere, or nested deeper than ``MAX_LEDGER_DEPTH``: the ledger stays
+    standard JSON that any tool can replay (ADR-024).
     """
+    problem = json_problem(payload or {}, max_depth=MAX_LEDGER_DEPTH)
+    if problem:
+        raise ValueError(f"{problem} in {type!r} event payload")
     event = Event(
         ts=get_clock().now(),
         actor_agent_id=actor_agent_id,

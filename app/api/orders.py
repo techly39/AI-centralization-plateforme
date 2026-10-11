@@ -17,7 +17,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import OrderCreateRequest, OrderOut, PortfolioOut, PositionOut
+from app.api.schemas import IdPath, OrderCreateRequest, OrderOut, PortfolioOut, PositionOut
+from app.limits import MAX_ID
 from app.db.base import get_session
 from app.db.models import Agent, OrderStatus
 from app.marketdata import get_provider
@@ -99,7 +100,7 @@ def create_order(
 
 @router.delete("/orders/{order_id}", response_model=OrderOut)
 def cancel(
-    order_id: int,
+    order_id: IdPath,
     actor: Agent = Depends(require(Action.PLACE_ORDER)),
     session: Session = Depends(get_session),
 ) -> OrderOut:
@@ -121,7 +122,9 @@ def cancel(
 
 @router.get("/orders", response_model=list[OrderOut])
 def read_orders(
-    pod: int | None = Query(default=None, description="Defaults to your own pod."),
+    pod: int | None = Query(
+        default=None, ge=1, le=MAX_ID, description="Defaults to your own pod."
+    ),
     order_status: OrderStatus | None = Query(
         default=None, alias="status", description="pending | filled | rejected | cancelled"
     ),
@@ -160,7 +163,7 @@ def read_orders(
 
 @router.get("/portfolio/{pod_id}", response_model=PortfolioOut)
 def read_portfolio(
-    pod_id: int,
+    pod_id: IdPath,
     actor: Agent = Depends(require(Action.READ_OWN_PORTFOLIO)),
     session: Session = Depends(get_session),
 ) -> PortfolioOut:

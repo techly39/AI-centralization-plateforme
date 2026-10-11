@@ -27,7 +27,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
-from app.limits import MAX_TOKENS_PER_REPORT
+from app.limits import MAX_ORDER_QTY, MAX_PRICE, MAX_TOKENS_PER_REPORT, MAX_USD_PER_REPORT
 from mcp_server.client import FundAPIError, FundClient
 
 
@@ -287,7 +287,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
     async def place_order(
         ticker: Annotated[str, Field(description="Symbol to trade.")],
         side: Annotated[str, Field(description="buy | sell")],
-        qty: Annotated[float, Field(description="Number of shares; fractional allowed.", gt=0)],
+        qty: Annotated[float, Field(description="Number of shares; fractional allowed.", gt=0, le=MAX_ORDER_QTY)],
         price_type: Annotated[str, Field(description="market (fill now) | limit (wait for a price)")],
         justification: Annotated[
             str,
@@ -295,7 +295,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         ],
         limit_price: Annotated[
             float | None,
-            Field(description="Required for limit orders, forbidden for market orders."),
+            Field(description="Required for limit orders, forbidden for market orders.", gt=0, le=MAX_PRICE),
         ] = None,
     ) -> Any:
         """Place an order for your own pod. PMs only.
@@ -372,7 +372,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         tokens_out: Annotated[
             int, Field(description="Output tokens you produced.", ge=0, le=MAX_TOKENS_PER_REPORT)
         ],
-        usd_cost: Annotated[float, Field(description="What that cost, in dollars.", ge=0)],
+        usd_cost: Annotated[float, Field(description="What that cost, in dollars.", ge=0, le=MAX_USD_PER_REPORT)],
         task_label: Annotated[
             str | None, Field(description="What the spend was for; reuse stable labels.")
         ] = None,

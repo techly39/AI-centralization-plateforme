@@ -233,11 +233,10 @@ def test_held_metrics_survive_token_rows_whose_sum_exceeds_int64(
     assert resp.json()["cost"]["tokens_in"] >= 2**63
 
 
-@pytest.mark.xfail(strict=True, reason="red-team 0001: usd_cost has no finite upper bound; "
-                   "1e308 x2 sums to inf and the pod's cost/cost-adjusted P&L render as null")
-def test_hole_metrics_cost_overflows_to_infinity(client, two_desks, admin_key):
-    """Standard JSON only. The headline ranking number becomes ``null`` — which
-    the API documents as 'not enough data', not 'infinite cost'."""
+def test_held_metrics_cost_overflows_to_infinity(client, two_desks, admin_key):
+    """Was a hole (cycle 0001): two 1e308 reports summed to inf and the headline
+    ranking number rendered as ``null`` ('not enough data', not 'infinite cost').
+    Fixed in cycle 0012: one report is capped at MAX_USD_PER_REPORT (ADR-024)."""
     _, an1_key = two_desks["an1"]
     for _ in range(2):
         client.post("/costs", headers=H(an1_key),
@@ -248,9 +247,8 @@ def test_hole_metrics_cost_overflows_to_infinity(client, two_desks, admin_key):
     assert row["cost_adjusted_pnl"] is not None
 
 
-@pytest.mark.xfail(strict=True, reason="red-team 0001: non-standard JSON 'Infinity' accepted "
-                   "as usd_cost and written to costs table and ledger")
-def test_hole_cost_accepts_infinity_literal(client, two_desks):
+def test_held_cost_accepts_infinity_literal(client, two_desks):
+    """Was a hole (cycle 0001): 'Infinity' was stored. Fixed in cycle 0012 (ADR-024)."""
     _, an1_key = two_desks["an1"]
     resp = client.post(
         "/costs",
@@ -260,9 +258,9 @@ def test_hole_cost_accepts_infinity_literal(client, two_desks):
     assert resp.status_code == 422
 
 
-@pytest.mark.xfail(strict=True, reason="red-team 0001: NaN usd_cost crashes the validation-error "
-                   "handler (500) instead of a clean 422")
-def test_hole_cost_nan_crashes_server(client, two_desks):
+def test_held_cost_nan_crashes_server(client, two_desks):
+    """Was a hole (cycle 0001): the 422 echoed NaN and failed to render (500).
+    Fixed in cycle 0012: the validation handler spells it as text (ADR-024)."""
     _, an1_key = two_desks["an1"]
     resp = client.post(
         "/costs",
