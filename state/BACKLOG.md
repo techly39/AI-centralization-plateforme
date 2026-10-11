@@ -61,12 +61,16 @@ feed price ×2).
       stretch gives >1000 events on one stamp and management cannot page past them → add an
       id cursor (`after_id`). Also: market price + `now` read before `OMS_LOCK`, so an order
       queued behind a sweep fills at a quote one sweep stale (red-team 0005 notes). With B-005.
-- [ ] **B-020** Clock vs agents: MCP `get_clock` tells all agents to use it; PM/analyst get 403
-      (P7) — and TRD §7 says `/clock` is system/management only. Decide by ADR: widen the read
-      (agents need the simulated date in backtests) or fix the tool docstring. Before B-004.
-      `test_clock_forbidden_for_analyst` changes only with that ADR as its reason (§4b.4).
+- [x] **B-020** Clock vs agents — cycle 14 (ADR-026): every agent reads `/clock`; `now` is the
+      ledger's now (`ledger_now`); control stays closed. Red-team 0006: 1 low hole fixed.
 - [ ] **B-004** TRD Phase 3a: simulated clock, `POST /clock/mode`, `POST /clock/advance`,
-      `run_id` scopes; pending-order monitor runs on every advance. Needs B-016 + B-020 first.
+      `run_id` scopes; pending-order monitor runs on every advance. **Next.** Must: scope the
+      ADR-025 floor *and* `ledger_now` per `run_id` before any agent runs a backtest (else a
+      backtest sharing a DB sees live stamps as "now" — re-audit, cycle 14); gate control on a
+      non-universal action (red-team 0006 guard); B-029 forward-step guard.
+- [ ] **B-031** (low) `mode` on `/clock` lets agents tell live from backtest (ADR-026 accepts it).
+      If an experiment needs agents blind to the mode, withhold it by role in one place, with the
+      Runtime/Truman controlling what an agent perceives (auditor note, cycle 14).
 - [ ] **B-005** TRD Phase 3b: look-ahead guard on every market-data route + red-team pass.
       Must filter bars by their **end** time (a daily bar stamped 00:00 carries that day's close,
       SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3). Fix the test double

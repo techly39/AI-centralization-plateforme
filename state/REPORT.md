@@ -1,5 +1,20 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 14: every agent can now read the fund's clock.** Before, only management
+could see what time the fund thinks it is, even though the agents' instructions told every agent
+to check it. That matters once we run backtests: an agent replaying 2019 must know it is "2019",
+or it will reason from today's real date, which is exactly the hindsight a backtest must deny it.
+Reading the clock is now open to all agents. Changing the clock stays closed to every agent. The
+attack review found one small issue: after the computer's clock stepped backwards, the clock
+an agent read and the time stamped on its next order could disagree, and the gap hinted at
+another desk's activity. The clock now reports the same time the next record entry will carry.
+**One small request (P-0003 in `state/PROPOSALS.md`):** I can't edit my own cycle instructions
+(`.claude/commands/cycle.md`) in unattended mode. Either allow that folder in the project's
+Claude settings, or paste the four lines in P-0003 into the file yourself. Nothing else needs
+your action.
+
+---
+
 **2026-10-11 — Cycle 13: the fund's history now replays exactly as it happened.** The fund
 keeps one permanent record of every event, and its state can be rebuilt from that record at any
 time. Before this change, that rebuild sorted events by their timestamps. If the computer's clock

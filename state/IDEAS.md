@@ -136,3 +136,14 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   after a random session with clock steps. Would have caught red-team 0005 hole 2; finds B-028.
 - **Tolerances as named laws.** Every epsilon in physics gets a docstring of what it forgives and a
   test of what it must not (the naked dust sell).
+
+## Cycle 14
+- **X-007 status:** blocked by headless `.claude/` protection → P-0003 (Human applies the text or
+  allows `.claude/commands/**`).
+- **One "now" for the whole world.** Every place physics says "now" (metrics `as_of`, market-data
+  defaults, leaderboard, OMS price lookup) should read `ledger_now`, not `get_clock().now()` — a
+  grep-driven test: no `get_clock().now()` outside `app/ledger/events.py` and the clock itself.
+  Extends the mirror audit from rows to readers. Natural slice of B-004.
+- **Fixture time sanity.** A conftest guard that fails a test which freezes the clock before the
+  ledger's latest stamp *without* declaring it (`@pytest.mark.step_back`): cycle 14 found three
+  tests silently exercising the rewind path.

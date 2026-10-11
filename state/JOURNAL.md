@@ -423,3 +423,27 @@ control stays absent (B-004 will gate it to system/management), then every role 
 `now` the OMS and market data use, the read writes no event and works during halt, no clock
 write appears on the surface for any role, the MCP `get_clock` promise becomes true, and
 reverting the one matrix line turns only the new read tests red.
+Work: `Action.READ_CLOCK` in `_UNIVERSAL` (`app/registry/permissions.py`); `/clock` gated on it;
+ADR-026 (+ amendment) amends TRD §7 for the read only. `tests/test_clock_and_health.py` rewritten
+(every role, exact `now`, a PM's order stamped with the now it read, no event, works under halt,
+deactivated → 401); red-team 0005's management-only read guard → read-only guard. Mutation: drop
+`READ_CLOCK` → 13 clock tests red, nothing else. Auditor **PASS** (notes: TRD §7 and the matrix
+comment → fixed). Red-team 0006: **1 low hole**, ~36 attacks held — after a clock step back,
+`/clock` gave the raw clock while the ledger held stamps (ADR-025), so an agent's next order was
+stamped later than the now it was told, revealing another pod's activity in its "future". Fixed:
+`ledger_now(session)` = `max(clock, latest ts)` through the INSERT's own expression; mutation →
+only that test red. Re-audit **PASS** (note: per-`run_id` floor must land with B-004 → backlog).
+X-007 (resume rule in `cycle.md` step 0): **refused** — `.claude/` edits need approval headless
+→ P-0003.
+Result: merged 55c0b54, pushed. 489+8xf → **546 passed + 8 xfailed**. Hypothesis **met, then
+amended**: "every role reads the same `now` the OMS uses" was false under a step back until the
+read reported the ledger's now, not the clock's.
+Learned: (1) Cycle 13's lesson recurred one level up: when a sink holds a law (ledger time), every
+*reader* that reports the same quantity must report the held value too — not just rows that copy
+it. "Now" is a ledger fact, not a clock fact. (2) My own fixtures hid a step back: freezing at
+2019 after fixtures stamped 2026 was silently a rewind in every test that did it. A frozen moment
+before the fixtures' stamps is a test of the step-back path whether I meant it or not. (3) Opening
+a read can *shrink* the ledger: analysts' `/clock` calls used to append `permission_denied` events
+every time.
+Next: B-004 simulated clock (per-`run_id` floor scoping `ledger_now` and stamps; B-029 guard;
+control endpoints never on a universal action — red-team 0006 guards it) → S-004b → B-028.
