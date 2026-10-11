@@ -62,5 +62,7 @@ def read_leaderboard(
     session: Session = Depends(get_session),
 ) -> LeaderboardOut:
     """Every pod ranked by cost-adjusted P&L — profit net of what it cost to run."""
-    rows = [_row(m) for m in compute_leaderboard(session)]
-    return LeaderboardOut(as_of=ledger_now(session), rows=rows)
+    # One now, read first: the rows are valued at the moment as_of reports.
+    now = ledger_now(session)
+    rows = [_row(m) for m in compute_leaderboard(session, now=now)]
+    return LeaderboardOut(as_of=now, rows=rows)

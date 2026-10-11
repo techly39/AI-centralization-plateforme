@@ -137,12 +137,12 @@ def test_the_sweep_prices_at_the_ledgers_now(client, stepped_back, db) -> None:
 #: here with its reason, in review. Counted per read, not per file: a listed
 #: file gaining one more read is as red as an unlisted one (auditor, cycle 17).
 ALLOWED_TIME_READS: dict[str, tuple[int, str]] = {
-    "clock.py": (2, "the clocks themselves"),
+    "clock.py": (5, "the clocks themselves (their own _now state)"),
     "ledger/events.py": (2, "append_event and ledger_now: the floor is applied in SQL"),
-    "run_clock.py": (3, "the backtest controller: raw clock vs ledger_now, wall_now bound"),
-    "marketdata/yfinance_provider.py": (1, "wall_now: the live quote's 60 s window (ADR-028)"),
+    "run_clock.py": (3, "the backtest controller: ledger_now base, wall_now bound"),
+    "marketdata/yfinance_provider.py": (2, "wall_now: the live quote's 60 s window (ADR-028)"),
     "cli.py": (1, "prints the start of a run it has just created"),
-    "main.py": (3, "request log line and its elapsed ms: diagnostics, not physics"),
+    "main.py": (4, "request log line and its elapsed ms: diagnostics, not physics"),
     # B-028: these rows should copy their event's held stamp, not read a clock.
     "metrics/reporting.py": (3, "B-028 (Cost.ts, Task.started_at/ended_at)"),
     "bus/messages.py": (1, "B-028 (Message.ts)"),
@@ -150,8 +150,9 @@ ALLOWED_TIME_READS: dict[str, tuple[int, str]] = {
     "registry/pods.py": (1, "B-028 (Allocation.ts)"),
 }
 
-#: Attribute names that read a clock, called or not (``f = clock.now`` counts).
-_CLOCK_ATTRS = {"now", "utcnow", "today"}
+#: Attribute names that read a clock, called or not (``f = clock.now`` counts):
+#: the clock's method and its state, the stdlib's, the real-now helper, SQL's.
+_CLOCK_ATTRS = {"now", "utcnow", "today", "_now", "wall_now", "current_timestamp"}
 
 
 def _is_time_read(node: ast.AST) -> bool:
@@ -162,11 +163,23 @@ def _is_time_read(node: ast.AST) -> bool:
         )
     if isinstance(node, ast.Name):
         return node.id == "wall_now" and isinstance(node.ctx, ast.Load)
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-        # getattr(clock, "now") spells the attribute as a string.
-        return node.func.id == "getattr" and any(
-            isinstance(a, ast.Constant) and a.value in _CLOCK_ATTRS for a in node.args
+    if isinstance(node, ast.Import):
+        # `import time` under any name: its reads are then spelled `t.time()`.
+        return any(a.name == "time" for a in node.names)
+    if isinstance(node, ast.ImportFrom):
+        # `from time import time`, `from app.clock import wall_now as real`.
+        return node.module == "time" or any(a.name in _CLOCK_ATTRS for a in node.names)
+    if isinstance(node, ast.Call):
+        func = node.func
+        name = func.id if isinstance(func, ast.Name) else (
+            func.attr if isinstance(func, ast.Attribute) else None
         )
+        if name == "methodcaller":
+            return True
+        if name == "getattr" and len(node.args) >= 2:
+            # A string attribute name: a clock one, or one computed at runtime.
+            attr = node.args[1]
+            return not isinstance(attr, ast.Constant) or attr.value in _CLOCK_ATTRS
     return False
 
 

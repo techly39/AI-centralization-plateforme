@@ -135,14 +135,20 @@ def compute_pod_metrics(
     pod_id: int,
     provider: MarketDataProvider | None = None,
     closes: DailyCloseCache | None = None,
+    now: datetime | None = None,
 ) -> PodMetrics:
-    """Everything the TRD asks for about one pod, valued at the ledger's now."""
+    """Everything the TRD asks for about one pod, valued at the ledger's now.
+
+    One read of now for the whole report (or the caller's, for a ranking): the
+    book, the curve and ``as_of`` are one moment (red-team 0009).
+    """
     provider = provider or get_provider()
-    now = ledger_now(session)
+    if now is None:
+        now = ledger_now(session)
     settings = get_settings().metrics
 
     pod = session.get(Pod, pod_id)
-    portfolio = build_portfolio(session, pod_id=pod_id, provider=provider)
+    portfolio = build_portfolio(session, pod_id=pod_id, provider=provider, now=now)
 
     net_contributed = pod.current_allocation if pod is not None else 0.0
     capital = CapitalMetrics(
@@ -193,18 +199,23 @@ def compute_pod_metrics(
 
 
 def compute_leaderboard(
-    session: Session, *, provider: MarketDataProvider | None = None
+    session: Session,
+    *,
+    provider: MarketDataProvider | None = None,
+    now: datetime | None = None,
 ) -> list[PodMetrics]:
-    """Every pod, best cost-adjusted P&L first.
+    """Every pod, best cost-adjusted P&L first, all valued at one now.
 
     One shared price cache across the whole ranking, so a firm of ten pods
     holding the same names downloads each history once rather than ten times.
     """
     provider = provider or get_provider()
+    if now is None:
+        now = ledger_now(session)
     closes = DailyCloseCache(provider)
     pod_ids = session.execute(select(Pod.id).order_by(Pod.id)).scalars().all()
     rows = [
-        compute_pod_metrics(session, pod_id=pid, provider=provider, closes=closes)
+        compute_pod_metrics(session, pod_id=pid, provider=provider, closes=closes, now=now)
         for pid in pod_ids
     ]
     return sorted(rows, key=lambda m: m.cost_adjusted_pnl, reverse=True)

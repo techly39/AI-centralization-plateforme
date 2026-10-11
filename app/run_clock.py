@@ -142,20 +142,23 @@ def advance(
                 f"{_REAL_NOW_MARGIN.seconds} s): the world has no data from the "
                 "future to show"
             )
-        previous = clock.now()
-        clock.move_to(end)
+        # Ledger first, clock second (red-team 0009): reads of now take no lock,
+        # so a clock moved before the commit showed the next day's prices to
+        # anyone polling — and a failed commit then took the day back. Once
+        # committed, ledger_now is already `end` whatever this copy says.
         try:
             append_event(
                 session,
                 type=EVENT_CLOCK_ADVANCED,
                 actor_agent_id=actor_agent_id,
                 payload={"from": _iso(start), "to": _iso(end), "minutes": minutes},
+                at=end,
             )
             session.commit()
         except Exception:
             session.rollback()
-            clock.move_to(previous)
             raise
+        clock.move_to(end)
     return start, end
 
 

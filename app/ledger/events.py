@@ -58,8 +58,14 @@ def append_event(
     type: str,
     actor_agent_id: int | None,
     payload: dict | None = None,
+    at: datetime | None = None,
 ) -> Event:
     """Append one immutable event, timestamped from the injected clock.
+
+    ``at`` stamps the event at a given moment instead of the clock's (still under
+    the floor). Only for the backtest advance (ADR-029): it records the new now
+    *before* the process clock moves, so no reader sees a now the ledger has not
+    committed (red-team 0009).
 
     The caller owns the transaction (commit/rollback). We flush so the event's
     ``id`` is populated for anyone who needs it in the same unit of work.
@@ -79,7 +85,7 @@ def append_event(
     clock = get_clock()
     _refuse_wrong_run_clock(session, type, clock.mode)
     event = Event(
-        ts=_not_before_latest(clock.now()),
+        ts=_not_before_latest(clock.now() if at is None else at),
         actor_agent_id=actor_agent_id,
         type=type,
         payload_json=payload or {},
