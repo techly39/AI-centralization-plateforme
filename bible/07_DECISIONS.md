@@ -492,3 +492,25 @@ metrics and POC fixtures fill at the prior close. Red-team 0004's two feed-price
 Mutations (each alone, 1 red each): bar by open, stamp unchecked, non-finite allowed, override
 allowed, yfinance always live, advance into the window, start into the window, flag off, double
 leaks today's close.
+**Amendment (cycle 16, red-team 0008 — 5 holes, all fixed same cycle).** The law was "nothing not
+known by `as_of` is *served*"; it must also be "nothing known by `as_of` is *withheld from the
+price*, and no answer *depends* on what is not known". (a) **High — stale-quote arbitrage:** `/ohlcv
+?interval=1h` served today's ended hourly bars while fills used yesterday's daily close; after the
+close a PM bought at 180 what the world already showed at 250. A past quote is now the close of the
+latest bar of any interval `/ohlcv` serves (`1d`, `1h`) that had ended, stamped at its end. So "not
+done: intraday prices" above now reads: intraday *resolution* is whatever the feed's hourly history
+gives (Yahoo: ~730 days); older backtests price daily. (b) **Medium — cache across a bar end:** a
+past quote is reused for its exact `as_of` only; live quotes keep the TTL. (c) **Medium — existence
+oracle:** `[] vs 404` depended on rows after `as_of` (bisect `end` → a future listing day). The base
+now clips the window it hands an implementation to `as_of`'s day, and a window with no ended bar is
+one `UnknownTickerError` naming only the request (so `/ohlcv` answers 404, not 200 `[]`, before any
+bar has ended). Two independent defences; each pinned by its own test. (d) **Low — the seal:**
+"final" is checked through the MRO at creation (a mixin is refused), and assigning a guarded entry
+on the class (metaclass) or an instance is a `TypeError`. `object.__setattr__` still bypasses the
+instance check: Python has no true final, and code inside the App's process is past the seal anyway
+— agent strategy code must never run in it (a constraint on Era III's sandbox, recorded here).
+(e) **Low — the 60 s edge:** `start_backtest`/`advance` refuse `>= wall − 60 s` (strict), matching
+the feed's inclusive window. Tests corrected, each with its reason: the look-ahead yfinance stub
+returned its daily frame for every interval (Yahoo never does); the one-lookup-per-sweep test
+counted by replacing `get_price` on an instance, now refused — it counts `_quote`. Mutations: each
+of the 9 fixes reverted alone turns its test red.

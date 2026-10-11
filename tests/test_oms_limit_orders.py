@@ -101,14 +101,16 @@ def test_only_one_price_lookup_per_ticker_per_sweep(client, desk, db, prices, mo
         _order(client, pm_key, ticker="AAPL", side="buy", qty=1,
                price_type="limit", limit_price=limit)
 
+    # Counted at the implementation's ``_quote``: ``get_price`` is sealed in the
+    # base and cannot be replaced, even on an instance (ADR-028, red-team 0008).
     calls: list[str] = []
-    original = prices.get_price
+    original = prices._quote
 
-    def counting_get_price(ticker, *, as_of):
-        calls.append(ticker)
-        return original(ticker, as_of=as_of)
+    def counting_quote(symbol, *, as_of):
+        calls.append(symbol)
+        return original(symbol, as_of=as_of)
 
-    monkeypatch.setattr(prices, "get_price", counting_get_price)
+    monkeypatch.setattr(prices, "_quote", counting_quote)
     check_pending_orders(db, provider=prices)
     assert calls == ["AAPL"]
 

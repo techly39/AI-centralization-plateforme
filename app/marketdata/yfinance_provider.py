@@ -7,15 +7,15 @@ allowed to import ``yfinance``; everything else depends on the interface in
 Two ways to answer a price (ADR-028). Yahoo's quote endpoint knows only the
 real present, so it answers an ``as_of`` within :data:`LIVE_QUOTE_WINDOW` of
 the real now and nothing else; an older ``as_of`` — every backtest — is
-answered with the close of the last daily bar that had *ended* by then, stamped
-at that bar's end. The real now is read (``wall_now``) only to tell which of
-the two the feed can honestly give; it is never a stamp.
+answered with the close of the latest daily or hourly bar that had *ended* by
+then, stamped at that bar's end. The real now is read (``wall_now``) only to
+tell which of the two the feed can honestly give; it is never a stamp.
 
-Caching: a quote is reused while the *clock* has moved less than
-``marketdata.cache_ttl_seconds`` since it was fetched. Keying the cache on the
-injected clock rather than wall time keeps it correct in backtest mode too — a
-clock advance of a day invalidates every entry, so a simulation can never be
-served a stale live price.
+Caching: a live quote is reused while the *clock* has moved less than
+``marketdata.cache_ttl_seconds`` since it was fetched; a past quote only for
+the exact ``as_of`` it answered (a one-minute advance can cross a bar's end).
+Keying the cache on the injected clock rather than wall time keeps it correct
+in backtest mode too.
 """
 
 from __future__ import annotations
@@ -42,11 +42,19 @@ from app.marketdata.base import (
 #: enough to span any exchange holiday stretch.
 _PAST_QUOTE_LOOKBACK = timedelta(days=14)
 
+#: Intervals a past quote looks at: the finest /ohlcv serves, and the daily
+#: (hourly history does not reach as far back). Weekly and monthly bars end
+#: no earlier than the daily bar carrying the same close.
+_PAST_QUOTE_INTERVALS = ("1d", "1h")
+
 
 @dataclass(frozen=True, slots=True)
 class _CachedQuote:
     quote: Quote
     fetched_for: datetime  # the ``as_of`` the fetch was made against
+    #: A live quote is the present for a short while; a past quote is the
+    #: answer for its exact ``as_of`` only — a bar may end the next minute.
+    live: bool
 
 
 def _to_utc(value: Any) -> datetime:
@@ -76,12 +84,13 @@ class YFinanceProvider(MarketDataProvider):
         if cached is not None:
             return cached
 
-        if wall_now() - as_of <= LIVE_QUOTE_WINDOW:
+        live = wall_now() - as_of <= LIVE_QUOTE_WINDOW
+        if live:
             quote = self._fetch_price(symbol, as_of)
         else:
             quote = self._past_price(symbol, as_of)
         with self._lock:
-            self._cache[symbol] = _CachedQuote(quote=quote, fetched_for=as_of)
+            self._cache[symbol] = _CachedQuote(quote=quote, fetched_for=as_of, live=live)
         return quote
 
     def _cache_get(self, symbol: str, as_of: datetime) -> Quote | None:
@@ -94,6 +103,10 @@ class YFinanceProvider(MarketDataProvider):
         # Only a *forward* move of the clock within the TTL keeps the quote
         # valid; any backwards jump (mode switch, replay) invalidates it.
         delta = as_of - entry.fetched_for
+        if not entry.live:
+            # A past quote is reused for its own moment only: a clock advance
+            # of one minute can cross a bar's end (red-team 0008).
+            return entry.quote if delta == timedelta(0) else None
         if timedelta(0) <= delta <= self._cache_ttl:
             return entry.quote
         return None
@@ -141,26 +154,34 @@ class YFinanceProvider(MarketDataProvider):
         )
 
     def _past_price(self, symbol: str, as_of: datetime) -> Quote:
-        """The close of the last daily bar that had ended by ``as_of``."""
-        bars = self.get_ohlcv(
-            symbol,
-            start=(as_of - _PAST_QUOTE_LOOKBACK).date(),
-            end=as_of.date() + timedelta(days=1),
-            interval="1d",
-            as_of=as_of,
-        )
-        if not bars:
+        """The close of the latest bar, of any interval /ohlcv serves at
+        ``as_of``, that had ended by then.
+
+        Not just the daily bar: after the close, today's hourly bars have ended
+        while today's daily bar has not, and a fill must never be at a price
+        older than what the same world already shows (red-team 0008).
+        """
+        latest: tuple[datetime, float] | None = None
+        for interval in _PAST_QUOTE_INTERVALS:
+            try:
+                bars = self.get_ohlcv(
+                    symbol,
+                    start=(as_of - _PAST_QUOTE_LOOKBACK).date(),
+                    end=as_of.date() + timedelta(days=1),
+                    interval=interval,
+                    as_of=as_of,
+                )
+            except UnknownTickerError:
+                continue  # e.g. no hourly history that far back
+            ended = bar_end(bars[-1].ts, interval)
+            if latest is None or ended > latest[0]:
+                latest = (ended, bars[-1].close)
+        if latest is None:
             raise UnknownTickerError(
-                f"no completed daily bar for {symbol!r} in the "
+                f"no completed bar for {symbol!r} in the "
                 f"{_PAST_QUOTE_LOOKBACK.days} days before {as_of.isoformat()}"
             )
-        last = bars[-1]
-        return Quote(
-            ticker=symbol,
-            price=last.close,
-            as_of=bar_end(last.ts, "1d"),
-            source=self.name,
-        )
+        return Quote(ticker=symbol, price=latest[1], as_of=latest[0], source=self.name)
 
     # --- history ------------------------------------------------------------
 
@@ -186,12 +207,10 @@ class YFinanceProvider(MarketDataProvider):
             raise MarketDataError(f"history lookup failed for {symbol}: {exc}") from exc
 
         if frame is None or frame.empty:
-            # Empty can mean "bad symbol" or "no trading days in range"; the
-            # caller cares about the difference, so probe once.
-            raise UnknownTickerError(
-                f"no OHLCV data for {symbol!r} between "
-                f"{start.isoformat()} and {end.isoformat()}"
-            )
+            # "Bad symbol" and "no trading in range" look the same to the
+            # caller on purpose: the base answers both with one error, so the
+            # answer cannot depend on data after ``as_of`` (red-team 0008).
+            return []
 
         # No look-ahead filter here: the base drops every bar not ended by
         # ``as_of`` (a bar's stamp is its open, not its close).

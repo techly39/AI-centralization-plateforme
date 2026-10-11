@@ -47,6 +47,8 @@ LOOK_AHEAD_GUARD = True
 
 #: How far behind the real now a backtest's clock must stay: within it, a live
 #: feed answers with its current quote, which a simulated "earlier" must not see.
+#: Strictly: the feed's window is inclusive, so the edge itself is refused
+#: (red-team 0008).
 _REAL_NOW_MARGIN = LIVE_QUOTE_WINDOW
 
 
@@ -64,7 +66,7 @@ def start_backtest(session: Session, *, start: datetime) -> BacktestClock:
     if start.tzinfo is None:
         raise RunClockError("start must carry a timezone (use UTC, e.g. ...Z)")
     start = start.astimezone(timezone.utc)
-    if start > wall_now() - _REAL_NOW_MARGIN:
+    if start >= wall_now() - _REAL_NOW_MARGIN:
         raise RunClockError(
             "a backtest must start in the past (at least "
             f"{_REAL_NOW_MARGIN.seconds} s ago): the future has no data"
@@ -134,7 +136,7 @@ def advance(
         # (an operator command) may have stamped later than this one's clock.
         start = ledger_now(session)
         end = start + timedelta(minutes=minutes)
-        if end > wall_now() - _REAL_NOW_MARGIN:
+        if end >= wall_now() - _REAL_NOW_MARGIN:
             raise RunClockError(
                 "a backtest cannot pass the real now (less "
                 f"{_REAL_NOW_MARGIN.seconds} s): the world has no data from the "

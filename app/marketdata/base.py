@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import calendar
 import math
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Literal
@@ -110,13 +110,39 @@ class Bar:
 _GUARDED = ("get_price", "get_ohlcv")
 
 
-class MarketDataProvider(ABC):
+def _refuse_override(owner: str, method: str) -> TypeError:
+    return TypeError(
+        f"{owner} replaces {method}: implement _quote / _bars instead — the "
+        "look-ahead guard lives in the base (ADR-028)"
+    )
+
+
+class _SealedEntries(ABCMeta):
+    """Refuses assigning or deleting a guarded entry on a provider class after
+    it is created (red-team 0008)."""
+
+    def __setattr__(cls, name: str, value: object) -> None:
+        if name in _GUARDED:
+            raise _refuse_override(cls.__name__, name)
+        super().__setattr__(name, value)
+
+    def __delattr__(cls, name: str) -> None:
+        if name in _GUARDED:
+            raise _refuse_override(cls.__name__, name)
+        super().__delattr__(name)
+
+
+class MarketDataProvider(metaclass=_SealedEntries):
     """Abstract price source. Implementations must be side-effect free.
 
     An implementation writes :meth:`_quote` and :meth:`_bars`; callers use
     :meth:`get_price` and :meth:`get_ohlcv`, which apply the look-ahead law to
-    whatever the implementation returns. Defining ``get_price`` or
-    ``get_ohlcv`` on a subclass is a ``TypeError`` at class creation.
+    whatever the implementation returns. A subclass whose ``get_price`` or
+    ``get_ohlcv`` resolves anywhere but here (its own, or a mixin's) is a
+    ``TypeError`` at class creation; so is assigning one later, on the class or
+    on an instance. This closes the ordinary routes, not every route: Python
+    has no true ``final``, and code running inside the App's process is past
+    the seal anyway — agent code never runs there (ADR-028 amendment).
     """
 
     #: Short name recorded on quotes and in logs.
@@ -125,11 +151,14 @@ class MarketDataProvider(ABC):
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         for method in _GUARDED:
-            if method in cls.__dict__:
-                raise TypeError(
-                    f"{cls.__name__} defines {method}: implement _quote / _bars "
-                    "instead — the look-ahead guard lives in the base (ADR-028)"
-                )
+            owner = next(k for k in cls.__mro__ if method in k.__dict__)
+            if owner is not MarketDataProvider:
+                raise _refuse_override(cls.__name__, method)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in _GUARDED:
+            raise _refuse_override(type(self).__name__, name)
+        super().__setattr__(name, value)
 
     def get_price(self, ticker: str, *, as_of: datetime) -> Quote:
         """Latest price for ``ticker`` known at ``as_of``.
@@ -165,12 +194,28 @@ class MarketDataProvider(ABC):
 
         A bar still open at ``as_of`` — today's daily bar at noon — is not
         served: its close is not known yet.
+
+        The answer may depend only on what was known by ``as_of`` (red-team
+        0008): the implementation is never asked about a day after ``as_of``'s,
+        and a window with no ended bar is one :class:`UnknownTickerError` whose
+        message names only the request — whether the ticker lists, resumes or
+        never existed later is not knowable, so it must not be tellable.
+
+        Raises:
+            UnknownTickerError: no bar in the window had ended by ``as_of``.
         """
         symbol = normalise_ticker(ticker)
         _require_aware(as_of)
         validate_window(start, end, interval, as_of)
-        bars = self._bars(symbol, start=start, end=end, interval=interval, as_of=as_of)
-        return [bar for bar in bars if bar_end(bar.ts, interval) <= as_of]
+        known_end = min(end, as_of.date() + timedelta(days=1))
+        bars = self._bars(symbol, start=start, end=known_end, interval=interval, as_of=as_of)
+        ended = [bar for bar in bars if bar_end(bar.ts, interval) <= as_of]
+        if not ended:
+            raise UnknownTickerError(
+                f"no {interval} bar for {symbol!r} in [{start.isoformat()}, "
+                f"{end.isoformat()}) had ended by {as_of.isoformat()}"
+            )
+        return ended
 
     @abstractmethod
     def _quote(self, symbol: str, *, as_of: datetime) -> Quote:

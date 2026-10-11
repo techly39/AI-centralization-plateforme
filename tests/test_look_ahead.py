@@ -126,6 +126,28 @@ def test_bar_end_refuses_an_unknown_interval():
         bar_end(NOON, "3s")
 
 
+def test_the_feed_is_never_asked_about_a_day_after_as_of():
+    """The base clips the window it hands an implementation, so no answer can
+    depend on rows after ``as_of``'s day (red-team 0008, existence oracle)."""
+
+    class Recording(MarketDataProvider):
+        name = "recording"
+        asked: list[date] = []
+
+        def _quote(self, symbol: str, *, as_of: datetime) -> Quote:
+            raise NotImplementedError
+
+        def _bars(self, symbol, *, start, end, interval, as_of) -> list[Bar]:
+            self.asked.append(end)
+            return [Bar(ts=_midnight(YESTERDAY), open=1.0, high=1.0, low=1.0,
+                        close=1.0, volume=0.0)]
+
+    feed = Recording()
+    feed.get_ohlcv("JPM", start=DAY - timedelta(days=5), end=date(2030, 1, 1),
+                   interval="1d", as_of=NOON)
+    assert feed.asked == [DAY + timedelta(days=1)]
+
+
 # --- the test double obeys the same law ---------------------------------------
 
 def test_the_test_double_does_not_know_todays_close_at_noon():
@@ -147,8 +169,13 @@ class _Ticker:
     def fast_info(self):
         return {"lastPrice": 999.0, "currency": "USD"}
 
-    def history(self, **_kwargs):
-        return self._frame
+    def history(self, *, interval="1d", **_kwargs):
+        # Daily bars only: passing them off as hourly ones (05:00 UTC, ended
+        # 06:00) is a shape Yahoo never returns, and since cycle 16 a past
+        # quote reads hourly bars too.
+        import pandas as pd
+
+        return self._frame if interval == "1d" else pd.DataFrame()
 
 
 @pytest.fixture
