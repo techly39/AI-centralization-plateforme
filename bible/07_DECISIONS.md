@@ -143,3 +143,7 @@ books are also history — a reader should see what was believed and what was me
 (honest measurement, Art. 9) — and only evidenced claims are touched, so a correction never
 smuggles in a new rule. Protected books (00, 01): read, nothing version- or count-specific to
 correct, so no proposal. Alternative rejected: silent rewrite (loses what the Human believed).
+Amended after audit (cycle 8): ADR-019 and SURVEY §9 listed `tools.profile` as global-only;
+the installed schema has a per-agent override (`agents.list[].tools.profile`). ADR-019 stands
+(mcp, web, sessions and agentToAgent are global). The docs' `agentToAgent` default-on is not
+counted as a measured loosening: the installed schema states no default.
