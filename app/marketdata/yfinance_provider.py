@@ -4,6 +4,13 @@ Delayed live quotes and historical OHLCV. This is the only module in the app
 allowed to import ``yfinance``; everything else depends on the interface in
 :mod:`app.marketdata.base`.
 
+Two ways to answer a price (ADR-028). Yahoo's quote endpoint knows only the
+real present, so it answers an ``as_of`` within :data:`LIVE_QUOTE_WINDOW` of
+the real now and nothing else; an older ``as_of`` — every backtest — is
+answered with the close of the last daily bar that had *ended* by then, stamped
+at that bar's end. The real now is read (``wall_now``) only to tell which of
+the two the feed can honestly give; it is never a stamp.
+
 Caching: a quote is reused while the *clock* has moved less than
 ``marketdata.cache_ttl_seconds`` since it was fetched. Keying the cache on the
 injected clock rather than wall time keeps it correct in backtest mode too — a
@@ -20,15 +27,20 @@ from typing import Any
 
 from loguru import logger
 
+from app.clock import wall_now
 from app.marketdata.base import (
+    LIVE_QUOTE_WINDOW,
     Bar,
     MarketDataError,
     MarketDataProvider,
     Quote,
     UnknownTickerError,
-    normalise_ticker,
-    validate_window,
+    bar_end,
 )
+
+#: How far back a past ``as_of`` looks for its last completed daily bar: long
+#: enough to span any exchange holiday stretch.
+_PAST_QUOTE_LOOKBACK = timedelta(days=14)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,14 +71,15 @@ class YFinanceProvider(MarketDataProvider):
 
     # --- prices -------------------------------------------------------------
 
-    def get_price(self, ticker: str, *, as_of: datetime) -> Quote:
-        symbol = normalise_ticker(ticker)
-
+    def _quote(self, symbol: str, *, as_of: datetime) -> Quote:
         cached = self._cache_get(symbol, as_of)
         if cached is not None:
             return cached
 
-        quote = self._fetch_price(symbol, as_of)
+        if wall_now() - as_of <= LIVE_QUOTE_WINDOW:
+            quote = self._fetch_price(symbol, as_of)
+        else:
+            quote = self._past_price(symbol, as_of)
         with self._lock:
             self._cache[symbol] = _CachedQuote(quote=quote, fetched_for=as_of)
         return quote
@@ -117,28 +130,49 @@ class YFinanceProvider(MarketDataProvider):
         if frame is None or frame.empty:
             raise UnknownTickerError(f"no market data for {symbol!r}")
 
+        # The last row may be today's bar still trading: its close is the
+        # current price, and its 00:00 stamp would claim it is older than it is.
         row = frame.iloc[-1]
         return Quote(
             ticker=symbol,
             price=float(row["Close"]),
-            as_of=_to_utc(frame.index[-1]),
+            as_of=as_of,
+            source=self.name,
+        )
+
+    def _past_price(self, symbol: str, as_of: datetime) -> Quote:
+        """The close of the last daily bar that had ended by ``as_of``."""
+        bars = self.get_ohlcv(
+            symbol,
+            start=(as_of - _PAST_QUOTE_LOOKBACK).date(),
+            end=as_of.date() + timedelta(days=1),
+            interval="1d",
+            as_of=as_of,
+        )
+        if not bars:
+            raise UnknownTickerError(
+                f"no completed daily bar for {symbol!r} in the "
+                f"{_PAST_QUOTE_LOOKBACK.days} days before {as_of.isoformat()}"
+            )
+        last = bars[-1]
+        return Quote(
+            ticker=symbol,
+            price=last.close,
+            as_of=bar_end(last.ts, "1d"),
             source=self.name,
         )
 
     # --- history ------------------------------------------------------------
 
-    def get_ohlcv(
+    def _bars(
         self,
-        ticker: str,
+        symbol: str,
         *,
         start: date,
         end: date,
         interval: str,
         as_of: datetime,
     ) -> list[Bar]:
-        symbol = normalise_ticker(ticker)
-        validate_window(start, end, interval, as_of)
-
         import yfinance as yf
 
         try:
@@ -159,14 +193,13 @@ class YFinanceProvider(MarketDataProvider):
                 f"{start.isoformat()} and {end.isoformat()}"
             )
 
+        # No look-ahead filter here: the base drops every bar not ended by
+        # ``as_of`` (a bar's stamp is its open, not its close).
         bars: list[Bar] = []
         for index, row in frame.iterrows():
-            ts = _to_utc(index)
-            if ts > as_of:
-                continue  # look-ahead guard: never emit a bar from the future
             bars.append(
                 Bar(
-                    ts=ts,
+                    ts=_to_utc(index),
                     open=float(row["Open"]),
                     high=float(row["High"]),
                     low=float(row["Low"]),

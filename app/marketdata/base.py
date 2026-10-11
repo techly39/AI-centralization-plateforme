@@ -9,23 +9,35 @@ Two rules every implementation must honour:
 
 1. **Time is injected.** Callers pass ``as_of`` (always ``clock.now()``); the
    provider must never read the system clock to decide what "now" is.
-2. **No look-ahead.** A provider must never return data timestamped after
-   ``as_of``. In live mode that is trivially true; in backtest mode (Phase 3) it
-   is the guarantee the whole simulation rests on, so the check lives here in
-   the shared base rather than in each implementation.
+2. **No look-ahead** (ADR-028, B-005). Nothing known only after ``as_of`` is
+   served: a bar is visible once it has *ended* (:func:`bar_end`), not once it
+   has opened — a daily bar stamped 00:00 carries that day's close — and a quote
+   stamped after ``as_of`` is refused. In a backtest this is the guarantee the
+   whole simulation rests on, so it is enforced here, in the base, and nowhere
+   else: :meth:`MarketDataProvider.get_price` and
+   :meth:`MarketDataProvider.get_ohlcv` are the only public entries, and a
+   subclass may not override them — it implements ``_quote`` / ``_bars``.
 """
 
 from __future__ import annotations
 
+import calendar
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 # Intervals we accept on /ohlcv. Kept deliberately small: these are the ones
 # yfinance serves reliably and the ones a daily-horizon fund actually needs.
 Interval = Literal["1d", "1wk", "1mo", "1h"]
 VALID_INTERVALS: frozenset[str] = frozenset({"1d", "1wk", "1mo", "1h"})
+
+#: How close to the real now an ``as_of`` must be for a live feed's *current*
+#: quote to answer it. Further back, a live feed answers from history. A
+#: backtest's clock is kept at least this far behind the real now
+#: (:mod:`app.run_clock`), so it is always answered from history (ADR-028).
+LIVE_QUOTE_WINDOW = timedelta(seconds=60)
 
 
 # --- Errors -----------------------------------------------------------------
@@ -50,6 +62,17 @@ class InvalidRequestError(MarketDataError):
     """Malformed request (bad interval, end before start) — mapped to HTTP 400."""
 
 
+class FeedDataError(MarketDataError):
+    """The feed answered with something physics refuses (mapped to HTTP 502).
+
+    A quote stamped after the ``as_of`` it answers (data from the future), or a
+    price that is not a positive finite number. The caller asked nothing wrong;
+    the feed failed it — so ``POST /orders`` answers ``price_unavailable`` (502,
+    nothing stored) and the sweep leaves an order pending, exactly as for an
+    outage.
+    """
+
+
 # --- Value objects ----------------------------------------------------------
 
 @dataclass(frozen=True, slots=True)
@@ -58,8 +81,10 @@ class Quote:
 
     ticker: str
     price: float
-    #: When the price itself is from — for a delayed live feed this is the
-    #: provider's stamp, not the moment we asked.
+    #: The latest moment the price can be from — never after the ``as_of``
+    #: asked. A past close is stamped at its bar's end; a live feed's current
+    #: quote, which carries no stamp of its own, at the moment asked (an upper
+    #: bound: a delayed quote is older).
     as_of: datetime
     currency: str = "USD"
     #: Free-form provider tag ("yfinance", "fake") for audit trails.
@@ -80,22 +105,53 @@ class Bar:
 
 # --- Interface --------------------------------------------------------------
 
+#: The public entries a subclass may not override: the look-ahead guard is in
+#: them, and an override would be a provider that skips it.
+_GUARDED = ("get_price", "get_ohlcv")
+
+
 class MarketDataProvider(ABC):
-    """Abstract price source. Implementations must be side-effect free."""
+    """Abstract price source. Implementations must be side-effect free.
+
+    An implementation writes :meth:`_quote` and :meth:`_bars`; callers use
+    :meth:`get_price` and :meth:`get_ohlcv`, which apply the look-ahead law to
+    whatever the implementation returns. Defining ``get_price`` or
+    ``get_ohlcv`` on a subclass is a ``TypeError`` at class creation.
+    """
 
     #: Short name recorded on quotes and in logs.
     name: str = "abstract"
 
-    @abstractmethod
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        for method in _GUARDED:
+            if method in cls.__dict__:
+                raise TypeError(
+                    f"{cls.__name__} defines {method}: implement _quote / _bars "
+                    "instead — the look-ahead guard lives in the base (ADR-028)"
+                )
+
     def get_price(self, ticker: str, *, as_of: datetime) -> Quote:
-        """Latest price for ``ticker`` at or before ``as_of``.
+        """Latest price for ``ticker`` known at ``as_of``.
 
         Raises:
-            UnknownTickerError: symbol unknown / no data.
+            UnknownTickerError: symbol unknown / no data at ``as_of``.
+            FeedDataError: the feed answered from after ``as_of``, or with a
+                price that is not a positive finite number.
             MarketDataError: upstream failure.
         """
+        symbol = normalise_ticker(ticker)
+        _require_aware(as_of)
+        quote = self._quote(symbol, as_of=as_of)
+        if quote.as_of > as_of:
+            raise FeedDataError(
+                f"{self.name} answered {symbol} at {as_of.isoformat()} with a "
+                f"quote from {quote.as_of.isoformat()} — no look-ahead"
+            )
+        if not (math.isfinite(quote.price) and quote.price > 0):
+            raise FeedDataError(f"{self.name} gave {symbol} a price of {quote.price!r}")
+        return quote
 
-    @abstractmethod
     def get_ohlcv(
         self,
         ticker: str,
@@ -105,7 +161,64 @@ class MarketDataProvider(ABC):
         interval: str,
         as_of: datetime,
     ) -> list[Bar]:
-        """Candles in ``[start, end)`` — never any bar stamped after ``as_of``."""
+        """Candles in ``[start, end)`` that had *ended* by ``as_of``.
+
+        A bar still open at ``as_of`` — today's daily bar at noon — is not
+        served: its close is not known yet.
+        """
+        symbol = normalise_ticker(ticker)
+        _require_aware(as_of)
+        validate_window(start, end, interval, as_of)
+        bars = self._bars(symbol, start=start, end=end, interval=interval, as_of=as_of)
+        return [bar for bar in bars if bar_end(bar.ts, interval) <= as_of]
+
+    @abstractmethod
+    def _quote(self, symbol: str, *, as_of: datetime) -> Quote:
+        """The implementation's price for a normalised ``symbol`` at ``as_of``.
+
+        Stamp it honestly (see :attr:`Quote.as_of`); the base refuses a stamp
+        after ``as_of``.
+        """
+
+    @abstractmethod
+    def _bars(
+        self,
+        symbol: str,
+        *,
+        start: date,
+        end: date,
+        interval: str,
+        as_of: datetime,
+    ) -> list[Bar]:
+        """The implementation's candles for a validated window.
+
+        May include bars that had not ended by ``as_of``; the base drops them.
+        """
+
+
+def bar_end(ts: datetime, interval: str) -> datetime:
+    """The first moment a bar opened at ``ts`` is complete — its close known.
+
+    Conservative by construction: a daily bar ends at the next midnight of its
+    stamp, though the exchange closed hours earlier. Serving a close late is a
+    small cost; serving it early is look-ahead.
+    """
+    if interval == "1h":
+        return ts + timedelta(hours=1)
+    if interval == "1d":
+        return ts + timedelta(days=1)
+    if interval == "1wk":
+        return ts + timedelta(weeks=1)
+    if interval == "1mo":
+        year, month = (ts.year + 1, 1) if ts.month == 12 else (ts.year, ts.month + 1)
+        day = min(ts.day, calendar.monthrange(year, month)[1])
+        return ts.replace(year=year, month=month, day=day)
+    raise InvalidRequestError(f"no bar length for interval {interval!r}")
+
+
+def _require_aware(as_of: datetime) -> None:
+    if as_of.tzinfo is None:
+        raise InvalidRequestError("as_of must carry a timezone (UTC)")
 
 
 def normalise_ticker(ticker: str) -> str:

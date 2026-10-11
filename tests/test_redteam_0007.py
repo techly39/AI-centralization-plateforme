@@ -107,7 +107,7 @@ class StepProvider(StaticProvider):
     def price_at(self, ticker: str, as_of: datetime) -> float:
         return [p for t, p in self.steps[normalise_ticker(ticker)] if t <= as_of][-1]
 
-    def get_price(self, ticker: str, *, as_of: datetime) -> Quote:
+    def _quote(self, ticker: str, *, as_of: datetime) -> Quote:
         if self.on_get is not None:
             hook, self.on_get = self.on_get, None
             hook()

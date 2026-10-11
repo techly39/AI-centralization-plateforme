@@ -35,13 +35,19 @@ from app.ledger.events import (
     ledger_now,
 )
 from app.limits import MAX_ADVANCE_MINUTES
+from app.marketdata.base import LIVE_QUOTE_WINDOW
 from app.oms.service import OMS_LOCK
 
 
-#: Does market data refuse anything after the simulated now? Not yet (B-005):
-#: a run opened today records that its results cannot be trusted as a backtest,
-#: so no later reader mistakes them for one. B-005 sets this to True.
-LOOK_AHEAD_GUARD = False
+#: Does market data refuse anything not known by the simulated now? Yes since
+#: B-005 (ADR-028): the guard is in the ``MarketDataProvider`` base. Runs opened
+#: before it record ``False`` in their ``run_started``, so no reader mistakes
+#: them for honest backtests.
+LOOK_AHEAD_GUARD = True
+
+#: How far behind the real now a backtest's clock must stay: within it, a live
+#: feed answers with its current quote, which a simulated "earlier" must not see.
+_REAL_NOW_MARGIN = LIVE_QUOTE_WINDOW
 
 
 class RunClockError(Exception):
@@ -58,8 +64,11 @@ def start_backtest(session: Session, *, start: datetime) -> BacktestClock:
     if start.tzinfo is None:
         raise RunClockError("start must carry a timezone (use UTC, e.g. ...Z)")
     start = start.astimezone(timezone.utc)
-    if start >= wall_now():
-        raise RunClockError("a backtest must start in the past: the future has no data")
+    if start > wall_now() - _REAL_NOW_MARGIN:
+        raise RunClockError(
+            "a backtest must start in the past (at least "
+            f"{_REAL_NOW_MARGIN.seconds} s ago): the future has no data"
+        )
     for table in Base.metadata.sorted_tables:
         if session.scalar(select(func.count()).select_from(table)):
             raise RunClockError(
@@ -125,10 +134,11 @@ def advance(
         # (an operator command) may have stamped later than this one's clock.
         start = ledger_now(session)
         end = start + timedelta(minutes=minutes)
-        if end > wall_now():
+        if end > wall_now() - _REAL_NOW_MARGIN:
             raise RunClockError(
-                "a backtest cannot pass the real now: the world has no data from "
-                "the future to show"
+                "a backtest cannot pass the real now (less "
+                f"{_REAL_NOW_MARGIN.seconds} s): the world has no data from the "
+                "future to show"
             )
         previous = clock.now()
         clock.move_to(end)

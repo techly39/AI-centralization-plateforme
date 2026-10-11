@@ -120,7 +120,20 @@ def stub_yfinance(monkeypatch):
     return holder
 
 
-def test_yfinance_provider_prefers_the_quote_endpoint(stub_yfinance):
+@pytest.fixture
+def real_now_is_now(monkeypatch):
+    """Make NOW the real now, so the provider's live quote may answer it.
+
+    Before ADR-028 these tests asked yfinance's *current* quote for a NOW months
+    in the past and got it — the look-ahead of SURVEY §4a.3. A live quote now
+    answers only an ``as_of`` at the real now; older ones come from history.
+    """
+    import app.marketdata.yfinance_provider as yfp
+
+    monkeypatch.setattr(yfp, "wall_now", lambda: NOW)
+
+
+def test_yfinance_provider_prefers_the_quote_endpoint(stub_yfinance, real_now_is_now):
     from app.marketdata import YFinanceProvider
 
     stub_yfinance["ticker"] = _FakeTicker(last_price=123.45)
@@ -130,7 +143,7 @@ def test_yfinance_provider_prefers_the_quote_endpoint(stub_yfinance):
     assert quote.source == "yfinance"
 
 
-def test_yfinance_provider_falls_back_to_history(stub_yfinance):
+def test_yfinance_provider_falls_back_to_history(stub_yfinance, real_now_is_now):
     import pandas as pd
 
     from app.marketdata import YFinanceProvider
@@ -141,7 +154,18 @@ def test_yfinance_provider_falls_back_to_history(stub_yfinance):
     )
     stub_yfinance["ticker"] = _FakeTicker(last_price=None, frame=frame)
     quote = YFinanceProvider(cache_ttl_seconds=0).get_price("AAPL", as_of=NOW)
+    # Live: the last row is today's bar still trading, its close the current
+    # price — stamped at the moment asked, not at the bar's 00:00 open.
     assert quote.price == 99.5
+    assert quote.as_of == NOW
+
+
+def test_yfinance_reports_unknown_tickers_live(stub_yfinance, real_now_is_now):
+    from app.marketdata import YFinanceProvider
+
+    stub_yfinance["ticker"] = _FakeTicker(last_price=None, frame=None)
+    with pytest.raises(UnknownTickerError):
+        YFinanceProvider(cache_ttl_seconds=0).get_price("NOPE", as_of=NOW)
 
 
 def test_yfinance_provider_reports_unknown_tickers(stub_yfinance):
@@ -152,7 +176,7 @@ def test_yfinance_provider_reports_unknown_tickers(stub_yfinance):
         YFinanceProvider(cache_ttl_seconds=0).get_price("NOPE", as_of=NOW)
 
 
-def test_quote_cache_is_driven_by_the_clock_not_wall_time(stub_yfinance):
+def test_quote_cache_is_driven_by_the_clock_not_wall_time(stub_yfinance, real_now_is_now):
     from app.marketdata import YFinanceProvider
 
     provider = YFinanceProvider(cache_ttl_seconds=60)
@@ -167,8 +191,10 @@ def test_quote_cache_is_driven_by_the_clock_not_wall_time(stub_yfinance):
     assert provider.get_price("AAPL", as_of=NOW + timedelta(seconds=90)).price == 150.0
 
     # A clock that jumps backwards (mode switch, replay) must invalidate too.
+    # (A step back within the live window: a day back is answered from history
+    # since ADR-028, which test_yfinance_answers_the_past_from_history covers.)
     stub_yfinance["ticker"] = _FakeTicker(last_price=42.0)
-    assert provider.get_price("AAPL", as_of=NOW - timedelta(days=1)).price == 42.0
+    assert provider.get_price("AAPL", as_of=NOW - timedelta(seconds=30)).price == 42.0
 
 
 def test_yfinance_history_drops_bars_after_as_of(stub_yfinance):
@@ -196,7 +222,9 @@ def test_yfinance_history_drops_bars_after_as_of(stub_yfinance):
         interval="1d",
         as_of=NOW,  # 2026-07-30 15:00 UTC
     )
-    assert [bar.close for bar in bars] == [1.0, 2.0]
+    # Only 07-29 had ended. The 07-30 bar (opened 00:00, carrying that day's
+    # close) used to be served at 15:00 — the leak of SURVEY §4a.2 (ADR-028).
+    assert [bar.close for bar in bars] == [1.0]
 
 
 # --- Endpoints --------------------------------------------------------------

@@ -18,13 +18,17 @@ from app.metrics.equity import build_equity_curve
 from tests.support import HistoricalProvider, straight_line
 
 DAY_ONE = date(2026, 6, 1)
+DAY_ZERO = DAY_ONE - timedelta(days=1)
 
 
 @pytest.fixture(autouse=True)
 def history(frozen_clock):
     """A market with a real past, installed as the app's provider.
 
-    AAPL rises 100 → 110 over four sessions; MSFT is flat at 400.
+    AAPL rises 100 → 110 over four sessions; MSFT is flat at 400. Each series
+    opens with a *day zero* close equal to day one's: since ADR-028 a trade at
+    15:00 on day one fills at the last close known then — day zero's — and
+    before ADR-028 these tests filled at day one's own close, unknown at 15:00.
 
     Autouse so the clock is frozen before *any* fixture writes an event: ledger
     time never runs backwards (ADR-025), so an ``agent_registered`` stamped by
@@ -32,8 +36,8 @@ def history(frozen_clock):
     """
     provider = HistoricalProvider(
         {
-            "AAPL": straight_line(DAY_ONE, [100.0, 105.0, 102.0, 110.0]),
-            "MSFT": straight_line(DAY_ONE, [400.0, 400.0, 400.0, 400.0]),
+            "AAPL": straight_line(DAY_ZERO, [100.0, 100.0, 105.0, 102.0, 110.0]),
+            "MSFT": straight_line(DAY_ZERO, [400.0, 400.0, 400.0, 400.0, 400.0]),
         }
     )
     frozen_clock.set(datetime(DAY_ONE.year, DAY_ONE.month, DAY_ONE.day, 15, 0, tzinfo=timezone.utc))
@@ -89,7 +93,9 @@ def test_curve_follows_the_market_day_by_day(
     # Cash after 100 shares at $100 plus the 0.1% fee: 100000 - 10000 - 10 = 89990.
     assert curve.points[0].equity == pytest.approx(89_990.0 + 100 * 100.0)
     assert curve.points[1].equity == pytest.approx(89_990.0 + 100 * 105.0)
-    assert curve.points[3].equity == pytest.approx(89_990.0 + 100 * 110.0)
+    # Day four at 15:00: its close (110) is not known yet; marked at day
+    # three's (102). Before ADR-028 this asserted 110 — the look-ahead.
+    assert curve.points[3].equity == pytest.approx(89_990.0 + 100 * 102.0)
     assert curve.fully_priced
 
 
@@ -115,7 +121,7 @@ def test_an_unpriceable_holding_is_carried_at_cost_and_flagged(
 ):
     """One dead symbol must not blank out the whole report."""
     pod_id, _, pm_key = desk
-    history.set_price("ZZZZ", DAY_ONE, 50.0)
+    history.set_price("ZZZZ", DAY_ZERO, 50.0)  # the close known at 15:00 on day one
     order(client, pm_key, ticker="ZZZZ", side="buy", qty=10, price_type="market")
 
     # Now the symbol goes dark: rebuild the provider without it.
@@ -150,18 +156,20 @@ def test_pod_metrics_reports_return_sharpe_and_drawdown(
     perf = body["performance"]
 
     assert body["capital"]["net_contributed"] == 100_000.0
-    assert body["capital"]["total_value"] == pytest.approx(89_990.0 + 11_000.0)
-    # Gained $1,000 on the position, paid $10 in fees.
-    assert perf["pnl"] == pytest.approx(990.0)
-    assert perf["unrealized_pnl"] == pytest.approx(1_000.0)
+    # 15:00 on day four: day four's close (110) is not known yet, so the pod is
+    # marked at day three's (102) — before ADR-028 this read 110, the leak.
+    assert body["capital"]["total_value"] == pytest.approx(89_990.0 + 10_200.0)
+    # Gained $200 on the position, paid $10 in fees.
+    assert perf["pnl"] == pytest.approx(190.0)
+    assert perf["unrealized_pnl"] == pytest.approx(200.0)
     assert perf["fees_paid"] == pytest.approx(10.0)
     assert perf["observations"] == 4
 
     # Time-weighted return is growth from the *first close*, so it is not
     # pnl/contributed: day one's entry fee was paid before there was a prior
     # equity to measure against, and no return series can include it. 99,990
-    # on day one grows to 100,990 on day four.
-    assert perf["total_return"] == pytest.approx(100_990.0 / 99_990.0 - 1, rel=1e-9)
+    # on day one grows to 100,190 on day four.
+    assert perf["total_return"] == pytest.approx(100_190.0 / 99_990.0 - 1, rel=1e-9)
     assert perf["sharpe_daily"] is not None
     assert perf["max_drawdown"] < 0  # the dip on day three
     assert perf["fully_priced"]

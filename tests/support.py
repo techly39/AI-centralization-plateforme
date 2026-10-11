@@ -19,7 +19,6 @@ from app.marketdata.base import (
     Quote,
     UnknownTickerError,
     normalise_ticker,
-    validate_window,
 )
 
 
@@ -51,9 +50,11 @@ class FrozenClock:
 class HistoricalProvider(MarketDataProvider):
     """A price feed with an actual past: ``{ticker: {date: close}}``.
 
-    ``get_price`` answers with the close of the most recent day at or before
-    ``as_of`` — including the look-ahead guarantee the interface requires, so a
-    test cannot accidentally prove something using tomorrow's price.
+    Each entry is one daily bar, open at 00:00 UTC of its date and ended at the
+    next midnight — the same law the real providers obey (ADR-028). ``get_price``
+    answers with the close of the last day that had *ended* by ``as_of``, stamped
+    at its end: at noon on day D that is D−1's close, never D's, so a test cannot
+    prove something using a close nobody could have known yet.
     """
 
     name = "historical-test"
@@ -70,36 +71,28 @@ class HistoricalProvider(MarketDataProvider):
         days[on] = price
         self._series[symbol] = dict(sorted(days.items()))
 
-    def _close_at(self, symbol: str, on: date) -> float | None:
-        days = self._series.get(symbol)
-        if not days:
-            return None
-        candidates = [d for d in days if d <= on]
-        return days[max(candidates)] if candidates else None
+    def _quote(self, symbol: str, *, as_of: datetime) -> Quote:
+        days = self._series.get(symbol) or {}
+        ended = [d for d in days if _day_end(d) <= as_of]
+        if not ended:
+            raise UnknownTickerError(f"no completed test day for {symbol!r} at {as_of}")
+        last = max(ended)
+        return Quote(ticker=symbol, price=days[last], as_of=_day_end(last), source=self.name)
 
-    def get_price(self, ticker: str, *, as_of: datetime) -> Quote:
-        symbol = normalise_ticker(ticker)
-        price = self._close_at(symbol, as_of.date())
-        if price is None:
-            raise UnknownTickerError(f"no test history for {symbol!r} at {as_of.date()}")
-        return Quote(ticker=symbol, price=price, as_of=as_of, source=self.name)
-
-    def get_ohlcv(
+    def _bars(
         self,
-        ticker: str,
+        symbol: str,
         *,
         start: date,
         end: date,
         interval: str,
         as_of: datetime,
     ) -> list[Bar]:
-        symbol = normalise_ticker(ticker)
-        validate_window(start, end, interval, as_of)
         days = self._series.get(symbol)
         if not days:
             raise UnknownTickerError(f"no test history for {symbol!r}")
-
-        bars = [
+        # Every day in the window; the base drops the ones not ended by as_of.
+        return [
             Bar(
                 ts=datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc),
                 open=close,
@@ -111,7 +104,11 @@ class HistoricalProvider(MarketDataProvider):
             for day, close in days.items()
             if start <= day < end
         ]
-        return [bar for bar in bars if bar.ts <= as_of]
+
+
+def _day_end(day: date) -> datetime:
+    """When a test day's bar ends: the next midnight, UTC."""
+    return datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
 
 
 def straight_line(

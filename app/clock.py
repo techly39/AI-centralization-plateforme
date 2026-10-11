@@ -62,8 +62,9 @@ class BacktestClock:
 def wall_now() -> datetime:
     """The real now, whatever clock is installed.
 
-    For one purpose only: a backtest may not run past it, because the world
-    has no data from the future to show (ADR-027). Never a stamp, never a price.
+    For two purposes only, both about what the world can show: a backtest may
+    not run past it (ADR-027), and a live feed's current quote answers only an
+    ``as_of`` near it (ADR-028). Never a stamp, never a price.
     """
     return LiveClock().now()
 

@@ -150,7 +150,9 @@ class HaltOut(BaseModel):
 class PriceOut(BaseModel):
     ticker: str
     price: float
-    as_of: datetime = Field(description="When the price itself is from.")
+    as_of: datetime = Field(
+        description="The latest moment the price can be from; never after the now asked."
+    )
     currency: str
     source: str = Field(description="Which provider served it, for the audit trail.")
 

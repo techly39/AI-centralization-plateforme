@@ -26,7 +26,7 @@ positions are identical; the cash is lower by exactly the fees.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
@@ -55,10 +55,16 @@ TRADING_DAY = date(2026, 5, 16)
 
 @pytest.fixture
 def poc_market(frozen_clock):
-    """The prices the POC actually filled at, on the day it ran."""
+    """The prices the POC actually filled at, on the day it ran.
+
+    At 08:35 UTC the last price anyone knew was the previous day's close, so
+    the fills are that day's bar (ADR-028); keyed on the trading day itself,
+    they would be a close not known until midnight.
+    """
     frozen_clock.set(datetime(2026, 5, 16, 8, 35, tzinfo=timezone.utc))
     provider = HistoricalProvider(
-        {ticker: {TRADING_DAY: price} for ticker, _, price, _ in POC_FILLS}
+        {ticker: {TRADING_DAY - timedelta(days=1): price}
+         for ticker, _, price, _ in POC_FILLS}
     )
     set_provider(provider)
     yield provider

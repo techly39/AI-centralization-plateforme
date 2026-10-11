@@ -176,10 +176,8 @@ def test_hole_small_orders_pay_no_fee(client, two_desks):
     assert resp.json()["fee"] > 0, "traded $4.80 of AAPL for free"
 
 
-@pytest.mark.xfail(strict=True, reason="red-team 0004 LOW (feed, not agent): a NaN/inf price "
-                   "from the provider passes assert_affordable (NaN > cash is False) and then "
-                   "append_event raises ValueError -> 500 on POST /orders; should be a clean "
-                   "price_unavailable rejection. /price also serves price: null")
+# Fixed cycle 16 (B-005/B-025 feed half, ADR-028): the provider base refuses a
+# price that is not a positive finite number -> FeedDataError -> price_unavailable.
 @pytest.mark.parametrize("bad", [math.nan, math.inf])
 def test_hole_non_finite_feed_price_is_a_500(client, two_desks, prices, db, bad):
     c = _soft(client)
