@@ -179,13 +179,18 @@ def test_hole_small_orders_pay_no_fee(client, two_desks):
 # Fixed cycle 16 (B-005/B-025 feed half, ADR-028): the provider base refuses a
 # price that is not a positive finite number -> FeedDataError -> price_unavailable.
 @pytest.mark.parametrize("bad", [math.nan, math.inf])
-def test_hole_non_finite_feed_price_is_a_500(client, two_desks, prices, db, bad):
+def test_held_non_finite_feed_price_is_price_unavailable(client, two_desks, prices, db, bad):
     c = _soft(client)
     _, pm1 = two_desks["pm1"]
     prices.set_price("MSFT", bad)
+    orders_before = db.scalar(select(func.count()).select_from(Order))
     resp = c.post("/orders", headers=H(pm1), json={
         "ticker": "MSFT", "side": "buy", "qty": 1, "price_type": "market", "justification": "t"})
-    assert resp.status_code != 500
+    assert resp.status_code == 502, resp.status_code
+    assert "no price" in resp.text
+    assert db.scalar(select(func.count()).select_from(Order)) == orders_before
+    # /price no longer serves `price: null` for a broken feed.
+    assert c.get("/price/MSFT", headers=H(pm1)).status_code == 502
     _ledger_is_standard_json(db)
 
 
