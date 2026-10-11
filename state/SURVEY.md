@@ -86,7 +86,8 @@ in the backlog: an endpoint for an agent to read its own tasks/costs (see §5).
 ### 2b. Everything else — tests, scripts, docs, legacy, root (S-003b, cycle 5)
 
 Every file read (~6 800 lines). Measurements: `uv run python scripts/survey_probe_repo.py`
-(no `app` import, writes nothing; opens `fund.db` only `mode=ro&immutable=1`, prints no key) —
+(the probe itself imports no `app` and writes nothing — R2's `pytest --collect-only` subprocess
+does import it; opens `fund.db` only `mode=ro&immutable=1`, prints no key) —
 results quoted as **R1–R4**.
 
 **Tests** — 276 collected = 267 + 9 strict-xfail (R2). Per area:
@@ -113,8 +114,8 @@ only, never measured for tests (no coverage tool installed).
 `app` except the settings object" (P9). Root `README.md`: Phase 0–2 status accurate; its Layout
 omits `bible/ state/ governance/ loop/ scripts/ experiments/`, and lists `ui/` as if it existed.
 
-**Legacy** — `legacy/oms_poc/` (`OMS.py` 322, requirements, `Portfolio.json`, one processed order
-+ result, a 148-byte log). Not imported anywhere. **Keep** (05_ERAS: archive unless there is a
+**Legacy** — `legacy/README.md` + `legacy/oms_poc/` (`OMS.py` 322, requirements, `Portfolio.json`,
+a pending-order template, one processed order + result, a 148-byte log). Not imported anywhere. **Keep** (05_ERAS: archive unless there is a
 reason): `test_poc_milestone.py` cites its fills as the milestone's ground truth, and
 `Logs/oms.log` records where the OpenClaw POC lived —
 `~/.openclaw/workspace/OCT/AI Hedgefund POC/OMS/` — a lead for S-005.

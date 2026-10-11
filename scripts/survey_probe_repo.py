@@ -4,7 +4,9 @@ Companion to ``survey_probe_physics.py``. That one inspected ``app/`` from the
 inside on a temp DB; this one looks at everything around it — the suite, root
 files, credentials lying about — and reports, never asserts.
 
-It does **not** import ``app`` and writes nothing. The one place it touches the
+The probe process does **not** import ``app`` and writes nothing; R2's
+``pytest --collect-only`` subprocess does import it (collection only, no cache
+provider; Python may still write ``__pycache__``). The one place it touches the
 Human's ``fund.db`` (R1) opens it with SQLite's ``mode=ro&immutable=1``: no write,
 no lock file, no journal. It never prints a key, only whether its hash matches.
 
@@ -23,6 +25,7 @@ import subprocess
 import sys
 import tomllib
 from collections import Counter
+from contextlib import closing
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -51,7 +54,7 @@ def r1_committed_key() -> None:
         print("    fund.db check: skipped")
         return
     uri = f"file:{db_path}?mode=ro&immutable=1"
-    with sqlite3.connect(uri, uri=True) as conn:
+    with closing(sqlite3.connect(uri, uri=True)) as conn:
         for key in keys:
             digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
             row = conn.execute(
