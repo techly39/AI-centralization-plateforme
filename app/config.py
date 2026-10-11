@@ -38,12 +38,18 @@ class OMSConfig(BaseModel):
 
 
 class MarketDataConfig(BaseModel):
-    # "yfinance" for real delayed quotes, "static" for an offline fixed table.
-    provider: Literal["yfinance", "static"] = "yfinance"
+    # "yfinance" for real delayed quotes, "static" for an offline fixed table,
+    # "synthetic" for a seeded offline random walk (backtests, ADR-030).
+    provider: Literal["yfinance", "static", "synthetic"] = "yfinance"
     # Reuse a quote while the clock has advanced less than this. 0 disables.
     cache_ttl_seconds: float = Field(default=60.0, ge=0.0)
     # Prices used when provider == "static" (ticker -> price).
     static_prices: dict[str, float] = Field(default_factory=dict)
+    # provider == "synthetic": the seed, and each symbol's price on 2000-01-01.
+    synthetic_seed: int = Field(default=0, ge=0, le=2**53 - 1)
+    synthetic_symbols: dict[str, float] = Field(
+        default_factory=lambda: {"SYNA": 100.0, "SYNB": 50.0, "SYNC": 20.0}
+    )
 
 
 class MetricsConfig(BaseModel):
