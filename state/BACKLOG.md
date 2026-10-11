@@ -6,9 +6,10 @@ agent wakes (before B-012's first live conformance probe and before B-015). Orde
 tier: B-002 + B-003 first, B-000d with or before B-016 (both touch `append_event`), B-000e with
 B-018, the rest when cheap or blocking.
 Each red-team hole has a strict-xfail test in `tests/test_redteam_000N.py`; fix = remove the marker.
-Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MCP path; 0004: fee,
-feed price ×2).
-- [ ] **B-025** (low, not agent-reachable) Non-finite or absurd prices from the world: a
+Open strict xfails: 6 (0001: payload size ×2, message content, system squat, MCP path; 0004: fee).
+- [ ] **B-025** (low, not agent-reachable) **Feed half fixed cycle 16** (quotes: the base refuses
+      non-finite / non-positive → `price_unavailable`). Left: non-finite *bar* values, `config.yaml`
+      bounds, sweep per-order isolation. Original: Non-finite or absurd prices from the world: a
       NaN/inf provider price (yfinance can) or `config.yaml` value (`fee_rate`, `static_prices`)
       → `append_event` raises → POST /orders 500; in the background sweep one such fill rolls back
       **every pod's fills that tick**, every tick (`app/oms/monitor.py`). Fix: providers refuse
@@ -68,16 +69,22 @@ feed price ×2).
 - [x] **B-004a** Backtest clock — cycle 15 (ADR-027): a run is a database (`start-backtest`,
       `run_started`), `POST /clock/advance` (`CONTROL_CLOCK`), sweep on advance, restart resume,
       `append_event` refuses a wrong-run clock. Red-team 0007: 3 medium holes fixed.
-- [ ] **B-005** TRD Phase 3b: look-ahead guard on every market-data route + red-team pass.
-      **Next — a backtest is not honest until this lands** (`run_started.look_ahead_guard: false`;
-      flip `LOOK_AHEAD_GUARD` in `app/run_clock.py`; red-team 0007 confirmed yfinance `get_price`
-      ignores `as_of`, so a 2024 run fills at today's quote).
-      Must filter bars by their **end** time (a daily bar stamped 00:00 carries that day's close,
-      SURVEY §4a.2) and never stamp a quote with the requested time (§4a.3). Fix the test double
-      `tests/support.py` `HistoricalProvider` the same way (§4b.3), or the suite certifies the leak.
-- [ ] **B-004b** One "now" for physics: metrics `as_of`, market-data defaults, leaderboard read
+- [x] **B-005** Look-ahead guard — cycle 16 (ADR-028 + amendment): sealed base entries, bars by
+      end, future/non-finite quotes refused, past quote = latest ended 1d/1h bar, window clipped,
+      uniform 404, strict 60 s margin; `LOOK_AHEAD_GUARD = True`. Red-team 0008: 5 holes fixed.
+- [ ] **B-004b** **Next.** One "now" for physics: metrics `as_of`, market-data defaults, leaderboard read
       `ledger_now`, not `get_clock().now()` (IDEAS c14); a grep test pins it. Then the Phase 3
       milestone: one pod, 1-month backtest, < 10 min real time (a scripted probe, no LLM).
+- [ ] **B-035** (low) Market-data follow-ups (re-audit notes, cycle 16): (a) a non-empty error on
+      the 1h leg of a past quote fails the whole quote (502) even when the daily bar exists. Kept
+      fail-safe on purpose (falling back would reopen the stale-quote arbitrage while 1h is flaky);
+      revisit if Yahoo raises on >730-day hourly requests (would silently stop old backtests);
+      (b) two history fetches per past quote and an exact-`as_of` cache → Yahoo request volume at
+      minute-step backtests: a per-run bar cache keyed by (symbol, interval, day) once B-004b's
+      probe measures it; (c) `bar_end` adds 24 h in UTC, so on DST fall-back a NY daily bar ends
+      23:00 local (still after the close: under-conservative by 1 h, not a leak); (d) clip uses
+      `as_of.date()` in `as_of`'s tz (UTC today); (e) live quote stamp hides the feed's delay;
+      (f) `DailyCloseCache` dates Asian closes by UTC day (mis-dated metric, not a leak — red-team).
 - [ ] **B-032** Clock control belongs to the Runtime, not to a firm agent: before any LLM
       management agent wakes, move `CONTROL_CLOCK` from `management` to a Runtime/operator
       identity (ADR-027; Art. 10 — the world's time is not a participant's lever).

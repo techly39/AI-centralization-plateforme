@@ -499,3 +499,31 @@ today's quote, and the test double obeys the same law, then: no provider — rea
 — can serve D's close before D ends or today's quote to 2024; tests that certified the leak turn
 red and are corrected with the reason; red-team 0004's two feed-price xfails pass; and
 `LOOK_AHEAD_GUARD` can be flipped to True.
+Work: (resumed at step 5. The previous session built and committed, then stopped before
+verify; rule X-007.) ADR-028 (+ amendment). `MarketDataProvider` base: `get_price`/`get_ohlcv` the
+only public entries (sealed: MRO check at creation, metaclass + instance `__setattr__` refuse
+replacing them); bars served only once ended (`bar_end`); a quote stamped after `as_of`, or not a
+positive finite price → `FeedDataError` (502 / `price_unavailable` / order stays pending); the
+window handed to an implementation clipped to `as_of`'s day; no ended bar → one uniform 404.
+yfinance: live quote only within 60 s of the real now, otherwise the latest ended 1d/1h bar's
+close stamped at its end; past quotes cached per exact `as_of`. Backtests stay strictly > 60 s
+behind the real now. `LOOK_AHEAD_GUARD = True`. Test double fixed. Auditor **PASS** (NOTE: the 0004
+feed-price test only asserted `!= 500` → now asserts 502, nothing stored, `/price` 502). Red-team 0008:
+**5 holes** (1 high: after the close `/ohlcv?interval=1h` showed today's 250 while fills used
+yesterday's 180, a risk-free +39%; 2 medium: quote cache outlives a bar end, existence oracle via
+`[]` vs 404 on rows after `as_of`; 2 low: seal dodged by mixin/setattr, 60 s off-by-equality),
+12 held. All 5 fixed same cycle; each of the 9 fixes turns its test red when reverted alone. Re-audit **PASS** (notes →
+B-035).
+Result: merged cb6f4f6, pushed. 628+8xf → **675 passed + 6 xfailed** (red-team 0004's two feed-price
+xfails closed). Hypothesis **met, then widened**: no feed serves the future. But that was only half
+the law. The other half: the price must not be *older* than what the same world already shows, and no
+answer may *depend* on what is not known.
+Learned: (1) Look-ahead has three faces, not one: serving the future (the guard), *withholding*
+the known present from the price (stale-quote arbitrage between two routes of one feed), and
+*answers shaped by* the future (an error vs an empty list is a bit of information). An honest
+backtest needs all three; only the first is a filter. (2) Consistency across routes is a law: when
+two routes show "the market", the agent can trade the gap. The fill price must be the latest that
+any route has revealed. (3) A defence that is redundant with another is invisible to mutation
+testing, so each needs its own test (the clip and the uniform 404 each closed the oracle alone).
+Next: B-004b one "now" (`ledger_now`) for metrics/market data + the Phase 3 milestone probe →
+S-004b → B-028.

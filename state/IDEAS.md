@@ -162,3 +162,17 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   every physics guard and law version in force (fee model, ADR numbers, git sha). Then the
   Observatory can refuse to compare runs born under different physics — honest measurement across
   generations.
+
+## Cycle 16
+- **One "known-by" index for the whole world.** Every route that shows the market (`/price`,
+  `/ohlcv` per interval, metrics, later news/filings from Truman) reports the latest moment it has
+  revealed; physics keeps a per-run `revealed_until[ticker]` and the fill price must be at least
+  that fresh. Turns "no route may be staler than another" from a yfinance detail into a law any
+  new feed inherits, which matters when Truman adds non-price information.
+- **Information-shape tests.** A generic property test: for any request R and as_of T, the
+  response (status, body, error text) is identical across two worlds that agree up to T and
+  differ after it. Run it over every agent-reachable route with a pair of synthetic feeds. Catches
+  existence oracles like red-team 0008's without having to imagine them.
+- **Deterministic synthetic market.** A seeded `SyntheticProvider` (GBM + jumps, any interval,
+  any date) would make the Phase 3 probe network-free, byte-reproducible and fast. It is also
+  Truman's first organ.

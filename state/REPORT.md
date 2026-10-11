@@ -1,5 +1,18 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 16: backtests are now honest about time.** A backtest replaying March 2024
+can no longer see prices from after its simulated "now". Every market-data source goes through
+one checkpoint that refuses "future" data, and no data source can skip that checkpoint. Today's
+closing price only becomes visible once the day has actually ended. New backtests record
+`look_ahead_guard: true`. The attack review found five ways around the first version, and all five
+are fixed. The worst was an arbitrage: after the market closed, an agent could already see
+today's closing price in the hourly price history, but its trades still went through at
+yesterday's price. That would have been a guaranteed 39% profit in the test. Trades now use
+the newest price the agent can already see. One design rule for later is now on record: agents'
+own code must never run inside the fund's engine. Nothing needs your action. P-0003 is still open.
+
+---
+
 **2026-10-11 — Cycle 15: the fund can now run in simulated past time (backtest), safely
 separated from the live fund.** A backtest is its own database file: you create it empty, give
 it a start date (for example 2 January 2024), and its clock then moves only when management calls
