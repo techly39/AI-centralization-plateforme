@@ -24,7 +24,7 @@ navigation lists `TOOLS.md` and `HEARTBEAT.md` as **retired** workspace files �
 OCT POC was built with `TOOLS.md`. Anything you "know" about OpenClaw may be stale.
 
 **The docs are not your version** (Survey, cycle 7 — `runtime/openclaw/VERSION_NOTES.md`):
-`docs.openclaw.ai` serves the *latest* release (no versioned docs were found). The Mac mini
+`docs.openclaw.ai` serves the *latest* release (whether versioned docs exist was not checked). The Mac mini
 runs **2026.5.12**, whose roster key is still `agents.list`, while the docs (≥ 2026.9) say
 `agents.entries` — and at least one newer default is **looser**: `tools.sessions.visibility`
 `tree` → `all`. (The docs also say `tools.agentToAgent.enabled` defaults on; the installed
