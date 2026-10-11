@@ -54,7 +54,9 @@ def test_every_role_reads_the_clocks_now(
     frozen_clock, client, agent_factory, make_pod, role
 ) -> None:
     key = _key(agent_factory, make_pod, role)
-    moment = datetime(2019, 3, 4, 14, 30, tzinfo=timezone.utc)
+    # After the fixtures' stamps: an earlier moment is a step back, where /clock
+    # reports the held ledger time (tests/test_redteam_0006.py).
+    moment = datetime(2026, 9, 4, 14, 30, tzinfo=timezone.utc)
     frozen_clock.set(moment)
     resp = client.get("/clock", headers=H(key))
     assert resp.status_code == 200, resp.text

@@ -28,7 +28,9 @@ from app.registry import permissions
 from app.registry.permissions import Action, has_permission
 from tests.test_redteam_0001 import H, two_desks  # noqa: F401  (fixtures)
 
-T0 = datetime(2019, 3, 4, 14, 30, tzinfo=timezone.utc)
+# After the fixtures' stamps (2026-06-01): an earlier T0 would be a clock step
+# back, which /clock now reports as the held ledger time (the hole below, fixed).
+T0 = datetime(2026, 9, 4, 14, 30, tzinfo=timezone.utc)
 FUTURE = "2099-01-01T00:00:00Z"
 
 
@@ -92,7 +94,7 @@ def test_held_query_strings_on_the_clock_read_change_nothing(
         assert resp.status_code == 200, (path, resp.status_code)
         assert resp.json() == {"mode": "frozen", "now": T0.isoformat().replace("+00:00", "Z")}
     # The clock did not move and nothing was written.
-    assert client.get("/clock", headers=H(two_desks["an1"][1])).json()["now"].startswith("2019-03-04")
+    assert client.get("/clock", headers=H(two_desks["an1"][1])).json()["now"].startswith("2026-09-04")
     assert _events(db) == before
 
 
@@ -269,10 +271,13 @@ def test_held_other_pods_activity_does_not_move_the_clock_read(
 # pod wrote to the ledger at a time the agent's "now" has not reached yet — in a
 # backtest, a date in the simulated future. Fix options: /clock reports
 # max(clock, ledger floor); or B-004 forbids a clock step behind the floor.
+#
+# FIXED (cycle 14): /clock reports ``ledger_now`` = max(clock, ledger floor), the
+# stamp the next event will carry. The precondition ``told == base`` became
+# ``told == later``: the agent is told the held time, not the raw clock.
 # =============================================================================
 
-@pytest.mark.xfail(strict=True, reason="HOLE rt-0006: /clock ignores the ledger floor (B-004)")
-def test_hole_clock_read_agrees_with_ledger_stamp_after_step_back(
+def test_held_clock_read_agrees_with_ledger_stamp_after_step_back(
     frozen_clock, client, two_desks
 ):
     base = frozen_clock.now()          # fixtures already stamped the ledger here
@@ -294,7 +299,7 @@ def test_hole_clock_read_agrees_with_ledger_stamp_after_step_back(
     stamped = datetime.fromisoformat(r.json()["created_at"])
     if stamped.tzinfo is None:
         stamped = stamped.replace(tzinfo=timezone.utc)
-    assert told == base
-    # The hole: pm1's stamp is pm2's later date, so the gap between the now it was
-    # told and the stamp it got reveals another pod's activity in pm1's "future".
+    assert told == later
+    # Was the hole: pm1's stamp is pm2's later date; a gap between the now it was
+    # told and the stamp it got would reveal another pod's activity.
     assert stamped == told, (told, stamped, later)

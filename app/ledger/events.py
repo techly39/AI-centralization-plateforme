@@ -82,6 +82,16 @@ def append_event(
     return event
 
 
+def ledger_now(session: Session) -> datetime:
+    """The time the next event would be stamped with: ``max(clock, latest ts)``.
+
+    What ``GET /clock`` tells agents (ADR-026): after the clock steps back the
+    ledger holds its stamps (ADR-025), and a read of the raw clock would then
+    disagree with the stamp on the agent's very next order.
+    """
+    return session.scalar(select(_not_before_latest(get_clock().now())))
+
+
 def _not_before_latest(now: datetime) -> ColumnElement[datetime]:
     """``max(now, latest ts in the ledger)``, evaluated inside the INSERT itself.
 

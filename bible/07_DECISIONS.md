@@ -374,3 +374,14 @@ deactivated agent gets 401. Mutation: dropping `READ_CLOCK` from the universal s
 red, all clock tests, nothing else. Red-team 0005's `test_held_no_clock_control_on_the_surface`
 (no clock write for any role, management included) is unchanged; its management-only read guard
 is replaced by a read-only guard (200, only `mode`/`now`).
+Amendment (same cycle, review): red-team 0006 — 1 low hole, ~36 attacks held (query strings, path
+and verb tricks, forged keys, `READ_CLOCK` admitting any other route, universal-set creep,
+cross-pod reads, deny-event spam, per-pod side channels, halt). Hole: after a clock step back the
+ledger holds its stamps (ADR-025) but `/clock` returned the raw clock, so an agent's next order
+was stamped later than the now it was told — the gap revealed another pod's activity in its
+"future". Fix: **`now` is the ledger's now** — `ledger_now(session)` in `app/ledger/events.py`,
+`max(clock, latest ts)` through the same `_not_before_latest` expression the INSERT uses: the stamp
+the agent's next event will carry. It reveals nothing an order would not (`created_at`). Mutation:
+raw clock back in `/clock` → only that test red. Tests whose frozen moment sat *before* the
+fixtures' stamps (an unnoticed step back) were moved after them; the attacks are unchanged.
+B-004's per-`run_id` floor will scope `ledger_now` with it.
