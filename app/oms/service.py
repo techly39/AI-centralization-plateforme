@@ -225,11 +225,12 @@ def place_order(
     )
 
     with OMS_LOCK:
-        if get_clock().mode != "live" and ledger_now(session) != now:
+        stamp_now = ledger_now(session)
+        if get_clock().mode != "live" and stamp_now != now:
             # A backtest clock advanced while the price was fetched (red-team
             # 0007): the order will be stamped at the new now, so it is priced
             # there too. Only this rare path fetches under the lock.
-            now = ledger_now(session)
+            now = stamp_now
             if price_type is PriceType.market:
                 reference_price = _fetch_price(provider, symbol, now)
         try:

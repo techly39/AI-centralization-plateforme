@@ -523,10 +523,12 @@ the raw clock. After a clock step back an agent was told 10 June, shown 4 June's
 10 June — a market order filled at a price from a moment its own stamp says had passed. Which "now"
 does physics answer with?
 Answer from the future: **one: `ledger_now(session)`.** Every physics reader of time uses it; the
-raw `clock.now()` is called only where an allowlist in `tests/test_one_now.py` names the file and
-the reason (the clocks; `append_event`/`ledger_now`, whose floor is applied in SQL; the backtest
-controller; the CLI's start line; the request log). The four row-stamp sites of B-028 are listed
-there as debt and leave the list when B-028 copies `event.ts`; a second test fails on a dead entry.
+raw clock is read only where an allowlist in `tests/test_one_now.py` names the file, the exact
+number of reads and the reason (the clocks; `append_event`/`ledger_now`, whose floor is applied in
+SQL; the backtest controller; yfinance's 60 s live window; the CLI's start line; the request log).
+A "read" is any spelling the AST shows: `.now`/`.utcnow`/`.today` called or not, `getattr(x,
+"now")`, anything off the `time` module, `wall_now`. The row-stamp sites of B-028 are listed as
+debt and leave the list when B-028 copies `event.ts`; a count above or below the list is red.
 Why: (1) **Honest measurement** — price, valuation and stamp of one act must be one moment, or
 P&L is measured across a gap nobody chose. (2) **Safer seal** — a law pinned by an AST test, not
 by review: a new `.now()` in physics is red until someone argues for it. (3) Deterministic and

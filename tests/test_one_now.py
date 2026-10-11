@@ -132,45 +132,76 @@ def test_the_sweep_prices_at_the_ledgers_now(client, stepped_back, db) -> None:
 
 # --- The static law ----------------------------------------------------------
 
-#: Every place in ``app/`` allowed to call ``.now()`` on a clock, and why. A new
-#: reader of time must use ``ledger_now(session)``; one that cannot must be added
-#: here with its reason, in review.
-ALLOWED_NOW_CALLS: dict[str, str] = {
-    "clock.py": "the clocks themselves",
-    "ledger/events.py": "append_event and ledger_now: the floor is applied in SQL",
-    "run_clock.py": "the backtest controller compares the raw clock with ledger_now",
-    "cli.py": "prints the start of a run it has just created",
-    "main.py": "request log line: diagnostics, not physics",
+#: Every raw read of time in ``app/``, counted per file, and why. A new reader of
+#: time must use ``ledger_now(session)``; one that cannot must change a count
+#: here with its reason, in review. Counted per read, not per file: a listed
+#: file gaining one more read is as red as an unlisted one (auditor, cycle 17).
+ALLOWED_TIME_READS: dict[str, tuple[int, str]] = {
+    "clock.py": (2, "the clocks themselves"),
+    "ledger/events.py": (2, "append_event and ledger_now: the floor is applied in SQL"),
+    "run_clock.py": (3, "the backtest controller: raw clock vs ledger_now, wall_now bound"),
+    "marketdata/yfinance_provider.py": (1, "wall_now: the live quote's 60 s window (ADR-028)"),
+    "cli.py": (1, "prints the start of a run it has just created"),
+    "main.py": (3, "request log line and its elapsed ms: diagnostics, not physics"),
     # B-028: these rows should copy their event's held stamp, not read a clock.
-    "metrics/reporting.py": "B-028 (Cost.ts, Task.started_at/ended_at)",
-    "bus/messages.py": "B-028 (Message.ts)",
-    "registry/service.py": "B-028 (Agent.created_at)",
-    "registry/pods.py": "B-028 (Allocation.ts)",
+    "metrics/reporting.py": (3, "B-028 (Cost.ts, Task.started_at/ended_at)"),
+    "bus/messages.py": (1, "B-028 (Message.ts)"),
+    "registry/service.py": (2, "B-028 (Agent.created_at)"),
+    "registry/pods.py": (1, "B-028 (Allocation.ts)"),
 }
 
+#: Attribute names that read a clock, called or not (``f = clock.now`` counts).
+_CLOCK_ATTRS = {"now", "utcnow", "today"}
 
-def _now_calls() -> dict[str, int]:
+
+def _is_time_read(node: ast.AST) -> bool:
+    if isinstance(node, ast.Attribute):
+        # x.now / datetime.utcnow / date.today, and anything off the time module.
+        return node.attr in _CLOCK_ATTRS or (
+            isinstance(node.value, ast.Name) and node.value.id == "time"
+        )
+    if isinstance(node, ast.Name):
+        return node.id == "wall_now" and isinstance(node.ctx, ast.Load)
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        # getattr(clock, "now") spells the attribute as a string.
+        return node.func.id == "getattr" and any(
+            isinstance(a, ast.Constant) and a.value in _CLOCK_ATTRS for a in node.args
+        )
+    return False
+
+
+def _time_reads() -> dict[str, int]:
     found: dict[str, int] = {}
     for path in sorted(APP.rglob("*.py")):
         tree = ast.parse(path.read_text(), filename=str(path))
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "now"
-            ):
-                rel = path.relative_to(APP).as_posix()
-                found[rel] = found.get(rel, 0) + 1
+        n = sum(1 for node in ast.walk(tree) if _is_time_read(node))
+        if n:
+            found[path.relative_to(APP).as_posix()] = n
     return found
 
 
 def test_no_physics_reader_of_now_bypasses_the_ledger() -> None:
-    offenders = {f: n for f, n in _now_calls().items() if f not in ALLOWED_NOW_CALLS}
-    assert not offenders, (
-        f"read time with ledger_now(session), not clock.now(): {offenders}"
-    )
+    allowed = {f: n for f, (n, _) in ALLOWED_TIME_READS.items()}
+    found = _time_reads()
+    over = {f: n for f, n in found.items() if n > allowed.get(f, 0)}
+    assert not over, f"read time with ledger_now(session), not the clock: {over}"
 
 
-def test_the_allowlist_has_no_dead_entries() -> None:
-    dead = set(ALLOWED_NOW_CALLS) - set(_now_calls())
-    assert not dead, f"no longer reads the clock — remove from the allowlist: {dead}"
+def test_the_allowlist_is_exact() -> None:
+    allowed = {f: n for f, (n, _) in ALLOWED_TIME_READS.items()}
+    under = {f: n for f, n in allowed.items() if _time_reads().get(f, 0) < n}
+    assert not under, f"fewer raw reads than listed — lower the count: {under}"
+
+
+@pytest.mark.parametrize("source", [
+    "get_clock().now()",
+    "f = clock.now",
+    "getattr(clock, 'now')()",
+    "datetime.utcnow()",
+    "date.today()",
+    "time.time()",
+    "time.monotonic()",
+    "wall_now()",
+])
+def test_the_detector_sees_every_spelling(source: str) -> None:
+    assert any(_is_time_read(n) for n in ast.walk(ast.parse(source))), source
