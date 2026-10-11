@@ -20,9 +20,11 @@ def rebuild_state(session: Session) -> DerivedState:
     The caller owns the transaction. Returns the computed state for inspection
     or comparison (used by tests to assert replay determinism).
     """
-    # Replay every event in canonical order into an in-memory accumulator.
+    # Replay every event in append order — the order live state folded them
+    # (ADR-025) — into an in-memory accumulator. Not ``ts``: a ledger written
+    # before time was made monotonic can hold a later event with an earlier stamp.
     state = DerivedState()
-    events = session.execute(select(Event).order_by(Event.ts, Event.id)).scalars()
+    events = session.execute(select(Event).order_by(Event.id)).scalars()
     for event in events:
         apply_event(state, event)
 

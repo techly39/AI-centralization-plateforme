@@ -17,6 +17,11 @@ from typing import Callable
 from app.db.models import Event
 from app.ledger.events import EVENT_ALLOCATION_SET, EVENT_ORDER_FILLED
 
+#: Quantities below this are treated as zero (float dust from partial sells).
+#: Lives here, below the OMS, because the reducer is where a position closes;
+#: the OMS re-exports it from ``app.oms.money`` for its sell check.
+QTY_EPSILON = 1e-9
+
 
 @dataclass
 class DerivedState:
@@ -86,9 +91,16 @@ def _apply_order_filled(state: DerivedState, payload: dict) -> None:
         pos["qty"] = new_qty
         state.positions[key] = pos
     elif side == "sell":
+        if qty > pos["qty"] + QTY_EPSILON:
+            # The OMS never fills such a sell, so a history holding one is
+            # corrupt or replayed out of order: say so, never erase it (ADR-025).
+            raise ValueError(
+                f"sell of {qty:g} {ticker} beyond pod {pod_id}'s position "
+                f"of {pos['qty']:g}"
+            )
         state.cash[pod_id] = state.cash.get(pod_id, 0.0) + (qty * price - fee)
         pos["qty"] -= qty
-        if pos["qty"] <= 1e-9:
+        if pos["qty"] <= QTY_EPSILON:
             state.positions.pop(key, None)
         else:
             state.positions[key] = pos

@@ -18,10 +18,12 @@ Conventions, decided once and applied everywhere:
 
 from __future__ import annotations
 
+#: Quantities below this are treated as zero (float dust from partial sells).
+#: Defined by the reducer, where a position actually closes.
+from app.ledger.reducers import QTY_EPSILON  # noqa: F401  (re-export)
+
 #: Decimal places money is stored with. Cents.
 MONEY_PRECISION = 2
-#: Quantities below this are treated as zero (float dust from partial sells).
-QTY_EPSILON = 1e-9
 
 
 def round_money(amount: float) -> float:
