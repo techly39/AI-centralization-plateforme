@@ -176,3 +176,16 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - **Deterministic synthetic market.** A seeded `SyntheticProvider` (GBM + jumps, any interval,
   any date) would make the Phase 3 probe network-free, byte-reproducible and fast. It is also
   Truman's first organ.
+
+## Cycle 17
+- **A "moment" object instead of a datetime.** Every physics answer takes a `Moment` (ledger now
+  + the run id + the revealed-until index), obtained once per request by a FastAPI dependency and
+  passed down. "One read of now per answer" then holds by construction instead of by review, and
+  the per-file time-read allowlist could shrink to the dependency itself.
+- **Commit-then-reveal as a general law.** The advance fix (ledger first, process state second)
+  applies to every in-memory mirror of ledger state (installed clock, caches, halt view): a
+  mirror may only move after the event that justifies it is committed. An AST/grep check could
+  list every module-level mutable that mirrors the ledger.
+- **Stamp check after flush (B-036).** One helper `assert_priced_at(event, now)` after every
+  `append_event` that carries a price: cheap, process-count-agnostic, and it would make
+  `OMS_LOCK` purely a performance device rather than a correctness one.

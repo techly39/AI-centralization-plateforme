@@ -535,3 +535,45 @@ S-004b → B-028.
   and skills go in `protocol/`. `.claude/commands/cycle.md` now only points there and holds the
   three gates + the `loop_status.json` rule; it and `.claude/agents/` are sealed (Constitution 6.1).
 - `protocol/`, CLAUDE.md, 06_LOOP §8, PROPOSALS and this entry may be uncommitted: commit them in step 0.
+
+## Cycle 0017 — One now: every physics reader of time reads the ledger's now (2026-10-11)
+Era: I — The Desk
+Exit criterion served: "one pod runs end-to-end" in backtest (Era I, TRD Phase 3): price,
+valuation and stamp of one act must be one moment, or the backtest's P&L measures a gap.
+Hypothesis: (written at step 4 by the Builder, recorded here at step 8 — the journal was being
+edited by the Human's intervention mid-cycle.) If every physics reader of "now" — `/price`, the
+`/ohlcv` defaults, `/portfolio`, pod metrics, the leaderboard, the OMS reference price and the
+sweep — reads `ledger_now(session)` instead of the raw clock, and an AST test pins every other raw
+read to an allowlist with reasons, then after a clock step back all of them answer at the moment
+`/clock` reports and the next order is stamped with, and a new raw read in physics is red.
+Work: ADR-029 (+ amendment). Seven readers moved to `ledger_now`; `tests/test_one_now.py`
+(step-back scenario: ledger on 10 June, clock back to 5 June, every route answers at 10 June —
+each red before; AST law). Red-team 0007's sweep spy moved to `monitor.ledger_now` (same read,
+same property). Auditor **PASS** (WARN ×2: allowlist per file → per read; detector too narrow →
+widened; NOTE: one read under the lock; docstring). Red-team 0009: **6 findings** — 1 medium (the
+advance moved the process clock before committing its event: lock-free reads showed tomorrow's
+close, and a failed commit took the day back), 4 low (metrics/leaderboard read now twice; a
+concurrent sale counted twice in the book; 8 detector dodges), 1 low open (cross-process
+`OMS_LOCK` gap → B-036, 2 strict xfails). Fixed: `append_event(at=)` (one caller by law) so the
+advance commits first and moves the clock after; one `now` passed down through metrics and the
+ranking; positions and cash read together under `OMS_LOCK` before pricing; the detector sees
+imports, `_now`, `wall_now`, `current_timestamp`, computed `getattr`, `methodcaller`. Mutations:
+clock-before-commit → red; cash-after-pricing → red; the lock part of the book fix is
+defence-in-depth (in-thread RLock), said in the ADR. Re-audit **PASS** (NOTE: pin `at=` callers →
+done). Mid-cycle the Human's P-0003 intervention landed (`protocol/`, CLAUDE.md, 06_LOOP §8,
+PROPOSALS, this journal); committed on main after the merge as its entry asks. `setup/` (the
+Human's one-shot installer for protected files) left untouched: it makes
+`test_every_python_directory_is_placed_in_the_law` fail in the working tree only — the committed
+tree has no `setup/`.
+Result: merged f03fb6c, pushed. 675+6xf → **717 passed + 8 xfailed** (+2 = B-036). Hypothesis
+**met, then widened**: the readers now agree on *which* now; red-team showed the law also needs
+*how many* reads one answer takes (one) and *when* a now becomes visible (only after its event
+commits).
+Learned: (1) An in-memory mirror of ledger state (the installed clock) must move only after the
+event that justifies it commits — otherwise lock-free readers see a future the ledger may never
+reach. Ledger first, mirror second. (2) "Read where you stamp" (cycles 13–15) has a twin: "read
+once per answer". Two reads of now in one report are two moments. (3) A mutation that doesn't go
+red is information, not failure: the book fix was the read *order*; the lock was redundant in
+the test's thread and is honestly labelled defence-in-depth.
+Next: B-004c the Phase 3 milestone probe (one scripted pod, 1-month backtest, twice to the same
+curve) → S-004b → B-028 (shrinks the time-read allowlist).

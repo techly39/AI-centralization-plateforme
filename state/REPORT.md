@@ -1,5 +1,20 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-11 — Cycle 17: the whole fund now agrees on what time it is.** Before this change,
+the clock agents read, the prices they were shown and the time stamped on their trades could
+come from three different moments (after the clock was moved backward). Now they all come from
+one: the fund's own record of time. A test now flags any new code that reads the clock any other
+way. The attack review found 6 problems, and 5 are fixed. The most serious one: while a backtest
+moved forward a day, agents could already see the next day's prices before the move was saved,
+and if saving failed, the day was undone after they had seen it. Now the move is saved first and
+only then shown. One minor problem is still open (B-036). It needs two programs writing to the
+same fund database at the same moment, which normal use never does. **Your P-0003 change is
+committed** (the `protocol/` folder and the edits to CLAUDE.md, 06_LOOP and PROPOSALS).
+`setup/` is untouched and waiting for you to run `bash setup/update.sh`. Until you do, one
+directory test fails on this machine only, because `setup/` is not in git.
+
+---
+
 **2026-10-11 — Cycle 16: backtests are now honest about time.** A backtest replaying March 2024
 can no longer see prices from after its simulated "now". Every market-data source goes through
 one checkpoint that refuses "future" data, and no data source can skip that checkpoint. Today's

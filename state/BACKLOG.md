@@ -6,7 +6,8 @@ agent wakes (before B-012's first live conformance probe and before B-015). Orde
 tier: B-002 + B-003 first, B-000d with or before B-016 (both touch `append_event`), B-000e with
 B-018, the rest when cheap or blocking.
 Each red-team hole has a strict-xfail test in `tests/test_redteam_000N.py`; fix = remove the marker.
-Open strict xfails: 6 (0001: payload size ×2, message content, system squat, MCP path; 0004: fee).
+Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MCP path; 0004: fee;
+0009: cross-process OMS_LOCK ×2 = B-036).
 - [ ] **B-025** (low, not agent-reachable) **Feed half fixed cycle 16** (quotes: the base refuses
       non-finite / non-positive → `price_unavailable`). Left: non-finite *bar* values, `config.yaml`
       bounds, sweep per-order isolation. Original: Non-finite or absurd prices from the world: a
@@ -72,9 +73,20 @@ Open strict xfails: 6 (0001: payload size ×2, message content, system squat, MC
 - [x] **B-005** Look-ahead guard — cycle 16 (ADR-028 + amendment): sealed base entries, bars by
       end, future/non-finite quotes refused, past quote = latest ended 1d/1h bar, window clipped,
       uniform 404, strict 60 s margin; `LOOK_AHEAD_GUARD = True`. Red-team 0008: 5 holes fixed.
-- [ ] **B-004b** **Next.** One "now" for physics: metrics `as_of`, market-data defaults, leaderboard read
-      `ledger_now`, not `get_clock().now()` (IDEAS c14); a grep test pins it. Then the Phase 3
-      milestone: one pod, 1-month backtest, < 10 min real time (a scripted probe, no LLM).
+- [x] **B-004b** One now — cycle 17 (ADR-029 + amendment): quotes, OHLCV defaults, portfolio,
+      metrics, leaderboard, order pricing and the sweep read `ledger_now`; one read per report;
+      advance commits before the clock moves; AST law counts every raw time read per file.
+      Red-team 0009: 4 holes + 8 detector dodges fixed, 1 → B-036.
+- [ ] **B-004c** **Next.** The Phase 3 milestone probe: one scripted pod (no LLM), 1-month
+      backtest, < 10 min real time, replayed twice to the same equity curve (first determinism
+      test; measures B-035b request volume). Consider the seeded `SyntheticProvider` (IDEAS c16).
+- [ ] **B-036** (low) `OMS_LOCK` is per-process: a second process (operator `check-orders`, a
+      second server) that commits an advance between the in-lock read of now and the fill INSERT
+      prices a fill at the old now and stamps it at the new; `build_portfolio`'s positions+cash
+      read has the same cross-process gap. 2 strict xfails in `tests/test_redteam_0009.py`. Fix:
+      after the flush compare `event.ts` with the priced now and roll back on mismatch, or
+      `BEGIN IMMEDIATE` before the read. With B-000b. Also (re-audit): `/portfolio` and metrics now
+      wait for `OMS_LOCK` behind a sweep's network pricing — watch latency once live sweeps run.
 - [ ] **B-035** (low) Market-data follow-ups (re-audit notes, cycle 16): (a) a non-empty error on
       the 1h leg of a past quote fails the whole quote (502) even when the daily bar exists. Kept
       fail-safe on purpose (falling back would reopen the stale-quote arbitrage while 1h is flaky);
@@ -88,9 +100,8 @@ Open strict xfails: 6 (0001: payload size ×2, message content, system squat, MC
 - [ ] **B-032** Clock control belongs to the Runtime, not to a firm agent: before any LLM
       management agent wakes, move `CONTROL_CLOCK` from `management` to a Runtime/operator
       identity (ADR-027; Art. 10 — the world's time is not a participant's lever).
-- [ ] **B-033** (low, operator-only) `advance` moves the clock before its commit; if the commit
-      fails, non-OMS writers may already hold stamps at `end` with no `clock_advanced` explaining
-      them (auditor WARN, cycle 15). Also: two concurrent `start-backtest` on one empty file, or a
+- [ ] **B-033** (low, operator-only) ~~`advance` moves the clock before its commit~~ fixed cycle 17
+      (ledger first, clock second — red-team 0009). Left: two concurrent `start-backtest` on one empty file, or a
       stale live write between its emptiness check and `run_started` (run check and insert are two
       statements). Fix: one statement, or a file lock for `start-backtest`. Mode check is a string
       (`!= "backtest"`) — an explicit allowed set if a third clock type appears.
