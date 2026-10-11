@@ -92,6 +92,8 @@ Deliverables:
 1. Commit Phase 2; add `tests/test_boundaries.py` (dependency law, no LLM SDK in `app/`).
    *(Done: Phase 2 committed in the Survey; boundary test cycle 10, ADR-022.)*
 2. Halt in physics (`governance/HALT` → agent writes refused; `GET /halt`).
+   *(Done cycle 11, ADR-023: 423 + `halt_refused` event for every write, every role; monitor
+   idle; `GET /halt` + MCP `get_halt`. The Runtime half — wakes stop within a tick — is B-009.)*
 3. TRD Phase 3: simulated clock, `/clock/advance`, look-ahead guard, `run_id` scopes,
    allocation endpoint, meeting packages.
 4. Truman v1: prices-only pack from cached real history + one scripted scenario;

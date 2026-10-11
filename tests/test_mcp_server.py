@@ -304,6 +304,32 @@ async def test_a_rejected_order_is_a_result_not_a_tool_failure(
 
 
 @pytest.mark.anyio
+async def test_a_halted_world_tells_the_agent_why(
+    mcp_client_factory, admin_key, make_pod, fund_pod_cash, halt_file
+):
+    """A halt is a tool failure the agent can read, and ``get_halt`` explains it."""
+    pod_id = make_pod(1)
+    fund_pod_cash(pod_id, 100_000.0)
+
+    async with mcp_client_factory(admin_key) as admin_conn:
+        pm = await call(
+            build_server(admin_conn), "register_agent",
+            name="pm-mcp", role="pm", pod_id=pod_id,
+        )
+
+    halt_file.touch()
+    async with mcp_client_factory(pm["api_key"]) as conn:
+        server = build_server(conn)
+        message = await call_expecting_error(
+            server, "place_order",
+            ticker="AAPL", side="buy", qty=1, price_type="market", justification="t",
+        )
+        assert "423" in message and "halted" in message
+        assert await call(server, "get_halt") == {"halted": True}
+        assert (await call(server, "get_portfolio", pod_id=pod_id))["pod_id"] == pod_id
+
+
+@pytest.mark.anyio
 async def test_optional_arguments_are_omitted_not_sent_as_null(
     mcp_client_factory, admin_key, make_pod
 ):

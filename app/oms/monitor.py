@@ -37,6 +37,7 @@ from app.oms.service import (
     execute_fill,
     record_rejection,
 )
+from app.registry.halt import is_halted
 
 
 @dataclass
@@ -88,12 +89,17 @@ def check_pending_orders(
 
     Commits its own transaction (see the transaction note in
     :mod:`app.oms.service`). Safe to call concurrently with ``place_order``.
+    While the world is halted it fills nothing and returns an empty result.
     """
+    result = MonitorResult()
     provider = provider or get_provider()
     now = get_clock().now()
-    result = MonitorResult()
 
     with OMS_LOCK:
+        # Checked under the lock, not before it: a sweep queued behind the lock
+        # must not wake up and fill orders in a world halted while it waited.
+        if is_halted():
+            return result
         try:
             orders = pending_limit_orders(session, pod_id=pod_id)
             result.checked = len(orders)

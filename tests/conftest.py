@@ -20,6 +20,7 @@ normally.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,9 +36,13 @@ from app.db.base import get_session
 from app.db.models import AgentRole, Base, Pod
 from app.main import create_app
 from app.marketdata import StaticProvider, set_provider
+from app.registry import halt
 from app.registry.pods import fund_pod
 from app.registry.service import get_or_create_system_agent, register_agent
 from tests.support import FrozenClock
+
+#: The path physics watches in production, captured before any fixture patches it.
+REAL_HALT_FILE = halt.HALT_FILE
 
 #: Starting prices every test begins from. Tests move them with ``prices.set_price``.
 DEFAULT_PRICES = {"AAPL": 200.0, "MSFT": 400.0, "NVDA": 100.0}
@@ -79,6 +84,18 @@ def no_background_jobs() -> Iterator[None]:
     oms_cfg.pending_monitor_enabled = False
     yield
     oms_cfg.pending_monitor_enabled = previous
+
+
+@pytest.fixture(autouse=True)
+def halt_file(tmp_path, monkeypatch) -> Path:
+    """Point the halt check at a temp file the test owns (absent until created).
+
+    Autouse so the Human halting the real world mid-run cannot fail the suite,
+    and so no test can create the real halt file by accident.
+    """
+    path = tmp_path / "HALT"
+    monkeypatch.setattr(halt, "HALT_FILE", path)
+    return path
 
 
 @pytest.fixture

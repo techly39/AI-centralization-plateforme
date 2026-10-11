@@ -22,6 +22,7 @@ from app.db.models import Event
 EVENT_AGENT_REGISTERED = "agent_registered"
 EVENT_AGENT_DEACTIVATED = "agent_deactivated"
 EVENT_PERMISSION_DENIED = "permission_denied"
+EVENT_HALT_REFUSED = "halt_refused"       # payload: {method, path, role}
 
 EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent_id}
 
