@@ -80,6 +80,12 @@ class ClockOut(BaseModel):
     now: datetime
 
 
+class HaltOut(BaseModel):
+    """``halted`` is true while the Human's halt file exists: writes get 423."""
+
+    halted: bool
+
+
 # --- Market data (TRD §7) ---------------------------------------------------
 
 class PriceOut(BaseModel):

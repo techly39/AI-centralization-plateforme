@@ -36,6 +36,11 @@ mcp:
   api_key: null
   timeout_seconds: 30
 
+# Human switches that physics reads and never writes. While the halt file
+# exists, every agent write is refused with 423 (Constitution Art. 5).
+# governance:
+#   halt_file: "governance/HALT"   # default, resolved from the repo root
+
 # Logging.
 logging:
   level: "INFO"

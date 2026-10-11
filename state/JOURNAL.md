@@ -299,3 +299,14 @@ Next: B-003 halt in physics (+ red-team) → B-000d + B-016 → B-020 → B-004.
   or the run is counted as failed.
 - Q-0003 / Q-0004: the Human handles the keys and the backup permissions.
 - This entry and the PROPOSALS edit are uncommitted: commit them in step 0 of the next cycle.
+  *(Builder, cycle 11 step 0: committed as 66af48b.)*
+
+## Cycle 0011 — Halt in physics (2026-10-11)
+Era: I — The Desk
+Exit criterion served: Era I deliverable 2 (`governance/HALT` → agent writes refused; `GET /halt`)
+and the physics half of the exit criterion "creating HALT mid-run stops the run within one tick".
+Hypothesis: If the halt check lives in the one dependency every authenticated endpoint already
+uses (`get_current_agent`), then a test generated from the OpenAPI schema shows every write route
+(8 today) refused with 423 + exactly one `halt_refused` event for every role, reads keep working,
+the pending monitor fills nothing, and deleting the file resumes the world — with no existing
+test changed. A mutation that disables the gate must turn every one of those tests red.

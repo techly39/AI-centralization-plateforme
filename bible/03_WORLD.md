@@ -70,7 +70,7 @@ constant (SURVEY §4a.9 — B-002 places it in the dependency law). The Phase 2 
 
 | Capability | Era | Notes |
 |---|---|---|
-| Halt: `governance/HALT` → all agent writes refused, `GET /halt` | I | First physics change. Test it. |
+| Halt: `governance/HALT` → all agent writes refused, `GET /halt` | I | **Done cycle 11** (ADR-023, `tests/test_halt.py`): 423 + `halt_refused`, every role; monitor idle. |
 | Simulated clock, `/clock/advance`, look-ahead guard, `run_id` scopes | I | TRD Phase 3 |
 | Allocation endpoint, meeting packages | I | TRD Phase 3 |
 | Truman as a `MarketDataProvider` | I | data world behind the existing interface |

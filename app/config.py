@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -70,6 +70,22 @@ class MCPConfig(BaseModel):
     api_base_url: str = "http://127.0.0.1:8000"
     api_key: str | None = None
     timeout_seconds: float = Field(default=30.0, gt=0.0)
+
+
+class GovernanceConfig(BaseModel):
+    """Where physics reads the Human's switches (Constitution Art. 5).
+
+    Physics only ever *reads* these paths. The file's existence is the switch:
+    present → the world is halted (see :mod:`app.registry.halt`).
+    """
+
+    halt_file: Path = REPO_ROOT / "governance" / "HALT"
+
+    @field_validator("halt_file")
+    @classmethod
+    def _anchor_at_repo_root(cls, value: Path) -> Path:
+        # A relative path must not depend on the directory the server was started from.
+        return value if value.is_absolute() else REPO_ROOT / value
 
 
 class LoggingConfig(BaseModel):
@@ -143,6 +159,7 @@ class Settings(BaseSettings):
     marketdata: MarketDataConfig = Field(default_factory=MarketDataConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
+    governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
 

@@ -1,7 +1,8 @@
 """FastAPI authentication & authorization dependencies.
 
 Every request must present ``X-API-Key``. :func:`get_current_agent` resolves it
-to an active agent (401 otherwise). :func:`require` builds a dependency that
+to an active agent (401 otherwise) and refuses writes while the world is halted
+(423, :mod:`app.registry.halt`). :func:`require` builds a dependency that
 enforces one :class:`Action` from the permission matrix, logging a
 ``permission_denied`` event and returning 403 on violation (TRD §6).
 """
@@ -10,13 +11,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
 from app.db.base import get_session
 from app.db.models import Agent
 from app.ledger.events import EVENT_PERMISSION_DENIED, append_event
+from app.registry.halt import refuse_if_halted
 from app.registry.permissions import Action, has_permission
 from app.registry.service import get_agent_by_api_key
 
@@ -25,6 +27,7 @@ _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def get_current_agent(
+    request: Request,
     api_key: str | None = Security(_api_key_header),
     session: Session = Depends(get_session),
 ) -> Agent:
@@ -35,6 +38,9 @@ def get_current_agent(
             detail="Invalid or missing API key.",
             headers={"WWW-Authenticate": "X-API-Key"},
         )
+    # Every authenticated endpoint passes through here, so this one line is the
+    # whole halt gate for the API (app/registry/halt.py).
+    refuse_if_halted(request, session, agent)
     return agent
 
 

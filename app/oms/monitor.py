@@ -31,6 +31,7 @@ from app.clock import get_clock
 from app.db.models import Order, OrderSide, OrderStatus, PriceType
 from app.marketdata import MarketDataError, MarketDataProvider, get_provider
 from app.oms.errors import OrderRejected
+from app.registry.halt import is_halted
 from app.oms.service import (
     OMS_LOCK,
     assert_affordable,
@@ -88,10 +89,13 @@ def check_pending_orders(
 
     Commits its own transaction (see the transaction note in
     :mod:`app.oms.service`). Safe to call concurrently with ``place_order``.
+    While the world is halted it fills nothing and returns an empty result.
     """
+    result = MonitorResult()
+    if is_halted():
+        return result
     provider = provider or get_provider()
     now = get_clock().now()
-    result = MonitorResult()
 
     with OMS_LOCK:
         try:

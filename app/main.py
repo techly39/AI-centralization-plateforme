@@ -18,6 +18,7 @@ from app.api import (
     agents,
     clock,
     events,
+    halt,
     marketdata,
     messages,
     metrics,
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(agents.router)
     app.include_router(events.router)
     app.include_router(clock.router)
+    app.include_router(halt.router)
     app.include_router(marketdata.router)
     app.include_router(orders.router)
     app.include_router(messages.router)

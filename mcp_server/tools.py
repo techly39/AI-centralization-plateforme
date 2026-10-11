@@ -477,6 +477,15 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """
         return await call("GET", "/clock")
 
+    @api_tool(server, method="GET", path="/halt")
+    async def get_halt() -> Any:
+        """Is the fund halted? While it is, every action that changes anything is refused.
+
+        If an order, message or report came back "halted", call this before trying
+        again. Reading prices, your portfolio and your inbox still works.
+        """
+        return await call("GET", "/halt")
+
     @api_tool(server, method="GET", path="/health")
     async def get_health() -> Any:
         """Check that the fund environment is up, and which clock mode it is in."""

@@ -200,3 +200,32 @@ importing `app.main`, `app.cli`, `app.scheduler` (and the wrapper's entry points
 import buried in a function that has not run. Code that hides an import from both is a
 review matter (auditor), not something this test can prove absent. `quant` and `truman` may
 import each other; the law does not order them yet.
+
+## ADR-023 — Halt in physics: one gate, every write, every role   (builder, cycle 11) — accepted
+Question: Art. 5 says the Human's halt file stops the world. 03 §2 / 05 Era I deliverable 2 ask
+physics to refuse agent writes and expose `GET /halt`. Which requests, which roles, which status,
+where is the check, and what about the background pending-order monitor?
+Answer from the future: **existence of the file is the switch** (an empty file halts), read on
+every request — no cache, no restart; lifting the halt is deleting the file. The gate is one call
+in `app.registry.auth.get_current_agent`, which every endpoint except `/health` depends on: any
+method other than GET/HEAD/OPTIONS from any authenticated agent — **every role, management and
+`system` included** — gets **423 Locked** and one `halt_refused` event `{method, path, role}`.
+Unauthenticated requests stay 401 and log nothing (no identity to attribute). Reads keep working:
+a halted world must stay observable. `check_pending_orders` fills nothing while halted, so both
+of its triggers (live scheduler, future `/clock/advance`) obey. `GET /halt` → `{halted}` is a
+universal action (`READ_HALT`), MCP tool `get_halt`. The path is `governance.halt_file` in
+settings (default: `governance/HALT` under the repo root; a relative override is anchored at the
+repo root, not the cwd).
+Alternatives rejected: a per-router dependency (a new router could forget it — the auth
+dependency cannot be dropped without losing auth); exempting management/`system` (the halt is the
+Human's, nothing in the firm outranks it); 503 (says "broken"; the world is deliberately stopped —
+423 says "locked, try later"); letting cost/task self-reports through (unverified self-reports;
+metering will come from the provider, 03 §4; the refusal event still records the attempt);
+returning the file's contents (Human prose is not a firm-facing channel yet); pre-auth middleware
+(needs its own key lookup and could not attribute the event).
+Consequences: the refusal event is the one write a halted world still makes. The "every write
+route" test is generated from the OpenAPI schema, so a new write endpoint is covered the day it
+lands; a write endpoint that skipped `get_current_agent` would escape the gate (none does today —
+the generated test would catch it, since it expects 423 from each). Not done here: stopping agent
+*wakes* within one tick — Era I exit criterion "creating HALT mid-run stops the run within one
+tick" — needs the Runtime (B-009).
