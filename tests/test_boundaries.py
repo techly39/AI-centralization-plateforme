@@ -63,6 +63,9 @@ MCP_SERVER_MAY_IMPORT_FROM_APP = frozenset({"app", "app.config", "app.limits"})
 #: the runtime layer still imports no ``app`` module at all (its Layer below).
 RUNTIME_MAY_LOAD_FROM_APP = MCP_SERVER_MAY_IMPORT_FROM_APP
 
+#: What the scanner reports for an import whose target it cannot read.
+COMPUTED_IMPORT = "<computed import>"
+
 #: Operator scripts that run physics in-process on a throwaway database, by
 #: design. Every other script is a client (HTTP/MCP) and never imports ``app``.
 IN_PROCESS_SCRIPTS = frozenset({"scripts/survey_probe_physics.py"})
@@ -120,14 +123,20 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
     ``from a.b import c`` yields both ``a.b`` and ``a.b.c`` (``c`` may be a
     submodule: ``from google import genai``). Relative imports are resolved
     against ``module_name``. ``__import__("x")`` and ``import_module("x")``
-    with a literal name count too; a computed name cannot be seen statically.
+    with a literal name count too. A computed name, or a load from a file path
+    (``spec_from_file_location``), cannot be seen statically: it yields
+    :data:`COMPUTED_IMPORT`, a violation in every layer (red-team 0012 H8).
     """
     found: set[str] = set()
     for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Call) and _is_dynamic_import(node.func):
+        if isinstance(node, ast.Call) and _is_file_import(node.func):
+            found.add(COMPUTED_IMPORT)
+        elif isinstance(node, ast.Call) and _is_dynamic_import(node.func):
             arg = node.args[0] if node.args else None
             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                 found.add(arg.value)
+            else:
+                found.add(COMPUTED_IMPORT)
         elif isinstance(node, ast.Import):
             found.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -145,6 +154,11 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
                 for alias in node.names if alias.name != "*"
             )
     return found
+
+
+def _is_file_import(func: ast.expr) -> bool:
+    name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+    return name in {"spec_from_file_location", "SourceFileLoader"}
 
 
 def _is_dynamic_import(func: ast.expr) -> bool:
@@ -173,6 +187,9 @@ def violations(root: Path, layer: Layer) -> list[str]:
         parts = rel.with_suffix("").parts
         module_name = ".".join(parts[:-1] if is_package else parts)
         for module in sorted(imported_modules(path.read_text(), module_name, is_package)):
+            if module == COMPUTED_IMPORT:  # no layer can prove what it would load
+                out.append(f"{rel}: {module}")
+                continue
             for banned in layer.forbidden:
                 if not _matches(module, banned):
                     continue

@@ -19,8 +19,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+from runtime.governance import load_unique_yaml
 
 
 class SpecError(ValueError):
@@ -60,16 +61,20 @@ def load_specs(directory: Path) -> list[AgentSpec]:
     if not directory.is_dir():
         raise SpecError(f"spec directory not found: {directory}")
     specs: dict[str, AgentSpec] = {}
-    for path in sorted(directory.glob("*.yaml")):
+    for path in sorted(directory.iterdir()):
+        if path.suffix.lower() not in {".yaml", ".yml"}:
+            continue
+        if path.suffix != ".yaml":  # a spec that would be silently skipped is refused
+            raise SpecError(f"{path.name}: spec files end in `.yaml`")
         try:
-            doc = yaml.safe_load(path.read_text())
-        except (OSError, yaml.YAMLError) as exc:
+            doc = load_unique_yaml(path)
+        except Exception as exc:  # noqa: BLE001 - any unreadable spec is refused by name
             raise SpecError(f"{path.name}: unreadable ({exc.__class__.__name__})") from exc
         if not isinstance(doc, dict):
             raise SpecError(f"{path.name}: a spec is a mapping of fields")
         try:
-            spec = AgentSpec(**doc)
-        except ValidationError as exc:
+            spec = AgentSpec.model_validate(doc)
+        except (ValidationError, TypeError) as exc:  # a non-str key is a TypeError (0012 H5)
             raise SpecError(f"{path.name}: {exc}") from exc
         if spec.id in specs:
             raise SpecError(f"{path.name}: duplicate spec id {spec.id!r}")

@@ -13,10 +13,12 @@ change takes effect at the next wake or tool batch.
 
 **Fail closed.** A cap the reader cannot read as a finite, non-negative number
 — missing file, YAML error, duplicate key, missing key, a string, a bool,
-``.inf``, a negative — is read as ``null``, with the reason in ``cap_problem``.
+``.inf``, a negative, a base-60 ``1:30``, any parser error — is read as ``null``,
+with the reason in ``cap_problem``.
 HALT counts if *anything* is at that path, a directory or a dangling link too,
 and if the path cannot be checked at all (permission denied, ``governance`` not a
-directory): only a definite "no such file" means the world runs.
+directory, or no ``governance/`` directory at all): only "the directory is there
+and the file is not" means the world runs.
 """
 
 from __future__ import annotations
@@ -45,8 +47,9 @@ class Governance:
 
 
 def read_governance() -> Governance:
+    halted = _halted(HALT_FILE)  # first, and independent of the cap file's health
     cap, problem = _read_cap(HUMAN_YAML)
-    return Governance(halted=_halted(HALT_FILE), monthly_llm_usd_cap=cap, cap_problem=problem)
+    return Governance(halted=halted, monthly_llm_usd_cap=cap, cap_problem=problem)
 
 
 def _halted(path: Path) -> bool:
@@ -55,7 +58,10 @@ def _halted(path: Path) -> bool:
     try:
         os.lstat(path)
     except FileNotFoundError:
-        return False
+        # Running only if the directory the Human halts in is there. A missing
+        # ``governance/`` means REPO_ROOT is not the repo (a non-editable
+        # install, a copied tree): the real HALT is unseen (red-team 0012 H3).
+        return not path.parent.is_dir()
     except OSError:
         return True
     return True
@@ -82,13 +88,39 @@ _UniqueKeyLoader.add_constructor(
 )
 
 
+def _refuse_sexagesimal(tag: str):
+    """YAML 1.1 reads ``1:30`` as 90: a value written like a time must not
+    become a number (red-team 0012 H7)."""
+    base = yaml.SafeLoader.yaml_constructors[tag]
+
+    def construct(loader: _UniqueKeyLoader, node: yaml.ScalarNode):
+        if ":" in str(node.value):
+            raise yaml.constructor.ConstructorError(
+                None, None, f"base-60 number {node.value!r} refused", node.start_mark,
+            )
+        return base(loader, node)
+
+    return construct
+
+
+for _tag in ("tag:yaml.org,2002:int", "tag:yaml.org,2002:float"):
+    _UniqueKeyLoader.add_constructor(_tag, _refuse_sexagesimal(_tag))
+
+
+def load_unique_yaml(path: Path) -> object:
+    """Safe-load a YAML file, refusing duplicate keys (the last one would win silently)."""
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)  # noqa: S506
+
+
 def _read_cap(path: Path) -> tuple[float | None, str | None]:
     try:
-        doc = yaml.load(path.read_text(), Loader=_UniqueKeyLoader)  # noqa: S506 - safe subclass
+        doc = load_unique_yaml(path)
     except OSError as exc:
         return None, f"cannot read {path.name}: {exc.__class__.__name__}"
-    except yaml.YAMLError as exc:
-        return None, f"{path.name} is not valid YAML: {exc.__class__.__name__}"
+    except Exception as exc:  # noqa: BLE001 - fail closed on *any* parse failure
+        # YAMLError, UnicodeDecodeError, an unhashable key (TypeError), deep
+        # nesting (RecursionError): a reader that raises is a gate that crashes.
+        return None, f"{path.name} is not readable YAML: {exc.__class__.__name__}"
     firm = doc.get("firm") if isinstance(doc, dict) else None
     if not isinstance(firm, dict) or "monthly_llm_usd_cap" not in firm:
         return None, "firm.monthly_llm_usd_cap is missing"

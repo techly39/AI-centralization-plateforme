@@ -36,9 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     law = read_governance()  # one read for one report
     wakes = []
     for spec in specs:
-        d = decide_wake_under(spec.provider, law)
-        wakes.append({"id": spec.id, "provider": spec.provider, "allowed": d.allowed,
-                      "reason": d.reason})
+        d = decide_wake_under(spec.provider, spec.adapter, law)
+        wakes.append({"id": spec.id, "provider": spec.provider, "adapter": spec.adapter,
+                      "allowed": d.allowed, "reason": d.reason})
     print(json.dumps({
         "halted": law.halted,
         "monthly_llm_usd_cap": law.monthly_llm_usd_cap,

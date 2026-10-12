@@ -87,16 +87,30 @@ def test_every_unreadable_cap_fails_closed_to_null(gov: Path, text: str) -> None
     assert g.cap_problem  # the reason is recorded, never silent
 
 
+@pytest.mark.parametrize("raw", [
+    b"firm:\n  monthly_llm_usd_cap: 50 \xff\xfe\n",          # not UTF-8
+    b"? [a, b]\n: 1\nfirm:\n  monthly_llm_usd_cap: 50\n",   # unhashable key
+    b"firm:\n  x: " + b"[" * 5000 + b"]" * 5000 + b"\n  monthly_llm_usd_cap: 50\n",  # deep
+])
+def test_a_cap_file_that_breaks_the_parser_fails_closed(gov: Path, raw: bytes) -> None:
+    """Audit c21 BLOCK: these raised out of the reader instead of reading as null."""
+    (gov / "human.yaml").write_bytes(raw)
+    (gov / "HALT").write_text("")
+    g = governance.read_governance()
+    assert g.monthly_llm_usd_cap is None and g.cap_problem
+    assert g.halted is True  # HALT is still reported when the cap file is broken
+    assert decide_wake("scripted", "native").reason == "halted"
+
+
 def test_a_missing_human_yaml_fails_closed(gov: Path) -> None:
     (gov / "human.yaml").unlink()
     g = governance.read_governance()
     assert g.monthly_llm_usd_cap is None and g.cap_problem
 
 
-def test_a_huge_integer_cap_is_finite_or_refused(gov: Path) -> None:
+def test_an_integer_too_large_for_a_float_is_refused(gov: Path) -> None:
     g = _cap(gov, "firm:\n  monthly_llm_usd_cap: " + "9" * 400 + "\n")
-    cap = g.monthly_llm_usd_cap
-    assert cap is None or math.isfinite(cap)
+    assert g.monthly_llm_usd_cap is None and g.cap_problem
 
 
 def test_halt_is_read_fresh_on_every_call(gov: Path) -> None:
@@ -147,7 +161,7 @@ def test_the_zero_cost_list_is_exactly_two_names() -> None:
 
 @pytest.mark.parametrize("provider", sorted(ZERO_COST_PROVIDERS))
 def test_zero_cost_providers_wake_under_cap_null(gov: Path, provider: str) -> None:
-    d = decide_wake(provider)
+    d = decide_wake(provider, "native")
     assert d.allowed and d.reason == "zero_cost"
 
 
@@ -156,36 +170,57 @@ def test_zero_cost_providers_wake_under_cap_null(gov: Path, provider: str) -> No
     "Scripted", "SCRIPTED", " scripted", "scripted ", "scripted\n", "cassette/claude",
 ])
 def test_every_other_provider_is_refused_under_cap_null(gov: Path, provider: str) -> None:
-    d = decide_wake(provider)
+    d = decide_wake(provider, "native")
     assert not d.allowed and d.reason == "cap_null"
 
 
-def test_a_provider_that_claims_to_be_free_is_still_refused(gov: Path) -> None:
-    """The gate owns the list; it never asks the component whether it is dangerous."""
+def test_a_provider_object_handed_to_the_gate_is_refused_unread(gov: Path) -> None:
+    """The gate owns the list; it never asks the component whether it is dangerous.
+    Even an object that calls itself ``scripted`` is not a name: refused, and its
+    ``spends_money`` and ``name`` are never read."""
 
     class Liar:
-        name = "freebie"
+        @property
+        def name(self) -> str:  # pragma: no cover - must never be read
+            raise AssertionError("the gate read the provider's name off the object")
 
         @property
         def spends_money(self) -> bool:  # pragma: no cover - must never be read
             raise AssertionError("the gate asked the provider what it costs")
 
-    d = decide_wake(Liar().name)
+    d = decide_wake(Liar(), "native")  # type: ignore[arg-type]
     assert not d.allowed and d.reason == "cap_null"
 
 
 @pytest.mark.parametrize("provider", [None, 0, b"scripted", ["scripted"], object()])
 def test_a_provider_name_that_is_not_a_string_is_refused(gov: Path, provider: object) -> None:
-    d = decide_wake(provider)  # type: ignore[arg-type]
+    d = decide_wake(provider, "native")  # type: ignore[arg-type]
     assert not d.allowed
+
+
+def test_the_zero_cost_adapter_list_is_native_only() -> None:
+    assert gate.ZERO_COST_ADAPTERS == frozenset({"native"})
+
+
+@pytest.mark.parametrize("adapter", ["openclaw", "Native", "native ", "", "langchain"])
+@pytest.mark.parametrize("provider", sorted(ZERO_COST_PROVIDERS))
+def test_a_zero_cost_provider_through_another_adapter_is_refused(
+    gov: Path, provider: str, adapter: str,
+) -> None:
+    """An OpenClaw agent runs its own model on its own key: spending, whatever
+    the spec's provider says (ADR-032 (4), red-team 0012 H1)."""
+    for cap, reason in ((CAP_NULL, "cap_null"), (CAP_50, "no_metered_key")):
+        (gov / "human.yaml").write_text(cap)
+        d = decide_wake(provider, adapter)
+        assert not d.allowed and d.reason == reason
 
 
 def test_a_spending_provider_is_refused_even_with_a_cap_until_metering_exists(gov: Path) -> None:
     """A cap without per-agent metered keys (R-6) cannot be enforced, so nothing spends."""
     (gov / "human.yaml").write_text(CAP_50)
-    d = decide_wake("metered")
+    d = decide_wake("metered", "native")
     assert not d.allowed and d.reason == "no_metered_key"
-    assert decide_wake("scripted").allowed
+    assert decide_wake("scripted", "native").allowed
 
 
 @pytest.mark.parametrize("provider", ["scripted", "cassette", "metered", "freebie"])
@@ -193,7 +228,7 @@ def test_halt_refuses_every_provider(gov: Path, provider: str) -> None:
     (gov / "HALT").write_text("")
     for cap in (CAP_NULL, CAP_50):
         (gov / "human.yaml").write_text(cap)
-        d = decide_wake(provider)
+        d = decide_wake(provider, "native")
         assert not d.allowed and d.reason == "halted"
 
 
@@ -208,20 +243,90 @@ def test_halt_refuses_the_next_tool_batch_and_lifting_it_allows_it(gov: Path) ->
 
 def test_an_unreadable_cap_refuses_spending_but_names_the_problem(gov: Path) -> None:
     (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: -5\n")
-    d = decide_wake("metered")
+    d = decide_wake("metered", "native")
     assert not d.allowed and d.reason == "cap_null"
-    assert decide_wake("scripted").allowed
+    assert decide_wake("scripted", "native").allowed
 
 
-def test_the_gate_reads_no_provider_attribute() -> None:
-    """Static check: the gate module never names ``spends_money`` in code."""
+def _code_names(module: object) -> set[str]:
+    """Attribute names, identifiers and string constants in a module's code
+    (docstrings excluded): ``getattr(p, "spends_money")`` is caught too."""
     import ast
     import inspect
 
-    tree = ast.parse(inspect.getsource(gate))
-    names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
-    names |= {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
-    assert "spends_money" not in names
+    tree = ast.parse(inspect.getsource(module))
+    docstrings = {
+        id(node.body[0].value) for node in ast.walk(tree)
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef))
+        and node.body and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    names: set[str] = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Attribute):
+            names.add(n.attr)
+        elif isinstance(n, ast.Name):
+            names.add(n.id)
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docstrings:
+            names.add(n.value)
+    return names
+
+
+def test_the_gate_reads_no_provider_attribute() -> None:
+    """Static check: the gate's code never names ``spends_money`` (nor ``name``
+    off an object): it decides on the spec's string."""
+    assert "spends_money" not in _code_names(gate)
+
+
+def test_the_static_check_catches_a_getattr_spelling() -> None:
+    """Counter-example for the check above."""
+    import types
+
+    planted = types.ModuleType("planted_gate")
+    source = 'def f(p):\n    """spends_money in a docstring is fine."""\n' \
+             '    return getattr(p, "spends_money")\n'
+    import inspect
+    from unittest import mock
+
+    with mock.patch.object(inspect, "getsource", return_value=source):
+        assert "spends_money" in _code_names(planted)
+    clean = 'def f(p):\n    """spends_money in a docstring is fine."""\n    return 1\n'
+    with mock.patch.object(inspect, "getsource", return_value=clean):
+        assert "spends_money" not in _code_names(planted)
+
+
+def test_only_tests_assign_the_governance_paths() -> None:
+    """The fixed paths are module globals; no runtime module may rebind them."""
+    import ast
+
+    root = Path(__file__).resolve().parent.parent / "runtime"
+    offenders = []
+    for path in root.rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text())):
+            targets = []
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            elif isinstance(node, ast.Call) and getattr(node.func, "id", None) == "setattr":
+                targets = node.args[1:2]
+            for t in targets:
+                name = getattr(t, "attr", None) or getattr(t, "id", None) or getattr(t, "value", None)
+                if name in {"HALT_FILE", "HUMAN_YAML", "REPO_ROOT"}:
+                    offenders.append(f"{path.name}:{node.lineno}")
+    # The one legitimate binding of each: their definitions in governance.py.
+    assert sorted(offenders) == sorted(
+        f"governance.py:{n}" for n in _definition_lines(root / "governance.py")
+    )
+
+
+def _definition_lines(path: Path) -> list[int]:
+    import ast
+
+    return [
+        node.lineno for node in ast.parse(path.read_text()).body
+        if isinstance(node, ast.Assign)
+        and any(getattr(t, "id", None) in {"HALT_FILE", "HUMAN_YAML", "REPO_ROOT"}
+                for t in node.targets)
+    ]
 
 
 # --- the provider protocol -------------------------------------------------------------
@@ -340,6 +445,29 @@ def test_an_invalid_spec_file_is_refused_by_name(tmp_path: Path) -> None:
         load_specs(tmp_path)
 
 
+def test_a_duplicate_key_inside_a_spec_is_refused(tmp_path: Path) -> None:
+    """``provider: scripted`` then ``provider: metered``: the last must not win silently."""
+    (tmp_path / "dup.yaml").write_text(
+        "id: pm-alpha\nname: A\nrole: pm\npod: 1\ncharter: c\n"
+        "provider: scripted\nprovider: metered\n"
+    )
+    with pytest.raises(SpecError, match="dup.yaml"):
+        load_specs(tmp_path)
+
+
+@pytest.mark.parametrize("name", ["pm.yml", "pm.YAML", "pm.Yaml"])
+def test_a_spec_with_another_extension_is_refused_not_skipped(tmp_path: Path, name: str) -> None:
+    _write(tmp_path, name, _spec())
+    with pytest.raises(SpecError, match=name.replace(".", r"\.")):
+        load_specs(tmp_path)
+
+
+def test_a_non_utf8_spec_is_refused_by_name(tmp_path: Path) -> None:
+    (tmp_path / "bin.yaml").write_bytes(b"id: \xff\xfe\n")
+    with pytest.raises(SpecError, match="bin.yaml"):
+        load_specs(tmp_path)
+
+
 def test_a_missing_spec_directory_is_refused(tmp_path: Path) -> None:
     with pytest.raises(SpecError):
         load_specs(tmp_path / "nope")
@@ -355,12 +483,17 @@ def test_status_reports_the_law_and_wakes_nothing(
     specs.mkdir()
     _write(specs, "pm.yaml", _spec())
     _write(specs, "spender.yaml", _spec(id="pm-spender", provider="metered"))
+    _write(specs, "claw.yaml", _spec(id="pm-claw", adapter="openclaw"))
     assert cli.main(["status", "--specs", str(specs)]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["halted"] is False and out["monthly_llm_usd_cap"] is None
     assert out["wakes"] == [
-        {"id": "pm-alpha", "provider": "scripted", "allowed": True, "reason": "zero_cost"},
-        {"id": "pm-spender", "provider": "metered", "allowed": False, "reason": "cap_null"},
+        {"id": "pm-alpha", "provider": "scripted", "adapter": "native",
+         "allowed": True, "reason": "zero_cost"},
+        {"id": "pm-claw", "provider": "scripted", "adapter": "openclaw",
+         "allowed": False, "reason": "cap_null"},
+        {"id": "pm-spender", "provider": "metered", "adapter": "native",
+         "allowed": False, "reason": "cap_null"},
     ]
     assert out["woke"] == 0
 
