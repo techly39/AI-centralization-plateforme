@@ -245,15 +245,41 @@ def test_halt_after_the_last_wake_stops_the_advance(SessionFactory, world, gov, 
 
 # --- refusals and errors ----------------------------------------------------------------
 
-def test_a_refused_wake_ends_the_run_and_time_stays(SessionFactory, world, woke):
-    """pm-1's key under a spec for pod 2: identity_mismatch. The world does not
-    move on without a mind the run names."""
+def test_a_key_that_is_not_its_specs_agent_refuses_the_run_before_step_0(
+        SessionFactory, world, woke):
+    """pm-1's key under a spec for pod 2. Since red-team 0015 H2 every key is read
+    before step 0, so nobody wakes at all (was: a woke once, then the run was refused)."""
     handed = [(_spec("a-pm", 1, "read-a"), world["pm"][1]),
               (_spec("b-pm", 2, "read-b"), world["pm"][1])]
     run = conduct(SessionFactory, handed, world["clock"], steps=3)
-    assert (run.ended, run.reason) == ("refused", "wake_refused:b-pm:identity_mismatch")
-    assert len(run.steps) == 1 and run.steps[0].advanced_to is None
-    assert woke == ["a"] and _advances(SessionFactory) == []
+    assert (run.ended, run.reason, run.steps) == ("refused", "identity_mismatch:b-pm", ())
+    assert woke == [] and _advances(SessionFactory) == []
+
+
+def test_a_refused_wake_ends_the_run_and_time_stays(SessionFactory, world, woke,
+                                                    monkeypatch):
+    """A mind the run names is refused mid-run (its script is gone from the table
+    after day one: unknown_script). The world does not move on without it."""
+    def vanishing(request):
+        table = dict(scripted.SCRIPTS)
+        del table["vanish"]
+        monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(table))
+        return CompletionResponse(content="done")
+    monkeypatch.setattr(scripted, "SCRIPTS",
+                        MappingProxyType(dict(scripted.SCRIPTS) | {"vanish": vanishing}))
+    handed = [(_spec("a-pm", 1, "read-a"), world["pm"][1]),
+              (_spec("b-pm", 2, "vanish"), world["pm"][2])]
+    run = conduct(SessionFactory, handed, world["clock"], steps=3)
+    assert (run.ended, run.reason) == ("refused", "wake_refused:b-pm:unknown_script")
+    assert len(run.steps) == 2 and run.steps[1].advanced_to is None
+    assert woke == ["a", "a"] and len(_advances(SessionFactory)) == 1
+    assert run.retired == ()
+
+
+def test_an_unreadable_mind_refuses_the_run(SessionFactory, world, woke):
+    run = conduct(SessionFactory, [(_spec("a-pm", 1), "not-a-key")], world["clock"], steps=2)
+    assert (run.ended, run.reason, run.steps) == ("refused", "mind_unreadable:a-pm:401", ())
+    assert woke == [] and _advances(SessionFactory) == []
 
 
 def test_a_spending_mind_is_refused_under_a_null_cap(SessionFactory, world, woke):

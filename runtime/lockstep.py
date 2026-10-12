@@ -17,13 +17,19 @@ The run ends ``completed`` after ``steps`` steps, or early:
 * ``error`` — the clock would not advance, or its answer had no ``now``.
 
 A mind that crashes (``error``) or spends its tool budget is data, recorded in
-its step, and the run goes on. After an early end the clock is never advanced
-again, so the ledger shows exactly how far the run got.
+its step, and the run goes on. So is a mind whose agent was **deactivated inside
+the world** (its key gets 401): it is *retired* — recorded, never woken again —
+and the run goes on, so no firm agent can stop the world's time by firing a
+colleague (red-team 0015 H1). After an early end the clock is never advanced
+again. If an advance fails, physics is asked where the clock is, and the step
+records that (it may have moved before the failure, H3).
 
 Before step 0 the conductor checks what it is handed, not what it is told: the
 clock key's ``/me`` must be the ``runtime`` role, ``/clock`` must say
-``backtest``, spec ids must be unique, and ``steps`` and ``days_per_step`` must be
-plain ints in range. Every act goes over HTTP; physics decides what is allowed.
+``backtest``, spec ids must be unique, every mind's key must be its spec's role
+and pod, and no App agent may be handed in twice (H2); ``steps`` and
+``days_per_step`` must be plain ints in range. Every act goes over HTTP; physics
+decides what is allowed.
 
 The record is returned, not stored: R-4 writes it to a cassette. Provisioning
 minds from their specs (binding the spec's name to the App agent) is R-3b-2;
@@ -32,6 +38,7 @@ until then the caller hands in each mind's client.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -73,6 +80,8 @@ class RunRecord:
     #: The providers that woke, sorted and joined: ``scripted`` for a scripted run.
     minds: str
     steps: tuple[StepRecord, ...] = ()
+    #: Spec ids whose agent was deactivated inside the world; they woke no more.
+    retired: tuple[str, ...] = ()
 
 
 async def run_backtest(
@@ -94,8 +103,9 @@ async def run_backtest(
     label = "+".join(sorted({m.spec.provider for m in ordered}))
     if len({m.spec.id for m in ordered}) != len(ordered):
         return RunRecord("refused", "duplicate_spec_id", label)
-    # The input is copied once, here: every wake of the run sees the same document.
-    step_input = dict(workflow_input or {})
+    # The input is copied once, deeply, here: every wake of the run sees the same
+    # document, whoever else holds a nested value (red-team 0015 H4).
+    step_input = copy.deepcopy(dict(workflow_input or {}))
 
     try:
         me = await clock.get("/me")
@@ -106,11 +116,26 @@ async def run_backtest(
         return RunRecord("refused", "clock_identity", label)
     if not isinstance(now, dict) or now.get("mode") != "backtest":
         return RunRecord("refused", "not_backtest", label)
+    # Red-team 0015 H2: one App agent is one mind. Every key is read before step 0;
+    # a key that is not its spec's agent, or an agent handed in twice, refuses the run.
+    agents: set[int] = set()
+    for mind in ordered:
+        try:
+            who = await mind.client.get("/me")
+        except FundAPIError as exc:
+            return RunRecord("refused", f"mind_unreadable:{mind.spec.id}:{exc.status_code}", label)
+        if not isinstance(who, dict) or (who.get("role"), who.get("pod_id")) != (
+                mind.spec.role, mind.spec.pod):
+            return RunRecord("refused", f"identity_mismatch:{mind.spec.id}", label)
+        if who.get("id") in agents or type(who.get("id")) is not int:
+            return RunRecord("refused", f"duplicate_agent:{mind.spec.id}", label)
+        agents.add(who["id"])
 
     done: list[StepRecord] = []
+    retired: list[str] = []
 
     def end(ended: str, reason: str | None = None) -> RunRecord:
-        return RunRecord(ended, reason or ended, label, tuple(done))
+        return RunRecord(ended, reason or ended, label, tuple(done), tuple(retired))
 
     for step in range(steps):
         if not decide_batch().allowed:
@@ -124,12 +149,20 @@ async def run_backtest(
         wakes: list[WakeRecord] = []
         stop: tuple[str, str] | None = None
         for mind in ordered:
+            if mind.spec.id in retired:
+                continue
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
                                 max_tool_calls=max_tool_calls)
             wakes.append(record)
             if record.ended == "halted":
                 stop = ("halted", "halted")
             elif record.ended == "refused":
+                if record.reason == "no_identity" and await _key_dead(mind.client):
+                    # Red-team 0015 H1: the agent was deactivated by an act inside the
+                    # world (e.g. management firing it). That is data, not a reason for
+                    # the world's time to stop: the mind is retired and the run goes on.
+                    retired.append(mind.spec.id)
+                    continue
                 stop = ("refused", f"wake_refused:{mind.spec.id}:{record.reason}")
             if stop:
                 break
@@ -141,12 +174,35 @@ async def run_backtest(
         try:
             moved = await clock.post("/clock/advance", {"days": days_per_step})
         except FundAPIError as exc:
-            done.append(StepRecord(step, at, tuple(wakes), None))
+            # Red-team 0015 H3: physics may have committed the advance and failed
+            # after it (the sweep, the connection). Ask physics where the clock is,
+            # so the record says what the ledger says.
+            done.append(StepRecord(step, at, tuple(wakes), await _moved_from(clock, at)))
             return end("error", f"advance_failed:{exc.status_code}")
         done.append(StepRecord(step, at, tuple(wakes), _now_of(moved)))
         if done[-1].advanced_to is None:  # it moved, but the record cannot say where
             return end("error", "clock_malformed")
     return end("completed")
+
+
+async def _key_dead(client: FundClient) -> bool:
+    """True only if physics answers 401 for this key: deactivated, not unreachable."""
+    try:
+        await client.get("/me")
+    except FundAPIError as exc:
+        return exc.status_code == 401
+    return False
+
+
+async def _moved_from(clock: FundClient, at: str) -> str | None:
+    """Where the clock is after a failed advance, if it moved off ``at``; else ``None``.
+    If physics cannot be asked either, ``None``: the record cannot know (the reason
+    still names the failure)."""
+    try:
+        now = _now_of(await clock.get("/clock"))
+    except FundAPIError:
+        return None
+    return now if now is not None and now != at else None
 
 
 def _now_of(answer: Any) -> str | None:
