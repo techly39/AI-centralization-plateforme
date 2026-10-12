@@ -1016,8 +1016,10 @@ when the command itself is wrong, before anything is contacted.
   `fund-runtime backtest` on it for 5 days: 10 wakes, all `done`, at least one PM order
   accepted by physics, no key in the output.
 Why: (1) M1 needs the month to be started by the operator, not by a test harness. (2) Safer seal:
-every refusal the command can make is made before the first registration (ADR-027: a part-way
-refusal spoils the run's database). Not done here: physics' own record of `minds:` (R-3b-2c-2:
+every refusal the command itself makes (usage, clock, sizes) comes before the first
+registration (ADR-027: a part-way refusal spoils the run's database). Provisioning can still
+stop part-way (HALT between registrations, a name taken in the race window, a lost answer);
+then `registered` names what may exist. Not done here: physics' own record of `minds:` (R-3b-2c-2:
 physics cannot see what drives a key, so the label is a declaration, and who may declare it is a
 design question for that slice), writing the RunRecord to a file (R-4's cassette).
 

@@ -220,6 +220,19 @@ def test_a_server_off_this_machine_is_refused(SessionFactory, keys, specs, capsy
     assert (code, out) == (2, None) and "this machine" in err and _made(SessionFactory) == {}
 
 
+def test_a_server_that_is_not_there_is_a_refusal_not_a_crash(keys, specs, capsys):
+    """No transport: a real connection to a loopback port nothing listens on."""
+    import socket
+    with socket.socket() as s:  # a port that was free a moment ago
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    code = cli.main(["backtest", "--specs", str(specs), "--steps", "2",
+                     "--server", f"http://127.0.0.1:{port}"])
+    out = json.loads(capsys.readouterr().out)
+    assert code == 1 and out == {"ended": "refused", "reason": "clock_unreadable:503",
+                                 "registered": [], "run": None}
+
+
 def test_the_server_may_come_from_the_environment(SessionFactory, keys, specs, monkeypatch,
                                                   capsys):
     monkeypatch.setenv(cli.SERVER_ENV, "http://evil.example")
