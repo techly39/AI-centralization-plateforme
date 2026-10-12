@@ -369,7 +369,10 @@ def test_held_a_pre_adr_runtime_squatter_blocks_seeding_loudly(db, cli_on_test_d
                  status=AgentStatus.active, created_at=START))
     db.commit()
     assert cli.main(["seed-runtime"]) == 1
-    assert "already exists" in capsys.readouterr().err
+    # Since B-041 (cycle 24) the CLI refuses the squatted database at startup,
+    # before seed-runtime runs, and names the squatter (was: "already exists").
+    err = capsys.readouterr().err
+    assert "holds the reserved name 'runtime'" in err and "management" in err
     assert not db.scalars(select(Agent).where(Agent.role == AgentRole.runtime)).all()
 
 

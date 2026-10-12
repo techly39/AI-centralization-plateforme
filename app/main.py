@@ -34,6 +34,7 @@ from app.db.base import get_session
 from app.finite import json_safe
 from app.ledger.events import RunClockMismatch
 from app.logging_setup import setup_logging
+from app.registry.service import check_reserved_identities
 from app.run_clock import install_run_clock
 from app.scheduler import shutdown_scheduler, start_scheduler
 
@@ -49,7 +50,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     previous = get_clock()
     sessions = app.dependency_overrides.get(get_session, get_session)()
     try:
-        installed = install_run_clock(next(sessions))
+        session = next(sessions)
+        # B-041: a reserved name worn by a firm agent stops the server here,
+        # not at the first act that needs physics' own identity. Before the
+        # clock is installed, so a refused start leaves the process's clock alone.
+        check_reserved_identities(session)
+        installed = install_run_clock(session)
     finally:
         sessions.close()
     start_scheduler()

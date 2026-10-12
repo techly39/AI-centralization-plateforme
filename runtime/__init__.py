@@ -11,4 +11,8 @@ R-1 (cycle 21) ships the skeleton and its gates only — nothing wakes yet:
 * :mod:`runtime.spec` is the AgentSpec (the genome), file-backed for now;
 * :mod:`runtime.providers` is the ``LLMProvider`` seam every mind plugs into;
 * :mod:`runtime.cli` is ``uv run fund-runtime``.
+
+R-2 (cycle 22) wakes a scripted mind (:mod:`runtime.native`); R-3b-1 (cycle 24)
+conducts a backtest in lockstep, the clock in the runtime identity's hand
+(:mod:`runtime.lockstep`).
 """

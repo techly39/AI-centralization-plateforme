@@ -16,6 +16,7 @@ from app.clock import get_clock
 from app.db.models import Agent, AgentRole, AgentStatus
 from app.ledger.events import (
     EVENT_AGENT_DEACTIVATED,
+    EVENT_AGENT_KEY_ROTATED,
     EVENT_AGENT_REGISTERED,
     append_event,
 )
@@ -213,6 +214,64 @@ def seed_runtime_agent(session: Session) -> tuple[Agent, str]:
     return _create_agent(session, name=RUNTIME_AGENT_NAME, role=AgentRole.runtime,
                          pod_id=None, charter_ref=None, research_domains=None,
                          actor_agent_id=None)
+
+
+def rotate_runtime_key(session: Session) -> tuple[Agent, str]:
+    """Give the Runtime's identity a new key and return it (shown once) — B-041.
+
+    The old key stops working in the same commit: its hash is replaced, not
+    kept beside the new one. A lost or leaked key would otherwise freeze the
+    backtest or leave a second hand on its clock. Operator-only (no endpoint):
+    a firm agent rotating the clock hand's key would be pulling a world lever.
+    The event names the agent, never the key or its hash.
+    """
+    runtimes = session.execute(
+        select(Agent).where(Agent.role == AgentRole.runtime).order_by(Agent.id)
+    ).scalars().all()
+    if not runtimes:
+        raise RegistryError("this database has no runtime identity (fund-env seed-runtime)")
+    if len(runtimes) > 1:
+        raise ReservedIdentityError(
+            f"this database has {len(runtimes)} runtime identities; it must have one"
+        )
+    agent = runtimes[0]
+    api_key = generate_api_key()
+    agent.api_key_hash = hash_api_key(api_key)
+    session.flush()
+    append_event(session, type=EVENT_AGENT_KEY_ROTATED, actor_agent_id=None,
+                 payload={"agent_id": agent.id})
+    return agent, api_key
+
+
+def reserved_identity_problems(session: Session) -> list[str]:
+    """What, in this database, breaks ADR-033's reserved identities (B-041).
+
+    A database written before ADR-033 can hold an ordinary agent wearing a
+    reserved name; a hand-edited one, two runtime rows. Either is found at
+    startup (server and operator CLI), not at the first act that needs the
+    identity. Read-only: the operator repairs, physics never renames an agent.
+    """
+    problems = [
+        f"agent {a.id} ({a.role.value}) holds the reserved name {a.name!r}"
+        for a in list_directory(session)
+        if a.role not in PHYSICS_ROLES and is_reserved_name(a.name)
+    ]
+    runtimes = session.scalar(
+        select(func.count()).select_from(Agent).where(Agent.role == AgentRole.runtime)
+    ) or 0
+    if runtimes > 1:
+        problems.append(f"{runtimes} runtime identities; a database has at most one")
+    return problems
+
+
+def check_reserved_identities(session: Session) -> None:
+    """Raise :class:`ReservedIdentityError` naming every problem, if there is one."""
+    problems = reserved_identity_problems(session)
+    if problems:
+        raise ReservedIdentityError(
+            "reserved identities are broken (ADR-033): " + "; ".join(problems)
+            + ". The operator must repair the database before it runs."
+        )
 
 
 def get_agent_by_api_key(session: Session, api_key: str) -> Agent | None:
