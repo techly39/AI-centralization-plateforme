@@ -19,16 +19,20 @@ import pytest
 
 from app.db.models import AgentRole
 from app.oms import RoleNotPermittedError, place_order
-from app.registry.permissions import Action, has_permission
-from app.registry.service import register_agent
+from app.registry.permissions import PHYSICS_ROLES, Action, has_permission
+from app.registry.service import _create_agent, register_agent
 
-ALL_ROLES = [AgentRole.analyst, AgentRole.pm, AgentRole.management, AgentRole.system]
+ALL_ROLES = list(AgentRole)
 
 
 def _agent(SessionFactory, name: str, role: AgentRole, pod_id: int | None):
     session = SessionFactory()
     try:
-        agent, _ = register_agent(session, name=name, role=role, pod_id=pod_id)
+        # Physics' identities are never registered (ADR-033); the matrix check
+        # still covers them, so build the row through the same private path.
+        make = _create_agent if role in PHYSICS_ROLES else register_agent
+        agent, _ = make(session, name=name, role=role, pod_id=pod_id,
+                        charter_ref=None, research_domains=None, actor_agent_id=None)
         session.commit()
         return agent
     finally:

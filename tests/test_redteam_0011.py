@@ -37,7 +37,11 @@ from app.db.models import AgentRole, Event
 from app.ledger.events import EVENT_RUN_STARTED
 from app.marketdata import StaticProvider, SyntheticProvider, set_provider
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import RunClockError, install_run_clock, start_backtest
 from tests.support import world_key
 
@@ -69,8 +73,10 @@ def _open_world(SessionFactory, provider, *, start: datetime = START) -> dict[st
         _, pm = register_agent(session, name="pm", role=AgentRole.pm, pod_id=pod.id)
         _, analyst = register_agent(session, name="analyst", role=AgentRole.analyst,
                                     pod_id=pod.id)
+        _, runtime = seed_runtime_agent(session)
         session.commit()
-        return {"admin": admin, "pm": pm, "analyst": analyst, "pod_id": pod.id}
+        return {"admin": admin, "pm": pm, "analyst": analyst, "runtime": runtime,
+                "pod_id": pod.id}
     finally:
         session.close()
 
@@ -262,7 +268,7 @@ def test_held_no_agent_action_breaks_the_next_restart(SessionFactory, client, db
         "structured_payload": {"world": {"provider": "evil"}}})
     client.post("/clock/advance", headers=H(pm), json={"days": 1})          # 403
     client.get("/events", headers=H(analyst))                               # 403
-    r = client.post("/clock/advance", headers=H(admin), json={"days": 2})
+    r = client.post("/clock/advance", headers=H(world["runtime"]), json={"days": 2})
     assert r.status_code == 200, r.text
     clock = _restart(db, SyntheticProvider(world_key(6), dict(reversed(SYMBOLS.items()))))
     assert clock.now() == START + timedelta(days=2)

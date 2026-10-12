@@ -38,7 +38,11 @@ from app.main import create_app
 from app.marketdata import StaticProvider, set_provider
 from app.registry import halt
 from app.registry.pods import fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from tests.support import FrozenClock
 
 #: The path physics watches in production, captured before any fixture patches it.
@@ -141,6 +145,19 @@ def admin_key(SessionFactory) -> str:
         _, api_key = register_agent(
             session, name="management", role=AgentRole.management
         )
+        session.commit()
+    finally:
+        session.close()
+    return api_key
+
+
+@pytest.fixture
+def runtime_key(SessionFactory) -> str:
+    """Seed the Runtime's identity (ADR-033) and return its key: the only
+    non-system key that may advance a backtest clock."""
+    session = SessionFactory()
+    try:
+        _, api_key = seed_runtime_agent(session)
         session.commit()
     finally:
         session.close()

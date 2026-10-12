@@ -45,6 +45,7 @@ class AgentRole(str, enum.Enum):
     pm = "pm"
     management = "management"
     system = "system"
+    runtime = "runtime"      # the Runtime's clock hand (ADR-033); never a mind's
 
 
 class AgentStatus(str, enum.Enum):

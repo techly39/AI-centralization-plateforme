@@ -843,3 +843,21 @@ Commit the build before step 5, so a resume starts from a commit.
 Next: R-3. The lockstep backtest workflow, plus a reserved `runtime` clock identity (B-032,
 B-000f): a scripted PM + Analyst live a month through the Runtime, with every act over HTTP, and
 the run is labelled `minds: scripted` (M1).
+
+## Cycle 0023 — R-3a: the world's clock belongs to the Runtime, not to management (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (a month *via the Runtime*: the conductor needs a clock identity no
+firm agent holds) and the seal for every later LLM manager (B-032, Art. 10). Size check (X-008):
+R-3 is split. R-3a (this cycle) is the identity, a physics change that needs red-team. R-3b is the
+lockstep workflow + the PM/Analyst month. R-3c is `daily_cycle`.
+Hypothesis: If (a) a new role `runtime` holds `CONTROL_CLOCK` and only the universal actions,
+(b) `management` loses `CONTROL_CLOCK`, (c) the identity is created only by the operator CLI
+(`fund-env seed-runtime`, one per database, key shown once) and can never be registered over
+HTTP, and (d) `system` is looked up by role, and registering the reserved names `system` or
+`runtime` (in any case or spacing) is refused, then: a management key gets 403 + `permission_denied`
+on `POST /clock/advance`; the runtime key advances the clock and can place no order, send no
+message and register no agent; the red-team 0001 squat xfail turns into a guard; and every old
+test that advanced the clock with management's key is a finding of the old law. Those tests move
+to the runtime key, the change is logged in the ADR, and no assertion is weakened. Expected: about
+25 new tests, 1 xfail fewer (7 → 6), no migration (the role column is a non-native enum with no
+CHECK constraint).

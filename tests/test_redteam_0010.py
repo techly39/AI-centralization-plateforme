@@ -37,7 +37,11 @@ from app.clock import LiveClock, set_clock
 from app.db.models import AgentRole
 from app.marketdata import SyntheticProvider, set_provider
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import start_backtest
 from tests.support import world_key
 
@@ -69,8 +73,9 @@ def _open_world(SessionFactory, *, key: bytes, start: datetime) -> dict[str, obj
         fund_pod(session, pod_id=pod.id, delta=100_000.0,
                  actor=get_or_create_system_agent(session), reason="red-team 0010")
         _, pm_key = register_agent(session, name="pm", role=AgentRole.pm, pod_id=pod.id)
+        _, rt_key = seed_runtime_agent(session)
         session.commit()
-        return {"admin": admin_key, "pm": pm_key, "pod_id": pod.id}
+        return {"admin": admin_key, "pm": pm_key, "runtime": rt_key, "pod_id": pod.id}
     finally:
         session.close()
 
@@ -81,8 +86,8 @@ def _get(client, key: str, path: str, **params) -> dict:
     return resp.json()
 
 
-def _advance(client, admin: str, **step) -> None:
-    resp = client.post("/clock/advance", headers=H(admin), json=step)
+def _advance(client, runtime: str, **step) -> None:
+    resp = client.post("/clock/advance", headers=H(runtime), json=step)
     assert resp.status_code == 200, resp.text
 
 
@@ -157,7 +162,7 @@ def test_hole_a_pm_cannot_recover_the_seed_and_compute_tomorrow(
         replica = SyntheticProvider(recovered, SYMBOLS)
         prediction = replica.get_price("SYNA", as_of=PROBE_START + timedelta(days=7)).price
 
-    _advance(client, world["admin"], days=7)
+    _advance(client, world["runtime"], days=7)
     actual = _get(client, pm, "/price/SYNA")["price"]
     assert prediction != actual, (
         f"key {recovered!r} recovered from 3 served volumes; next week's close "
@@ -199,7 +204,7 @@ def test_held_no_close_or_week_before_its_end_at_the_midnight_edge(
     assert quote["price"] == daily[-1]["close"]
     assert datetime.fromisoformat(quote["as_of"]) <= SUNDAY_2359
 
-    _advance(client, world["admin"], minutes=1)
+    _advance(client, world["runtime"], minutes=1)
     daily = _get(client, pm, "/ohlcv/SYNA", interval="1d")["bars"]
     assert daily[-1]["ts"].startswith(sunday)
     weekly = _get(client, pm, "/ohlcv/SYNA", interval="1wk", start="2024-01-01")["bars"]

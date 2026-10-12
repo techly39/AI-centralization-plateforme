@@ -156,14 +156,17 @@ def test_held_no_clock_control_on_the_surface(client, two_desks, admin_key, meth
         assert resp.status_code in (404, 405), (method, path, resp.status_code)
 
 
-def test_held_no_role_moves_a_live_clock(client, two_desks, admin_key, db):
-    """ADR-027: advance is CONTROL_CLOCK (PM/analyst 403) and backtest-only
-    (management 409 in a live run); the live clock and the ledger's now stay put."""
+def test_held_no_role_moves_a_live_clock(client, two_desks, admin_key, runtime_key, db):
+    """ADR-027: advance is CONTROL_CLOCK (PM/analyst 403, and management 403 since
+    ADR-033) and backtest-only (the runtime identity 409 in a live run); the live
+    clock and the ledger's now stay put."""
     before = client.get("/clock", headers=H(admin_key)).json()
     for who in ("pm1", "an1"):
         resp = client.post("/clock/advance", headers=H(two_desks[who][1]), json={"days": 1})
         assert resp.status_code == 403, (who, resp.status_code)
     resp = client.post("/clock/advance", headers=H(admin_key), json={"days": 1})
+    assert resp.status_code == 403, resp.text
+    resp = client.post("/clock/advance", headers=H(runtime_key), json={"days": 1})
     assert resp.status_code == 409, resp.text
     assert get_clock().mode == "live"
     after = client.get("/clock", headers=H(admin_key)).json()

@@ -38,7 +38,11 @@ from app.ledger.events import EVENT_ORDER_FILLED
 from app.main import create_app
 from app.marketdata import SyntheticProvider, set_provider
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import start_backtest
 from mcp_server import FundClient, build_server
 from runtime import governance, native, registry, scripted
@@ -511,7 +515,7 @@ def _month_through_the_runtime(world: int) -> tuple[list[tuple], list]:
     set_provider(SyntheticProvider(world_key(world), SYMBOLS))
     with Sessions() as s:
         start_backtest(s, start=START)
-        _, admin = register_agent(s, name="management", role=AgentRole.management)
+        _, clock_key = seed_runtime_agent(s)
         pod = create_pod(s, name="runtime-desk")
         fund_pod(s, pod_id=pod.id, delta=CAPITAL, actor=get_or_create_system_agent(s),
                  reason="probe capital")
@@ -535,11 +539,12 @@ def _month_through_the_runtime(world: int) -> tuple[list[tuple], list]:
         transport = httpx.ASGITransport(app=app)
         async with FundClient(base_url="http://fund.test", api_key=pm_key,
                               transport=transport) as pm, \
-                FundClient(base_url="http://fund.test", api_key=admin,
-                           transport=transport) as boss:
+                FundClient(base_url="http://fund.test", api_key=clock_key,
+                           transport=transport) as clock_hand:
             for _ in range(DAYS):
                 records.append(await wake(spec, pm, workflow_input={"universe": list(SYMBOLS)}))
-                await boss.post("/clock/advance", {"days": 1})  # R-3 moves this into the Runtime
+                # The runtime identity (ADR-033); R-3b moves the loop into the Runtime.
+                await clock_hand.post("/clock/advance", {"days": 1})
 
     with TestClient(app):  # the lifespan puts the server on the run's clock
         asyncio.run(month())
@@ -578,6 +583,10 @@ def test_the_scripted_pm_lives_a_month_through_the_tools(months) -> None:
     assert placed == len(fills)
     stamps = sorted({e[1] for e in fills})
     assert stamps[0] >= START.isoformat() and stamps[-1] < (START + timedelta(days=DAYS)).isoformat()
+    # Time really moved, every day, by the runtime identity's hand (audit c23 NOTE 1).
+    advances = [e for e in ledger if e[3] == "clock_advanced"]
+    assert len(advances) == DAYS and len({e[2] for e in advances}) == 1
+    assert len({e[1] for e in fills}) > 1   # fills on more than one simulated day
 
 
 def test_the_same_world_twice_through_the_runtime_leaves_the_same_ledger(months) -> None:

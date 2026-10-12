@@ -5,7 +5,7 @@ Every authenticated agent may read the clock (ADR-026, amending TRD §7's
 simulated date, and an agent has no other honest way to learn it.
 
 Moving it is ``POST /clock/advance``: backtest runs only, ``CONTROL_CLOCK``
-(management/system, never universal). There is no ``POST /clock/mode``: the
+(the Runtime's ``runtime`` identity and ``system`` — never a firm agent, ADR-033). There is no ``POST /clock/mode``: the
 mode is a fact of the run's database, fixed when it was created (ADR-027).
 """
 

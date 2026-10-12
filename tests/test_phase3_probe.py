@@ -38,7 +38,11 @@ from app.main import create_app
 from app.marketdata import SyntheticProvider, set_provider
 from app.registry import halt
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import start_backtest
 from tests.support import world_key
 
@@ -129,6 +133,7 @@ def run_month(world: int) -> ProbeRun:
         fund_pod(session, pod_id=pod.id, delta=CAPITAL,
                  actor=get_or_create_system_agent(session), reason="probe capital")
         _, pm_key = register_agent(session, name="pm-probe", role=AgentRole.pm, pod_id=pod.id)
+        _, runtime = seed_runtime_agent(session)
         session.commit()
         pod_id = pod.id
     finally:
@@ -152,7 +157,7 @@ def run_month(world: int) -> ProbeRun:
             book = pm.portfolio()
             assert book["fully_priced"], book
             curve.append((book["as_of"], book["total_value"]))
-            resp = client.post("/clock/advance", headers={"X-API-Key": admin},
+            resp = client.post("/clock/advance", headers={"X-API-Key": runtime},
                                json={"days": 1})
             assert resp.status_code == 200, resp.text
         management = ScriptedPM(client, admin, pod_id)  # metrics are management's view
