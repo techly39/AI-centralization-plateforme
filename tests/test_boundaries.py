@@ -157,14 +157,24 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
 
 
 def _is_file_import(func: ast.expr) -> bool:
+    """Calls whose target module the scanner cannot read at all: a load from a
+    path, code run from a string, or an import function fetched by name."""
+    if isinstance(func, ast.Name) and func.id in {"exec", "eval", "compile"}:  # builtins only
+        return True
     name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
-    return name in {"spec_from_file_location", "SourceFileLoader"}
+    if name in {"spec_from_file_location", "SourceFileLoader"}:
+        return True
+    return (  # getattr(importlib, "import_module")(x)
+        isinstance(func, ast.Call) and getattr(func.func, "id", None) == "getattr"
+        and len(func.args) >= 2 and isinstance(func.args[1], ast.Constant)
+        and func.args[1].value in {"import_module", "__import__"}
+    )
 
 
 def _is_dynamic_import(func: ast.expr) -> bool:
     if isinstance(func, ast.Name):
         return func.id in {"__import__", "import_module"}
-    return isinstance(func, ast.Attribute) and func.attr == "import_module"
+    return isinstance(func, ast.Attribute) and func.attr in {"import_module", "__import__"}
 
 
 def _matches(module: str, banned: str) -> bool:
@@ -381,6 +391,28 @@ def test_scanner_catches_planted_violations(tmp_path: Path) -> None:
         "runtime/direct.py: app.config",
         "runtime/direct.py: app.config.get_settings",
     ]
+
+
+@pytest.mark.parametrize("source", [
+    "import importlib\ndef f(x):\n    return importlib.import_module('app.' + x)\n",
+    "import importlib\ndef f(x):\n    return importlib.__import__('app.' + x)\n",
+    "import builtins\ndef f(x):\n    return builtins.__import__(x)\n",
+    "def f(x):\n    return __import__(x)\n",
+    "import importlib\ndef f(x):\n    return getattr(importlib, 'import_module')(x)\n",
+    "def f():\n    exec('import app.ledger')\n",
+    "def f(s):\n    return eval(s)\n",
+    "def f(s):\n    return compile(s, 'x', 'exec')\n",
+    "import importlib.util\nspec = importlib.util.spec_from_file_location('m', '/x.py')\n",
+])
+def test_scanner_refuses_every_import_it_cannot_read(source: str) -> None:
+    """Re-audit c21: the computed-import rule names every spelling it claims."""
+    assert COMPUTED_IMPORT in imported_modules(source, "runtime.x", False)
+
+
+def test_scanner_does_not_mistake_re_compile_for_code_loading() -> None:
+    assert COMPUTED_IMPORT not in imported_modules(
+        "import re\nP = re.compile('x')\n", "runtime.x", False,
+    )
 
 
 def test_relative_imports_resolve() -> None:

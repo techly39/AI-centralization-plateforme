@@ -61,7 +61,10 @@ def _halted(path: Path) -> bool:
         # Running only if the directory the Human halts in is there. A missing
         # ``governance/`` means REPO_ROOT is not the repo (a non-editable
         # install, a copied tree): the real HALT is unseen (red-team 0012 H3).
-        return not path.parent.is_dir()
+        try:
+            return not path.parent.is_dir()
+        except OSError:  # is_dir re-raises e.g. PermissionError: fail closed
+            return True
     except OSError:
         return True
     return True

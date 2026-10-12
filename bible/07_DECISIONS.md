@@ -776,9 +776,17 @@ non-editable install or a copied tree moves `REPO_ROOT` away from the Human's re
 first form: `os.path.lexists` answers False on any OSError, which would have failed open.
 (Physics' `Path.exists()` has a milder form of the same gap → B-040.) The spec loader uses the
 same duplicate-refusing loader, and it refuses `.yml`/`.YAML` files instead of skipping them.
-(f) **The boundary scanner refuses what it cannot read** (red-team H8). In every layer, an
-`import_module`/`__import__` with a non-literal name, or a load from a file path
-(`spec_from_file_location`, `SourceFileLoader`), is itself a violation. No layer had one.
+(f) **The boundary scanner refuses what it cannot read** (red-team H8, widened at re-audit).
+In every layer, each of these is itself a violation:
+- `import_module` or `__import__` called with a non-literal name, whether as a bare name or as an
+  attribute (`importlib.__import__`, `builtins.__import__`);
+- `getattr(…, "import_module" | "__import__")(…)`;
+- the builtins `exec`, `eval` and `compile`;
+- a load from a file path (`spec_from_file_location`, `SourceFileLoader`).
+
+No layer had any of these. Planted tests cover each spelling, plus one showing that `re.compile`
+is not mistaken for one. This is a lint on code the Builder writes, not a seal: a determined
+author can still hide an import (for example, a getattr chain built from computed strings).
 (e) **AgentSpec deviations from 03 §3, recorded.**
 - One added field, `provider`.
 - `role` is one of {pm, analyst, management}. `system` and R-3's `runtime` identity are never a
