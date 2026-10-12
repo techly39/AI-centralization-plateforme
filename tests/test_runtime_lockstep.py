@@ -253,8 +253,9 @@ def test_a_key_that_is_not_its_specs_agent_refuses_the_run_before_step_0(
         SessionFactory, world, woke):
     """pm-1's key under a spec for pod 2. Since red-team 0015 H2 every key is read
     before step 0, so nobody wakes at all (was: a woke once, then the run was refused)."""
+    # b-pm wears pm-1's own name, so only the pod differs (audit c26 BLOCK 1).
     handed = [(_spec("a-pm", 1, "read-a"), world["pm"][1]),
-              (_spec("b-pm", 2, "read-b"), world["pm"][1])]
+              (_spec("b-pm", 2, "read-b", name="pm-1"), world["pm"][1])]
     run = conduct(SessionFactory, handed, world["clock"], steps=3)
     assert (run.ended, run.reason, run.steps) == ("refused", "identity_mismatch:b-pm", ())
     assert woke == [] and _advances(SessionFactory) == []

@@ -7,14 +7,16 @@ Claims under test:
   the actor of every ``agent_registered`` event, and the minds it returns live a
   backtest through the conductor;
 * every spec is checked **before any is registered**: HALT, a cap refusal,
-  ``wake_policy: never``, a spec no mind can be built from, and duplicate ids or
-  names register nothing; a HALT that appears part-way stops the next registration;
+  ``wake_policy: never``, a spec no mind can be built from, duplicate ids, names
+  that look the same, reserved names and names already taken register nothing;
+  a HALT that appears part-way stops the next registration;
 * physics decides who may register: the clock key and a PM key get 403 and
   register nothing;
-* a failure part-way names what was already registered, and only that exists;
+* a refusal part-way names what was already registered, and only that exists;
   an answer that is not the agent asked for is refused and no client is left open;
 * **a key must wear its spec's name**: a key with the right role and pod but
-  another name cannot wake (``identity_mismatch``) or join a run.
+  another name cannot wake (``identity_mismatch``) or join a run, and the right
+  name with the wrong role or pod cannot either.
 """
 
 from __future__ import annotations
@@ -167,24 +169,60 @@ def test_duplicate_ids_or_names_register_nothing(SessionFactory, world, woke, sp
     assert _made(SessionFactory) == {}
 
 
-@pytest.mark.parametrize("who", ["clock", "pm"])
-def test_physics_decides_who_may_register(SessionFactory, world, woke, who):
+@pytest.mark.parametrize("who, reason, action", [
+    ("pm", "register_failed:a-pm:403", "register_agents"),
+    ("clock", "directory_unreadable:403", "list_agents"),  # stopped one read earlier
+])
+def test_physics_decides_who_may_register(SessionFactory, world, woke, who, reason, action):
     key = world["clock"] if who == "clock" else world["pm"][1]
     err, _, _ = _provision(SessionFactory, [_spec("a-pm", "ok")], key)
-    assert (err.reason, err.registered) == ("register_failed:a-pm:403", ())
+    assert (err.reason, err.registered) == (reason, ())
     assert _made(SessionFactory) == {}
     [denied] = _events(SessionFactory, EVENT_PERMISSION_DENIED)
-    assert denied.payload_json["action"] == "register_agents"
+    assert denied.payload_json["action"] == action
 
 
-@pytest.mark.parametrize("taken", ["pm-2", "runtime"], ids=["taken", "reserved"])
-def test_a_failure_part_way_names_what_was_registered(SessionFactory, world, woke, taken):
-    specs = [_spec("a-pm", "fresh-1"), _spec("b-pm", "fresh-2"), _spec("c-pm", taken),
-             _spec("d-pm", "fresh-4")]
-    err, _, closed = _provision(SessionFactory, specs, world["admin"])
-    assert (err.reason, err.registered) == ("register_failed:c-pm:409", ("a-pm", "b-pm"))
+@pytest.mark.parametrize("name, reason", [
+    ("pm-2", "name_taken:c-pm"), ("PM-2​", "name_taken:c-pm"),
+    ("runtime", "name_reserved:c-pm"), ("System", "name_reserved:c-pm"),
+], ids=["taken", "taken-lookalike", "reserved", "reserved-case"])
+def test_a_name_physics_would_refuse_registers_nothing(SessionFactory, world, woke, name,
+                                                       reason):
+    """Red-team 0016 H3: a refusal knowable in advance is found before anything is
+    registered (this test pinned the part-way 409 before; the law is now stronger)."""
+    specs = [_spec("a-pm", "fresh-1"), _spec("b-pm", "fresh-2"), _spec("c-pm", name)]
+    err, _, _ = _provision(SessionFactory, specs, world["admin"])
+    assert (err.reason, err.registered) == (reason, ())
+    assert _made(SessionFactory) == {}
+
+
+def test_a_refusal_part_way_names_what_was_registered(SessionFactory, world, woke):
+    """Physics refuses the third (here: its pod is a role it may not hold) after two
+    were made: only those two exist, are named, and their clients are closed."""
+    specs = [_spec("a-pm", "fresh-1"), _spec("b-pm", "fresh-2"),
+             _spec("c-pm", "fresh-3", pod=None, role="management")]
+
+    class RefusesThird(FundClient):
+        async def post(self, path, body=None, **params):
+            if body["name"] == "fresh-3":
+                body = {**body, "role": "system"}  # physics answers 422
+            return await super().post(path, body, **params)
+
+    err, _, closed = _provision(SessionFactory, specs, world["admin"], registrar=RefusesThird)
+    assert (err.reason, err.registered) == ("register_failed:c-pm:422", ("a-pm", "b-pm"))
     assert set(_made(SessionFactory)) == {"fresh-1", "fresh-2"}
     assert closed == [True, True]  # no client outlives a failed provisioning
+
+
+def test_the_runtime_fold_is_physics_fold() -> None:
+    """The Runtime cannot import physics, so it keeps a copy of the name fold and the
+    reserved names; the copy must not drift."""
+    from app.registry import service
+    from runtime import provision as rp
+    assert rp.RESERVED_NAMES == service._RESERVED_NAMES
+    corpus = ["pm-1", "PM-1", " pm-1 ", "pm-1​", "ｐｍ-1", "Runtime", "ſystem", "ꜱystem",
+              "run time", "ㅤruntime", "runtime\U000e01f0", "é", "ﬁ", "a\x00b", "ß", "İ"]
+    assert [rp.name_key(n) for n in corpus] == [service._name_key(n) for n in corpus]
 
 
 @pytest.mark.parametrize("lie", [
@@ -226,3 +264,24 @@ def test_a_key_under_another_name_cannot_join_a_run(SessionFactory, world, woke)
                   world["clock"], steps=2)
     assert (run.ended, run.reason, run.steps) == ("refused", "identity_mismatch:a-pm", ())
     assert woke == []
+
+
+@pytest.mark.parametrize("spec, key", [
+    (_spec("a-pm", "management", 1), "admin"),   # right name, wrong role
+    (_spec("a-pm", "pm-1", 2), "pm-1"),          # right name, wrong pod
+], ids=["role", "pod"])
+def test_the_name_alone_is_not_enough(SessionFactory, world, woke, spec, key):
+    """Audit c26 BLOCK 1: role and pod are still checked when the name is right."""
+    key = world["admin"] if key == "admin" else world["pm"][1]
+    app = _app(SessionFactory)
+
+    async def go():
+        async with FundClient(base_url="http://fund.test", api_key=key,
+                              transport=httpx.ASGITransport(app=app)) as client:
+            return await wake(spec, client, workflow_input={})
+
+    with TestClient(app):
+        record = asyncio.run(go())
+    assert (record.ended, record.reason) == ("refused", "identity_mismatch")
+    run = conduct(SessionFactory, [(spec, key)], world["clock"], steps=1)
+    assert (run.ended, run.reason) == ("refused", "identity_mismatch:a-pm") and woke == []

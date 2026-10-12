@@ -968,7 +968,27 @@ Amended (cycle 26, R-3b-2b-1 shipped: `runtime/provision.py`, `tests/test_runtim
   them to their specs.
 - *Finding.* 65 older runtime tests broke because their fixtures handed a key under another
   name: spec name = spec id, agent `pm-1`. That is the gap this law closes. Only the fixtures
-  were changed, to name the agent they register. No assertion changed.
+  were changed, to name the agent they register. No assertion changed. **But** (audit c26
+  BLOCK 1) in four guards whose purpose is a role or pod mismatch (0013 H2/H3, lockstep
+  wrong-pod, 0015 clock-key-as-mind), the new names also mismatched. Those guards would have
+  passed on the name check alone, so the role and pod checks were left unpinned. Fixed: each
+  spec now wears its key's own name, so only the role or pod differs. Two new tests check a
+  right name with a wrong role and a right name with a wrong pod, through both the wake and the
+  conductor.
+- *Red-team 0016 amendment* (4 low holes, all fixed, guards in `tests/test_redteam_0016.py`):
+  - H1: a 5xx answer (lost after physics committed) now names the failing spec as possibly
+    registered. Only a 4xx proves nothing was made.
+  - H1b: a failing `connect`, or any other exception from the POST, is a `ProvisionError`
+    naming what may exist.
+  - H2: names are unique **under physics' fold** (`provision.name_key`, a copy pinned to
+    `app.registry.service._name_key` by a test, since runtime imports no `app`).
+  - H3: reserved names (`name_reserved`) and names already in the directory (`name_taken`,
+    read through the registrar's `GET /agents`) are refused before anything is registered.
+    A registrar that cannot read the directory is refused (`directory_unreadable`). A name
+    taken in the window between that read and the POST still fails closed with a 409.
+  - Seen, not filed: management keeps `REGISTER_AGENTS`, so in Era II a management mind could
+    take a future spec's name first. It fails closed, but it is a way to block a spec (→
+    BACKLOG).
 - *Proof.* The R-3b-2a two-pod month now runs with minds provisioned over HTTP.
 Still **R-3b-2c**: `fund-runtime backtest` and the `minds:` label in physics' run record
 (physics → red-team).

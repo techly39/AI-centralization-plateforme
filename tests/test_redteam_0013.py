@@ -151,7 +151,8 @@ async def test_hole_spec_identity_is_not_checked_against_the_key(
 ) -> None:
     scripts(look=lambda r: CompletionResponse(content="who am I?"))
     fc, _ = fund_client(admin_key)
-    rec = await wake(_spec(script="look"), fc, workflow_input={})  # spec: pm of pod 1
+    # The spec wears the key's own name, so only the role differs (audit c26 BLOCK 1).
+    rec = await wake(_spec(script="look", name="management"), fc, workflow_input={})
     assert rec.ended == "refused", json.loads(rec.transcript[1].content)["me"]
 
 
@@ -165,7 +166,8 @@ async def test_hole_pod_spec_woken_with_another_pods_key(
     _, pm2_key = pm_factory("pm-2", pod2)
     scripts(look=lambda r: CompletionResponse(content="hi"))
     fc, _ = fund_client(pm2_key)
-    rec = await wake(_spec(script="look", pod=1), fc, workflow_input={})
+    # The spec wears the key's own name, so only the pod differs (audit c26 BLOCK 1).
+    rec = await wake(_spec(script="look", pod=1, name="pm-2"), fc, workflow_input={})
     assert rec.ended == "refused"
 
 
