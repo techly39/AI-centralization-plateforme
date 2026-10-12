@@ -23,6 +23,7 @@ import re
 import secrets
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -204,17 +205,33 @@ def backtest_check() -> bool:
                 fine = (r.returncode == 0 and out["ended"] == "completed"
                         and out["registered"] == ["a-analyst", "b-pm"] and len(wakes) == 10
                         and all(w["ended"] == "done" and w["tool_failures"] == 0 for w in wakes)
-                        and filled
+                        and bool(filled)
                         and not any(k in r.stdout + r.stderr for k in keys.values()))
                 detail = (f"{out['ended']}, {len(out['run']['steps'])} steps, {len(wakes)} wakes,"
                           f" {len(filled)} orders accepted")
             except (ValueError, KeyError, TypeError):
                 fine, detail = False, (r.stdout + r.stderr).strip()[-300:]
             ok = step("fund-runtime backtest: specs/desk-month lives 5 days", fine, detail)
+            ok &= minds_check(tmpdir / "backtest.db")
         finally:
             clean = stop(server)
             server_log.close()
         return ok & step("backtest server stopped cleanly on SIGINT", clean)
+
+
+def minds_check(db: Path) -> bool:
+    """Physics' own record of the run (ADR-032 (p)): one declaration, ``scripted``,
+    written before any firm agent's event. Read from the file, as a reader would."""
+    with sqlite3.connect(db) as con:
+        rows = con.execute("SELECT id, payload_json FROM events "
+                           "WHERE type = 'run_minds_declared'").fetchall()
+        first_firm = con.execute(
+            "SELECT min(e.id) FROM events e JOIN agents a ON a.id = e.actor_agent_id "
+            "WHERE a.role NOT IN ('system', 'runtime')").fetchone()[0]
+    fine = (len(rows) == 1 and json.loads(rows[0][1]) == {"minds": ["scripted"]}
+            and first_firm is not None and rows[0][0] < first_firm)
+    return step("backtest db: the ledger declares minds: scripted, before any firm act", fine,
+                f"{rows}, first firm event {first_firm}")
 
 
 if __name__ == "__main__":

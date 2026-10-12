@@ -213,6 +213,30 @@ async def check_clock(clock: FundClient) -> str | None:
     return None
 
 
+#: Physics' kind for each zero-cost provider (``app.run_clock.MIND_KINDS``; a test
+#: pins the copy). Any other provider is a model answering now: ``model``.
+_KIND = {"scripted": "scripted", "cassette": "cassette"}
+
+
+def mind_kinds(specs: Sequence[AgentSpec]) -> list[str]:
+    """The kinds physics records for minds made from ``specs``, sorted. A
+    provider this map does not name is declared ``model``: an unknown mind is
+    never labelled as code."""
+    return sorted({_KIND.get(s.provider, "model") for s in specs})
+
+
+async def declare_minds(clock: FundClient, specs: Sequence[AgentSpec]) -> str | None:
+    """Tell physics what drives this run's minds (``POST /run/minds``, ADR-032
+    (p)); ``None`` if it took the declaration, else why not. Physics takes it only
+    before the clock moves and before any firm agent acts, so a caller declares
+    before it registers anyone."""
+    try:
+        await clock.post("/run/minds", {"minds": mind_kinds(specs)})
+    except FundAPIError as exc:
+        return f"minds_refused:{exc.status_code}"
+    return None
+
+
 def record_json(record: Any) -> Any:
     """A record as plain JSON values: dataclasses → objects, tuples → arrays,
     transcript messages → their JSON dump. A transcript keeps tool results as

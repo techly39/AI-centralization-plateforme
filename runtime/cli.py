@@ -22,7 +22,10 @@ identity and made the pods. In order:
 2. the clock key is checked **before anything is registered**: it must be the
    ``runtime`` role on a ``backtest`` run, so a live database never gains a
    run's agents;
-3. :func:`runtime.provision.provision` makes one App agent per spec, then
+3. the clock key declares what drives the run's minds (``POST /run/minds``, the
+   specs' kinds: ADR-032 (p)). Physics takes it once, and only before any firm
+   agent acts, so it comes before registration too;
+4. :func:`runtime.provision.provision` makes one App agent per spec, then
    :func:`runtime.lockstep.run_backtest` conducts the run.
 
 One JSON object goes to stdout: ``{ended, reason, registered, run}``.
@@ -59,6 +62,7 @@ from runtime.lockstep import (
     MAX_STEPS,
     Mind,
     check_clock,
+    declare_minds,
     record_json,
     run_backtest,
 )
@@ -174,7 +178,9 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
     registrar, clock = connect(registrar_key), connect(clock_key)
     minds: list[Mind] = []
     try:
-        problem = await check_clock(clock)  # before anything is registered
+        # Both before anything is registered: physics takes the declaration only
+        # while no firm agent has acted (ADR-032 (p)).
+        problem = await check_clock(clock) or await declare_minds(clock, specs)
         if problem is not None:
             return refused(problem)
         try:
