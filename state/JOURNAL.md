@@ -1065,3 +1065,20 @@ timeout after the commit is "maybe".
 409 into a clean refusal. The race window that remains fails closed.
 Next: R-3b-2c. `fund-runtime backtest` (specs dir + server + keys → a provisioned run) and the
 `minds:` label in physics' run record (physics → red-team).
+
+## Cycle 0027 — R-3b-2c-1: `fund-runtime backtest`, a run from a specs directory (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (M1: the PM + Analyst month started by one operator command, not by
+a test harness). Size check (X-008): R-3b-2c is split. **R-3b-2c-1** (this cycle, no physics
+change): the command. **R-3b-2c-2**: the `minds:` label in physics' run record (physics →
+red-team, and a design question: physics cannot see what drives a key).
+Step 0: `?? setup/` is the Human's P-0003 installer. It was left untouched.
+Hypothesis: If `fund-runtime backtest --specs DIR --steps N [--days-per-step D] [--input FILE]
+[--server URL]` reads the registrar and clock keys **from the environment only**
+(`FUND_RUNTIME__REGISTRAR_KEY`, `FUND_RUNTIME__CLOCK_KEY`; argv is visible to `ps`), checks the
+clock key and the run's mode **before provisioning** (a live database must not gain agents),
+then provisions and conducts, and prints the RunRecord as JSON, then: the R-3b-2a pod lives its
+days through the command against a served App; the output carries no key; a live database, a
+wrong clock key, a missing key, a bad spec or input, HALT or a taken name each exit non-zero
+with a reason and register nothing (or name what may exist); exit 0 means `completed`.
+Expected ~12 new tests. Xfails stay at 6.

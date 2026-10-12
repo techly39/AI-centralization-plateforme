@@ -1,0 +1,11 @@
+# The desk month (R-3b-2a, ADR-032 (l)): the Analyst of pod 1. A scripted mind (Q-0005 B):
+# code with an API key, not a firm agent — a run of these never ticks EC1 (R-8).
+id: a-analyst
+name: desk-1-analyst
+role: analyst
+pod: 1
+provider: scripted
+script: ma-signal-analyst
+charter: >-
+  Read the bars of your universe every day and tell your pod's PM, in one signal message
+  dated today, which names are long and which are flat.
