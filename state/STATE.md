@@ -1,9 +1,26 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 26 (R-3b-2b-1 minds provisioned from their specs + a key wears its spec's name — merged ca17717, 2026-10-12)
+**Last cycle:** 27 (R-3b-2c-1 `fund-runtime backtest` — merged 6d8e08d, 2026-10-12)
 
 ## What is true now
+- **A run starts from one operator command** (R-3b-2c-1, ADR-032 (o) + audit amendment,
+  `tests/test_runtime_cli_backtest.py`).
+  `fund-runtime backtest --specs DIR --steps N [--days-per-step D] [--input FILE]
+  [--max-tool-calls K] [--server URL]`:
+  - Keys come from the environment only: `FUND_RUNTIME__REGISTRAR_KEY`, `FUND_RUNTIME__CLOCK_KEY`.
+    The server comes from `--server` or `FUND_RUNTIME__SERVER_URL`, and must be `127.0.0.1` or
+    `::1`.
+  - Exit 2 for usage problems, before anything is contacted. Then `lockstep.check_clock` runs
+    before any registration (a live database never gains a run's agents). Then provision, then
+    conduct.
+  - It prints `{ended, reason, registered, run}`. The output passes through `cli.redact` (keys
+    in the form physics mints). Exit 0 only for `completed`.
+  - `FundClient` uses no proxy from the environment (`trust_env=False`), the MCP server's
+    client included.
+  - `specs/desk-month/` is the analyst + PM pod as files. **The smoke run lives it for 5 days
+    against a real `fund-env serve` on a synthetic backtest database**, and the PM's order is
+    accepted (smoke 20/20).
 - **Minds are made from their specs** (R-3b-2b-1, ADR-032 (n) + red-team 0016 amendment,
   `tests/test_runtime_provision.py`, `tests/test_redteam_0016.py`).
   `runtime.provision.provision(specs, registrar, connect) → [Mind]` registers one App agent per
@@ -152,7 +169,7 @@
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
-  identity + the lockstep conductor. **1334 passed + 6 xfailed** (with the runtime). No model
+  identity + the lockstep conductor. **1369 passed + 6 xfailed** (with the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
@@ -176,9 +193,9 @@
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
 - No Truman, Quant Lab or Observatory yet. The Runtime conducts a lockstep backtest. There is no
-  live scheduler yet (R-3c). Agents are provisioned from specs by code (R-3b-2b-1), but there is
-  no `fund-runtime backtest` command yet, and physics' run record does not carry the `minds:`
-  label (R-3b-2c).
+  live scheduler yet (R-3c). Agents are provisioned from specs and a run is one command
+  (`fund-runtime backtest`), but physics' run record does not carry the `minds:` label yet
+  (R-3b-2c-2), and the RunRecord is printed, not stored (R-4).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -186,10 +203,12 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-3b-2c** `fund-runtime backtest`: specs dir + server URL + registrar and runtime keys
-   from env → `provision` → `run_backtest` → the RunRecord as JSON. Also write the label
-   `minds: scripted` into physics' run record. That closes M1. It touches physics, so red-team.
+1. **R-3b-2c-2** The `minds:` label in physics' run record. Physics cannot see what drives a key,
+   so the label is a declaration. Likely design: the runtime identity declares it once, before
+   the first wake, as an event; physics refuses a second declaration and any declaration after
+   a wake. `fund-runtime backtest` declares it. That closes M1. Physics change, so red-team.
 2. **R-4** Cassettes + replay (M2). `retired_at`, `tool_failures` and the spec behind each
-   agent (`charter_ref`) go into the cassette.
+   agent (`charter_ref`) go into the cassette. **A cassette must redact minted keys**
+   (ADR-032 (o)), and a replay that meets a redacted key is a divergence.
 3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 / B-042 / B-046 when cheap.
    Retrospective at cycle 30.

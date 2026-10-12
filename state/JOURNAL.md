@@ -1082,3 +1082,37 @@ days through the command against a served App; the output carries no key; a live
 wrong clock key, a missing key, a bad spec or input, HALT or a taken name each exit non-zero
 with a reason and register nothing (or name what may exist); exit 0 means `completed`.
 Expected ~12 new tests. Xfails stay at 6.
+Work:
+- `runtime/cli.py`: `fund-runtime backtest`. Usage errors (no specs, bad input, sizes, missing
+  or identical keys, a server off this machine) exit 2 before anything is contacted. Then
+  `lockstep.check_clock` (extracted from the conductor, behaviour unchanged) runs before
+  `provision`, then `run_backtest`. `lockstep.record_json` turns a RunRecord into JSON.
+- `specs/desk-month/`: the R-3b-2a pod (analyst + PM, pod 1) as files, with `input.json`.
+- `scripts/smoke_run.py` has a second phase. It builds a synthetic backtest database with the
+  real `fund-env` commands, serves it, and runs `fund-runtime backtest` on it for 5 days. Result:
+  10 wakes, all `done`, and the PM's order on its analyst's signal is accepted by physics.
+- Claim check: an absent server is `clock_unreadable:503`, not a crash (test added). The ADR's
+  "every refusal before registration" was narrowed to the command's own refusals.
+- Mutation: dropping the pre-provision clock check fails 3 tests.
+- Auditor: **FAIL, 1 BLOCK.** "No key is printed" was false. A management mind's
+  `register_agent` result holds the new key, and the transcript keeps it. Fixed with `redact`
+  over the output, a hiring-mind test (it fails without `redact`), and a test over 200 minted
+  keys. WARN 1: httpx honoured proxy env vars, so a key could leave the machine through a proxy.
+  `FundClient` now sets `trust_env=False`. WARN 2: the tool budget has a maximum (1024). NOTEs:
+  `localhost` and `--steps 0` are refused. Re-audit **PASS**.
+- No physics change, so no red-team (the `FundClient` change is client-side).
+Result: merged 6d8e08d, pushed. 1334+6xf → **1369 passed + 6 xfailed** (plus the known `setup/`
+failure). Smoke 20/20 (was 12). Hypothesis **met**. The run ran against a real served App, not
+only ASGI.
+Learned:
+(1) **"No record holds a key" is a claim about every tool's answer, not about the runtime's
+own fields.** A transcript is the world's words as they came. Anything that prints or stores one
+(the CLI now, the cassette at R-4) inherits the redaction duty. The ADR says so.
+(2) **Loopback-only is not "the key stays here"** while the HTTP library obeys proxy variables.
+A seal has to cover the transport as well as the URL.
+(3) **A smoke run against real processes finds what ASGI tests cannot.** This one confirmed that
+the operator commands chain together: init-db → start-backtest → seed → serve → backtest.
+Next: R-3b-2c-2, the `minds:` label in physics' run record. It is a design question first:
+physics cannot see what drives a key, so the label is a declaration. Decide who may declare it.
+The likely answer is the runtime identity, once, before the first wake, as an event. Then
+red-team. After that, R-4 cassettes, which must redact keys.

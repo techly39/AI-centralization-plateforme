@@ -307,3 +307,12 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   agent to its genome. With a spec hash in it (`spec:<id>@<sha>`), the cassette (R-4) and the
   ledger together could prove which genome each agent ran. That is a precondition for
   generations and mutation (Era III) to be measurable and not just told.
+- **Secrets as a taint, not a regex (cycle 27).** Physics knows every key it mints. A
+  "secret-out" check could take every key in the run's database and search every artifact the
+  run wrote (stdout, cassette, logs, reports) for each one, in any of N encodings (raw, base64,
+  hex, split). That turns "no key leaks" from a pattern match into a measurement. It is also
+  data for Era II: an agent that re-encodes a key it was handed is scheming (Art. 8).
+- **The smoke run as the Era I exit rehearsal (cycle 27).** The smoke run already chains the
+  operator's real commands into a scripted pod's days. When R-8 arrives, the same script with
+  `--steps 21` and real specs *is* the EC1 run. Keep it the single path an operator would take,
+  so the first real month is not a new code path.

@@ -55,10 +55,22 @@ keep their ids for history.
             registrar key (the runtime key gains nothing). Names are folded, reserved and taken
             names are refused before any registration, and the name is bound at wake and
             conductor.
-      - [ ] **R-3b-2c** **Next.** `fund-runtime backtest` CLI (specs dir + server URL +
-            registrar/runtime keys from env → provision → RunRecord as JSON); the run label
-            `minds: scripted` in physics' run record (physics → red-team). **M1**. Serves EC1,
-            does not tick it (R-8).
+      - [ ] **R-3b-2c** Split cycle 27 (X-008):
+        - [x] **R-3b-2c-1** **Done cycle 27** (merged 6d8e08d; ADR-032 (o) + audit amendment,
+              `tests/test_runtime_cli_backtest.py`, smoke backtest phase). `fund-runtime
+              backtest`; clock checked before any registration; keys from env, redacted
+              output, no proxy, loopback only; `specs/desk-month/`.
+        - [ ] **R-3b-2c-2** **Next.** The `minds:` label in physics' run record: a
+              declaration by the runtime identity, once, before the first wake (design in the
+              slice; physics → red-team). `fund-runtime backtest` declares it. **M1**. Serves
+              EC1, does not tick it (R-8).
+      - [ ] **B-047** (cycle 27, low) A transcript keeps tool results as they came, so it can
+            hold a minted key (`register_agent`). The CLI redacts its output. R-4's cassette
+            must redact too, and replay must treat a redacted key as a divergence. Also decide
+            whether `native` should redact at the source.
+      - [ ] **B-048** (cycle 27, low) `FundClient` turns a non-JSON 2xx answer into a raw
+            `ValueError` (`response.json()`), not a `FundAPIError`. A wrong process on the
+            port would crash the command with a traceback instead of a refusal.
       - [ ] **B-045** (cycle 26, low, Era II) Management keeps `REGISTER_AGENTS`. A management
             mind could take a future spec's name first and so block that spec (it fails
             closed, `name_taken`). Decide with the `spawn_worker` / `generation_turnover`

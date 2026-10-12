@@ -1,5 +1,29 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 27: a simulated run now starts with one command.** You point
+`fund-runtime backtest` at a folder of agent description files. It creates the agents and runs
+the simulated days, then prints what happened. I tested it end to end against the real server:
+the analyst and the PM from `specs/desk-month/` lived 5 simulated days, and the PM placed a
+trade based on its analyst's signal.
+
+The command checks everything it can before it creates anything:
+- the folder, the input file and the sizes are valid;
+- both keys are present;
+- the server is on this machine;
+- the database is a simulated run, not the live one.
+
+Keys are read only from environment variables, never typed on the command line, where other
+programs on the Mac could see them.
+
+The reviewer caught a real leak. An agent that hires another agent receives the new agent's key,
+and my printout would have shown it. Keys are now blanked out of the output. The reviewer also
+found that a proxy setting on the Mac could have sent keys off the machine. Proxies are now
+ignored. Both are fixed and tested.
+
+Nothing needs your action. `setup/` is still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 26: agents are now created from their written descriptions.** Each agent
 has a file that describes it: name, role, desk, script. Until now, a test created each agent by
 hand and handed its key over. Now the Runtime creates every agent from its file through the
