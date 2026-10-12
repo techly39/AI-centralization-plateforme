@@ -100,7 +100,7 @@ def deactivate(
     except ReservedIdentityError as exc:  # physics' own identity (ADR-033)
         session.rollback()
         raise deny(session, actor, Action.DEACTIVATE_AGENTS, detail=str(exc),
-                   context={"target_agent_id": agent_id})
+                   context={"target_agent_id": agent_id, "reason": "reserved_identity"})
     except RegistryError as exc:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

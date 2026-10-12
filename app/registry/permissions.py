@@ -87,10 +87,13 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
         }
     ),
     # 'runtime' is the Runtime's identity (ADR-033, B-032): it moves a backtest's
-    # clock between lockstep steps and does nothing a participant does. The
-    # world's time is not a firm agent's lever (Art. 10), so management lost
-    # CONTROL_CLOCK — a TRD §6 deviation, logged in the ADR.
-    AgentRole.runtime: _UNIVERSAL | frozenset({Action.CONTROL_CLOCK}),
+    # clock between lockstep steps and does nothing a participant does — not
+    # even the universal inbox / cost / task reports, so no ledger row it writes
+    # can pass for agent activity. The world's time is not a firm agent's lever
+    # (Art. 10), so management lost CONTROL_CLOCK — a TRD §6 deviation, in the ADR.
+    AgentRole.runtime: frozenset(
+        {Action.READ_HALT, Action.READ_CLOCK, Action.CONTROL_CLOCK}
+    ),
     # 'system' is the internal/bootstrap identity and may do anything.
     AgentRole.system: frozenset(Action),
 }

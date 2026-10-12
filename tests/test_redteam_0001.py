@@ -335,6 +335,7 @@ def test_hole_system_identity_name_squat(client, make_pod, admin_key, db):
     make_pod(1)
     resp = client.post("/agents/register", headers=H(admin_key),
                        json={"name": "system", "role": "analyst", "pod_id": None})
+    assert resp.status_code == 409, resp.text      # the name is reserved (ADR-033)
     squatter_id = resp.json().get("id") if resp.status_code == 201 else None
     system = get_or_create_system_agent(db)
     assert system.role is AgentRole.system

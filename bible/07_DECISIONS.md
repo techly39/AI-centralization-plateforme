@@ -872,9 +872,11 @@ agent, a participant. Once an LLM manager wakes, it could stop, speed up or time
 clock: a participant would hold a world lever (Art. 10, B-032). The lockstep conductor (R-3b)
 needs a hand on the clock that no mind holds. Separately, `system` was found by *name*, and
 management could register an analyst called `system` first (red-team 0001, B-000f).
-Answer from the future: (1) **A new role, `runtime`**, holds `CONTROL_CLOCK` plus the universal
-actions (read inbox, report own cost and task, read halt, read clock), and nothing a participant
-does: no orders, messages, registrations, market data, directory or events.
+Answer from the future: (1) **A new role, `runtime`**, holds `READ_HALT`, `READ_CLOCK` and
+`CONTROL_CLOCK`, and nothing else (`/me` needs no permission). It has none of a participant's
+actions: no orders, messages, registrations, market data, directory or events. It also lacks the
+inbox, cost and task actions every firm agent has (audit c23 NOTE 5), so nothing it writes can
+pass for agent activity.
 **`management` loses `CONTROL_CLOCK`. This deviates from the TRD:** TRD §6 implies
 management/system, and ADR-027 says management. `system` keeps every action (it never
 authenticates). (2) **Physics' roles** (`PHYSICS_ROLES = {system, runtime}`, in

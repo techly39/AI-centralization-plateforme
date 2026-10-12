@@ -87,10 +87,9 @@ def test_only_physics_holds_control_clock():
     assert holders == {AgentRole.runtime, AgentRole.system}
 
 
-def test_the_runtime_role_is_the_universal_actions_plus_the_clock():
+def test_the_runtime_role_is_halt_and_clock_only():
     granted = {a for a in Action if has_permission(AgentRole.runtime, a)}
-    assert granted == {Action.READ_MESSAGES, Action.REPORT_COST, Action.REPORT_TASK,
-                       Action.READ_HALT, Action.READ_CLOCK, Action.CONTROL_CLOCK}
+    assert granted == {Action.READ_HALT, Action.READ_CLOCK, Action.CONTROL_CLOCK}
 
 
 def test_physics_roles_are_exactly_system_and_runtime():
@@ -126,6 +125,9 @@ def test_the_runtime_identity_advances_the_clock(client, world, db):
     ("GET", "/price/AAPL", None),
     ("GET", "/portfolio/1", None),
     ("GET", "/events", None),
+    ("GET", "/messages", None),
+    ("POST", "/costs", {"tokens_in": 1, "tokens_out": 1, "usd_cost": 0.01}),
+    ("POST", "/tasks/start", {"subject": "tick"}),
 ])
 def test_the_runtime_identity_does_nothing_a_participant_does(
     client, world, db, method, path, body

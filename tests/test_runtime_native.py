@@ -583,6 +583,10 @@ def test_the_scripted_pm_lives_a_month_through_the_tools(months) -> None:
     assert placed == len(fills)
     stamps = sorted({e[1] for e in fills})
     assert stamps[0] >= START.isoformat() and stamps[-1] < (START + timedelta(days=DAYS)).isoformat()
+    # Time really moved, every day, by the runtime identity's hand (audit c23 NOTE 1).
+    advances = [e for e in ledger if e[3] == "clock_advanced"]
+    assert len(advances) == DAYS and len({e[2] for e in advances}) == 1
+    assert len({e[1] for e in fills}) > 1   # fills on more than one simulated day
 
 
 def test_the_same_world_twice_through_the_runtime_leaves_the_same_ledger(months) -> None:
