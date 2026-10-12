@@ -384,8 +384,7 @@ async def test_held_mcp_get_messages_mine_false_refused_for_pm(two_desks, mcp_as
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(strict=True, reason="red-team 0001: MCP path params are not escaped; "
-                   "get_price('../health') calls a different endpoint than the tool declares")
+# Was a strict xfail (B-000h); fixed in cycle 22 (mcp_server.tools._segment, red-team 0013 H1). Guard.
 async def test_hole_mcp_path_traversal_reaches_other_endpoint(two_desks, mcp_as):
     """No privilege gain (same key, the API still checks it), but a tool reaches
     an endpoint other than the one recorded in TOOL_ROUTES, so the MCP-mirrors-API

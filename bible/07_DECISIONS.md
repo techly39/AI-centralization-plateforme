@@ -795,3 +795,73 @@ author can still hide an import (for example, a getattr chain built from compute
 - `memory_policy` is `none`, and `wake_policy` is one of {every_step, never}, until their slices
   widen them.
 - Specs are YAML files, one per agent, loaded in id order, which is the lockstep order.
+
+Amended (cycle 22, R-2 shipped: `runtime/registry.py`, `runtime/scripted.py`, `runtime/native.py`,
+`tests/test_runtime_native.py`):
+(g) **The name builds the mind, and a contradicting spec builds none.** `runtime.registry.build_provider`
+builds every mind from its spec through `PROVIDER_CLASSES`, a read-only table in code. Today that
+table has one entry: `scripted` → `ScriptedProvider`. `cassette` is on the gate's list, but the
+registry refuses it with `unavailable` until R-4, so it is never built from another class.
+`wake()` has no parameter that takes a provider object (a test pins its signature). Open question
+(b) is decided by the prime rule (safer budget, more honest measurement): a zero-cost spec that
+names a `model` or a non-zero `budget_usd` is **refused** (`contradiction`). A `$0` label on a
+model must not load as if it were valid. The spec still *loads*. The refusal happens where a mind
+would be built, so `fund-runtime status` can still show the spec. AgentSpec gains a **second added
+field, `script`**: the name of a policy in `runtime.scripted.SCRIPTS`, a read-only table in code.
+It is required when the provider is `scripted` and refused for any other provider. A spec names
+a script but can never supply one. `scripted.py` may import only pure stdlib modules and
+`runtime.providers`, and may not name a builtin that loads code or reaches other modules
+(`__import__`, `eval`, `exec`, `compile`, `globals`, `vars`, `getattr`, `open`, `__builtins__`).
+An AST check with planted counter-examples enforces this. It is a lint, not a seal (as in (f)).
+"A script is a pure function of the transcript and keeps no state" is a rule for script authors.
+Review enforces it, and the month-twice test checks it for `moving-average-pm`. Code does not
+enforce it. `Usage.cost_usd` is a provider's self-report and is never the meter (R-6).
+(h) **The native adapter.** A mind sees `build_server`'s published tool list, narrowed by
+`spec.tools`; an unknown name in that list refuses the wake. A call outside the list returns a
+tool error and reaches no endpoint. Every other call runs the MCP tool function over HTTP with the
+agent's own key, so physics' 403s reach the mind as tool errors. The context is assembled by code
+and is the start of the returned `WakeRecord.transcript`: the charter as the system message, then
+`{me: whoami, input: workflow_input}` as sorted JSON. **HALT is read (`decide_batch`) before every
+model turn and before every tool call.** 03 §3 asks only for "every batch". The auditor's c22 BLOCK
+read Art. 5.2's "nothing beyond the current tool call" as covering calls inside a batch, and the
+next model turn too, which under R-6 costs money. A per-wake tool-call budget (default 64) also
+stops the wake: a batch that would pass the budget does not run at all. The mind is shown deep
+copies of the transcript, and its reply is copied on receipt, so nothing a mind holds can rewrite
+the record (c22 WARN). A wake ends `done | halted | tool_budget | refused | error`. `error` means the
+provider raised (`provider_error:<Type>`) or returned something other than a
+`CompletionResponse` (`bad_reply`). An exception from a tool function becomes a tool error.
+There is no wall-clock timeout yet: a script that never returns hangs its wake. Timeouts arrive
+with the first network provider (R-6). The context is returned in the record, not yet stored.
+Storing it is R-4's cassette.
+(i) **Red-team 0013: 8 holes (3 medium, 5 low), all fixed in cycle 22.** `tests/test_redteam_0013.py`.
+- **H1 (medium).** Tool-list narrowing went by name only. `get_price("../agents")` reached `GET
+  /agents`: the open red-team 0001 hole, B-000h. **This is the cycle's one physics-surface change.**
+  `mcp_server.tools._segment` percent-encodes every string path value and refuses `""`, `.` and
+  `..`. Today the only string path parameter is `ticker`, in `get_price` and `get_ohlcv`; every
+  other path parameter is an int. A guard checks the raw path the server routes on. The 0001
+  xfail is now a guard.
+- **H2/H3 (medium).** `wake()` did not bind the spec to its key: a PM spec woken with
+  management's key, or another pod's key, ran. Now `/me`'s (role, pod_id) must equal the spec's
+  (role, pod), or the wake is refused (`identity_mismatch`). The agent's name is not compared:
+  spec ids and App names may differ until R-3 provisions agents from specs.
+- **H4 (medium).** The audit fix's deep copy raised RecursionError on a 600-deep reply, and the
+  wake was lost. Fixed together with H5/H6.
+- **H5/H6 (low).** Duplicate call ids ran, and non-JSON arguments (objects, NaN) poisoned the
+  record. Now copying and checking a reply happens inside one guarded step: call ids must be new
+  in the wake, and arguments must survive a strict JSON round trip unchanged. Otherwise the wake
+  ends `error`/`bad_reply` and the reply is not recorded, so a record always serialises. One
+  held guard moved: a NaN argument used to become a tool error, and now ends the wake before any
+  call.
+- **H7 (low).** A non-JSON `workflow_input` crashed the wake. It is now refused with `bad_input`
+  before `/me` is read.
+- **H8 (low).** `wake_policy: never` still woke. It is now refused with `wake_policy_never`. The
+  scheduler's own reading of wake policies is R-3's.
+
+Held: spec tricks (empty model, tiny budget, padded or odd script names, YAML `!!python`), odd
+tool names, a 10,000-call batch, refused calls counting toward the budget, widening the tool list
+through the request, and a dangling-symlink HALT.
+Dynamic boundary, measured: with `runtime → mcp_server` in place, importing every runtime module
+loads `{app, app.limits}`, within (a)'s set. The probe's moving-average PM is now the script
+`moving-average-pm`. It trades a 31-day synthetic month through the adapter, and two runs of the
+same world leave the same ledger and the same transcripts. The test still advances the clock with
+management's key. R-3 moves that into the Runtime.
