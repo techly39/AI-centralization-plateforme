@@ -8,7 +8,7 @@ Claims under test:
   backtest through the conductor;
 * every spec is checked **before any is registered**: HALT, a cap refusal,
   ``wake_policy: never``, a spec no mind can be built from, and duplicate ids or
-  names register nothing;
+  names register nothing; a HALT that appears part-way stops the next registration;
 * physics decides who may register: the clock key and a PM key get 403 and
   register nothing;
 * a failure part-way names what was already registered, and only that exists;
@@ -142,6 +142,19 @@ def test_under_halt_nothing_is_registered(SessionFactory, world, woke, gov):
     err, _, _ = _provision(SessionFactory, [_spec("a-pm", "ok")], world["admin"])
     assert (err.reason, err.registered) == ("wake_refused:a-pm:halted", ())
     assert _made(SessionFactory) == {}
+
+
+def test_halt_part_way_stops_the_next_registration(SessionFactory, world, woke, gov):
+    class HaltsAfterOne(FundClient):
+        async def post(self, path, body=None, **params):
+            made = await super().post(path, body, **params)
+            (gov / "HALT").write_text("")
+            return made
+
+    specs = [_spec("a-pm", "fresh-1"), _spec("b-pm", "fresh-2")]
+    err, _, closed = _provision(SessionFactory, specs, world["admin"], registrar=HaltsAfterOne)
+    assert (err.reason, err.registered) == ("halted", ("a-pm",))
+    assert set(_made(SessionFactory)) == {"fresh-1"} and closed == [True]
 
 
 @pytest.mark.parametrize("specs, reason", [

@@ -15,7 +15,8 @@ conductor, so nothing bound the spec to the agent beyond role and pod.
 * Every spec is checked **before any is registered**: ids and names unique, the
   wake gate open under one read of the law (HALT or a cap refusal provisions
   nothing), ``wake_policy`` not ``never``, and a mind buildable from the spec.
-  A spec that could never wake gets no agent.
+  A spec that could never wake gets no agent. HALT is read again before every
+  registration: a HALT that appears part-way stops the next one (Art. 5.2).
 * An answer is accepted only if it is the agent asked for (name, role, pod, an
   int id never seen in this call, a key). If a registration fails or is wrong,
   :class:`ProvisionError` names the specs already registered: those agents exist
@@ -30,7 +31,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime.gate import decide_wake_under
+from runtime.gate import decide_batch, decide_wake_under
 from runtime.governance import read_governance
 from runtime.lockstep import Mind
 from runtime.registry import ProviderRefused, build_provider
@@ -78,6 +79,8 @@ async def provision(
     try:
         for spec in ordered:
             done = [m.spec.id for m in minds]
+            if not decide_batch().allowed:  # HALT is re-read before every registration
+                raise ProvisionError("halted", done)
             try:
                 made = await registrar.post("/agents/register", {
                     "name": spec.name, "role": spec.role, "pod_id": spec.pod,
