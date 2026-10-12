@@ -4,7 +4,7 @@ A provider turns one request (messages + the tool schema the adapter built
 from the published MCP tool list) into one response (text and/or tool calls,
 plus usage). Three providers are planned: ``scripted`` (R-2,
 :mod:`runtime.scripted`: a deterministic policy in code, no model, no network),
-``cassette`` (R-4: replays a recorded exchange, refuses on a miss) and
+``cassette`` (R-4b, :mod:`runtime.replay`: replays a recorded exchange, refuses on a miss) and
 ``metered`` (R-6: one OpenRouter key per agent). Which name builds which class
 is :mod:`runtime.registry`'s closed table.
 

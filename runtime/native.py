@@ -63,6 +63,7 @@ from runtime.providers import (
     Usage,
 )
 from runtime.registry import ProviderRefused, build_provider
+from runtime.replay import Tape
 from runtime.spec import AgentSpec
 
 #: Tool calls one wake may make unless the caller says otherwise.
@@ -120,8 +121,10 @@ async def wake(
     *,
     workflow_input: dict[str, Any],
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
+    tape: Tape | None = None,
 ) -> WakeRecord:
-    """Wake the mind ``spec`` describes once, acting as ``client``'s agent."""
+    """Wake the mind ``spec`` describes once, acting as ``client``'s agent. ``tape`` is the
+    recording a ``cassette`` mind replays (R-4b); the registry builds the mind from it."""
     if type(max_tool_calls) is not int or max_tool_calls < 0:
         raise ValueError("max_tool_calls is a non-negative int")
     if spec.adapter != "native":
@@ -132,7 +135,7 @@ async def wake(
     if not decision.allowed:
         return WakeRecord(spec.id, "refused", decision.reason, 0)
     try:
-        provider = build_provider(spec)
+        provider = build_provider(spec, tape)
     except ProviderRefused as exc:
         return WakeRecord(spec.id, "refused", exc.reason, 0)
 

@@ -149,7 +149,9 @@ def test_the_adapter_takes_no_provider_object() -> None:
     """The mind is built from the spec inside the wake: no caller can hand one in."""
     import inspect
     params = inspect.signature(wake).parameters
-    assert set(params) == {"spec", "client", "workflow_input", "max_tool_calls"}
+    # R-4b (ADR-038): `tape` is data — exactly a `replay.Tape`, checked in the registry —
+    # from which the name `cassette` builds its mind. Still no provider object.
+    assert set(params) == {"spec", "client", "workflow_input", "max_tool_calls", "tape"}
 
 
 # --- the scripted provider -------------------------------------------------------------

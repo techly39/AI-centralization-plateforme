@@ -48,7 +48,7 @@ from mcp_server.client import FundAPIError, FundClient
 from runtime.gate import decide_batch, decide_wake_under
 from runtime.governance import read_governance
 from runtime.lockstep import Mind
-from runtime.registry import ProviderRefused, build_provider
+from runtime.registry import ProviderRefused, check_spec
 from runtime.spec import AgentSpec
 
 #: Physics' reserved names and name fold (``app.registry.service``), copied: the
@@ -103,7 +103,7 @@ async def provision(
         if not decision.allowed:
             raise ProvisionError(f"wake_refused:{spec.id}:{decision.reason}")
         try:
-            build_provider(spec)
+            check_spec(spec)
         except ProviderRefused as exc:
             raise ProvisionError(f"provider_refused:{spec.id}:{exc.reason}") from exc
     try:
