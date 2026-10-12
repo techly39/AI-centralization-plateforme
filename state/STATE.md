@@ -1,9 +1,27 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 31 (R-4a: a run writes a cassette — merged fba3b1c, 2026-10-12)
+**Last cycle:** 32 (R-4b-1: a replay drives the minds from a cassette — merged a1f72a2, 2026-10-13)
 
 ## What is true now
+- **A cassette can be replayed at $0** (R-4b-1, ADR-038 + amendment (a), `runtime/replay.py`,
+  `cassette.read`, `tests/test_cassette_replay.py`, `tests/test_redteam_0018.py`). In process only.
+  - `cassette.read` accepts only the canonical v1 document (no repeated key, NaN, extra key,
+    other version, non-ASCII, symlink, FIFO, pretty-printing). `Recording.load` turns a completed,
+    consistent, model-free run into `Tape`s; `Turn`/`Tape`/`Recording` validate exact types.
+  - The name `cassette` builds `CassetteProvider` only from an exact `Tape`
+    (`registry.build_provider(spec, tape)`); provisioning uses `check_spec`. Replies carry zero usage.
+  - `run_backtest(replay=)` refuses mixed minds, other ids, other step counts. The first wake that
+    leaves the recording ends the run `diverged:<id>:<step>:<seq>:<kind>` (`unrecorded | world |
+    key | surface | ended`), or `diverged:clock:<step>:0:calendar_at|calendar_landed`. The clock
+    never moves after it. Only a HALT refusal is exempt. A recorded `tool_budget` stop is reproduced.
+  - **Evidence:** the 31-day scripted month (3 minds) replays into a fresh DB in the same world
+    with the same ledger event for event, same transcripts, zero usage; world 12 diverges.
+  - The run label is `cassette`, not `replay` (Q-0006, for the Human).
+  - Not done: `fund-runtime replay` CLI, cassette v2 (run parameters, spec digests, model), smoke
+    step, hash links from events, size cap. Replies are not hashed (accepted, ADR-038).
+  - **EC2 test half is met in code; nothing ticked** (ADR-032 leaves EC2 to R-8). **1555 passed +
+    6 xfailed**, smoke 21/21. Era I: still 3 of 7 ticked.
 - **A run can leave a cassette** (R-4a, ADR-037, `tests/test_cassette.py`).
   `fund-runtime backtest --cassette PATH` writes the printed outcome to a new `*.cassette.json`
   (redacted, mode 0600, exclusive, the file never a symlink), refused runs included.
@@ -256,9 +274,10 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-4b**: the `cassette` provider reads a cassette (reject duplicate JSON keys), replays into
-   a fresh DB in the same world; same ledger, declared `minds: replay`; a miss, a changed tool
-   surface or a minted key is a recorded divergence (M2). Physics-adjacent (`/run/minds` label):
-   plan a red-team.
+1. **R-4b-2**: `fund-runtime replay --cassette PATH --specs DIR` (end-to-end ledger comparison; only
+   allowed difference: the `run_minds_declared` payload), cassette v2 (run parameters, spec
+   digests, each wake's model), a cassette step in the smoke run, a replay setup error that does
+   not read as `diverged` (audit c32 NOTE 4). New claim-check question (X-006): what does the
+   artifact hold that the reader never compares?
 2. **B-053**: a pre-gate before provisioning in `fund-runtime backtest` (red-team).
-3. R-3c `daily_cycle`. B-048 when cheap. Tick-check (X-011) EC2 after R-4b.
+3. R-6 metering v1 (EC4). R-3c `daily_cycle`. Tick-check (X-011) EC2 stays open until R-8.

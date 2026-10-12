@@ -101,7 +101,14 @@ keep their ids for history.
             a tool body for the mind's bad arguments (audit c25 NOTE 4). No tool body builds a
             pydantic model today. If one ever does, classify by where the error was raised.
   - [ ] **R-3c** `daily_cycle` workflow.
-- [ ] **R-4** Split cycle 31. **R-4a done cycle 31** (merged fba3b1c, ADR-037: `runtime/cassette.py`,
+- [ ] **R-4** **R-4b-1 done cycle 32** (ADR-038 + amendment (a), `runtime/replay.py`, `cassette.read`,
+      `tests/test_cassette_replay.py`, red-team 0018). **R-4b-2 next:** `fund-runtime replay --cassette
+      PATH --specs DIR` (CLI, ledger comparison end to end; only allowed ledger difference: the
+      `run_minds_declared` payload scripted -> cassette); cassette v2 records run parameters
+      (steps, days_per_step, max_tool_calls, workflow_input), each spec's digest and each wake's
+      `model`; a cassette step in the smoke run; a replay setup error (contradiction,
+      `unknown_tool`, `identity_mismatch`) should not read as `diverged:...:ended` (audit c32 NOTE 4);
+      `key` can mislabel a surface change (NOTE 5); no size cap on the reader. Split cycle 31. **R-4a done cycle 31** **R-4a done cycle 31** (merged fba3b1c, ADR-037: `runtime/cassette.py`,
       `--cassette`, `WakeRecord.exchanges`; B-000i closed; B-047 decided: redact on the way out,
       hash the unredacted request). **R-4b next**, with these carry-overs from R-4a:
       the reader rejects duplicate JSON keys (`object_pairs_hook`); a changed tool surface is a

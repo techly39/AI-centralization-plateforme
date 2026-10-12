@@ -348,3 +348,7 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   the diff added a field to every wake record; the auditor caught it. A test that pins the CLI
   output's key set per level would make "unchanged" checkable and any change a visible diff.
   Question: how many of my BLOCKs are claims about surfaces a golden file would pin? — status: new
+- [cycle 32] **Claim check for absences** — the red-team's best holes this cycle were fields the
+  cassette holds and the replay never compares (the calendar), not sentences I wrote. Add to X-006:
+  for every artifact the run writes, list each field and name where a replay/reader compares it, or
+  why not. Metric: holes the red-team finds per cycle that this list would have named. — status: new
