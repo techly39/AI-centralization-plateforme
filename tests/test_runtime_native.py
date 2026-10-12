@@ -47,6 +47,7 @@ from app.run_clock import start_backtest
 from mcp_server import FundClient, build_server
 from runtime import governance, native, registry, scripted
 from runtime.gate import ZERO_COST_PROVIDERS
+from runtime.lockstep import Mind, run_backtest
 from runtime.native import wake
 from runtime.providers import CompletionResponse, ToolCall, Usage
 from runtime.registry import PROVIDER_CLASSES, ProviderRefused, build_provider
@@ -533,7 +534,7 @@ def _month_through_the_runtime(world: int) -> tuple[list[tuple], list]:
             s.close()
     app.dependency_overrides[get_session] = _session
     spec = _spec(pod=pod_id)
-    records = []
+    runs = []
 
     async def month() -> None:
         transport = httpx.ASGITransport(app=app)
@@ -541,13 +542,15 @@ def _month_through_the_runtime(world: int) -> tuple[list[tuple], list]:
                               transport=transport) as pm, \
                 FundClient(base_url="http://fund.test", api_key=clock_key,
                            transport=transport) as clock_hand:
-            for _ in range(DAYS):
-                records.append(await wake(spec, pm, workflow_input={"universe": list(SYMBOLS)}))
-                # The runtime identity (ADR-033); R-3b moves the loop into the Runtime.
-                await clock_hand.post("/clock/advance", {"days": 1})
+            # The loop lives in the Runtime now (R-3b-1), the clock in the runtime identity's hand.
+            runs.append(await run_backtest([Mind(spec, pm)], clock_hand, steps=DAYS,
+                                           workflow_input={"universe": list(SYMBOLS)}))
 
     with TestClient(app):  # the lifespan puts the server on the run's clock
         asyncio.run(month())
+    (run,) = runs
+    assert (run.ended, run.minds, len(run.steps)) == ("completed", "scripted", DAYS), run.reason
+    records = [w for step in run.steps for w in step.wakes]
     with Sessions() as s:
         ledger = [(e.id, e.ts.isoformat(), e.actor_agent_id, e.type, e.payload_json)
                   for e in s.execute(select(Event).order_by(Event.id)).scalars()]

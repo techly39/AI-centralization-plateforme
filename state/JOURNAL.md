@@ -893,3 +893,24 @@ and a red-team to grow it.
 Next: R-3b. The lockstep backtest workflow in `runtime/`: halt/cap → wake specs in id order →
 advance with the runtime key. A scripted PM + Analyst (the Analyst messages a signal, the PM
 trades on it) live a month, labelled `minds: scripted` (M1).
+
+## Cycle 0024 — R-3b-1: the conductor, and a way back from a lost clock key (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (a month *via the Runtime*: the loop leaves the test and lives in the
+Runtime), M1 groundwork. Size check (X-008): R-3b is split. R-3b-1 (this cycle) is B-041, a
+physics change to the registry that needs red-team, plus the lockstep conductor
+`runtime.lockstep.run_backtest`. R-3b-2 is provisioning from specs (the spec's name is bound), the
+Analyst script, the PM + Analyst month, the `fund-runtime backtest` CLI and the run label in
+physics' run record.
+Hypothesis: If (a) `fund-env rotate-runtime-key` replaces the runtime identity's key hash and
+records `agent_key_rotated` (the agent id only, never the key or its hash), (b) the server and
+the operator CLI refuse to start on a database where a non-physics agent holds a reserved name
+or where more than one runtime row exists, and (c) `run_backtest(minds, clock, steps=N)` wakes
+the minds one at a time in spec-id order and then advances the clock with a key whose `/me` is
+`runtime` (and refuses any other clock key, a live run, duplicate ids or a bad step count), then:
+the old key gets 401 after rotation and the new one advances; a pre-ADR-033 `system` squatter
+stops the server at startup, not at first use; the R-2 month test drives the conductor instead
+of its own loop and still leaves the same ledger twice; HALT before a step, or inside a wake,
+ends the run `halted` with no further advance; and a refused wake ends the run `refused`, with no
+advance, rather than letting the world move without one of its minds. Expected: ~30 new tests,
+xfails unchanged (6).
