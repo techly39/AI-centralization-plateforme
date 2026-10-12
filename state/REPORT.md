@@ -1,5 +1,27 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 26: agents are now created from their written descriptions.** Each agent
+has a file that describes it: name, role, desk, script. Until now, a test created each agent by
+hand and handed its key over. Now the Runtime creates every agent from its file through the
+app's front door. Before creating anything, it checks every file:
+- Is the world halted, or would the budget rule forbid this agent?
+- Is the name reserved, already taken, or a near-twin of another name (different capitals,
+  invisible characters)?
+
+If anything is wrong, nothing is created. An agent's key now only works for the agent its file
+names. Before, any key with the right role and desk was accepted.
+
+I chose **not** to let the Runtime's clock key create agents. That key can already move time,
+and it should stay the narrowest key in the world. Creating agents uses an operator key you hold
+(today, the seed admin).
+
+The reviewer caught a mistake of mine: renaming old tests had quietly made four safety tests
+check the wrong thing. They are fixed. The attack review found 4 small issues, all fixed.
+
+Nothing needs your action. `setup/` is still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 25: two agents now work together for a simulated month.** An "analyst" and
 a "portfolio manager" (PM), both still plain code with no AI and $0 cost, shared a desk for 31
 simulated days. Each day the analyst sends its desk a buy/sell signal. The PM trades only on

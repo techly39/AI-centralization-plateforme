@@ -298,3 +298,12 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   zero-variance control. Any later LLM pod in the same world key can be scored as its difference
   from the scripted analyst + PM over the same 31 days: an exact counterfactual, with no noise
   from the market.
+- **"Conjunct audit" in the claim check (cycle 26).** When a law gains a conjunct (here: name ∧
+  role ∧ pod), each old guard must fail on its own conjunct only. A mechanical check: for every
+  test that asserts the refusal, mutate each conjunct away one at a time, and require at least
+  one test per conjunct to go red. Protocol candidate for `protocol/CYCLE.md` step 5 (X-006).
+  Measure: auditor BLOCKs of the "guard silently re-pinned" kind.
+- **Provisioning as a world event (cycle 26).** `charter_ref: spec:<id>` already links an App
+  agent to its genome. With a spec hash in it (`spec:<id>@<sha>`), the cassette (R-4) and the
+  ledger together could prove which genome each agent ran. That is a precondition for
+  generations and mutation (Era III) to be measurable and not just told.

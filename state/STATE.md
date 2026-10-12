@@ -1,9 +1,31 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 25 (R-3b-2a a pod of two minds lives a month + a list stays a list — merged b0c83a1, 2026-10-12)
+**Last cycle:** 26 (R-3b-2b-1 minds provisioned from their specs + a key wears its spec's name — merged ca17717, 2026-10-12)
 
 ## What is true now
+- **Minds are made from their specs** (R-3b-2b-1, ADR-032 (n) + red-team 0016 amendment,
+  `tests/test_runtime_provision.py`, `tests/test_redteam_0016.py`).
+  `runtime.provision.provision(specs, registrar, connect) → [Mind]` registers one App agent per
+  spec through `POST /agents/register`. Name, role and pod come from the spec, and
+  `charter_ref` is `spec:<id>`.
+  - **The registrar is a caller-held key** (today the seed admin). Physics decides whether it may
+    register. The runtime key was **not** widened: it is still halt + clock only.
+  - **Before anything is registered**, provisioning refuses:
+    - duplicate ids;
+    - names equal under physics' fold (`provision.name_key`, a copy pinned by a test);
+    - reserved names;
+    - a closed wake gate (one law read), `wake_policy: never`, or an unbuildable mind;
+    - names already in the directory (`GET /agents` through the registrar). A registrar that
+      cannot read the directory is refused.
+  - HALT is re-read before each registration.
+  - **On failure**, `ProvisionError(reason, registered)` names every spec whose agent may exist
+    (a 5xx, a non-API error or a failing `connect` name the failing spec too), and closes their
+    clients.
+  - **The name is bound:** `native.wake` and `run_backtest` compare `/me`'s name, role and pod
+    (`identity_mismatch`). Each conjunct has its own guard.
+  - The R-3b-2a two-pod month now runs with provisioned minds, and the registrar is the actor of
+    every registration.
 - **A pod of two scripted minds lives a month through the conductor** (R-3b-2a, ADR-032 (l),
   `tests/test_runtime_pod.py`).
   - `ma-signal-analyst` sends its pod `{"kind": "signal", "as_of", "signals": {t: long|flat}}`.
@@ -130,11 +152,11 @@
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
-  identity + the lockstep conductor. **1287 passed + 6 xfailed** (with the runtime). No model
+  identity + the lockstep conductor. **1334 passed + 6 xfailed** (with the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
-  low), 0012, 0013 (Runtime), 0014 (clock identity) and 0015 (conductor: 4 holes) fixed. 6 strict xfails open (0001: payload
+  low), 0012, 0013 (Runtime), 0014 (clock identity), 0015 (conductor: 4 holes) and 0016 (provisioning: 4 low) fixed. 6 strict xfails open (0001: payload
   size ×2 = B-000g, message content = B-000e; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
   B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038, B-040 (low; physics' halt check is
@@ -154,8 +176,9 @@
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
 - No Truman, Quant Lab or Observatory yet. The Runtime conducts a lockstep backtest. There is no
-  live scheduler yet (R-3c). Agents are not yet provisioned from specs: the caller hands in keys
-  (R-3b-2b).
+  live scheduler yet (R-3c). Agents are provisioned from specs by code (R-3b-2b-1), but there is
+  no `fund-runtime backtest` command yet, and physics' run record does not carry the `minds:`
+  label (R-3b-2c).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -163,9 +186,10 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-3b-2b** Provision App agents from specs and bind the spec's name. Add `fund-runtime
-   backtest` (specs dir + DB + world → a run), and write the label `minds: scripted` into
-   physics' run record. That closes M1. It touches physics, so red-team.
-2. **R-4** Cassettes + replay (M2). `retired_at` and `tool_failures` go into the cassette.
-3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 / B-042 when cheap.
+1. **R-3b-2c** `fund-runtime backtest`: specs dir + server URL + registrar and runtime keys
+   from env → `provision` → `run_backtest` → the RunRecord as JSON. Also write the label
+   `minds: scripted` into physics' run record. That closes M1. It touches physics, so red-team.
+2. **R-4** Cassettes + replay (M2). `retired_at`, `tool_failures` and the spec behind each
+   agent (`charter_ref`) go into the cassette.
+3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 / B-042 / B-046 when cheap.
    Retrospective at cycle 30.

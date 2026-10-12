@@ -49,10 +49,23 @@ keep their ids for history.
             `tests/test_runtime_pod.py`). `ma-signal-analyst` + `signal-pm`; a two-pod month
             through the conductor, twice; MCP list answers are one array block; `tool_failures`,
             `retired_at`; c24 NOTE 3/4 pinned.
-      - [ ] **R-3b-2b** **Next.** Provision agents from specs and bind the spec's name to the App
-            agent; `fund-runtime backtest` CLI (specs dir + DB + world key → RunRecord); the run
-            label `minds: scripted` in physics' run record (physics → red-team). **M1**. Serves
-            EC1, does not tick it (R-8).
+      - [x] **R-3b-2b-1** **Done cycle 26** (merged ca17717; ADR-032 (n) + red-team 0016
+            amendment, `tests/test_runtime_provision.py`, `tests/test_redteam_0016.py`: 4 low
+            holes, all fixed). `runtime.provision` makes minds from specs with a caller-held
+            registrar key (the runtime key gains nothing). Names are folded, reserved and taken
+            names are refused before any registration, and the name is bound at wake and
+            conductor.
+      - [ ] **R-3b-2c** **Next.** `fund-runtime backtest` CLI (specs dir + server URL +
+            registrar/runtime keys from env → provision → RunRecord as JSON); the run label
+            `minds: scripted` in physics' run record (physics → red-team). **M1**. Serves EC1,
+            does not tick it (R-8).
+      - [ ] **B-045** (cycle 26, low, Era II) Management keeps `REGISTER_AGENTS`. A management
+            mind could take a future spec's name first and so block that spec (it fails
+            closed, `name_taken`). Decide with the `spawn_worker` / `generation_turnover`
+            workflows: reserve spec names, or give provisioning its own identity.
+      - [ ] **B-046** (cycle 26, low) The runtime's copy of physics' name fold is pinned on 16
+            samples (audit c26 NOTE 3). Make it a property test over generated strings
+            (hypothesis is not a dependency yet: a seeded random corpus is enough).
       - [ ] **B-043** (cycle 25, low) `get_messages`' description should say `ts` is physics'
             stamp and a payload's dates are the sender's claim (journal c25 Learned 2). Era II
             LLM agents will trust whichever one the tool tells them about.

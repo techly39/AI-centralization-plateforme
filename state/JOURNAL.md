@@ -1031,3 +1031,37 @@ ledger records the registrar as the actor of every `agent_registered`, a spec wh
 taken refuses with the earlier ones named, a key with the right role and pod but another name
 cannot wake, and nothing is registered under HALT or cap refusal. Expected ~15 new tests.
 Xfails stay at 6. Old tests that hand in a key under another name are findings of the new law.
+Work:
+- `runtime/provision.py`: `provision(specs, registrar, connect) → [Mind]`. Every spec is checked
+  first, then registered, with HALT re-read before each registration. Each answer is validated,
+  and a `ProvisionError` names every spec whose agent may exist.
+- The wake and the conductor now compare `/me`'s name as well. 65 old runtime tests broke on
+  fixtures that handed keys under other names. Their fixtures were renamed and no assertion
+  changed.
+- The R-3b-2a pod month now provisions through HTTP, and the registrar is the actor of every
+  registration.
+- The claim check (before the auditor) found that "HALT provisions nothing" held only for a HALT
+  present at the start. Re-reading HALT per registration fixed it, with a counter-example test.
+- Mutations: dropping the name check or the preflight fails 8 tests. Cutting the check to the
+  name only fails 6.
+- Auditor: **FAIL, 1 BLOCK.** My renames had made four role/pod guards mismatch on name too, so
+  they would pass on the name check alone. Fixed: each guard's spec now wears its key's own name,
+  and there are new right-name/wrong-role and right-name/wrong-pod tests. Re-audit **PASS**.
+- Red-team 0016: 4 low holes, all fixed. A lost (5xx) answer hid an agent. A failing `connect`
+  escaped raw. Lookalike names both registered. Reserved and taken names were found only after
+  earlier specs were registered. Now names are folded with a pinned copy of physics' fold, and
+  the directory is read through the registrar. 9 guards were added.
+Result: merged ca17717, pushed. 1287+6xf → **1334 passed + 6 xfailed** (plus the known `setup/`
+failure in the working tree). Smoke 12/12. Hypothesis **met**, and more: names are refused under
+the fold and against the directory, not only when they are exactly equal.
+Learned:
+(1) **When a new check is added, every old guard whose fixture now trips it stops testing what
+it was written for.** The suite stayed green while the role and pod checks lost their pins. For
+each broken guard, the fix must make the *new* check pass, so that only the guard's own mismatch
+remains. The claim check should ask for this whenever a law adds a conjunct.
+(2) **"Nothing registered" must cover a lost answer.** Only a 4xx proves nothing happened. A
+timeout after the commit is "maybe".
+(3) **A preflight is only as good as what it can know.** Reading the directory turns a part-way
+409 into a clean refusal. The race window that remains fails closed.
+Next: R-3b-2c. `fund-runtime backtest` (specs dir + server + keys → a provisioned run) and the
+`minds:` label in physics' run record (physics → red-team).
