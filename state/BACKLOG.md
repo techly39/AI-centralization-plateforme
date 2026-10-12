@@ -77,9 +77,15 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       metrics, leaderboard, order pricing and the sweep read `ledger_now`; one read per report;
       advance commits before the clock moves; AST law counts every raw time read per file.
       Red-team 0009: 4 holes + 8 detector dodges fixed, 1 → B-036.
-- [ ] **B-004c** **Next.** The Phase 3 milestone probe: one scripted pod (no LLM), 1-month
-      backtest, < 10 min real time, replayed twice to the same equity curve (first determinism
-      test; measures B-035b request volume). Consider the seeded `SyntheticProvider` (IDEAS c16).
+- [x] **B-004c** Phase 3 probe — cycle 18 (ADR-030 + amendment): keyed `SyntheticProvider`
+      (HMAC, ≥128-bit env-only key, no default; config.yaml carrying it refuses to load); scripted
+      pod, 31 days through HTTP in ~0.55 s, twice to the same ledger/curve/book/metrics, another
+      world differs. Red-team 0010: 1 high hole (seed from volumes) fixed, 6 held.
+- [ ] **B-037** **Next.** A run records its world: `run_started` carries provider, symbols,
+      parameters and a one-way key **fingerprint** (never the key — management reads `/events`);
+      which agents have lived which worlds (re-running a lived world is not out-of-sample). A
+      `fund-env backtest` CLI driver that re-runs a ledger's world from the operator's key file.
+      Keep `test_held_no_agent_visible_surface_carries_the_seed` green (ADR-030 "not done").
 - [ ] **B-036** (low) `OMS_LOCK` is per-process: a second process (operator `check-orders`, a
       second server) that commits an advance between the in-lock read of now and the fill INSERT
       prices a fill at the old now and stamps it at the new; `build_portfolio`'s positions+cash

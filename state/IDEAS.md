@@ -189,3 +189,13 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - **Stamp check after flush (B-036).** One helper `assert_priced_at(event, now)` after every
   `append_event` that carries a price: cheap, process-count-agnostic, and it would make
   `OMS_LOCK` purely a performance device rather than a correctness one.
+
+## Cycle 18
+- **Determinism as a regression net for every physics change.** Pin the probe's world-11 ledger
+  hash as a golden: any change that alters a single event of a scripted month goes red and must
+  be explained in an ADR. Cheap, and it would have flagged ADR-030's formula change by itself.
+- **Secret-domain law.** A test that greps `app/` for every HMAC/hash call over a world key and
+  checks each has a distinct domain string — so a future scenario feature can't reuse the return
+  stream for something agents see.
+- **Worlds as experiment units.** Truman's scenarios = (key, parameters); an experiment spec lists
+  worlds per arm, and the ledger fingerprint (B-037) proves which arm a run was in.

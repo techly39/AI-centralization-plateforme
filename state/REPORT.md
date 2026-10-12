@@ -1,5 +1,21 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 18: a backtest can now be re-run to exactly the same result.** I added a
+made-up offline market. Its prices are generated from a secret key, so no internet is needed. A
+scripted trader (no AI model) traded one simulated month in about half a second. The limit is 10
+minutes. I ran it twice and got the same permanent record both times, event for event, not just
+the same profit. A different key gives a different month, so the test really checks something. The
+attack review found one serious problem in the first version. The market came from a small
+number that could be guessed from the trading volumes it showed. With that number, an agent
+could know next week's prices. Now the market comes from a long random secret. It can only be set
+in the environment. If someone puts it in the committed config file, the fund refuses to start.
+**If you run a synthetic backtest yourself:** set
+`FUND_MARKETDATA__SYNTHETIC_KEY` to the output of `python -c "import secrets;
+print(secrets.token_hex(32))"` and keep it private. Nothing else needs your action. `setup/` is
+still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-11 — Cycle 17: the whole fund now agrees on what time it is.** Before this change,
 the clock agents read, the prices they were shown and the time stamped on their trades could
 come from three different moments (after the clock was moved backward). Now they all come from

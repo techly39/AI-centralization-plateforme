@@ -590,4 +590,32 @@ LLM-free pod drives a fresh backtest database only through the HTTP API (read `/
 days), then: the month runs in well under 10 minutes; two runs in two fresh databases produce the
 same equity curve *and* the same ledger (types, stamps, payloads, modulo per-run secrets); a
 different seed produces a different curve (the test is not vacuous); and whatever in physics is
-*not* deterministic shows up as a diff the test names.
+*not* deterministic shows up as a diff the test names. (The hypothesis says "seed"; the world
+became a secret *key* before merge — see Work.)
+Work: (resumed at step 5 — the previous session built, red-teamed and fixed, then stopped before
+the re-audit; rule X-007.) `SyntheticProvider` (daily GBM from `HMAC-SHA256(key, "return:…")`,
+wicks/volume from a `"noise:…"` domain, 1wk/1mo aggregated with running periods never computed,
+1h refused); `tests/test_phase3_probe.py` (scripted 5/20-day MA pod, HTTP only, 31 advances, fresh
+DB per run; world 11 twice → identical ledger event for event, curve, book, `rebuild_state`,
+`/metrics/pod`; world 12 differs); ADR-030 (+ amendment). Red-team 0010: **1 high hole** — the
+first version was an int seed with default 0 and three served volumes recovered it, pricing SYNA a
+week ahead exactly; 6 properties held (edges, routes, oracles, seed exposure, window cost). Fixed:
+≥128-bit key, HMAC, noise in its own domain, env only, no default; the hole test re-aimed at the
+keyed law with a companion proving the search works on a guessable key. Re-audit (this session)
+**PASS**: WARN "env only is a comment, not code" → `config.yaml` carrying `synthetic_key` now
+refuses to load; NOTE odd-length hex → refused at startup; TRD repo map updated. Both new tests
+red before the fix.
+Result: merged 71d6492, pushed. 717+8xf → **770 passed + 8 xfailed** (working tree: +1 known
+`setup/` failure, the Human's untracked installer). Hypothesis **met**: 31 days in ~0.55 s
+(budget 600 s); the same world gives the same ledger, not just the same P&L; nothing in physics
+diffed between runs. **Amended**: a determinism seed is also the world's future — it must be a
+secret.
+Learned: (1) A determinism tool and a secrecy tool are the same function; the only difference is
+who holds the input. Any agent-visible byte derived from the seed is a leak channel, so noise needs
+its own domain and the seed needs entropy, not obscurity. (2) "Environment only" written in a
+comment is a wish; the auditor was right to want it in the loader. A rule about where a secret
+lives is a physics law like any other. (3) X-007 worked a second time: resuming at the gate cost
+one audit, not a rebuild.
+Next: B-037 (a run records its world by fingerprint) → B-036 / B-028 (the probe now gives a
+determinism harness to test them against) → toward the Runtime (Era I exit: one pod via the
+Runtime).
