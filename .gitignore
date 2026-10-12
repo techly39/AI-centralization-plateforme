@@ -24,5 +24,9 @@ fund.db*
 # Claude Code personal/local settings (shared settings.json may be committed)
 .claude/settings.local.json
 
+# Cassettes and run records (R-4a, B-000i): a run is a proof object, not source
+*.cassette.json
+experiments/*/runs/
+
 # OS
 .DS_Store

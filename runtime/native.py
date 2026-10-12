@@ -35,8 +35,8 @@ in one of those or in at least one tool call, so the budget bounds the loop. An
 ``Exception`` from the provider ends the wake with a record; one from a tool
 function becomes a tool error for the mind and is counted in the record's
 ``tool_failures``, so a tool bug is not mistaken for physics refusing. The
-adapter's own bugs still raise. R-4 writes the
-record to a cassette.
+adapter's own bugs still raise. Each model turn asked leaves an :class:`Exchange` (R-4a);
+:mod:`runtime.cassette` writes the record to a file.
 There is no wall-clock timeout yet: a script that never returns hangs its wake.
 Timeouts arrive with the first provider that can hang on the network (R-6).
 """
@@ -53,12 +53,33 @@ from pydantic import ValidationError
 from mcp_server.client import FundClient
 from mcp_server.tools import build_server
 from runtime.gate import decide_batch, decide_wake
-from runtime.providers import CompletionRequest, CompletionResponse, Message, ToolCall, ToolSpec
+from runtime.cassette import request_sha256
+from runtime.providers import (
+    CompletionRequest,
+    CompletionResponse,
+    Message,
+    ToolCall,
+    ToolSpec,
+    Usage,
+)
 from runtime.registry import ProviderRefused, build_provider
 from runtime.spec import AgentSpec
 
 #: Tool calls one wake may make unless the caller says otherwise.
 DEFAULT_MAX_TOOL_CALLS = 64
+
+
+@dataclass(frozen=True)
+class Exchange:
+    """One model turn the mind was asked for (R-4a). The request is not stored: it is the
+    transcript before the ``seq``-th assistant message plus the wake's tools and
+    ``spec.model``, and ``request_sha256`` names it. The response is that assistant message."""
+    seq: int
+    #: Taken from the request *before* the mind saw it (a mind can edit what it is handed).
+    request_sha256: str
+    #: What the provider said it used. ``None``: the reply was not accepted (the provider
+    #: raised, or ``bad_reply``), so no assistant message answers this exchange.
+    usage: Usage | None
 
 
 @dataclass(frozen=True)
@@ -77,6 +98,8 @@ class WakeRecord:
     #: ``ToolError``): all reach the mind as tool errors, so the record keeps
     #: them apart (R-2 re-audit NOTE 1).
     tool_failures: int = 0
+    #: One per model turn asked, in order (R-4a). Empty for a wake refused before any turn.
+    exchanges: tuple[Exchange, ...] = ()
 
 
 async def published_tools(client: FundClient) -> list[ToolSpec]:
@@ -143,10 +166,11 @@ async def wake(
     made = 0
     used_ids: set[str] = set()
     failures: list[str] = []
+    exchanges: list[Exchange] = []
 
     def end(ended: str, reason: str | None = None) -> WakeRecord:
         return WakeRecord(spec.id, ended, reason or ended, made, tuple(transcript),
-                          len(failures))
+                          len(failures), tuple(exchanges))
 
     while True:
         if not decide_batch().allowed:  # no thinking after HALT: R-6's think costs money
@@ -155,9 +179,12 @@ async def wake(
         request = CompletionRequest(messages=[m.model_copy(deep=True) for m in transcript],
                                     tools=[t.model_copy(deep=True) for t in tools],
                                     model=spec.model)
+        digest = request_sha256(request)  # R-4a: before the mind can touch what it was handed
+        seq = len(exchanges)
         try:
             response = provider.complete(request)
         except Exception as exc:  # a mind's crash is a recorded end (SystemExit still escapes)
+            exchanges.append(Exchange(seq, digest, None))
             return end("error", f"provider_error:{type(exc).__name__}")
         # A reply enters the record only as a copy, only if it is plain JSON, and only if
         # every call id is new in this wake (red-team 0013 H4–H6). Otherwise the wake ends
@@ -172,7 +199,9 @@ async def wake(
             if not _is_json(response.model_dump()):  # the whole reply, not only arguments
                 raise ValueError("the reply is not plain JSON")
         except Exception:
+            exchanges.append(Exchange(seq, digest, None))
             return end("error", "bad_reply")
+        exchanges.append(Exchange(seq, digest, response.usage))
         used_ids |= set(ids)
         transcript.append(Message(role="assistant", content=response.content,
                                   tool_calls=response.tool_calls))

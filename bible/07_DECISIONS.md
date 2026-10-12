@@ -1268,3 +1268,42 @@ any wake gate refuses. Under a null cap, a spending spec therefore leaves regist
 a `model` label on a run in which nothing woke. Nothing spends, so EC6 holds. But the ledger
 tells a misleading story, and the fix changes Runtime gate code (its own cycle, with a
 red-team). EC1, EC2, EC4 and EC7 are untouched.
+
+## ADR-037 — R-4a: a run writes a cassette file   (builder, cycle 31) — accepted
+Amends ADR-032 (7). Question: what does a run leave behind so that R-4b can replay it at $0,
+without storing a minted key and without a hash that matches by luck?
+- **One file per run**, `*.cassette.json`, written by `fund-runtime backtest --cassette PATH`,
+  not a table. A run is a proof object that can be carried around (`09_BUILDER_VISION.md` §2).
+  Gitignored (`*.cassette.json`, `experiments/*/runs/`: B-000i), created `O_EXCL | O_NOFOLLOW`
+  with mode 0600, never overwritten. The path is checked in the usage phase (exit 2, nothing
+  contacted) and again by the open itself.
+- **What an exchange stores:** `(seq, request_sha256, usage | None)`
+  (`runtime.native.Exchange`, `WakeRecord.exchanges`). Deviation from (7)'s "request, response":
+  neither is stored again. The request is the transcript before the `seq`-th assistant message
+  plus the wake's tools plus `spec.model`; the response is that assistant message. `usage` is
+  `None` exactly when no assistant message answers the exchange (the provider raised, or
+  `bad_reply`), so a failed turn is a recorded exchange, and a turn never asked (HALT first) is
+  not.
+- **The hash** (`cassette.request_sha256`, `HASH_FORMAT = sha256/json-sorted-compact-ascii/1`)
+  is taken in `native.wake` after the request is built and **before** `provider.complete`,
+  because a mind holds the object it is given. It is of the *unredacted* request, so a request
+  holding a minted key diverges on replay (B-047, decided). Pinned by a golden vector whose
+  canonical JSON is written out by hand in the test. Tool descriptions and schemas are inside
+  every request: editing one invalidates old cassettes, which R-4b must call "surface changed",
+  not a bug.
+- **Redaction** is at the way out, not the source (B-047 decided): `native` keeps what the mind
+  saw, and both stdout and the file redact (`cassette.redact_count`, on the serialised text,
+  so object keys, values and JSON nested in strings are all covered; the count is stored). A
+  key a mind re-encodes is not caught (Art. 8). Two keys that redact to one object key leave a
+  duplicate key in the text: R-4b's reader must reject duplicate keys.
+- **A cassette is written for every run that began**, refused ones included (Art. 9: no trial
+  is hidden). A write that fails after the run exits 1 and the outcome was already printed.
+  The printed JSON and exit codes are unchanged.
+- **Finding (an old law broke a design, the law stayed):** `request_sha256` first went into
+  `runtime.providers`. `tests/test_redteam_0013.py::test_held_scripted_module_has_no_reach_via_its_shapes`
+  pins that module to `{__future__, typing, pydantic}` (a script's only non-stdlib import) and
+  went red on `hashlib`/`json`. The hash moved to `runtime.cassette` (stdlib only, imports no
+  physics and not the conductor); the test was not touched.
+- **Not done:** replay, the `cassette` provider, `minds: replay` (R-4b); hashes linked from
+  events (a physics change, its own red-team); a cassette step in the smoke run; a size cap
+  (bounded by `max_tool_calls` and context growth). EC1, EC2, EC4, EC7 are not ticked.

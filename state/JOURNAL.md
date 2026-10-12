@@ -1332,3 +1332,20 @@ today (scripted minds wake under null). The tick is honest only because Q-0005 B
 down and the box says what would re-open it.
 Next: R-4a (cassette writer, gitignore B-000i, B-047 redaction; seed in the backlog), then B-053
 (pre-gate before provisioning, with red-team).
+
+## Cycle 0031 — R-4a: every run writes a cassette (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC2 (replay at $0), through M2. This slice ticks nothing.
+X-011 check (architect): EC1 not met (ticked only by real minds, R-8); EC2 no cassette code;
+EC4 not met (`POST /costs` is a self-report; a scripted run is $0 vacuously; waits for R-6);
+EC7 no adapter yet.
+Plan: UNIT: R-4a. Each run writes one cassette file holding its record and every model exchange:
+a per-request hash plus usage, with minted keys redacted. Backlog: R-4a, B-000i, B-047.
+SLICE: Record only. Deferred: R-4b (cassette provider, replay, divergence, `minds: replay`),
+event links to hashes (physics, own red-team), smoke step, `tools_sha256`.
+RED-TEAM: no (nothing under `app/`, no halt/budget order change; auditor must attack secret
+handling, overwrite and symlinks).
+Hypothesis: a run's whole exchange with its minds can be written to a deterministic, redacted,
+exclusive 0600 file, with each request hashed before the mind sees it, without changing any
+printed output or any HALT order. Metric: two identical runs give byte-identical cassettes; no
+minted key in file or stdout.

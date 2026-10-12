@@ -185,6 +185,101 @@ def test_a_run_that_ends_early_exits_1(SessionFactory, keys, specs, woke, gov, m
     assert _advances(SessionFactory) == 0
 
 
+# --- --cassette (R-4a) ----------------------------------------------------------------------
+
+def test_cassette_flag_writes_the_record_and_changes_nothing_printed(
+        SessionFactory, keys, specs, woke, tmp_path, capsys):
+    path = tmp_path / "month.cassette.json"
+    code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "2",
+                                           "--cassette", str(path)], capsys)
+    assert code == 0 and out["ended"] == "completed"
+    doc = json.loads(path.read_text())
+    assert (doc["cassette_version"], doc["redactions"]) == (1, 0)
+    assert doc["outcome"] == out  # the file holds what was printed
+    wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
+    assert all(len(w["exchanges"]) == sum(m["role"] == "assistant" for m in w["transcript"])
+               for w in wakes)
+    assert all(e["usage"] is not None and len(e["request_sha256"]) == 64
+               for w in wakes for e in w["exchanges"]) and wakes[0]["exchanges"]
+    assert f"cassette {path} (0 redactions)" in err
+    assert oct(path.stat().st_mode & 0o777) == "0o600"
+
+
+def test_a_refused_run_is_written_too(SessionFactory, specs, woke, monkeypatch, tmp_path, capsys):
+    """A trial is never hidden (Art. 9): ``not_backtest`` still leaves its cassette."""
+    s = SessionFactory()
+    try:
+        _, clock_key = seed_runtime_agent(s)
+        _, admin = register_agent(s, name="management", role=AgentRole.management)
+        for n in (1, 2):
+            create_pod(s, name=f"desk-{n}")
+        s.commit()
+    finally:
+        s.close()
+    monkeypatch.setenv(cli.REGISTRAR_KEY_ENV, admin)
+    monkeypatch.setenv(cli.CLOCK_KEY_ENV, clock_key)
+    path = tmp_path / "refused.cassette.json"
+    code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "2",
+                                         "--cassette", str(path)], capsys)
+    assert code == 1 and out["reason"] == "not_backtest"
+    assert json.loads(path.read_text())["outcome"] == out
+
+
+@pytest.mark.parametrize("name", ["taken.cassette.json", "wrong-suffix.json"])
+def test_a_cassette_path_that_cannot_be_written_is_refused_before_anything(
+        SessionFactory, keys, specs, woke, tmp_path, capsys, name):
+    path = tmp_path / name
+    path.write_text("mine")
+    code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "2",
+                                           "--cassette", str(path)], capsys)
+    assert (code, out) == (2, None) and "cassette" in err
+    assert _made(SessionFactory) == {} and woke == [] and path.read_text() == "mine"
+
+
+def test_a_cassette_that_cannot_be_written_after_the_run_exits_1(
+        SessionFactory, keys, specs, woke, tmp_path, monkeypatch, capsys):
+    """The path was fine at the check and taken during the run."""
+    path = tmp_path / "late.cassette.json"
+    real = cli._conduct
+
+    async def conduct_then_take(*a, **kw):
+        out = await real(*a, **kw)
+        path.write_text("someone else's")
+        return out
+    monkeypatch.setattr(cli, "_conduct", conduct_then_take)
+    code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "1",
+                                           "--cassette", str(path)], capsys)
+    assert code == 1 and out["ended"] == "completed"  # the outcome was still printed
+    assert "exists" in err and path.read_text() == "someone else's"
+
+
+def test_the_cassette_holds_no_key_a_mind_was_handed(
+        SessionFactory, keys, tmp_path, monkeypatch, capsys):
+    from types import MappingProxyType
+
+    from runtime import scripted
+
+    def hires(request):
+        if not any(m.role == "assistant" for m in request.messages):
+            return CompletionResponse(content="hiring", tool_calls=[ToolCall(
+                id="hire", name="register_agent",
+                arguments={"name": "hire-1", "role": "analyst", "pod_id": 1})])
+        return CompletionResponse(content="done")
+    monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(dict(scripted.SCRIPTS) | {"hire": hires}))
+    specs = _write_specs(tmp_path / "specs", {
+        "id": "m-boss", "name": "desk-boss", "role": "management", "pod": None,
+        "provider": "scripted", "script": "hire", "charter": "Hire."})
+    path = tmp_path / "hire.cassette.json"
+    code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1",
+                                         "--cassette", str(path)], capsys)
+    assert code == 0 and "hire-1" in _made(SessionFactory)
+    raw = path.read_text()
+    assert re.findall(r"fk_[A-Za-z0-9_-]{20,}", raw) == []
+    assert json.loads(raw)["redactions"] >= 1
+    for secret in (keys["admin"], keys["clock"]):
+        assert secret not in raw
+
+
 # --- the clock is checked before anything is registered ------------------------------------
 
 def test_a_live_database_gains_no_agents(SessionFactory, specs, woke, monkeypatch, capsys):

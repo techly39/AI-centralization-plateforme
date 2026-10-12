@@ -246,7 +246,7 @@ def record_json(record: Any) -> Any:
     """A record as plain JSON values: dataclasses → objects, tuples → arrays,
     transcript messages → their JSON dump. A transcript keeps tool results as
     they came, so it may hold a key a tool returned (``register_agent``): whoever
-    prints or stores it redacts (``runtime.cli.redact``)."""
+    prints or stores it redacts (``runtime.cassette.redact``)."""
     if dataclasses.is_dataclass(record) and not isinstance(record, type):
         return {f.name: record_json(getattr(record, f.name)) for f in dataclasses.fields(record)}
     if isinstance(record, BaseModel):
