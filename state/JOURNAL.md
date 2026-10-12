@@ -1347,5 +1347,6 @@ RED-TEAM: no (nothing under `app/`, no halt/budget order change; auditor must at
 handling, overwrite and symlinks).
 Hypothesis: a run's whole exchange with its minds can be written to a deterministic, redacted,
 exclusive 0600 file, with each request hashed before the mind sees it, without changing any
-printed output or any HALT order. Metric: two identical runs give byte-identical cassettes; no
-minted key in file or stdout.
+any HALT order. Metric: two identical runs that mint no key give byte-identical cassettes (with a
+minted key the unredacted hashes differ by design); no minted key in file or stdout.
+(Audit c31 BLOCK 1: the printed JSON does gain `exchanges`; I first wrote "unchanged".)

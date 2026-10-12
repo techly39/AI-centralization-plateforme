@@ -5,7 +5,9 @@ backtest`` prints), with every wake's exchanges (``request_sha256`` and usage; s
 :class:`runtime.native.Exchange`). R-4b reads it back to replay the run at $0.
 
 * **Deterministic.** The text is a pure function of the outcome: sorted keys, compact
-  separators, ASCII, no clock, no randomness. Two equal runs give equal bytes.
+  separators, ASCII, no clock, no randomness. Equal runs give equal bytes **unless a mind was
+  handed a minted key**: the exchange hash is of the unredacted request (below), and a key is
+  fresh randomness, so the hashes after it differ run to run while the redacted text does not.
 * **Redacted.** Every key in the form physics mints is replaced before the file is
   written, and the number replaced is stored (``redactions``). The hash in an exchange
   is of the *unredacted* request, so a replay that meets a minted key diverges instead of
@@ -106,7 +108,9 @@ def write(path: Path, outcome: Mapping[str, Any]) -> int:
     try:
         with os.fdopen(fd, "w", encoding="ascii") as f:
             f.write(text)
-    except OSError as exc:
-        path.unlink(missing_ok=True)  # we created it exclusively just now
-        raise CassetteError(f"cannot write {path}: {exc.strerror}") from exc
+    except BaseException as exc:  # an interrupt too: no partial file is left either way
+        path.unlink(missing_ok=True)  # we created it exclusively just now (by path, not inode)
+        if isinstance(exc, OSError):
+            raise CassetteError(f"cannot write {path}: {exc.strerror}") from exc
+        raise
     return redactions

@@ -187,7 +187,7 @@ def test_a_run_that_ends_early_exits_1(SessionFactory, keys, specs, woke, gov, m
 
 # --- --cassette (R-4a) ----------------------------------------------------------------------
 
-def test_cassette_flag_writes_the_record_and_changes_nothing_printed(
+def test_cassette_flag_writes_the_record_that_was_printed(
         SessionFactory, keys, specs, woke, tmp_path, capsys):
     path = tmp_path / "month.cassette.json"
     code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "2",

@@ -1296,9 +1296,19 @@ without storing a minted key and without a hash that matches by luck?
   so object keys, values and JSON nested in strings are all covered; the count is stored). A
   key a mind re-encodes is not caught (Art. 8). Two keys that redact to one object key leave a
   duplicate key in the text: R-4b's reader must reject duplicate keys.
-- **A cassette is written for every run that began**, refused ones included (Art. 9: no trial
-  is hidden). A write that fails after the run exits 1 and the outcome was already printed.
-  The printed JSON and exit codes are unchanged.
+- **A cassette is written for every invocation that passed the usage checks**, refused ones
+  included (`run: null`; Art. 9: no trial is hidden). A write that fails after the run exits 1
+  and the outcome was already printed. The printed JSON **gains** `exchanges` in every wake
+  record (`record_json` dumps every field); `--cassette` adds two exits: 2 for a path that
+  cannot be written (before anything is contacted), 1 for a run that completed but whose
+  cassette could not be written.
+- **Byte-for-byte determinism has one exception:** the exchange hash is of the unredacted
+  request, so once a mind is handed a minted key (`register_agent`) every later hash in that
+  wake differs run to run, while the redacted text does not (B-047, decided above). Two equal
+  scripted runs that mint no key write equal bytes (`test_runtime_pod`). R-4b treats a minted
+  key as a divergence by design.
+- **Known, accepted:** the cleanup after a failed write unlinks by path, not inode; `redactions`
+  also counts `fk_…` text in a mind's prose.
 - **Finding (an old law broke a design, the law stayed):** `request_sha256` first went into
   `runtime.providers`. `tests/test_redteam_0013.py::test_held_scripted_module_has_no_reach_via_its_shapes`
   pins that module to `{__future__, typing, pydantic}` (a script's only non-stdlib import) and

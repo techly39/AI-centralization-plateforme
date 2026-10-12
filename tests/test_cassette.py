@@ -10,7 +10,8 @@ Claims under test:
   A turn never asked (HALT first) is never recorded; a refused wake records none;
 * **the file** — ``dumps`` is deterministic and versioned; every minted key is gone from
   keys, values and JSON nested in strings, and counted; ``write`` is exclusive, mode 0600,
-  never follows a symlink, and leaves nothing behind on a refusal;
+  never is a symlink itself (a symlinked directory is followed), and leaves no file behind on a
+  refusal or a failed write;
 * **the ignore rule** — cassettes and run directories are gitignored (B-000i).
 """
 
