@@ -143,7 +143,7 @@ def cmd_start_backtest(args: argparse.Namespace) -> int:
     with session_scope() as session:
         try:
             clock = start_backtest(session, start=start)
-        except RunClockError as exc:
+        except (RunClockError, ValueError) as exc:  # ValueError: no world configured
             print(f"Error: {exc}", file=sys.stderr)
             return 1
         now = clock.now()

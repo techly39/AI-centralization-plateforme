@@ -185,6 +185,30 @@ def test_an_operator_command_refuses_a_run_in_another_world(
     assert [e.type for e in db.execute(select(Event)).scalars()] == [EVENT_RUN_STARTED]
 
 
+def test_start_backtest_without_a_world_key_is_an_error_not_a_traceback(
+    SessionFactory, db, monkeypatch, capsys
+):
+    from app.config import get_settings
+
+    @contextmanager
+    def scope() -> Iterator:
+        s = SessionFactory()
+        try:
+            yield s
+            s.commit()
+        finally:
+            s.close()
+
+    monkeypatch.setattr(cli, "session_scope", scope)
+    monkeypatch.setattr(get_settings().marketdata, "provider", "synthetic")
+    monkeypatch.setattr(get_settings().marketdata, "synthetic_key", None)
+    set_provider(None)                               # build from (keyless) config
+    assert cli.main(["start-backtest", "--start", START.isoformat()]) == 1
+    assert "no world key" in capsys.readouterr().err
+    db.expire_all()
+    assert db.scalar(select(Event).limit(1)) is None
+
+
 def test_management_sees_the_fingerprint_never_the_key(SessionFactory):
     provider = _synthetic(1)
     admin = _open_run(SessionFactory)
