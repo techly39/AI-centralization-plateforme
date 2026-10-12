@@ -577,3 +577,17 @@ red is information, not failure: the book fix was the read *order*; the lock was
 the test's thread and is honestly labelled defence-in-depth.
 Next: B-004c the Phase 3 milestone probe (one scripted pod, 1-month backtest, twice to the same
 curve) → S-004b → B-028 (shrinks the time-read allowlist).
+
+## Cycle 0018 — The Phase 3 probe: a scripted pod lives a month, twice, identically (2026-10-11)
+Era: I — The Desk
+Exit criterion served: "one pod runs end-to-end" in backtest (Era I; TRD Phase 3 milestone: a
+1-month backtest in under 10 minutes) and the first determinism test ("Boundary + determinism
+tests pass").
+Hypothesis: If a seeded `SyntheticProvider` derives every daily bar from (seed, symbol, day)
+alone — no network, no request-order dependence, obeying the ADR-028 base — and a scripted,
+LLM-free pod drives a fresh backtest database only through the HTTP API (read `/clock`, `/ohlcv`,
+`/price`, place market orders with justifications, management advances one day per step for 31
+days), then: the month runs in well under 10 minutes; two runs in two fresh databases produce the
+same equity curve *and* the same ledger (types, stamps, payloads, modulo per-run secrets); a
+different seed produces a different curve (the test is not vacuous); and whatever in physics is
+*not* deterministic shows up as a diff the test names.

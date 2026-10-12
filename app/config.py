@@ -8,12 +8,14 @@ double underscore, e.g. ``FUND_OMS__FEE_RATE=0.002``). Load the settings once vi
 
 from __future__ import annotations
 
+import math
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -38,12 +40,40 @@ class OMSConfig(BaseModel):
 
 
 class MarketDataConfig(BaseModel):
-    # "yfinance" for real delayed quotes, "static" for an offline fixed table.
-    provider: Literal["yfinance", "static"] = "yfinance"
+    # "yfinance" for real delayed quotes, "static" for an offline fixed table,
+    # "synthetic" for a keyed offline random walk (backtests, ADR-030).
+    provider: Literal["yfinance", "static", "synthetic"] = "yfinance"
     # Reuse a quote while the clock has advanced less than this. 0 disables.
     cache_ttl_seconds: float = Field(default=60.0, ge=0.0)
     # Prices used when provider == "static" (ticker -> price).
     static_prices: dict[str, float] = Field(default_factory=dict)
+    # provider == "synthetic": the world's secret key — whoever holds it knows
+    # every future close (red-team 0010). Hex, ≥ 32 digits (128 bits), from
+    # `secrets.token_hex(32)`. Environment only (FUND_MARKETDATA__SYNTHETIC_KEY),
+    # never config.yaml: the file is committed. No default — no key, no world.
+    synthetic_key: SecretStr | None = None
+    # Each symbol's price on 2000-01-01.
+    synthetic_symbols: dict[str, float] = Field(
+        default_factory=lambda: {"SYNA": 100.0, "SYNB": 50.0, "SYNC": 20.0}
+    )
+
+    @field_validator("synthetic_key")
+    @classmethod
+    def _key_is_long_hex(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and not re.fullmatch(
+            r"(?:[0-9a-fA-F]{2}){16,64}", value.get_secret_value()
+        ):
+            raise ValueError(
+                "synthetic_key must be an even 32..128 hex digits (≥ 128 bits)"
+            )
+        return value
+
+    @field_validator("synthetic_symbols")
+    @classmethod
+    def _symbols_are_priced(cls, value: dict[str, float]) -> dict[str, float]:
+        if not all(math.isfinite(p) and p > 0 for p in value.values()):
+            raise ValueError("synthetic_symbols prices must be positive and finite")
+        return value
 
 
 class MetricsConfig(BaseModel):
@@ -98,7 +128,14 @@ class YamlSettingsSource(PydanticBaseSettingsSource):
         return None, field_name, False
 
     def __call__(self) -> dict[str, Any]:
-        return _load_yaml(CONFIG_PATH)
+        data = _load_yaml(CONFIG_PATH)
+        # The file is committed; a world key in it is a published future (ADR-030).
+        if "synthetic_key" in (data.get("marketdata") or {}):
+            raise ValueError(
+                f"{CONFIG_PATH}: marketdata.synthetic_key is environment only "
+                "(FUND_MARKETDATA__SYNTHETIC_KEY), never the committed file"
+            )
+        return data
 
 
 class Settings(BaseSettings):

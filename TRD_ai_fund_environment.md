@@ -42,7 +42,7 @@ fund-env/
     bus/               # messaging + directory
     registry/          # agent identity + permissions
     metrics/           # cost/activity/performance aggregation
-    marketdata/        # MarketDataProvider interface + yfinance impl
+    marketdata/        # MarketDataProvider interface + yfinance, static, keyed synthetic (ADR-030) impls
     api/               # routers, one file per domain
   mcp_server/          # MCP wrapper over the REST API
   ui/                  # Phase 4

@@ -22,6 +22,10 @@ marketdata:
   provider: "yfinance"
   cache_ttl_seconds: 60        # reuse a quote while the clock moves less than this
   static_prices: {}            # e.g. {AAPL: 200.0, MSFT: 380.0}
+  # provider "synthetic": a keyed offline random walk, the same bars for the same key.
+  # The key is secret (whoever holds it knows the future): set it only in the
+  # environment, FUND_MARKETDATA__SYNTHETIC_KEY=<secrets.token_hex(32)>, never here.
+  synthetic_symbols: {SYNA: 100.0, SYNB: 50.0, SYNC: 20.0}   # price on 2000-01-01
 
 # Metrics. Only affects how performance is *reported* — never how it is earned.
 metrics:

@@ -26,6 +26,7 @@ from app.marketdata.base import (
     validate_window,
 )
 from app.marketdata.static_provider import StaticProvider
+from app.marketdata.synthetic_provider import SyntheticProvider
 from app.marketdata.yfinance_provider import YFinanceProvider
 
 _provider: MarketDataProvider | None = None
@@ -35,6 +36,14 @@ def _build_default_provider() -> MarketDataProvider:
     cfg = get_settings().marketdata
     if cfg.provider == "static":
         return StaticProvider(cfg.static_prices)
+    if cfg.provider == "synthetic":
+        if cfg.synthetic_key is None:
+            raise ValueError(
+                "marketdata.provider is 'synthetic' but no world key is set: put "
+                "secrets.token_hex(32) in FUND_MARKETDATA__SYNTHETIC_KEY"
+            )
+        key = bytes.fromhex(cfg.synthetic_key.get_secret_value())
+        return SyntheticProvider(key, cfg.synthetic_symbols)
     return YFinanceProvider(cache_ttl_seconds=cfg.cache_ttl_seconds)
 
 
@@ -64,6 +73,7 @@ __all__ = [
     "MarketDataProvider",
     "Quote",
     "StaticProvider",
+    "SyntheticProvider",
     "UnknownTickerError",
     "YFinanceProvider",
     "bar_end",
