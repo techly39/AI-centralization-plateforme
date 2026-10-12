@@ -17,6 +17,7 @@ Claims under test:
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -419,3 +420,87 @@ def test_a_failed_advance_records_what_physics_says_or_that_it_cannot(after, rea
 def test_steps_and_days_are_plain_ints_in_range(kwargs):
     with pytest.raises(ValueError):
         asyncio.run(run_backtest([], None, **kwargs))  # type: ignore[arg-type]
+
+
+# --- R-3b-2a: the c24 audit's carry-overs -------------------------------------------------
+
+def test_when_every_mind_is_retired_the_world_still_lives_its_steps(SessionFactory, world,
+                                                                    monkeypatch):
+    """Audit c24-b NOTE 4/5: management fires the PM in step 1 and itself in step 2.
+    Each is retired at the step its next wake was refused; steps 4 and 5 wake no one,
+    and the clock still moves: it is the Runtime's, not the minds'."""
+    wakes = {"n": 0}
+
+    def fire(who: int) -> CompletionResponse:
+        return CompletionResponse(content="you're fired", tool_calls=[
+            ToolCall(id="fire", name="deactivate_agent", arguments={"agent_id": who})])
+
+    def firer(request):
+        turns = sum(m.role == "assistant" for m in request.messages)
+        if turns == 0:
+            wakes["n"] += 1
+            return CompletionResponse(content="who is here?",
+                                      tool_calls=[ToolCall(id="dir", name="list_agents")])
+        if turns == 1 and wakes["n"] == 2:
+            directory = json.loads(request.messages[-1].content)
+            return fire(next(a["id"] for a in directory if a["name"] == "pm-2"))
+        if turns == 1 and wakes["n"] == 3:
+            return fire(json.loads(request.messages[1].content)["me"]["id"])
+        return CompletionResponse(content="done")
+
+    monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(
+        dict(scripted.SCRIPTS) | {"firer": firer, "read-b": _read_once}))
+    handed = [(AgentSpec(id="a-mgmt", name="a-mgmt", role="management", provider="scripted",
+                         script="firer", charter="Run the firm."), world["admin"]),
+              (_spec("b-pm", 2, "read-b"), world["pm"][2])]
+    run = conduct(SessionFactory, handed, world["clock"], steps=5)
+    assert run.ended == "completed", run.reason
+    assert (run.retired, run.retired_at) == (("b-pm", "a-mgmt"), (1, 3))
+    assert [len(st.wakes) for st in run.steps] == [2, 2, 1, 1, 0]
+    assert all(st.advanced_to for st in run.steps) and len(_advances(SessionFactory)) == 5
+
+
+def _read_once(request):
+    if not any(m.role == "assistant" for m in request.messages):
+        return CompletionResponse(content="time?", tool_calls=[ToolCall(id="c", name="get_clock")])
+    return CompletionResponse(content="done")
+
+
+class _FlakyMe(FundClient):
+    """A live key whose ``/me`` fails once, with 503, on the ``fail_on``-th read."""
+
+    def __init__(self, *args, fail_on: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.reads, self.fail_on = 0, fail_on
+
+    async def request(self, method, path, **kwargs):
+        if path == "/me":
+            self.reads += 1
+            if self.reads == self.fail_on:
+                raise FundAPIError(503, "the App blinked", path=path)
+        return await super().request(method, path, **kwargs)
+
+
+def test_a_no_identity_refusal_with_a_live_key_still_ends_the_run(SessionFactory, world,
+                                                                  monkeypatch):
+    """Audit c24-b NOTE 3: retirement is only for a key physics now answers 401. A
+    wake refused ``no_identity`` while the key still works (a blip, not a firing)
+    ends the run with no advance, as any other refused wake does."""
+    monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(
+        dict(scripted.SCRIPTS) | {"read-a": _read_once}))
+    app = _app(SessionFactory)
+
+    async def go() -> lockstep.RunRecord:
+        transport = httpx.ASGITransport(app=app)
+        # /me reads: 1 before step 0, 2 in step 0's wake, 3 in step 1's wake (fails).
+        async with _FlakyMe(base_url="http://fund.test", api_key=world["pm"][1],
+                            transport=transport, fail_on=3) as pm, \
+                FundClient(base_url="http://fund.test", api_key=world["clock"],
+                           transport=transport) as clock:
+            return await run_backtest([Mind(_spec("a-pm", 1, "read-a"), pm)], clock, steps=3)
+
+    with TestClient(app):
+        run = asyncio.run(go())
+    assert (run.ended, run.reason) == ("refused", "wake_refused:a-pm:no_identity")
+    assert run.retired == () and len(run.steps) == 2 and run.steps[1].advanced_to is None
+    assert len(_advances(SessionFactory)) == 1

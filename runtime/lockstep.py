@@ -20,7 +20,10 @@ A mind that crashes (``error``) or spends its tool budget is data, recorded in
 its step, and the run goes on. So is a mind whose agent was **deactivated inside
 the world** (its key gets 401): it is *retired* — recorded, never woken again —
 and the run goes on, so no firm agent can stop the world's time by firing a
-colleague (red-team 0015 H1). After an early end the clock is never advanced
+colleague (red-team 0015 H1). If every mind is retired, the world still lives
+its remaining steps with no one awake: the clock is the Runtime's, not the
+minds' (audit c24 NOTE 4). Any other refused wake — ``no_identity`` while the
+key still answers, say — still ends the run. After an early end the clock is never advanced
 again. If an advance fails, physics is asked where the clock is, and the step
 records that (it may have moved before the failure, H3).
 
@@ -32,7 +35,7 @@ and pod, and no App agent may be handed in twice (H2); ``steps`` and
 decides what is allowed.
 
 The record is returned, not stored: R-4 writes it to a cassette. Provisioning
-minds from their specs (binding the spec's name to the App agent) is R-3b-2;
+minds from their specs (binding the spec's name to the App agent) is R-3b-2b;
 until then the caller hands in each mind's client.
 """
 
@@ -82,6 +85,8 @@ class RunRecord:
     steps: tuple[StepRecord, ...] = ()
     #: Spec ids whose agent was deactivated inside the world; they woke no more.
     retired: tuple[str, ...] = ()
+    #: The step each of ``retired`` was retired at, in the same order (audit c24 NOTE 5).
+    retired_at: tuple[int, ...] = ()
 
 
 async def run_backtest(
@@ -135,9 +140,11 @@ async def run_backtest(
 
     done: list[StepRecord] = []
     retired: list[str] = []
+    retired_at: list[int] = []
 
     def end(ended: str, reason: str | None = None) -> RunRecord:
-        return RunRecord(ended, reason or ended, label, tuple(done), tuple(retired))
+        return RunRecord(ended, reason or ended, label, tuple(done), tuple(retired),
+                         tuple(retired_at))
 
     for step in range(steps):
         if not decide_batch().allowed:
@@ -164,6 +171,7 @@ async def run_backtest(
                     # world (e.g. management firing it). That is data, not a reason for
                     # the world's time to stop: the mind is retired and the run goes on.
                     retired.append(mind.spec.id)
+                    retired_at.append(step)
                     continue
                 stop = ("refused", f"wake_refused:{mind.spec.id}:{record.reason}")
             if stop:

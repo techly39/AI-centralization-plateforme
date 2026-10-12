@@ -33,8 +33,9 @@ A wake ends when the mind replies with no tool calls (``done``), or with
 returned something that is not a :class:`CompletionResponse`). Every turn ends
 in one of those or in at least one tool call, so the budget bounds the loop. An
 ``Exception`` from the provider ends the wake with a record; one from a tool
-function becomes a tool error, so a bug inside a tool function shows up only as
-an error in the transcript. The adapter's own bugs still raise. R-4 writes the
+function becomes a tool error for the mind and is counted in the record's
+``tool_failures``, so a tool bug is not mistaken for physics refusing. The
+adapter's own bugs still raise. R-4 writes the
 record to a cassette.
 There is no wall-clock timeout yet: a script that never returns hangs its wake.
 Timeouts arrive with the first provider that can hang on the network (R-6).
@@ -47,6 +48,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import ValidationError
 
 from mcp_server.client import FundClient
 from mcp_server.tools import build_server
@@ -70,6 +72,11 @@ class WakeRecord:
     tool_calls: int
     #: Context first (system, user), then every turn and result, in order.
     transcript: tuple[Message, ...] = ()
+    #: Calls whose tool function itself raised (a bug in the tool layer), as
+    #: opposed to physics refusing or the App being unreachable (both a
+    #: ``ToolError``): all reach the mind as tool errors, so the record keeps
+    #: them apart (R-2 re-audit NOTE 1).
+    tool_failures: int = 0
 
 
 async def published_tools(client: FundClient) -> list[ToolSpec]:
@@ -133,9 +140,11 @@ async def wake(
 
     made = 0
     used_ids: set[str] = set()
+    failures: list[str] = []
 
     def end(ended: str, reason: str | None = None) -> WakeRecord:
-        return WakeRecord(spec.id, ended, reason or ended, made, tuple(transcript))
+        return WakeRecord(spec.id, ended, reason or ended, made, tuple(transcript),
+                          len(failures))
 
     while True:
         if not decide_batch().allowed:  # no thinking after HALT: R-6's think costs money
@@ -174,13 +183,15 @@ async def wake(
             # Art. 5.2: nothing beyond the current tool call — HALT is read before each one.
             if not decide_batch().allowed:
                 return end("halted")
-            transcript.append(await _execute(server, visible, call))
+            transcript.append(await _execute(server, visible, call, failures))
             made += 1
 
 
-async def _execute(server: Any, visible: frozenset[str] | None, call: ToolCall) -> Message:
+async def _execute(server: Any, visible: frozenset[str] | None, call: ToolCall,
+                   failures: list[str] | None = None) -> Message:
     """Run one call through the MCP tool; a refusal, a tool error or an exception
-    from the tool function becomes a tool error message.
+    from the tool function becomes a tool error message. The id of a call whose
+    tool function raised is also appended to ``failures``.
 
     ``visible=None`` is the adapter's own read (``whoami`` for the context).
     """
@@ -192,8 +203,17 @@ async def _execute(server: Any, visible: frozenset[str] | None, call: ToolCall) 
     try:
         result = await server.call_tool(call.name, dict(call.arguments))
     except ToolError as exc:
+        # The MCP server wraps whatever the tool function raised in a ToolError. A
+        # ToolError under it is the tool speaking (physics refused, the App was
+        # unreachable); a ValidationError is the mind's bad arguments; no cause is
+        # an unknown tool. Anything else is a bug under the tool.
+        if exc.__cause__ is not None and not isinstance(exc.__cause__, (ToolError, ValidationError)):
+            if failures is not None:
+                failures.append(call.id)
         return error(str(exc))
-    except Exception as exc:  # e.g. the App unreachable: the mind is told, the wake goes on
+    except Exception as exc:  # a bug in the server itself: the mind is told, the wake goes on
+        if failures is not None:
+            failures.append(call.id)
         return error(f"the tool failed: {type(exc).__name__}")
     texts = [b.text for b in getattr(result, "content", None) or []
              if getattr(b, "type", "") == "text"]

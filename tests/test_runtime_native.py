@@ -291,6 +291,30 @@ async def test_physics_refusals_reach_the_mind_as_tool_errors(
 
 
 @pytest.mark.anyio
+async def test_a_tool_bug_is_counted_apart_from_a_refusal(
+    fund_client, desk, agent_factory, scripts,
+) -> None:
+    """R-2 re-audit NOTE 1: a tool function that raises and a 403 both reach the mind
+    as tool errors; only the first is a ``tool_failure`` in the record."""
+    _, analyst_key = agent_factory("analyst-1", "analyst", 1)
+    real = fund_client(analyst_key)
+
+    class Buggy(FundClient):
+        async def request(self, method, path, **kwargs):
+            if path == "/clock":
+                raise RuntimeError("a bug under the tool")
+            return await real.request(method, path, **kwargs)
+
+    scripts(two=_calls("get_clock", "place_order"))
+    rec = await wake(_spec(id="an-a", role="analyst", script="two"),
+                     Buggy(base_url="http://unused", api_key=analyst_key), workflow_input={})
+    assert (rec.ended, rec.tool_calls, rec.tool_failures) == ("done", 2, 1)
+    clock, order = (m for m in rec.transcript if m.role == "tool")
+    assert clock.is_error and "a bug under the tool" in clock.content
+    assert order.is_error and "403" in order.content
+
+
+@pytest.mark.anyio
 async def test_a_tool_outside_the_list_reaches_no_endpoint(fund_client, desk, scripts,
                                                            SessionFactory) -> None:
     _, _, pm_key = desk
@@ -358,8 +382,8 @@ async def test_halt_inside_a_batch_stops_the_next_call(fund_client, desk, gov, s
     _, _, pm_key = desk
     real_execute = native._execute
 
-    async def execute_then_halt(server, visible, call):
-        result = await real_execute(server, visible, call)
+    async def execute_then_halt(server, visible, call, *rest):
+        result = await real_execute(server, visible, call, *rest)
         if visible is not None:  # not the adapter's own whoami read
             (gov / "HALT").write_text("")  # the Human halts while call 1 is answered
         return result
@@ -379,8 +403,8 @@ async def test_a_halted_mind_is_not_asked_to_think_again(fund_client, desk, gov,
     real_execute = native._execute
     turns = []
 
-    async def execute_then_halt(server, visible, call):
-        result = await real_execute(server, visible, call)
+    async def execute_then_halt(server, visible, call, *rest):
+        result = await real_execute(server, visible, call, *rest)
         if visible is not None:
             (gov / "HALT").write_text("")
         return result
