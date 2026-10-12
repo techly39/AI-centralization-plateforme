@@ -1374,3 +1374,12 @@ decision (B-047) has a cost: cassettes of runs that mint keys are not byte-repro
 treats that as a divergence by design; revisit if hiring runs must replay.
 Next: R-4b (cassette provider, replay, `minds: replay`, duplicate-key-rejecting reader, red-team
 planned), then B-053.
+
+## Cycle 0032 — R-4b-1 a replay drives the minds from a cassette (2026-10-13)
+Era: I — The Desk
+Exit criterion served: EC2 (replay at $0), test half, through M2. Ticks nothing (ADR-032 leaves EC2 to R-8).
+X-011 check (architect): EC1 not met (real minds, R-8); EC2 no cassette reader existed; EC4 not met (no provisioner or system-reported cost anywhere); EC7 not met (`runtime/openclaw/` holds only VERSION_NOTES).
+Plan: UNIT: R-4b-1. A replay drives every mind from a recorded cassette at $0. The first divergence ends the run and names where and why. In-process through `run_backtest`; the recorded scripted month replays into a fresh DB in the same world, event for event.
+SLICE: reader (`cassette.read`), `runtime/replay.py` (Recording, Tape, CassetteProvider, divergence kinds), registry entry + `check_spec`, `wake(tape=)`, `run_backtest(replay=)`. Deferred to R-4b-2: `fund-runtime replay` CLI, cassette v2 (run params, spec digest, wake model), smoke step.
+RED-TEAM: yes (registry is the second half of the cap gate; the cassette file is untrusted input).
+Hypothesis: a cassette of a completed scripted month, replayed in the same world at $0, leaves the same ledger and transcripts; in another world it ends `diverged` with a position and kind, and the clock never moves after it. Metric: ledger tuples equal event for event; zero usage; divergence kind correct for world / surface / key.

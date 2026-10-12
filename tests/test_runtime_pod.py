@@ -164,7 +164,10 @@ def _spec(id: str, name: str, role: str, pod: int, script: str) -> AgentSpec:
                      charter="Work the desk.")
 
 
-def _pod_month(world: int) -> dict:
+def _pod_month(world: int, *, replay=None, tweak=None, cassettes: bool = False) -> dict:
+    """Live the month in ``world``. With ``replay`` (R-4b) the minds are the same specs with
+    provider ``cassette``, replayed from that recording; ``cassettes=True`` makes them
+    cassette minds with no recording; ``tweak`` changes each such spec."""
     _, Sessions = _fresh_database()
     set_provider(SyntheticProvider(world_key(world), SYMBOLS))
     keys = {}
@@ -184,6 +187,11 @@ def _pod_month(world: int) -> dict:
     specs = [_spec("a-analyst-1", "an-1", "analyst", pods[0], "ma-signal-analyst"),
              _spec("b-pm-1", "pm-1", "pm", pods[0], "signal-pm"),
              _spec("c-pm-2", "pm-2", "pm", pods[1], "signal-pm")]
+    if replay is not None or cassettes:
+        from runtime.replay import as_cassette
+        specs = [as_cassette(s) for s in specs]
+        if tweak is not None:
+            specs = [tweak(s) for s in specs]
 
     app = create_app()
 
@@ -207,7 +215,8 @@ def _pod_month(world: int) -> dict:
         try:
             minds = await provision(specs, clients["registrar"], connect)
             runs.append(await run_backtest(minds, clients["clock"], steps=DAYS,
-                                           workflow_input={"universe": UNIVERSE}))
+                                           workflow_input={"universe": UNIVERSE},
+                                           replay=replay))
         finally:
             for c in [*clients.values(), *(m.client for m in minds)]:
                 await c.aclose()

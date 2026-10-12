@@ -71,3 +71,10 @@ Runtime refuses to wake agents" will use a spending provider.
 Reversible: yes. Tell me A, and the gate will refuse every provider; the scripted tests would then
 run only in-process, as the probe does today.
 Human answer:
+
+## Q-0006 (cycle 32) — Is the run label for a replay `cassette` or `replay`?
+Context: Q-0005 wrote "`minds: replay`". Physics already accepts the closed kinds
+`{scripted, cassette, model}` and the Runtime's label is the sorted provider name, so a replay is
+labelled `cassette`. Chosen: `cassette` (no physics change, one name for one thing). Reversible:
+rename the kind in `app/run_clock.MIND_KINDS` (a physics change with a red-team) if you prefer.
+Human answer:

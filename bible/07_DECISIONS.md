@@ -1317,3 +1317,56 @@ without storing a minted key and without a hash that matches by luck?
 - **Not done:** replay, the `cassette` provider, `minds: replay` (R-4b); hashes linked from
   events (a physics change, its own red-team); a cassette step in the smoke run; a size cap
   (bounded by `max_tool_calls` and context growth). EC1, EC2, EC4, EC7 are not ticked.
+
+
+## ADR-038 — R-4b-1: a replay drives the minds from a cassette   (builder, cycle 32) — accepted
+Amends ADR-032 (4)(g)(j) and ADR-037. Serves EC2's test half; **ticks nothing** (ADR-032 leaves EC2
+to real minds, R-8). Plan by the architect; red-team: see the cycle-32 entry in the journal.
+- **What shipped.** `cassette.read` (the canonical-v1 reader), `runtime/replay.py` (`Recording`,
+  `Tape`, `CassetteProvider`, `as_cassette`), `registry.check_spec` + `build_provider(spec, tape)`,
+  `native.wake(tape=)`, `run_backtest(replay=)`, run end `diverged`. In process only: no CLI yet.
+- **The label is `cassette`, not `replay`.** Physics' kind (`app.run_clock.MIND_KINDS`) and the
+  sorted provider name are both `cassette`; Q-0005 wrote `minds: replay`. Reuse over a physics
+  change. Noted for the Human in `state/QUESTIONS.md`.
+- **Where the tape enters.** As data: `wake(tape=)`, and the registry builds the mind from it only
+  if `type(tape) is Tape` and the name is `cassette`. A tape on `scripted` is a `contradiction`;
+  no tape (or a subclass, a dict, a provider) on `cassette` is `unavailable`. The no-provider-object
+  law holds, and the gate is unchanged (`cassette` was already on `ZERO_COST_PROVIDERS`).
+- **Provisioning** now calls `check_spec` (every contradiction, no tape needed) instead of
+  building a provider; a test pins that `cassette` with a model, a budget or a script is refused.
+- **The reader refuses anything but the canonical v1 document**: it re-serialises the parsed
+  outcome with the writer's own assembly and demands equal text. That rejects pretty-printing,
+  reordered keys, a second version or hash format, extra keys, NaN, non-ASCII, repeated keys (two
+  minted keys that redact to one object key included: the writer cannot see it, the reader
+  does), a symlink, a non-regular file. **No size cap yet** (a hostile file can be large).
+- **A miss ends the run.** `diverged:<id>:<step>:<seq>:<kind>`, kinds decided from the two
+  records, never from reason strings: `unrecorded`, `world` (the transcript before the turn
+  differs), `key` (equal, except the recording holds a redacted minted key), `surface` (equal
+  transcript, different request: tools or model changed), `ended` (all hashes matched but the
+  wake ended differently or earlier). The step is recorded with `advanced_to=None`, nothing wakes
+  after it and the clock does not move. Only HALT is not a divergence: any other refusal (a mind
+  retired in the replay included) is, because a completed recording woke every mind every step.
+  (Found by me while claim-checking: the first version skipped the check for every refusal, so a
+  retired mind let a replay finish `completed`. Pinned by a test and a mutation.)
+- **Replay costs nothing and says so**: replies carry `Usage()`; the recorded cost belongs to the
+  recording. A recorded failed turn replays as a failure (`provider_error:ReplayedFailure`), not
+  a divergence.
+- **What replays.** A canonical v1 cassette of a `completed` run, no retired mind, whose specs have
+  no `model` (v1 does not record the model; a model-bearing recording needs cassette v2).
+- **Known, accepted:** responses are not hashed. A cassette edited in its replies while the request
+  hashes are kept replays the edited replies, within the agent key's own permissions and under
+  the `cassette` label. Only a ledger comparison against the original catches it (R-4b-2).
+  Cassette bytes are trusted as far as a file you chose to read is.
+- **Finding (an old pin moved, with its reason):** `test_the_adapter_takes_no_provider_object` pinned
+  `wake`'s parameters to four names; `tape` is a fifth. The pin now names it and says why; the
+  stronger tests are the tape-type ones in `tests/test_cassette_replay.py`. One spy in
+  `test_runtime_lockstep` (`_built`) took `build_provider(spec)` and now passes the tape through;
+  its assertion is unchanged.
+- **Evidence.** The recorded 31-day scripted month (3 minds), replayed into a fresh database in the
+  same world, leaves the same ledger event for event, the same transcripts and request hashes, at
+  zero usage. World 12 diverges (`world`); narrowing the tool list diverges at turn 0 (`surface`).
+  1485 → 1527 passed, smoke 21/21.
+- **Not done (R-4b-2 and later):** `fund-runtime replay`; cassette v2 (run parameters, spec
+  digests, each wake's model); a cassette step in the smoke run; hash links from events (physics,
+  own red-team); `tools_sha256`; a size cap; replaying a run that did not complete; mixed
+  live/replay minds (Era II fork instrument). EC1, EC2, EC4, EC7 stay unticked.

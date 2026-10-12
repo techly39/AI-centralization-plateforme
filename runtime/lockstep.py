@@ -14,7 +14,9 @@ The run ends ``completed`` after ``steps`` steps, or early:
 * ``halted`` — HALT before a step, inside a wake, or before an advance;
 * ``refused`` — a wake was refused (a mind the run names did not wake: the world
   must not move on without it), or the run itself was refused before step 0;
-* ``error`` — the clock would not advance, or its answer had no ``now``.
+* ``error`` — the clock would not advance, or its answer had no ``now``;
+* ``diverged`` — a replay left its recording (R-4b, :mod:`runtime.replay`): the step is
+  recorded without an advance, and nothing wakes after it.
 
 A mind that crashes (``error``) or spends its tool budget is data, recorded in
 its step, and the run goes on. So is a mind whose agent was **deactivated inside
@@ -53,6 +55,7 @@ from pydantic import BaseModel
 from mcp_server.client import FundAPIError, FundClient
 from runtime.gate import ZERO_COST_ADAPTERS, ZERO_COST_PROVIDERS, decide_batch
 from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
+from runtime.replay import Recording
 from runtime.spec import AgentSpec
 
 #: The longest run one call may ask for, and the longest step: a decade of days.
@@ -80,7 +83,7 @@ class StepRecord:
 
 @dataclass(frozen=True)
 class RunRecord:
-    #: ``completed`` | ``halted`` | ``refused`` | ``error``
+    #: ``completed`` | ``halted`` | ``refused`` | ``error`` | ``diverged``
     ended: str
     #: Why, as a short code: ``ended`` itself, or e.g. ``wake_refused:pm-a:cap_null``.
     reason: str
@@ -101,8 +104,15 @@ async def run_backtest(
     days_per_step: int = 1,
     workflow_input: Mapping[str, Any] | None = None,
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
+    replay: Recording | None = None,
 ) -> RunRecord:
-    """Live ``steps`` steps of a backtest with ``minds``, the clock in the Runtime's hand."""
+    """Live ``steps`` steps of a backtest with ``minds``, the clock in the Runtime's hand.
+
+    With ``replay`` (R-4b), every mind must be a ``cassette`` mind, the ids and the step count
+    must be the recording's, and each wake replays its recorded tape. The first wake that
+    leaves the recording ends the run ``diverged:<id>:<step>:<seq>:<kind>`` and the clock is
+    not advanced after it.
+    """
     for value, top in ((steps, MAX_STEPS), (days_per_step, MAX_DAYS_PER_STEP)):
         if type(value) is not int or not 0 <= value <= top:
             raise ValueError(f"steps and days_per_step are plain ints in [0, {top}]")
@@ -112,6 +122,15 @@ async def run_backtest(
     label = "+".join(sorted({m.spec.provider for m in ordered}))
     if len({m.spec.id for m in ordered}) != len(ordered):
         return RunRecord("refused", "duplicate_spec_id", label)
+    if replay is not None:
+        if type(replay) is not Recording:
+            raise ValueError("replay is a Recording")
+        if any(m.spec.provider != "cassette" for m in ordered):
+            return RunRecord("refused", "replay_mixed", label)
+        if {m.spec.id for m in ordered} != replay.spec_ids:
+            return RunRecord("refused", "replay_minds", label)
+        if steps != replay.steps:
+            return RunRecord("refused", "replay_steps", label)
     # The input is copied once, deeply, here: every wake of the run sees the same
     # document, whoever else holds a nested value (red-team 0015 H4).
     step_input = copy.deepcopy(dict(workflow_input or {}))
@@ -159,10 +178,16 @@ async def run_backtest(
             if mind.spec.id in retired:
                 continue
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
-                                max_tool_calls=max_tool_calls)
+                                max_tool_calls=max_tool_calls,
+                                tape=None if replay is None else replay.tape(step, mind.spec.id))
             wakes.append(record)
             if record.ended == "halted":
                 stop = ("halted", "halted")
+            elif replay is not None and (record.ended, record.reason) != ("refused", "halted") and (
+                    where := replay.divergence(step, record)):
+                # Only HALT is not a divergence. Any other refusal (a retired mind included) is:
+                # a recorded run woke every mind, so a mind that does not wake left the recording.
+                stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
             elif record.ended == "refused":
                 if record.reason == "no_identity" and await _key_dead(mind.client):
                     # Red-team 0015 H1: the agent was deactivated by an act inside the

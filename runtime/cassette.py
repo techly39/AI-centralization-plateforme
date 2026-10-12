@@ -1,4 +1,4 @@
-"""The cassette file: what a run leaves behind (R-4a, ADR-032 (7) + amendment).
+"""The cassette file: what a run leaves behind, and how it is read back (R-4a/R-4b, ADR-037, ADR-038).
 
 One JSON file per run, ``*.cassette.json``: the run's record (the outcome ``fund-runtime
 backtest`` prints), with every wake's exchanges (``request_sha256`` and usage; see
@@ -26,6 +26,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -47,7 +48,7 @@ _REDACTED = "fk_<redacted>"
 
 
 class CassetteError(Exception):
-    """The cassette cannot be written; nothing was left behind."""
+    """The cassette cannot be written (nothing was left behind) or cannot be read (R-4b)."""
 
 
 def request_sha256(request: CompletionRequest) -> str:
@@ -74,6 +75,13 @@ def redact(text: str) -> str:
     return redact_count(text)[0]
 
 
+def _assemble(body: str, redactions: int) -> str:
+    """The document text around an already-serialised, already-redacted outcome. The
+    writer and the reader (:func:`read`) share it: a file is canonical iff it equals this."""
+    return (f'{{"cassette_version":{CASSETTE_VERSION},"hash_format":{json.dumps(HASH_FORMAT)},'
+            f'"outcome":{body},"redactions":{redactions}}}')
+
+
 def dumps(outcome: Mapping[str, Any]) -> tuple[str, int]:
     """``(text, redactions)``: the cassette document for ``outcome``.
 
@@ -82,8 +90,64 @@ def dumps(outcome: Mapping[str, Any]) -> tuple[str, int]:
     body, redactions = redact_count(json.dumps(
         outcome, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False))
     # Assembled as text so the count describes exactly the text that was redacted.
-    return (f'{{"cassette_version":{CASSETTE_VERSION},"hash_format":{json.dumps(HASH_FORMAT)},'
-            f'"outcome":{body},"redactions":{redactions}}}'), redactions
+    return _assemble(body, redactions), redactions
+
+
+def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    keys = [k for k, _ in pairs]
+    if len(set(keys)) != len(keys):
+        raise CassetteError("a key is used twice in one object")
+    return dict(pairs)
+
+
+def _refuse_constant(name: str) -> Any:
+    raise CassetteError(f"{name} is not JSON")
+
+
+def read(path: Path) -> tuple[dict[str, Any], int]:
+    """``(outcome, redactions)`` from a cassette written by :func:`write`, else
+    :class:`CassetteError` (R-4b). The file is untrusted input, so only the canonical v1
+    document is accepted: the file itself is not a symlink, is a regular file, is ASCII,
+    repeats no key, holds no NaN/Infinity, carries exactly the four top-level keys with this
+    version and hash format, and its text equals what :func:`write` would have produced for
+    its own outcome. Anything else (pretty-printed, reordered, a second version) is refused.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise CassetteError(f"cannot open {path}: {exc.strerror}") from exc
+    try:
+        with os.fdopen(fd, "rb") as f:
+            if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+                raise CassetteError(f"{path} is not a regular file")
+            raw = f.read()
+    except OSError as exc:
+        raise CassetteError(f"cannot read {path}: {exc.strerror}") from exc
+    try:
+        text = raw.decode("ascii")
+        doc = json.loads(text, object_pairs_hook=_unique_pairs, parse_constant=_refuse_constant)
+    except CassetteError:
+        raise
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+        raise CassetteError(f"{path} is not a cassette ({type(exc).__name__})") from exc
+    if (type(doc) is not dict
+            or set(doc) != {"cassette_version", "hash_format", "outcome", "redactions"}):
+        raise CassetteError("a cassette has exactly four top-level keys")
+    if type(doc["cassette_version"]) is not int or doc["cassette_version"] != CASSETTE_VERSION:
+        raise CassetteError(f"this reader reads cassette version {CASSETTE_VERSION} only")
+    if doc["hash_format"] != HASH_FORMAT:
+        raise CassetteError("a different hash format")
+    redactions, outcome = doc["redactions"], doc["outcome"]
+    if type(redactions) is not int or redactions < 0 or type(outcome) is not dict:
+        raise CassetteError("redactions is a non-negative int and the outcome an object")
+    try:
+        body = json.dumps(outcome, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                          allow_nan=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise CassetteError("the outcome is not plain JSON") from exc
+    if text != _assemble(body, redactions):
+        raise CassetteError("the file is not in the canonical form write() produces")
+    return outcome, redactions
 
 
 def check_path(path: Path) -> Path:

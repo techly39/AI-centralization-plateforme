@@ -670,9 +670,9 @@ def _built(monkeypatch) -> list[str]:
     from runtime import native
     original, built = native.build_provider, []
 
-    def build(spec):
+    def build(spec, tape=None):  # R-4b: the registry takes a tape; the spy passes it through
         built.append(spec.id)
-        return original(spec)
+        return original(spec, tape)
     monkeypatch.setattr(native, "build_provider", build)
     return built
 
