@@ -1,9 +1,24 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 20 (retrospective + Builder vision + Runtime plan ADR-032 — merged 34c1a59, 2026-10-12)
+**Last cycle:** 21 (R-1 Runtime skeleton + fail-closed gates — merged 8d6e2fe, 2026-10-12)
 
 ## What is true now
+- **The Runtime exists as a skeleton with its gates** (R-1, ADR-032 amendment (a)–(f),
+  `tests/test_runtime_gates.py`, `tests/test_redteam_0012.py`). Nothing wakes yet.
+  - `runtime.governance` reads HALT first, then the cap, fresh, from fixed paths. HALT counts if
+    anything is at the path, if the path cannot be checked, or if `governance/` is missing. Every
+    unreadable cap is `null` + `cap_problem`.
+  - `runtime.gate.decide_wake(provider, adapter)`: zero-cost = `{scripted, cassette}` ×
+    `{native}`, exact `str`. A numeric cap still refuses spending (`no_metered_key`) until R-6.
+    `decide_batch()` checks HALT.
+  - `runtime.spec.AgentSpec` has the 03 §3 fields + `provider`. Specs are YAML, in id order.
+  - `runtime.providers.LLMProvider` is the protocol.
+  - `uv run fund-runtime status [--specs DIR]` prints the law and what would wake.
+
+  Boundary law: runtime imports no `app` module, and importing it loads at most
+  `{app, app.config, app.limits}` (dynamic probe, planted counter-example). The scanner refuses
+  imports it cannot read, in every layer.
 - **The frontier is the Runtime** (cycle-20 retrospective). `bible/09_BUILDER_VISION.md` exists:
   a run is a proof object (physics + world + minds' cassettes), and the target instrument is the
   exact counterfactual fork. ADR-032 fixes the Runtime's shape. BACKLOG "Runtime" R-1…R-8 serve
@@ -45,15 +60,16 @@
   live order** (ADR-025); **portable JSON ledger** (ADR-024); **halt is physics** (ADR-023);
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
-  clock + look-ahead guard + one now + keyed synthetic market + world record. **796 passed + 8
-  xfailed**. No model
+  clock + look-ahead guard + one now + keyed synthetic market + world record. **967 passed + 8
+  xfailed** (with the runtime). No model
   has traded through the App yet (a scripted pod has). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
   low) fixed. 8 strict xfails open (0001: payload size ×2 = B-000g, message
   content = B-000e, system squat = B-000f, MCP path = B-000h; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
-  B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038 (low).
+  B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038, B-040 (low; physics' halt check is
+  milder than the Runtime's).
 - Still-open time debts: B-017 Sharpe ×0.845, B-028 row stamps, B-029 live forward step, B-036.
   B-032: clock control moves off management before an LLM manager wakes.
 - **Constraint for Era III (ADR-028 amendment):** agent strategy code never runs inside the App's
@@ -68,8 +84,7 @@
 - **The Human (2026-10-11):** accepted P-0001/P-0002/P-0003. Open: Q-0001 (budget), Q-0002
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
-- No Runtime, Truman, Quant Lab or Observatory yet. `runtime/` holds only
-  `openclaw/VERSION_NOTES.md`.
+- No Truman, Quant Lab or Observatory yet. The Runtime wakes nothing yet (R-2/R-3).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -77,10 +92,11 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-1** Runtime skeleton: `runtime/` + `fund-runtime`, AgentSpec, governance reader (HALT,
-   fail-closed cap gate on `{scripted, cassette}`), `LLMProvider` protocol, dynamic boundary
-   probe for `runtime` (allowlist = ADR-032 amendment + planted counter-example).
-2. **R-2** scripted mind + `native` adapter over the published MCP tool list (HALT per tool
-   batch); the probe's `ScriptedPM` becomes the first scripted mind.
-3. **R-3** lockstep backtest + `runtime` clock identity (B-032, B-000f): a scripted PM + Analyst
-   live a month through the Runtime (M1). Retrospective due at cycle 30.
+1. **R-2** Scripted mind + `native` adapter over the published MCP tool list (HALT per tool
+   batch via `decide_batch`). A provider registry where each zero-cost name builds exactly one
+   class with no model and no network (R-1 carry-overs in BACKLOG). The probe's `ScriptedPM`
+   becomes the first scripted mind. First import of `mcp_server` from runtime: the dynamic probe
+   will measure it.
+2. **R-3** Lockstep backtest + `runtime` clock identity (B-032, B-000f): a scripted PM + Analyst
+   live a month through the Runtime (M1).
+3. **R-4** Cassettes + replay (M2). B-040 when cheap. Retrospective due at cycle 30.

@@ -243,3 +243,17 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
    signal they can see but not argue with? *Measure:* per-agent retries/escalations on 423s.
    Parked because a scripted mind obeys by construction: measuring it before M6 measures
    nothing.
+
+## Cycle 21
+- **Error-class fuzzing for gate inputs.** Every fail-closed reader (HALT, cap, specs, later
+  cassettes and metered-key files) gets one shared parametrised fixture of hostile inputs: bytes
+  that are not UTF-8, unhashable keys, deep nesting, duplicate keys, base-60 values, symlinks,
+  FIFOs, a missing parent, a parent that is a file. One list, reused by every gate, so a new
+  reader inherits every past red-team finding. Measure: holes per new reader.
+- **Identity tuples, not names.** The gate's H1 lesson generalises: anything that decides on
+  cost or permission should key on the full tuple that determines behaviour (provider, adapter,
+  and later model and key source). A protocol check: "which fields of the identity does this
+  decision ignore, and why is each one safe to ignore?"
+- **`fund-runtime status` as the Observatory's first panel.** It already prints the law and what
+  would wake. In Era II it can answer "why didn't agent X wake?" with a reason code per wake,
+  logged per step, which makes scheduler behaviour inspectable without reading code.

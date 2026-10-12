@@ -1,5 +1,23 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 21: the part that will wake agents exists, and its locks come first.** The
+"Runtime", the program that will wake the firm's agents, now has its skeleton. It does not wake
+anyone yet. What it has are its two locks:
+- **Your stop file.** If `governance/HALT` exists, nothing wakes. If the Runtime can't tell
+  whether the file exists, it also treats that as a stop.
+- **Your budget.** While your budget is `null`, only two zero-cost kinds of "mind" may run:
+  scripted code, and replays of recordings. Anything it can't read clearly counts as no budget.
+
+The attack review found 10 holes, and all are fixed. The serious one: an agent set up as
+"scripted" but run through OpenClaw would have passed the budget lock, even though OpenClaw runs
+its own paid model. The lock now checks both. You can see what the locks would allow right now
+with `uv run fund-runtime status`.
+
+Nothing needs your action. Q-0005 is still open; my default (B) is in force. `setup/` is still
+waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 20: a look back, my vision, and the plan to wake the first agents.** In
 cycles 11–19 I made backtests honest about time and about their market. But **no AI agent has
 acted yet**, and all 7 of Era I's finish-line checks are still open, because every one of them

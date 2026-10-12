@@ -748,3 +748,44 @@ that claims `spends_money=False` are both refused; a malformed cap fails closed;
 boundary probe shows that importing the Runtime loads no physics module outside
 `{app, app.config, app.limits}`. A planted counter-example proves the probe can fail. Expected:
 about 30 new tests, no physics change.
+Work: `runtime/` gained five modules:
+- `governance.py`: fixed paths; HALT read first, by `lstat`; a duplicate-refusing YAML loader;
+  every parse failure → `null` + `cap_problem`.
+- `gate.py`: `decide_wake(provider, adapter)` / `decide_batch()`. Zero-cost means
+  `{scripted, cassette}` × `{native}`, both exactly `str`. A numeric cap still refuses spending
+  (`no_metered_key`) until R-6.
+- `spec.py`: AgentSpec with the 03 §3 fields + `provider`. It is frozen and forbids extra fields.
+  YAML files load in id order; duplicates, other extensions and non-str keys are refused.
+- `providers.py`: the `LLMProvider` protocol and its request/response models.
+- `cli.py`: `fund-runtime status`, which wakes nothing.
+
+The `fund-runtime` script and the wheel package are in pyproject. The dynamic boundary probe
+imports every runtime module, with a planted counter-example. The static scanner now refuses
+imports it cannot read. ADR-032 amendment (a)–(f); 03 §1 law note.
+
+Review findings:
+- The claim check found one hole before review: `os.path.lexists` answered False on any OSError,
+  which failed open.
+- Auditor **FAIL** (1 BLOCK): non-UTF-8 input, an unhashable key and deep nesting raised out of
+  the reader, and the cap was read before HALT. There were also 3 WARN (weak tests and an
+  evadable static check) and NOTEs. All fixed.
+- Red-team 0012: **10 holes**, all fixed. 4 were already fixed by the audit fixes; 6 were
+  strict xfails, now removed.
+  - **H1, high:** `scripted` + `adapter: openclaw` woke under null.
+  - H3, medium: a missing `governance/` read as running.
+  - Low: H4 str subclass, H5 non-str spec key, H7 base-60 `1:30` read as $90, H8 computed
+    imports invisible.
+- Re-audit **PASS**, 1 WARN fixed: ADR (f) claimed more import spellings than the scanner
+  caught. It now catches all of them, with planted tests; the `is_dir` race fails closed.
+Result: merged 8d6e2fe, pushed. 796+8xf → **967 passed + 8 xfailed** (working tree +1 known
+`setup/` failure). Hypothesis **met and widened**: "never asks the provider" was not enough. The
+adapter is a second cost axis, and the gate must own both lists. No physics change. EC5/EC6 are
+served, not ticked (R-5).
+Learned: (1) "Fail closed" has to be proved per error class. My first reader failed open on
+`lexists`, and then crashed on three parser errors I had not imagined. Catching broadly and
+recording the reason is the honest shape for a gate's input. (2) A gate keyed on one field
+of a multi-field identity is a gate on the wrong thing. The red-team's high finding came from
+reading ADR-032 (4) more literally than I had. (3) A path computed from `__file__` is a claim
+about how the code is installed; check the directory as well as the file.
+Next: R-2. The scripted mind, the provider registry (each zero-cost name → one class) and the
+`native` adapter over `build_server`'s tool list, with HALT checked per tool batch.

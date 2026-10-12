@@ -4,7 +4,9 @@
 One slice per cycle, in order. Each names the exit criterion (EC1–EC7, `05_ERAS.md` Era I, in
 order) and the vision milestone (M1–M6, `09_BUILDER_VISION.md` §3) it serves. Folded-in items
 keep their ids for history.
-- [ ] **R-1** **Next.** Runtime skeleton (was B-009, first half): `runtime/` package +
+- [x] **R-1** **Done cycle 21** (merged 8d6e2fe; `runtime/`, `tests/test_runtime_gates.py`,
+      red-team 0012: 10 holes, all fixed; ADR-032 amendment (a)–(f)). The gate decides on
+      provider **+ adapter**, so `openclaw` always spends. Original: Runtime skeleton (was B-009, first half): `runtime/` package +
       `fund-runtime` script in `pyproject.toml`; `AgentSpec` (pydantic; `03_WORLD.md` §3 fields,
       file-backed for now); governance reader (fixed paths, read-only): HALT → nothing wakes, cap
       `null` → fail closed, only the coded list `{scripted, cassette}` wakes, nothing is
@@ -13,7 +15,14 @@ keep their ids for history.
       dynamic probe to `runtime` (transitive physics load ⊆ `app.config` + `app.limits`); an
       allowlist for runtime is a law change → ADR-032 amendment + planted counter-example. Serves
       EC5/EC6 (gates exist).
-- [ ] **R-2** Scripted mind + `native` adapter over the published MCP tool list (`build_server`
+- [ ] **R-2** **Next.** Carry-overs from R-1 (ADR-032 amendment (b), audit c21 NOTEs 5–6):
+      - a name→class registry in which `scripted` and `cassette` each build exactly one class,
+        with no model and no network client, plus a test that a `scripted` spec carrying a
+        `model` cannot reach a model;
+      - decide whether a zero-cost spec with `model` or `budget_usd > 0` is refused;
+      - `Usage.cost_usd` is self-reported and is never the meter (R-6).
+
+      Scripted mind + `native` adapter over the published MCP tool list (`build_server`
       → LLM tool schema → calls through `FundClient`); per-wake tool-call budget; HALT re-checked
       before every tool-call batch (03 §3); context =
       charter + `/me` + workflow input, assembled by code and logged. The probe's `ScriptedPM`
@@ -60,6 +69,16 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       non-finite prices (→ clean `price_unavailable` rejection); settings `allow_inf_nan=False` +
       upper bounds; sweep isolates per-order failures. Red-team 0004 xfail
       `test_hole_non_finite_feed_price_is_a_500`. With B-005/B-008.
+- [ ] **B-040** (low, human-only path, cycle 21 claim check + red-team 0012 H3) Physics' halt
+      check `app/registry/halt.py: HALT_FILE.exists()` answers "not halted" in three cases that
+      the Runtime's reader treats as halted:
+      - a dangling symlink at HALT;
+      - `governance` is a file (ENOTDIR);
+      - `governance/` is missing (a moved `REPO_ROOT`).
+
+      A permission error there raises, which becomes a 500 and is closed in effect. Fix: port
+      `runtime.governance._halted`'s rule ("the directory is there and the file is not" → running).
+      Each case gets a test in `tests/test_halt.py`.
 - [ ] **B-039** (gate item, cycle-20 retrospective, IDEAS c16) Information-shape test: every
       agent-reachable route answers identically in two worlds that agree up to `now` and differ
       after it (needs a synthetic world with a branch day). Before any spending mind wakes.
