@@ -4,7 +4,8 @@ Claims under test:
 
 * management's ``GET /events`` (every filter, and ``list_events`` over MCP) reads
   ``run_started.world`` and ``run_minds_declared.minds`` as ``"withheld"``: no
-  law, drift, volatility, symbol list or fingerprint reaches a firm agent;
+  law, drift, volatility, symbol list or fingerprint reaches a firm agent through
+  the ledger (what an agent can estimate from served bars is its own work);
 * the ledger keeps the full record: a read never rewrites the row, a restart in the
   same world still starts and one in another world is still refused, and
   ``run_minds()`` still reads the kinds;
