@@ -1,11 +1,28 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 21 (R-1 Runtime skeleton + fail-closed gates — merged 8d6e2fe, 2026-10-12)
+**Last cycle:** 22 (R-2 scripted mind + native adapter — merged db3e7ee, 2026-10-12)
 
 ## What is true now
-- **The Runtime exists as a skeleton with its gates** (R-1, ADR-032 amendment (a)–(f),
-  `tests/test_runtime_gates.py`, `tests/test_redteam_0012.py`). Nothing wakes yet.
+- **A scripted mind wakes through the Runtime** (R-2, ADR-032 amendment (g)(h)(i),
+  `tests/test_runtime_native.py`, `tests/test_redteam_0013.py`). `runtime.native.wake(spec,
+  client, workflow_input=, max_tool_calls=64)` → `WakeRecord(ended ∈ done|halted|tool_budget|
+  refused|error, reason, tool_calls, transcript)`.
+  - The mind is built from the spec by `runtime.registry` (`scripted` → `ScriptedProvider`;
+    `cassette` → `unavailable` until R-4). A zero-cost spec with a `model` or `budget_usd` is
+    refused (`contradiction`). `script` names a policy in the closed `runtime.scripted.SCRIPTS`.
+  - Tools = `build_server`'s list narrowed by `spec.tools`. The context is the charter + `{me,
+    input}`. `/me`'s role and pod must equal the spec's (`identity_mismatch`). HALT is read
+    before every model turn and every tool call. The mind gets deep copies. A reply is recorded
+    only if it is plain JSON with fresh call ids, else `error/bad_reply`. `wake_policy: never`
+    and non-JSON input are refused.
+  - `moving-average-pm` trades a 31-day synthetic month through MCP tools. Twice in the same
+    world, it gives the same ledger and the same transcripts. The clock is still advanced by
+    management's key in that test (R-3 moves it).
+  - MCP path values are escaped (`mcp_server.tools._segment`, B-000h closed).
+  - Importing runtime loads `{app, app.limits}`.
+- **The Runtime's gates** (R-1, ADR-032 amendment (a)–(f),
+  `tests/test_runtime_gates.py`, `tests/test_redteam_0012.py`).
   - `runtime.governance` reads HALT first, then the cap, fresh, from fixed paths. HALT counts if
     anything is at the path, if the path cannot be checked, or if `governance/` is missing. Every
     unreadable cap is `null` + `cap_problem`.
@@ -60,13 +77,13 @@
   live order** (ADR-025); **portable JSON ledger** (ADR-024); **halt is physics** (ADR-023);
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
-  clock + look-ahead guard + one now + keyed synthetic market + world record. **967 passed + 8
+  clock + look-ahead guard + one now + keyed synthetic market + world record. **1084 passed + 7
   xfailed** (with the runtime). No model
-  has traded through the App yet (a scripted pod has). Era I deliverables 2 of 8 done (+ B-004a/b/c,
+  has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
-  low) fixed. 8 strict xfails open (0001: payload size ×2 = B-000g, message
-  content = B-000e, system squat = B-000f, MCP path = B-000h; 0004: fee = B-026; 0009:
+  low), 0012 and 0013 (Runtime) fixed. 7 strict xfails open (0001: payload size ×2 = B-000g, message
+  content = B-000e, system squat = B-000f; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
   B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038, B-040 (low; physics' halt check is
   milder than the Runtime's).
@@ -84,7 +101,8 @@
 - **The Human (2026-10-11):** accepted P-0001/P-0002/P-0003. Open: Q-0001 (budget), Q-0002
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
-- No Truman, Quant Lab or Observatory yet. The Runtime wakes nothing yet (R-2/R-3).
+- No Truman, Quant Lab or Observatory yet. The Runtime wakes one scripted mind per call; no
+  scheduler yet (R-3).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -92,11 +110,10 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-2** Scripted mind + `native` adapter over the published MCP tool list (HALT per tool
-   batch via `decide_batch`). A provider registry where each zero-cost name builds exactly one
-   class with no model and no network (R-1 carry-overs in BACKLOG). The probe's `ScriptedPM`
-   becomes the first scripted mind. First import of `mcp_server` from runtime: the dynamic probe
-   will measure it.
-2. **R-3** Lockstep backtest + `runtime` clock identity (B-032, B-000f): a scripted PM + Analyst
-   live a month through the Runtime (M1).
-3. **R-4** Cassettes + replay (M2). B-040 when cheap. Retrospective due at cycle 30.
+1. **R-3** Lockstep backtest + `runtime` clock identity (B-032, B-000f; a physics change → red-team):
+   per step halt/cap → wake specs in id order via `native.wake` → advance. A scripted PM +
+   Analyst (new script: the Analyst messages a signal, the PM trades on it) live a month, run
+   labelled `minds: scripted` (M1). R-2 carry-overs in BACKLOG (provision agents from specs, bind
+   name; count tool-function errors). Size check (X-008): split `daily_cycle` off as R-3b.
+2. **R-4** Cassettes + replay (M2): `WakeRecord` transcripts already serialise by construction.
+3. **R-5** Agent-level gates (EC3/5/6). B-040 when cheap. Retrospective due at cycle 30.

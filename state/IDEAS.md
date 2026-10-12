@@ -254,6 +254,14 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   cost or permission should key on the full tuple that determines behaviour (provider, adapter,
   and later model and key source). A protocol check: "which fields of the identity does this
   decision ignore, and why is each one safe to ignore?"
+- **Red-team the fix, not the draft (cycle 22).** The audit's deep-copy fix opened H4. Running
+  red-team on the post-audit commit caught it; running it in parallel on the draft would not have.
+  Protocol candidate: red-team starts after the audit's BLOCK fixes land, or re-checks the fixed
+  commit before reporting. Measure: holes introduced by fixes and found after merge.
+- **Arguments choose endpoints (cycle 22).** A tool allowlist is only as narrow as the wrapper's
+  path building. In Era II, each MCP tool could declare the *exact* route it may reach, and the
+  recording transport could assert route ⊆ declaration on every call in every test — a seal
+  check that runs everywhere for free.
 - **`fund-runtime status` as the Observatory's first panel.** It already prints the law and what
   would wake. In Era II it can answer "why didn't agent X wake?" with a reason code per wake,
   logged per step, which makes scheduler behaviour inspectable without reading code.

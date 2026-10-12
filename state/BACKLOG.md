@@ -15,7 +15,14 @@ keep their ids for history.
       dynamic probe to `runtime` (transitive physics load ⊆ `app.config` + `app.limits`); an
       allowlist for runtime is a law change → ADR-032 amendment + planted counter-example. Serves
       EC5/EC6 (gates exist).
-- [ ] **R-2** **Next.** Carry-overs from R-1 (ADR-032 amendment (b), audit c21 NOTEs 5–6):
+- [x] **R-2** **Done cycle 22** (merged db3e7ee; `runtime/registry.py`, `runtime/scripted.py`,
+      `runtime/native.py`, `tests/test_runtime_native.py`, red-team 0013: 8 holes, all fixed;
+      ADR-032 amendment (g)(h)(i)). Carry-overs → R-3: the spec's *name* is not bound to the App
+      agent (only role + pod) until R-3 provisions agents from specs; tool-function exceptions
+      surface only as tool errors (count them in the wake record, re-audit NOTE 1); a real-App
+      test of exotic tickers (`^GSPC`, `BRK.B`, `EURUSD=X`) through `_segment` once the synthetic
+      world can carry them (re-audit NOTE 5); wall-clock timeout (R-6). Original:
+      Carry-overs from R-1 (ADR-032 amendment (b), audit c21 NOTEs 5–6):
       - a name→class registry in which `scripted` and `cassette` each build exactly one class,
         with no model and no network client, plus a test that a `scripted` spec carrying a
         `model` cannot reach a model;
@@ -27,7 +34,7 @@ keep their ids for history.
       before every tool-call batch (03 §3); context =
       charter + `/me` + workflow input, assembled by code and logged. The probe's `ScriptedPM`
       becomes the first scripted mind. Serves M1.
-- [ ] **R-3** Lockstep backtest workflow (was B-011 `backtest`) + B-032 (CONTROL_CLOCK → a
+- [ ] **R-3** **Next.** Lockstep backtest workflow (was B-011 `backtest`) + B-032 (CONTROL_CLOCK → a
       reserved `runtime` identity, with B-000f; a TRD role deviation, logged as such): per step halt/cap check → wake in agent-id order
       → advance. PM + Analyst (scripted; the Analyst messages a signal, the PM trades) live a
       month < 10 min, every act over HTTP; run record says `minds: scripted`. **M1**. It
@@ -99,7 +106,8 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
 - [ ] **B-000f** 'system' identity looked up by role/reserved name, not a squattable name.
 - [ ] **B-000g** Byte-size caps on `structured_payload` and task `outcome` (depth is capped since
       cycle 12, size is not — 2 xfails in red-team 0001).
-- [ ] **B-000h** MCP client: URL-escape path params.
+- [x] **B-000h** MCP client: URL-escape path params — **done cycle 22** (`mcp_server.tools._segment`,
+      red-team 0013 H1; the 0001 xfail is a guard).
 - [ ] **B-000b** A test that proves `OMS_LOCK` is load-bearing (F-0001), e.g. race injected between
       cash read and write, or run against a row-locking backend; or document the lock as defence-in-depth.
 - [ ] **B-000j** Decide whether `state/loop_status.json` is tracked (runner state) — auditor note.

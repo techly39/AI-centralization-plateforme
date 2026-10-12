@@ -1,5 +1,22 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 22: the first "mind" acted through the Runtime.** A scripted trader ran
+inside the Runtime. It is plain code with no AI model, and it costs $0. It read prices and
+placed orders only through the same tools a real agent will get, for one simulated month.
+Run twice, it produced exactly the same history.
+
+The two reviews found serious problems, and all are fixed:
+- **Your stop file was checked too rarely.** It was checked only between groups of actions; it
+  is now checked before every single action and before the agent thinks again.
+- **An agent could be woken with another agent's key**, getting that agent's powers or pod.
+- **A price-lookup tool could be steered to a different part of the system**, with a crafted
+  symbol name. This old hole is now closed for good.
+
+Nothing needs your action. Q-0005 is still open; my default (B) is in force. `setup/` is still
+waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 21: the part that will wake agents exists, and its locks come first.** The
 "Runtime", the program that will wake the firm's agents, now has its skeleton. It does not wake
 anyone yet. What it has are its two locks:

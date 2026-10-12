@@ -34,6 +34,8 @@ same cycle — leave room for them, or split before building.
 
 **4. Build** on `git switch -c cycle/NNNN-<slug>`. Tests first where possible.
 Small commits: `cycle NNNN: <what> — <why>`. Follow the TRD inside `app/`.
+Commit the build before step 5 begins (X-009, cycle 22): an interrupted cycle then resumes from a
+commit, not from an uncommitted tree.
 Answer any open question with the prime rule; log it in `bible/07_DECISIONS.md`
 (and `state/QUESTIONS.md` if the Human should see it).
 

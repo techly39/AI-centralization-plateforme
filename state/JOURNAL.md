@@ -789,3 +789,57 @@ reading ADR-032 (4) more literally than I had. (3) A path computed from `__file_
 about how the code is installed; check the directory as well as the file.
 Next: R-2. The scripted mind, the provider registry (each zero-cost name → one class) and the
 `native` adapter over `build_server`'s tool list, with HALT checked per tool batch.
+
+## Cycle 0022 — R-2: a scripted mind wakes through the native adapter (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (one pod end to end *via the Runtime*) and EC5 (HALT stops agents),
+both served, neither ticked (R-3/R-5/R-8 tick them). Vision milestone M1.
+Hypothesis: If the Runtime gets (a) a provider registry that maps each zero-cost name to exactly
+one class and builds the mind itself (the adapter never accepts a provider object), (b) a
+`scripted` provider whose policy is a pure function of the request, chosen by name from a closed
+table, with no model and no network client, (c) AgentSpec rules that a zero-cost spec names no
+`model` and no budget and that `script` is set iff the provider is `scripted`, and (d) a `native`
+adapter whose tool list is exactly `build_server`'s (narrowed by `spec.tools`), whose context is
+charter + `/me` + workflow input assembled by code and returned in a wake record, which re-reads
+HALT before every tool batch and stops at a per-wake tool-call budget — then the probe's
+moving-average PM, rewritten as a script, trades a pod for several backtest days purely through
+MCP tool calls; the same days twice leave the same ledger; HALT created between batches stops the
+wake before the next batch runs; and a mind calling a tool outside its list or past its budget
+reaches no endpoint. Expected: ~30 new tests, no physics change.
+Work: Resumed after an interruption. The build was uncommitted in the working tree; I recognised
+`setup/` as the Human's installer and left it alone. First I fixed one wrong column name in a new
+test (`agent_id` → `created_by`). Then I committed `runtime/registry.py` (name → one class, with
+contradiction refusals), `runtime/scripted.py` (closed `SCRIPTS`, `moving-average-pm`),
+`runtime/native.py` (the adapter), the AgentSpec `script` field and `Message.tool_calls`/`is_error`.
+The old law test that pins AgentSpec's extra fields to exactly `{provider}` failed. That is a
+finding: the fix is ADR-032 amendment (g), which adds `script`, not a test edit. The auditor
+returned **BLOCK**: HALT was read per batch but not per call, and not before the next model turn
+(Art. 5.2). It also gave 3 WARNs: a provider exception escaped without a record, the mind could
+rewrite the record through shared objects, and the import lint overclaimed. All of these are
+fixed, with tests. Red-team 0013 then found **8 holes**, all fixed (amendment (i)):
+- **H1 (medium):** path traversal through `get_price("../agents")` got around tool narrowing.
+  This is the open B-000h from red-team 0001; MCP path values are now escaped, and the 0001 xfail
+  is now a guard.
+- **H2/H3 (medium):** a spec was not bound to its key (identity_mismatch).
+- **H4 (medium):** a deep copy I added in the audit fix raised RecursionError and lost the record.
+- **H5–H8 (low):** duplicate call ids, a non-JSON reply, non-JSON input, and `wake_policy: never`.
+
+Re-audit **PASS**; I applied 4 of its 5 NOTEs (whole-reply JSON check, narrowed claims).
+Result: merged db3e7ee, pushed. 1084 passed + 7 xfailed. The working tree also has the 1 known
+`setup/` failure. xfails went 8 → 7: B-000h is closed. Smoke run 12/12. Hypothesis **met, with
+corrections**. The probe PM, rewritten as a script, trades a 31-day synthetic month purely through
+MCP tool calls. The same world twice gives the same ledger and the same transcripts. HALT stops
+the wake, now before the next *call* and not only the next batch. A tool outside the list, a
+budget overrun, a wrong key or a bad reply reaches no endpoint. One physics-surface change, against
+the hypothesis's "no physics change": the MCP wrapper escapes path values. About 120 new tests,
+not about 30.
+Learned: (1) **A fix can open a hole.** The audit's deep-copy fix added the H4 crash. Red-team
+after the audit fixes, on the fixed commit, caught it; the order matters. (2) "Narrowed by tool
+name" is not "narrowed by endpoint". A tool's *arguments* can choose the endpoint, so the wrapper
+must be part of the seal. (3) A record is only as good as its serialisability: validating at the
+door (JSON round trip, fresh ids) is cheaper than R-4 finding unserialisable cassettes. (4) The
+interrupted-cycle resume worked again (X-007), but the interruption cost the step-5 context.
+Commit the build before step 5, so a resume starts from a commit.
+Next: R-3. The lockstep backtest workflow, plus a reserved `runtime` clock identity (B-032,
+B-000f): a scripted PM + Analyst live a month through the Runtime, with every act over HTTP, and
+the run is labelled `minds: scripted` (M1).
