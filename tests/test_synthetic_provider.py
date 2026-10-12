@@ -196,10 +196,25 @@ def test_no_key_no_world(monkeypatch):
         _build(monkeypatch, MarketDataConfig(provider="synthetic"))
 
 
-@pytest.mark.parametrize("bad", ["0" * 31, "xyz" * 11, "0" * 129, "11"])
-def test_config_refuses_a_short_or_non_hex_key(bad):
+@pytest.mark.parametrize("bad", ["0" * 31, "xyz" * 11, "0" * 129, "11", "0" * 33])
+def test_config_refuses_a_short_odd_or_non_hex_key(bad):
     with pytest.raises(ValidationError):
         MarketDataConfig(provider="synthetic", synthetic_key=bad)
+
+
+def test_the_committed_file_cannot_carry_the_world_key(monkeypatch, tmp_path):
+    """Environment only is a law, not a comment (auditor, cycle 18): a key in
+    config.yaml — a committed file — refuses to load."""
+    from app import config
+
+    path = tmp_path / "config.yaml"
+    path.write_text(f"marketdata:\n  synthetic_key: '{world_key(1).hex()}'\n")
+    monkeypatch.setattr(config, "CONFIG_PATH", path)
+    with pytest.raises(ValueError, match="environment only"):
+        config.Settings()
+    monkeypatch.setenv("FUND_MARKETDATA__SYNTHETIC_KEY", world_key(1).hex())
+    path.write_text("marketdata:\n  provider: synthetic\n")
+    assert config.Settings().marketdata.synthetic_key is not None
 
 
 @pytest.mark.parametrize("prices", [{"SYNA": 0.0}, {"SYNA": -1.0}, {"SYNA": float("nan")}])

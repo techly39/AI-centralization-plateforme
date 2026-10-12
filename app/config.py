@@ -61,9 +61,11 @@ class MarketDataConfig(BaseModel):
     @classmethod
     def _key_is_long_hex(cls, value: SecretStr | None) -> SecretStr | None:
         if value is not None and not re.fullmatch(
-            r"[0-9a-fA-F]{32,128}", value.get_secret_value()
+            r"(?:[0-9a-fA-F]{2}){16,64}", value.get_secret_value()
         ):
-            raise ValueError("synthetic_key must be 32..128 hex digits (≥ 128 bits)")
+            raise ValueError(
+                "synthetic_key must be an even 32..128 hex digits (≥ 128 bits)"
+            )
         return value
 
     @field_validator("synthetic_symbols")
@@ -126,7 +128,14 @@ class YamlSettingsSource(PydanticBaseSettingsSource):
         return None, field_name, False
 
     def __call__(self) -> dict[str, Any]:
-        return _load_yaml(CONFIG_PATH)
+        data = _load_yaml(CONFIG_PATH)
+        # The file is committed; a world key in it is a published future (ADR-030).
+        if "synthetic_key" in (data.get("marketdata") or {}):
+            raise ValueError(
+                f"{CONFIG_PATH}: marketdata.synthetic_key is environment only "
+                "(FUND_MARKETDATA__SYNTHETIC_KEY), never the committed file"
+            )
+        return data
 
 
 class Settings(BaseSettings):
