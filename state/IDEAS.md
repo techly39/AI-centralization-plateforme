@@ -326,3 +326,8 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   market hid a flaky step for 20 runs. A cheap law, like the time law: a scanner flags any
   `secrets.`/`random` call in `scripts/` and `tests/` that feeds a world key without a reason
   on an allowlist.
+- **An information-flow law (cycle 29).** B-049 was found by reading, not by a test. Make it a
+  law: tag every ledger field and every response field `world | experiment | firm`, and a
+  walker over every route × every role asserts that no `world`/`experiment` value, planted
+  with a unique marker, ever appears in a firm agent's answer. It would also price Truman:
+  what each mind may know becomes a table, not a hunt.

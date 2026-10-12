@@ -1,9 +1,15 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 28 (R-3b-2c-2 physics records the run's minds — merged 2cd2cb2, 2026-10-12)
+**Last cycle:** 29 (B-049 the market's law is withheld from agents — merged d908dbe, 2026-10-12)
 
 ## What is true now
+- **No agent reads the operator's facts about the experiment** (B-049, ADR-034,
+  `tests/test_world_withheld.py`). `app.ledger.events.AGENT_WITHHELD_FIELDS` names
+  `run_started.world` and `run_minds_declared.minds`; `EventOut` (the only response shape with a
+  payload, pinned by a test) reads them as `"withheld"` for every agent, management included.
+  The ledger keeps the full record; `install_run_clock` and `run_minds()` read it. The ticker
+  universe can still be probed by 200/404 (B-052, with Truman).
 - **Physics records what drives a run's minds** (R-3b-2c-2, ADR-032 (p) + red-team 0017
   amendment, `tests/test_run_minds.py`, `tests/test_redteam_0017.py`). **M1 is closed for
   scripted minds.**
@@ -23,8 +29,7 @@
     event. The smoke market key is now fixed (a hash of `fund-smoke-world/1`); a random key
     could fail the order step on luck.
   - A lone surrogate in any request body is now a 422, not a 500 (`json_safe`).
-  - **B-049 (found):** management reads `run_started.world` (drift, volatility) through
-    `/events`.
+  - B-049 (found here) fixed in cycle 29: the world record is withheld from agents.
 - **A run starts from one operator command** (R-3b-2c-1, ADR-032 (o) + audit amendment,
   `tests/test_runtime_cli_backtest.py`).
   `fund-runtime backtest --specs DIR --steps N [--days-per-step D] [--input FILE]
@@ -190,7 +195,8 @@
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
-  identity + the lockstep conductor + the run's minds label. **1433 passed + 6 xfailed** (with
+  identity + the lockstep conductor + the run's minds label + the withheld world record.
+  **1443 passed + 6 xfailed** (with
   the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
@@ -225,13 +231,11 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-4** Cassettes + replay (M2). Probably split (X-008): R-4a writes the RunRecord + every
+1. **Cycle 30 is a retrospective** (re-read the Constitution and Genesis, `06_LOOP.md` §6),
+   alongside its unit of work.
+2. **R-4** Cassettes + replay (M2). Probably split (X-008): R-4a writes the RunRecord + every
    exchange to a cassette (gitignore first, B-000i), redacting minted keys (B-047). R-4b
    replays into a fresh DB in the same world: the same ledger, declared `cassette`, and a miss
    or a redacted key is a recorded divergence. `retired_at`, `tool_failures` and `charter_ref`
-   go into the cassette.
-2. **B-049** (physics, before any LLM management mind wakes) `run_started.world` (the market's
-   law) is readable through `/events`. Redact it from agent reads, or prove it harmless. Then
-   B-048 when cheap.
-3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. **Retrospective at cycle 30**
-   (re-read the Constitution and Genesis).
+   go into the cassette. B-048 when cheap.
+3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`.

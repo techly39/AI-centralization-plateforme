@@ -1199,3 +1199,32 @@ MCP) carries no drift, volatility or fingerprint, while the ledger, `install_run
 `run_minds()` read the full record unchanged. Two old guards that assert management reads the
 fingerprint (red-team 0011, `test_run_world`) become findings of the new law. Expected ~10 new
 tests; xfails stay at 6.
+Work:
+- **Physics.** `app.ledger.events.AGENT_WITHHELD_FIELDS` + `agent_payload` (a new dict, never
+  a mutation). `EventOut` applies it in an after-validator, so every route that returns an event
+  (today only `/events`, and `list_events` over MCP through it) withholds. ADR-034.
+- **Tests.** `tests/test_world_withheld.py` (10): every filter, MCP, every symbol / price /
+  origin, the row unchanged after reads and a later commit, the world check and `run_minds`
+  still reading the full record, `EventOut` the only payload shape. Two old guards that asserted
+  management reads the fingerprint now assert it is withheld (findings, logged in ADR-034).
+- My first test was wrong: it checked `run_minds()` after the PM (registered before the
+  declaration) wrote a message, and red-team 0017's H4 rule rightly voided the label.
+- **Claim check:** "no law reaches a firm agent" narrowed to "through the ledger" (bars still
+  reveal what estimation can find; that is the agent's work).
+- **Auditor: PASS, 0 BLOCK, 6 NOTEs.** Fixed 1–4: `s.dirty` proves nothing on a plain JSON
+  column (the row's value is the guard); `start`/`look_ahead_guard` checked over HTTP; every
+  symbol, price and origin checked; the ADR names what is tested. NOTE 5 → B-052. No red-team:
+  the diff touches no registry, OMS, market data, metering or halt code.
+Result: merged d908dbe and pushed. **1443 passed + 6 xfailed** (+ the known `setup/` failure).
+Smoke 21/21. Hypothesis **met**: 10 new tests, 2 findings of the new law, xfails unchanged.
+Learned:
+(1) **A redaction has one home or it has holes.** Putting it in the response shape, not the
+route, means a future route that returns an event cannot forget it, and a test pins that no
+other shape carries a payload.
+(2) **A dirty-set check is not a mutation check.** SQLAlchemy does not track in-place edits of a
+plain JSON column, so `obj not in session.dirty` would pass over exactly the bug it names. Only
+reading the value back proves the row is whole.
+(3) **My own earlier law caught my test.** H4 (cycle 28) made "an older agent acted" void the
+label; the new test tripped it. Laws written last cycle are already doing work.
+Next: R-4a — the RunRecord and every exchange to a cassette (gitignore first, B-000i; redact
+minted keys, B-047). Cycle 30 is a retrospective (re-read the Constitution and Genesis).

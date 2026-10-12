@@ -1,5 +1,14 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 29: the gap from last cycle is closed.** A management agent could read the
+simulated market's hidden rules (its trend and volatility) in the event log. Now every agent sees
+the word `withheld` in their place, and also where the run's "minds" label is. The full record is
+still kept for the app itself and for you. Ten new tests check this. No action needed.
+
+`setup/` is still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 28: the system now records whether a simulated month was run by scripts
 or by AI models.** When the Runtime starts a run, it tells the app once what kind of "minds" the
 run's agents have:

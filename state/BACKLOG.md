@@ -65,12 +65,12 @@ keep their ids for history.
               `POST /run/minds` under CONTROL_CLOCK: once, before any firm act or advance.
               The reader trusts ledger order and covers only agents registered after the
               declaration. **M1 closed** (scripted). Serves EC1, does not tick it (R-8).
-      - [ ] **B-049** (cycle 28, medium, **before any LLM management mind wakes**) Management
-            reads `run_started.world` (law, drift, volatility, symbols) through `GET /events`
-            (`READ_CROSS_POD`). The world's generating law is an edge that no participant
-            should hold. Redact `world` from agent reads of the ledger (the operator's tools
-            read the file), or decide by ADR that it is harmless. Found by the c28 claim
-            check.
+      - [x] **B-049** **Done cycle 29** (merged d908dbe; ADR-034,
+            `tests/test_world_withheld.py`). `EventOut` reads `run_started.world` and
+            `run_minds_declared.minds` as `"withheld"` for every agent; the ledger keeps them.
+      - [ ] **B-052** (cycle 29, low, with Truman) The ticker universe is still discoverable:
+            an agent can probe `/price/<guess>` and tell 200 from 404 (audit c29 NOTE 5).
+            Truman decides what a mind is told about its world; until then charters name it.
       - [ ] **B-050** (cycle 28, low, Era II) A declaration exempts an older agent's
             *registrations* (the registrar making the run's minds). An older management mind
             driven by a model could register agents after the declaration, and they would
