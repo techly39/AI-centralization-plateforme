@@ -1,8 +1,8 @@
 """The ``native`` adapter: one wake of one mind over the published tools (ADR-032 (2), R-2).
 
 A mind acts only through the tool list :func:`mcp_server.build_server` publishes
-— the same tools an OpenClaw agent gets — so "same tools for every adapter"
-holds by construction. Each call runs the MCP tool function, which calls the API
+— the list an OpenClaw agent will get through the same server (R-7), which is how
+"same tools for every adapter" is meant to hold. Each call runs the MCP tool function, which calls the API
 over HTTP with the agent's own key; physics decides what is allowed (403s reach
 the mind as tool errors). The adapter only decides *what the mind sees*:
 
@@ -17,14 +17,20 @@ And it enforces the Runtime's own limits (03 §3):
 
 * the wake gate before anything else; the mind is built from the spec by
   :mod:`runtime.registry`, never handed in;
-* **HALT is re-read before every tool-call batch**; a halted batch does not run;
-* a per-wake **tool-call budget**; a batch that would pass it does not run.
+* **HALT is re-read before every model turn and before every tool call** (03 §3
+  asks for every batch; Art. 5.2 allows nothing beyond the current tool call);
+* a per-wake **tool-call budget**; a batch that would pass it does not run;
+* the mind is shown deep copies, and its reply is copied on receipt, so nothing
+  a mind holds can rewrite the transcript afterwards.
 
 A wake ends when the mind replies with no tool calls (``done``), or with
-``halted``, ``tool_budget`` or ``refused``. Every turn ends in one of those or in
-at least one tool call, so the budget bounds the loop. Every exit returns a
-:class:`WakeRecord`; R-4 writes it to a cassette. Wall-clock timeouts arrive
-with the first provider that can hang (R-6); a script cannot.
+``halted``, ``tool_budget``, ``refused`` or ``error`` (the provider raised or
+returned something that is not a :class:`CompletionResponse`). Every turn ends
+in one of those or in at least one tool call, so the budget bounds the loop. An
+exception from the provider or a tool function becomes a record or a tool error;
+the adapter's own bugs still raise. R-4 writes the record to a cassette.
+There is no wall-clock timeout yet: a script that never returns hangs its wake.
+Timeouts arrive with the first provider that can hang on the network (R-6).
 """
 
 from __future__ import annotations
@@ -38,7 +44,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_server.client import FundClient
 from mcp_server.tools import build_server
 from runtime.gate import decide_batch, decide_wake
-from runtime.providers import CompletionRequest, Message, ToolCall, ToolSpec
+from runtime.providers import CompletionRequest, CompletionResponse, Message, ToolCall, ToolSpec
 from runtime.registry import ProviderRefused, build_provider
 from runtime.spec import AgentSpec
 
@@ -49,7 +55,7 @@ DEFAULT_MAX_TOOL_CALLS = 64
 @dataclass(frozen=True)
 class WakeRecord:
     spec_id: str
-    #: ``done`` | ``halted`` | ``tool_budget`` | ``refused``
+    #: ``done`` | ``halted`` | ``tool_budget`` | ``refused`` | ``error``
     ended: str
     #: Why: the gate's or registry's reason code, or the same word as ``ended``.
     reason: str
@@ -110,25 +116,42 @@ async def wake(
     ]
 
     made = 0
+
+    def end(ended: str, reason: str | None = None) -> WakeRecord:
+        return WakeRecord(spec.id, ended, reason or ended, made, tuple(transcript))
+
     while True:
-        response = provider.complete(
-            CompletionRequest(messages=list(transcript), tools=tools, model=spec.model))
+        if not decide_batch().allowed:  # no thinking after HALT: R-6's think costs money
+            return end("halted")
+        # The mind gets copies: nothing it holds can rewrite the record (audit c22 WARN 2).
+        request = CompletionRequest(messages=[m.model_copy(deep=True) for m in transcript],
+                                    tools=[t.model_copy(deep=True) for t in tools],
+                                    model=spec.model)
+        try:
+            response = provider.complete(request)
+        except Exception as exc:  # a mind's crash is a recorded end, never a lost wake
+            return end("error", f"provider_error:{type(exc).__name__}")
+        if type(response) is not CompletionResponse:
+            return end("error", "bad_reply")
+        response = response.model_copy(deep=True)
         transcript.append(Message(role="assistant", content=response.content,
                                   tool_calls=response.tool_calls))
         batch = response.tool_calls
         if not batch:
-            return WakeRecord(spec.id, "done", "done", made, tuple(transcript))
+            return end("done")
         if made + len(batch) > max_tool_calls:
-            return WakeRecord(spec.id, "tool_budget", "tool_budget", made, tuple(transcript))
-        if not decide_batch().allowed:
-            return WakeRecord(spec.id, "halted", "halted", made, tuple(transcript))
+            return end("tool_budget")
         for call in batch:
+            # Art. 5.2: nothing beyond the current tool call — HALT is read before each one.
+            if not decide_batch().allowed:
+                return end("halted")
             transcript.append(await _execute(server, visible, call))
-        made += len(batch)
+            made += 1
 
 
 async def _execute(server: Any, visible: frozenset[str] | None, call: ToolCall) -> Message:
-    """Run one call through the MCP tool; every failure becomes a tool error message.
+    """Run one call through the MCP tool; a refusal, a tool error or an exception
+    from the tool function becomes a tool error message.
 
     ``visible=None`` is the adapter's own read (``whoami`` for the context).
     """
@@ -141,6 +164,8 @@ async def _execute(server: Any, visible: frozenset[str] | None, call: ToolCall) 
         result = await server.call_tool(call.name, dict(call.arguments))
     except ToolError as exc:
         return error(str(exc))
+    except Exception as exc:  # e.g. the App unreachable: the mind is told, the wake goes on
+        return error(f"the tool failed: {type(exc).__name__}")
     texts = [b.text for b in getattr(result, "content", None) or []
              if getattr(b, "type", "") == "text"]
     if getattr(result, "is_error", True) is not False:

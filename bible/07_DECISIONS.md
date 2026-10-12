@@ -809,19 +809,30 @@ model must not load as if it were valid. The spec still *loads*. The refusal hap
 would be built, so `fund-runtime status` can still show the spec. AgentSpec gains a **second added
 field, `script`**: the name of a policy in `runtime.scripted.SCRIPTS`, a read-only table in code.
 It is required when the provider is `scripted` and refused for any other provider. A spec names
-a script but can never supply one. `scripted.py` may import only the stdlib and
-`runtime.providers` (an AST check with planted counter-examples). A script is a pure function of
-the transcript it is shown. `Usage.cost_usd` is a provider's self-report and is never the meter
-(R-6).
+a script but can never supply one. `scripted.py` may import only pure stdlib modules and
+`runtime.providers`, and may not name a builtin that loads code or reaches other modules
+(`__import__`, `eval`, `exec`, `compile`, `globals`, `vars`, `getattr`, `open`, `__builtins__`).
+An AST check with planted counter-examples enforces this. It is a lint, not a seal (as in (f)).
+"A script is a pure function of the transcript and keeps no state" is a rule for script authors.
+Review enforces it, and the month-twice test checks it for `moving-average-pm`. Code does not
+enforce it. `Usage.cost_usd` is a provider's self-report and is never the meter (R-6).
 (h) **The native adapter.** A mind sees `build_server`'s published tool list, narrowed by
 `spec.tools`; an unknown name in that list refuses the wake. A call outside the list returns a
 tool error and reaches no endpoint. Every other call runs the MCP tool function over HTTP with the
 agent's own key, so physics' 403s reach the mind as tool errors. The context is assembled by code
 and is the start of the returned `WakeRecord.transcript`: the charter as the system message, then
-`{me: whoami, input: workflow_input}` as sorted JSON. The adapter checks HALT (`decide_batch`)
-before every batch, and a halted batch does not run. A per-wake tool-call budget (default 64) also
-stops the wake, and a batch that would pass the budget does not run. A wake ends `done | halted |
-tool_budget | refused`. Wall-clock timeouts wait for the first provider that can hang (R-6).
+`{me: whoami, input: workflow_input}` as sorted JSON. **HALT is read (`decide_batch`) before every
+model turn and before every tool call.** 03 §3 asks only for "every batch". The auditor's c22 BLOCK
+read Art. 5.2's "nothing beyond the current tool call" as covering calls inside a batch, and the
+next model turn too, which under R-6 costs money. A per-wake tool-call budget (default 64) also
+stops the wake: a batch that would pass the budget does not run at all. The mind is shown deep
+copies of the transcript, and its reply is copied on receipt, so nothing a mind holds can rewrite
+the record (c22 WARN). A wake ends `done | halted | tool_budget | refused | error`. `error` means the
+provider raised (`provider_error:<Type>`) or returned something other than a
+`CompletionResponse` (`bad_reply`). An exception from a tool function becomes a tool error.
+There is no wall-clock timeout yet: a script that never returns hangs its wake. Timeouts arrive
+with the first network provider (R-6). The context is returned in the record, not yet stored.
+Storing it is R-4's cassette.
 Dynamic boundary, measured: with `runtime → mcp_server` in place, importing every runtime module
 loads `{app, app.limits}`, within (a)'s set. The probe's moving-average PM is now the script
 `moving-average-pm`. It trades a 31-day synthetic month through the adapter, and two runs of the

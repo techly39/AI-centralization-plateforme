@@ -155,15 +155,27 @@ _SCRIPTED_MAY_IMPORT = frozenset({
 })
 
 
+#: Builtins that load code or reach other modules without an import statement.
+_REACHING_BUILTINS = frozenset({
+    "__import__", "eval", "exec", "compile", "globals", "vars", "getattr", "open",
+    "breakpoint", "__builtins__",
+})
+
+
 def _imports(source: str) -> set[str]:
+    """Every module imported, plus ``<name>`` for every reaching builtin named anywhere."""
     names: set[str] = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
             names |= {a.name for a in node.names}
         elif isinstance(node, ast.ImportFrom):
             names.add("." * node.level + (node.module or ""))
-        elif isinstance(node, ast.Call) and getattr(node.func, "id", None) == "__import__":
-            names.add("<__import__>")
+        elif isinstance(node, ast.Name) and node.id in _REACHING_BUILTINS:
+            names.add(f"<{node.id}>")
+        elif isinstance(node, ast.Attribute) and node.attr in _REACHING_BUILTINS:
+            names.add(f"<{node.attr}>")
+        elif isinstance(node, ast.Constant) and node.value in _REACHING_BUILTINS:
+            names.add(f"<{node.value}>")
     return names
 
 
@@ -176,6 +188,11 @@ def test_the_scripted_module_imports_nothing_that_reaches_out() -> None:
 @pytest.mark.parametrize("planted", [
     "import httpx\n", "from anthropic import Anthropic\n", "import socket\n",
     "from runtime import native\n", "x = __import__('urllib.request')\n",
+    "eval(\"__import__('socket')\")\n", "exec('import socket')\n",
+    "globals()['__builtins__']['__import__']('socket')\n",
+    "import builtins\nbuiltins.__import__('socket')\n", "f = getattr(json, 'x')\n",
+    "compile('1', 'f', 'eval')\n", "open('/etc/hosts')\n", "vars()\n",
+    "from . import native\n",
 ])
 def test_the_import_check_catches_a_planted_reach(planted: str) -> None:
     assert not _imports("import json\n" + planted) <= _SCRIPTED_MAY_IMPORT
@@ -327,6 +344,99 @@ async def test_halt_between_batches_stops_the_next_batch(fund_client, desk, gov,
     assert (rec.ended, rec.tool_calls) == ("halted", 1)
     assert [m.tool_call_id for m in rec.transcript if m.role == "tool"] == ["c"]
     assert _orders(SessionFactory) == []
+
+
+@pytest.mark.anyio
+async def test_halt_inside_a_batch_stops_the_next_call(fund_client, desk, gov, scripts,
+                                                       monkeypatch, SessionFactory) -> None:
+    """Audit c22 BLOCK: Art. 5.2 — nothing beyond the current tool call, even inside a batch."""
+    _, _, pm_key = desk
+    real_execute = native._execute
+
+    async def execute_then_halt(server, visible, call):
+        result = await real_execute(server, visible, call)
+        if visible is not None:  # not the adapter's own whoami read
+            (gov / "HALT").write_text("")  # the Human halts while call 1 is answered
+        return result
+    monkeypatch.setattr(native, "_execute", execute_then_halt)
+    scripts(two=_calls("get_clock", "place_order"))
+    rec = await wake(_spec(script="two"), fund_client(pm_key), workflow_input={})
+    assert (rec.ended, rec.tool_calls) == ("halted", 1)
+    assert [m.tool_call_id for m in rec.transcript if m.role == "tool"] == ["0:0"]
+    assert _orders(SessionFactory) == []
+
+
+@pytest.mark.anyio
+async def test_a_halted_mind_is_not_asked_to_think_again(fund_client, desk, gov, scripts,
+                                                         monkeypatch) -> None:
+    """Audit c22 BLOCK: after HALT no further model turn — under R-6 a turn costs money."""
+    _, _, pm_key = desk
+    real_execute = native._execute
+    turns = []
+
+    async def execute_then_halt(server, visible, call):
+        result = await real_execute(server, visible, call)
+        if visible is not None:
+            (gov / "HALT").write_text("")
+        return result
+    monkeypatch.setattr(native, "_execute", execute_then_halt)
+
+    def one_call_then_count(request):
+        turns.append(1)
+        if len(turns) > 1:
+            pytest.fail("a halted mind was asked to think")
+        return CompletionResponse(tool_calls=[ToolCall(id="c", name="get_clock")])
+    scripts(once=one_call_then_count)
+    rec = await wake(_spec(script="once"), fund_client(pm_key), workflow_input={})
+    assert (rec.ended, rec.tool_calls, len(turns)) == ("halted", 1, 1)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("reply, reason", [
+    (lambda r: 1 / 0, "provider_error:ZeroDivisionError"),
+    (lambda r: {"tool_calls": []}, "bad_reply"),
+    (lambda r: None, "bad_reply"),
+])
+async def test_a_crashing_or_lying_mind_ends_in_a_record(fund_client, desk, scripts,
+                                                         reply, reason) -> None:
+    """Audit c22 WARN 1: every exit of a wake returns a record — the transcript survives."""
+    _, _, pm_key = desk
+    scripts(bad=reply)
+    rec = await wake(_spec(script="bad"), fund_client(pm_key), workflow_input={})
+    assert (rec.ended, rec.reason, rec.tool_calls) == ("error", reason, 0)
+    assert [m.role for m in rec.transcript] == ["system", "user"]
+
+
+@pytest.mark.anyio
+async def test_a_mind_cannot_rewrite_the_record(fund_client, desk, scripts) -> None:
+    """Audit c22 WARN 2: the mind sees copies; what it holds cannot change the transcript."""
+    _, _, pm_key = desk
+    held = []
+
+    def forger(request):
+        for m in request.messages:  # rewrite everything the mind was shown
+            for c in m.tool_calls:
+                c.arguments["ticker"] = "FORGED"
+        if held:  # rewrite the reply it gave last turn, too
+            held[0].tool_calls[0].arguments["forged"] = True
+            return CompletionResponse(content="done")
+        reply = CompletionResponse(tool_calls=[ToolCall(id="c", name="get_price",
+                                                        arguments={"ticker": "AAPL"})])
+        held.append(reply)
+        return reply
+    scripts(forger=forger)
+    rec = await wake(_spec(script="forger"), fund_client(pm_key), workflow_input={})
+    assert rec.ended == "done"
+    assert rec.transcript[2].tool_calls[0].arguments == {"ticker": "AAPL"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("workflow_input", [{}, {"universe": []}, {"universe": "SYNA"}])
+async def test_the_pm_script_without_a_universe_does_nothing(fund_client, desk,
+                                                             workflow_input) -> None:
+    _, _, pm_key = desk
+    rec = await wake(_spec(), fund_client(pm_key), workflow_input=workflow_input)
+    assert (rec.ended, rec.tool_calls) == ("done", 0)
 
 
 @pytest.mark.anyio

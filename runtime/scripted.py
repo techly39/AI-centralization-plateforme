@@ -8,9 +8,13 @@ A script is chosen by name from :data:`SCRIPTS`, a closed table in code: a spec
 names a script, it cannot supply one. Adding a script is a code change, reviewed
 like any other.
 
-This module imports only the standard library and :mod:`runtime.providers`;
-``tests/test_runtime_native.py`` checks that, so a script cannot reach a model
-or the network through an import.
+This module imports only pure standard-library modules and :mod:`runtime.providers`,
+and calls none of the builtins that load code or reach other modules
+(``__import__``, ``eval``, ``exec``, ``compile``, ``globals``, ``vars``, ``getattr``,
+``open``, ``__builtins__``). ``tests/test_runtime_native.py`` checks both, with
+planted counter-examples. That check is a lint on code the Builder writes, not a
+seal (ADR-032 (f)). "Pure" and "keeps no state" are rules for script authors,
+checked by review and by the month-twice test, not by code.
 
 A scripted mind is not a firm agent (Art. 2.1): it is a script with an API key,
 like the cycle-18 probe pod. Runs with scripted minds are labelled so (R-3).
@@ -72,7 +76,9 @@ def moving_average_pm(request: CompletionRequest) -> CompletionResponse:
     """
     context = _context(request)
     pod_id = context["me"]["pod_id"]
-    universe: list[str] = list(context["input"]["universe"])
+    universe = context["input"].get("universe")
+    if type(universe) is not list or not universe or pod_id is None:
+        return CompletionResponse(content="No pod or no universe in my input; nothing to do.")
     turn = _turn(request)
 
     if turn == 0:
