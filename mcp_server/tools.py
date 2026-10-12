@@ -125,7 +125,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
             # MCP renders a list as one text block per item: a list of one would
             # reach the agent as the bare object and an empty list as nothing.
             # One JSON array block keeps a list a list (ADR-032 (k)).
-            return json.dumps(result, indent=2)
+            return json.dumps(result, indent=2, ensure_ascii=False)  # as MCP renders a dict
         return result
 
     # --- Registry -----------------------------------------------------------

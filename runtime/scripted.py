@@ -155,11 +155,13 @@ def ma_signal_analyst(request: CompletionRequest) -> CompletionResponse:
 def signal_pm(request: CompletionRequest) -> CompletionResponse:
     """A PM that trades only on its own analyst's signal for today.
 
-    Turn 0 reads the clock, the book, the directory, the newest page of its inbox
-    and the price of every name in the input's ``universe``. Turn 1 takes the
-    newest message that is addressed to its pod, comes from an analyst of its pod
-    (by the directory, not by what the message says), and carries a ``signal``
-    payload stamped with the clock's now. With no such message it holds. Otherwise
+    Turn 0 reads the clock, the book, the directory, the newest 50 messages it
+    can see and the price of every name in the input's ``universe``. Turn 1 takes
+    the newest of those that is addressed to its pod, comes from an active analyst
+    of its pod (by the directory, not by what the message says), was stamped by
+    physics with the clock's now (``ts``), and carries a ``signal`` payload whose
+    ``as_of`` says the same. A signal pushed out of the 50 by later messages is
+    not seen. With no such message it holds. Otherwise
     it buys a sleeve of each ``long`` name it does not hold and sells each ``flat``
     name it holds, citing the message id. Turn 2 is done. Any failed read ends the
     wake without trading.
@@ -186,11 +188,12 @@ def signal_pm(request: CompletionRequest) -> CompletionResponse:
         failed = sorted(k for k, v in results.items() if v is None)
         if failed:
             return CompletionResponse(content=f"A read failed ({', '.join(failed)}); not trading.")
+        now = results["clock"]["now"]
         analysts = {a["id"] for a in results["directory"]
-                    if a["role"] == "analyst" and a["pod_id"] == pod_id}
+                    if a["role"] == "analyst" and a["pod_id"] == pod_id and a["status"] == "active"}
         today = [m for m in results["inbox"]
                  if m["from_agent"] in analysts and m["to"] == f"pod:{pod_id}"
-                 and _is_signal(m["structured_payload"], results["clock"]["now"])]
+                 and m["ts"] == now and _is_signal(m["structured_payload"], now)]
         if not today:
             return CompletionResponse(content="No signal from my analyst for today; holding.")
         signal = max(today, key=lambda m: m["id"])

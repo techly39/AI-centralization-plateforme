@@ -918,17 +918,21 @@ Every MCP tool now answers a list as **one JSON array block** (`mcp_server.tools
 That is the surface every adapter shares, OpenClaw's included (R-7), so the fix is there, not in
 the native adapter. No existing test pinned the old shape.
 (l) **A pod of two scripted minds.** `ma-signal-analyst` reads the clock and the bars and sends
-its pod `{"kind": "signal", "as_of": <now>, "signals": {ticker: long|flat}}`. `signal-pm` trades
-only on the newest message that is addressed to its pod, comes from an analyst *of its pod by the
-directory* (not by anything the message claims), and is stamped with the clock's now. A malformed
-signal, a stale one, another pod's, or none means the PM holds. Spec-id order (`a-…` analyst,
+its pod `{"kind": "signal", "as_of": <now>, "signals": {ticker: long|flat}}`. `signal-pm` reads
+the newest 50 messages it can see and trades only on the newest that is addressed to its pod,
+comes from an *active* analyst *of its pod by the directory* (not by anything the message
+claims), was stamped by physics (`ts`) with the clock's now, and whose payload's `as_of` says the
+same. A malformed signal, a stale or pre-dated one, another pod's, one pushed out of the 50 by
+later messages, or none means the PM holds (audit c25 NOTEs 1–3: in-sim data, worded exactly). Spec-id order (`a-…` analyst,
 `b-…` PM) is how the signal reaches the PM within the same step. In a 31-day month, a second pod
 whose PM has no analyst never trades, and every order of pod 1 cites a message its analyst sent
 that same simulated day. The same world twice leaves the same ledger and transcripts.
 (m) **Carry-overs from the c24 audit.** `WakeRecord.tool_failures` counts calls whose tool
 function raised something other than a `ToolError` (physics refusing, App unreachable) or a
 `ValidationError` (the mind's bad arguments): a bug under the tool, which the mind sees as an
-ordinary tool error. `RunRecord.retired_at` records the step each retired mind left at. If every
+ordinary tool error. (A `ValidationError` raised by a bug *inside* a tool body would be taken for
+bad arguments; no tool body builds a pydantic model today — audit c25 NOTE 4.)
+`RunRecord.retired_at` records the step each retired mind left at (NOTE 5). If every
 mind is retired, the world still lives its remaining steps with no one awake: the clock is the
 Runtime's, not the minds' (NOTE 4). A `no_identity` refusal while the key still answers ends the
 run like any other refusal (NOTE 3, now pinned).

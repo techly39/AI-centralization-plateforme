@@ -232,7 +232,9 @@ def _is_json(value: Any) -> bool:
 
 
 def _payload(texts: list[str]) -> str:
-    """One JSON document per result. MCP splits a list result into one block per item."""
+    """One JSON document per result. ``build_server``'s tools answer in one block (a
+    list as one array, ADR-032 (k)); several blocks from any other tool are joined
+    as a list."""
     try:
         parsed = [json.loads(t) for t in texts]
     except ValueError:

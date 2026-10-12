@@ -73,14 +73,15 @@ PM = {"id": 3, "role": "pm", "pod_id": 1}
 DIRECTORY = [{"id": 2, "role": "analyst", "pod_id": 1, "name": "an-1", "status": "active"},
              {"id": 3, "role": "pm", "pod_id": 1, "name": "pm-1", "status": "active"},
              {"id": 4, "role": "pm", "pod_id": 1, "name": "pm-1b", "status": "active"},
-             {"id": 5, "role": "analyst", "pod_id": 2, "name": "an-2", "status": "active"}]
+             {"id": 5, "role": "analyst", "pod_id": 2, "name": "an-2", "status": "active"},
+             {"id": 6, "role": "analyst", "pod_id": 1, "name": "an-1-old", "status": "inactive"}]
 BOOK = {"positions": [{"ticker": "SYNB", "qty": 10}], "cash": 10_000.0, "total_value": 10_500.0}
 
 
-def _msg(id: int, *, sender: int = 2, to: str = "pod:1", as_of: str = NOW,
+def _msg(id: int, *, sender: int = 2, to: str = "pod:1", as_of: str = NOW, ts: str = NOW,
          signals: object = None, kind: str = "signal") -> dict:
     return {"id": id, "from_agent": sender, "to": to, "body": "x", "thread_id": None,
-            "ts": NOW, "structured_payload": {
+            "ts": ts, "structured_payload": {
                 "kind": kind, "as_of": as_of,
                 "signals": {"SYNA": "long", "SYNB": "flat"} if signals is None else signals}}
 
@@ -104,6 +105,8 @@ def test_the_pm_trades_on_todays_signal_from_its_analyst_and_cites_it() -> None:
 @pytest.mark.parametrize("inbox", [
     [],
     [_msg(7, as_of="2024-01-09T14:30:00Z")],          # yesterday's
+    [_msg(7, ts="2024-01-09T14:30:00Z")],             # sent yesterday, pre-dated to today
+    [_msg(7, sender=6)],                               # an analyst no longer active
     [_msg(7, sender=4)],                               # a PM of the pod, not an analyst
     [_msg(7, sender=5, to="pod:2")],                   # another pod's analyst
     [_msg(7, sender=5)],                               # another pod's analyst, to pod 1
@@ -113,7 +116,7 @@ def test_the_pm_trades_on_todays_signal_from_its_analyst_and_cites_it() -> None:
     [_msg(7, signals={"SYNA": "all-in"})],
     [_msg(7, signals=["SYNA"])],
     [{**_msg(7), "structured_payload": None}],
-], ids=["none", "stale", "not-analyst", "other-pod", "other-pod-to-us", "elsewhere",
+], ids=["none", "stale", "pre-dated", "inactive-analyst", "not-analyst", "other-pod", "other-pod-to-us", "elsewhere",
         "broadcast", "not-signal", "bad-side", "bad-shape", "no-payload"])
 def test_the_pm_holds_without_a_valid_signal_for_today(inbox) -> None:
     reply = _pm_turn_1(inbox)
