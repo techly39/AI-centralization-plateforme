@@ -1,5 +1,23 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 24: the Runtime now runs the simulated month itself.** Until now, a test
+moved the clock forward day by day. Now the Runtime does it. Each simulated day, it wakes every
+agent once, always in the same order, and then moves the clock forward with its own key.
+
+The attack review found a real problem. If management fired a colleague mid-run, the whole
+backtest stopped. That would let a firm agent freeze the world's clock at a moment of its
+choosing, which is exactly the power cycle 23 took away. Now a fired agent is simply retired: it
+is recorded and not woken again, and the world goes on. Three smaller issues were also fixed:
+- One agent handed in twice got two turns a day.
+- A failure after the clock moved could make the record disagree with the history.
+- The agents' shared instructions could be changed mid-run.
+
+Also new: if the clock key is ever lost, `uv run fund-env rotate-runtime-key` issues a new one.
+
+Nothing needs your action. `setup/` is still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 23: no firm agent controls the clock any more.** In a backtest, simulated
 time moves only when someone pushes it forward. Until now the firm's *management* agent could do
 that. Once management is a real AI, that would give a player in the game control over the game's

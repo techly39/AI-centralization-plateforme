@@ -1,9 +1,33 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 23 (R-3a the world's clock belongs to the Runtime — merged 5397ad2, 2026-10-12)
+**Last cycle:** 24 (R-3b-1 the conductor + B-041 runtime key rotation — merged c3cbfd4, 2026-10-12)
 
 ## What is true now
+- **The Runtime conducts a backtest** (R-3b-1, ADR-032 (j) + its red-team amendment,
+  `tests/test_runtime_lockstep.py`, `tests/test_redteam_0015.py`).
+  `runtime.lockstep.run_backtest(minds, clock, steps=, days_per_step=1, workflow_input=,
+  max_tool_calls=)` → `RunRecord(ended ∈ completed|halted|refused|error, reason, minds, steps,
+  retired)`.
+  - **Before step 0** it checks:
+    - the clock key's `/me` is `runtime`;
+    - `/clock` is `backtest`;
+    - spec ids are unique;
+    - every mind's `/me` matches its spec's role and pod, with an int id that does not repeat
+      (one App agent = one mind);
+    - `steps` and `days` are exact ints in range.
+  - **Each step:** HALT is read, every mind wakes once in spec-id order, HALT is read again, then
+    the runtime key advances the clock.
+  - **A refused wake ends the run**, with no advance. The exception is a mind whose key now gets
+    401: it was deactivated *inside the world*, so it is **retired** (never woken again) and the
+    run goes on. Firing a peer cannot freeze the world's time.
+  - **A failed advance** re-reads `/clock` and records the now that physics reports. If physics
+    cannot say, the reason ends `:clock_unknown`.
+  - The input is deep-copied once. The R-2 month test drives the conductor.
+- **The clock key can be replaced** (B-041, ADR-033 (b)). `fund-env rotate-runtime-key` records
+  `agent_key_rotated` (the id only). The server and every DB-clock operator command refuse a
+  database where a non-physics agent holds a reserved name, or where there is more than one
+  runtime row.
 - **The world's clock has one hand, and it is not a firm agent's** (R-3a, ADR-033 + amendment
   (a), `tests/test_runtime_identity.py`, `tests/test_redteam_0014.py`).
   - Role `runtime` = `READ_HALT`, `READ_CLOCK`, `CONTROL_CLOCK`, nothing else. `management` lost
@@ -90,11 +114,11 @@
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
-  identity. **1178 passed + 6 xfailed** (with the runtime). No model
+  identity + the lockstep conductor. **1261 passed + 6 xfailed** (with the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
-  low), 0012, 0013 (Runtime) and 0014 (clock identity) fixed. 6 strict xfails open (0001: payload
+  low), 0012, 0013 (Runtime), 0014 (clock identity) and 0015 (conductor: 4 holes) fixed. 6 strict xfails open (0001: payload
   size ×2 = B-000g, message content = B-000e; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
   B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038, B-040 (low; physics' halt check is
@@ -113,8 +137,9 @@
 - **The Human (2026-10-11):** accepted P-0001/P-0002/P-0003. Open: Q-0001 (budget), Q-0002
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
-- No Truman, Quant Lab or Observatory yet. The Runtime wakes one scripted mind per call; no
-  scheduler yet (R-3).
+- No Truman, Quant Lab or Observatory yet. The Runtime conducts a lockstep backtest. There is no
+  live scheduler yet (R-3c). Agents are not yet provisioned from specs: the caller hands in keys
+  (R-3b-2).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -122,11 +147,11 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-3b** Lockstep backtest workflow in `runtime/`: per step halt/cap → wake specs in id order
-   via `native.wake` → advance with the runtime key. A scripted PM + Analyst (new script: the
-   Analyst messages a signal, the PM trades on it) live a month, run labelled `minds: scripted`
-   (M1). R-2 carry-overs (provision agents from specs, bind name; count tool-function errors).
-   B-041 (runtime key rotation + startup squat check) first, or as the first commit. If it is
-   too big: provisioning from specs → R-3b, the month → R-3b'.
-2. **R-4** Cassettes + replay (M2): `WakeRecord` transcripts already serialise by construction.
-3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 when cheap. Retrospective at 30.
+1. **R-3b-2** Provision App agents from specs and bind the spec's name. Then the Analyst script
+   (it messages a signal, the PM trades on it), and a PM + Analyst month through `run_backtest`
+   in under 10 min. Then `fund-runtime backtest`, and the label `minds: scripted` in physics'
+   run record (M1). Carry-overs: count tool-function errors, plus audit c24-b NOTE 3–5. If too
+   big: provisioning + CLI first, the Analyst month second.
+2. **R-4** Cassettes + replay (M2). Record the step at which a mind was retired.
+3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 / B-042 when cheap.
+   Retrospective at cycle 30.

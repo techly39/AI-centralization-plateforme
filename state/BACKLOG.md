@@ -39,13 +39,19 @@ keep their ids for history.
         `tests/test_runtime_identity.py`, red-team 0014: 1 low hole, fixed). B-032 + B-000f:
         `runtime` role = READ_HALT/READ_CLOCK/CONTROL_CLOCK; management lost CONTROL_CLOCK;
         `fund-env seed-runtime`; `system` found by role; reserved names.
-  - [ ] **R-3b** **Next.** Lockstep backtest workflow (was B-011 `backtest`) in `runtime/`: per
-        step halt/cap check → wake specs in id order (`native.wake`) → advance with the runtime
-        key. PM + Analyst (scripted; new script: the Analyst messages a signal, the PM trades on
-        it) live a month < 10 min, every act over HTTP; run record says `minds: scripted`. **M1**.
-        Serves EC1, does not tick it (R-8). R-2 carry-overs: provision agents from specs and bind
-        the spec's name; count tool-function errors in the wake record. Before the Runtime holds
-        the key: B-041.
+  - [ ] **R-3b** Split cycle 24 (X-008):
+    - [x] **R-3b-1** **Done cycle 24** (merged c3cbfd4; ADR-032 (j) + red-team 0015 amendment,
+          ADR-033 (b), `tests/test_runtime_lockstep.py`, red-team 0015: 4 holes, all fixed).
+          `runtime.lockstep.run_backtest`, B-041. A mind deactivated in-world is *retired*,
+          not a world stop; one App agent = one mind; a failed advance records physics' now.
+    - [ ] **R-3b-2** **Next.** Provision agents from specs and bind the spec's name to the App
+          agent; the Analyst script (messages a signal, the PM trades on it); the PM + Analyst
+          month through `run_backtest` < 10 min; `fund-runtime backtest` CLI; the run label
+          `minds: scripted` in physics' run record. **M1**. Serves EC1, does not tick it (R-8).
+          Carry-overs: count tool-function errors in the wake record; audit c24-b NOTE 3 (a
+          `no_identity` refusal with a live key still ends the run: untested), NOTE 4 (all minds
+          retired → the clock still advances: say so in the ADR), NOTE 5 (record the step a
+          mind was retired at, for R-4).
   - [ ] **R-3c** `daily_cycle` workflow.
 - [ ] **R-4** Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
       replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded
@@ -113,11 +119,8 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       lose exactness past ~9e7 max-size reports). Decide on a per-agent rate law. With B-013.
 - [x] **B-000f** 'system' identity looked up by role/reserved name — **done cycle 23** (ADR-033;
       the 0001 xfail is a guard).
-- [ ] **B-041** (with R-3b) No way back from a lost or leaked runtime key: no rotation, no operator
-      deactivate, `seed-runtime` refuses while any runtime row exists. Add `fund-env
-      rotate-runtime-key` (new key, old hash replaced, event recorded) before the Runtime holds
-      the key. Also (audit c23 NOTE 7): a pre-ADR-033 DB with a non-system agent named `system`
-      fails only at first use. Add a startup check.
+- [x] **B-041** Runtime key rotation + startup squat check — **done cycle 24** (`fund-env
+      rotate-runtime-key`, `reserved_identity_problems` at server/CLI start, ADR-033 (b)).
 - [ ] **B-042** (low, in-sim, red-team 0014 + re-audit NOTE 3) Directory honesty for firm names:
       uniqueness is on the exact string, so `pm-alpha` + an invisible character passes for a
       colleague, and a name that is only blanks (U+3164…) is accepted. Make uniqueness and

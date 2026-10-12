@@ -279,3 +279,13 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   the universal actions; the audit saw that its cost rows could pass for agent activity. The same
   test applies to every future non-participant (Observatory reader, Truman feed, world-event
   writer): each gets its own minimal role, never "universal + one".
+- **Stop conditions are levers (cycle 24).** Every rule of the form "the run/world stops when
+  X" hands a lever to whoever can cause X. A red-team pass could enumerate each stop reason
+  in the Runtime and physics, and ask for each one which role can trigger it from inside the
+  sim. A participant-triggerable stop must become recorded data, or a stop that the operator
+  alone can cause. This is a generated table, like the route × role matrix.
+- **Retirement as a first-class world event (cycle 24).** Today a retired mind is only a field in
+  the conductor's record. In Era II, firing, hiring and resignation are society events. The
+  Runtime could subscribe to `agent_deactivated` rather than discover it through a 401, and
+  record the step in the cassette (R-4). Then "who fired whom, when" can be replayed and
+  counterfactually forked.

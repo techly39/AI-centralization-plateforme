@@ -914,3 +914,40 @@ of its own loop and still leaves the same ledger twice; HALT before a step, or i
 ends the run `halted` with no further advance; and a refused wake ends the run `refused`, with no
 advance, rather than letting the world move without one of its minds. Expected: ~30 new tests,
 xfails unchanged (6).
+Work: resumed an interrupted session (X-007): the build, claim check and first audit were
+already committed (d31df89…498b0ce). Red-team 0015's fixes were in the working tree, uncommitted,
+and were committed first (X-009).
+- `fund-env rotate-runtime-key` records `agent_key_rotated`. The server and the operator CLI
+  check `reserved_identity_problems` at startup (B-041, ADR-033 (b)).
+- `runtime.lockstep.run_backtest` (ADR-032 (j)). The R-2 month test drives the conductor.
+- The claim check pinned every DB-clock operator command to refuse a squatted DB.
+- First audit: PASS (WARN 1 seed guard re-pinned, NOTE 2 `clock_malformed`).
+- Red-team 0015: **4 holes, all fixed.**
+  - H1 (medium): management fired a peer PM mid-run, the peer's wake was refused and the
+    *whole run* ended, so a firm agent could freeze the world's time. Now a mind whose key gets
+    401 after a refused `no_identity` wake is *retired* and the run goes on.
+  - H2: one App agent's key under two spec ids got two turns a step. Now every `/me` is read
+    before step 0, with `duplicate_agent` / `identity_mismatch` / `mind_unreadable`.
+  - H3: the sweep fails after the advance commits, and the record said "did not move". Now
+    `/clock` is re-read.
+  - H4: the input was copied shallow. It is deep now.
+- Re-audit: PASS. WARN 1 (a failed re-read looked like "stayed") → `:clock_unknown`. WARN 2
+  ("retired = never woken" unpinned) → the H1 test asserts b-pm's wakes per step. NOTE 1–2
+  applied, NOTE 3–5 → R-3b-2.
+- One old test expectation changed: an identity mismatch now refuses before step 0, so it is
+  stricter. The mid-run refusal claim is kept by a new test, with a script that vanishes.
+Result: merged c3cbfd4, pushed. 1178+6xf → **1261 passed + 6 xfailed** (the working tree also has
+the 1 known `setup/` failure). Smoke 12/12. Hypothesis **met, with one rule reversed**. "A
+refused wake ends the run" was right for a mind the run cannot wake, and wrong for a mind the
+*world* removed. Left alone, it handed the clock lever ADR-033 had just taken away back to
+management, through the back door.
+Learned: (1) **Every "the run stops if X" is a lever for whoever can cause X.** ADR-033 took the
+clock from management, and the conductor's own stop rule gave it back. Each stop condition
+needs the question "who in the sim can trigger this?". If the answer is a participant, the
+condition is data, not a stop. (2) **`None` must not mean two things in a record.** "Stayed" and
+"cannot know" both came out as `advanced_to=None`. An honest record keeps them apart. (3) Writing
+the per-step expectation for H1 by hand, I got the id order wrong: management wakes before the PM
+it fires, in the same step. The test caught my model of the conductor, which is the point of
+pinning shapes, not just outcomes.
+Next: R-3b-2. Provision agents from specs (bind the name), the Analyst script, the PM + Analyst
+month through the conductor, `fund-runtime backtest`, and the label in the run record (M1).
