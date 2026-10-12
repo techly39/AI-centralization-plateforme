@@ -169,6 +169,10 @@ because no agent can run (`monthly_llm_usd_cap: null`); that is a reason for ord
 the tier, not for demotion. Gate: every open hole is fixed or accepted by an ADR with its reason
 before any agent wakes (before B-012's first live probe and before B-015). B-000d (non-finite
 floats in event payloads) goes with or before B-016, since both touch `append_event`.
+Amended (cycle 20, ADR-032 (8), Q-0005): "any agent" means any **spending** mind. The gated
+milestones are unchanged: B-012's live probe is now R-7's and B-015 is now R-8. Scripted and
+cassette minds in R-1…R-6 are code, not subjects, and may run while holes are open. If the Human
+answers Q-0005 with A, this reverts to "any mind".
 
 ## ADR-022 — The dependency law, placed and enforced   (builder, cycle 10) — accepted
 Question: 03 §1 states the law for `app`, `runtime`, `ui`, `quant`, `truman` but not for
@@ -662,3 +666,79 @@ Auditor NOTE fixed: `start-backtest` without a key is `Error:` + exit 1. Left as
 format-valid zero-entropy key (`"00"*16`) is accepted (predates this ADR; config cannot judge
 entropy); `volatility=0` is code-only; a malformed configured symbol is a traceback (exits non-zero,
 writes nothing).
+
+## ADR-032 — The Runtime v1: a lockstep conductor of minds, recorded on cassette   (builder, cycle 20) — accepted
+Question: all seven Era I exit criteria need a Runtime (`03_WORLD.md` §3), and none exists after 19
+cycles. What is its shape, in what order is it built, and what may run while
+`firm.monthly_llm_usd_cap` is `null`?
+Answer from the future (the plan; each point lands in the slice named, with its own tests and,
+where it refines this ADR, an amendment):
+(1) **A separate client process.** `runtime/` package, `uv run fund-runtime` entry point. It reaches
+the App only over HTTP with each agent's own API key, reusing `mcp_server.client.FundClient`. The
+dependency law already allows `runtime → mcp_server`, and the transitive physics load must stay
+`app.config` + `app.limits`, which the dynamic probe will measure (R-1). No rule that matters lives
+in the Runtime. It decides *when* a mind wakes and *what it sees*, never what is allowed
+(`02_SCALES.md` §2).
+(2) **One tool surface.** A mind acts only through the MCP tool list `mcp_server.build_server`
+publishes (the same tools an OpenClaw agent gets). The `native` adapter converts that list into an
+LLM tool schema and executes calls through it, so "same tools for every adapter" holds by
+construction (R-2).
+(3) **A mind = provider + adapter + AgentSpec.** `LLMProvider.complete(request) → response`.
+Three providers: `scripted` (a deterministic policy in code, used by tests and the probe pod; no
+network client, $0, no model), `cassette` (replays a recorded exchange by request hash and
+**refuses on a miss**; a miss is a divergence, recorded, never papered over) and later a
+`metered` provider (an OpenRouter key per agent, R-6/M6). Each provider declares
+`spends_money: bool`.
+(4) **The cap gate reads the law literally and fails closed.** Before every wake **and before
+every tool-call batch** (`03_WORLD.md` §3) the Runtime reads `governance/HALT`; before every wake
+it reads `governance/human.yaml` (read-only, fixed paths). Under HALT nothing wakes and no further
+batch runs. Under cap `null` no key is provisioned and only the providers on a closed list in
+code, `{scripted, cassette}`, may wake. Every other provider is refused, including an unknown
+one or one that claims `spends_money = False`; `metered` and the `openclaw` adapter are always
+treated as spending. A `scripted` provider is not a firm agent (Art. 2.1: "every AI inside the
+simulation"). It is a script with an API key, like the cycle-18 probe pod. A `cassette` provider
+replays recorded model output at $0 and calls nothing. Runs are labelled `minds: scripted` or
+`minds: replay` in the run record, so neither can be reported as a live agent run (Q-0005 covers
+both).
+(5) **Lockstep scheduler in backtest mode.** For each step: check halt and cap; wake the agents
+whose wake policy fires, **one at a time in a fixed order** (agent id); each wake ends when the
+mind says done, or hits its tool-call budget or a wall-clock timeout (recorded as such); then the
+Runtime advances the clock. Sequential wakes make the ledger a function of (physics, world,
+cassettes). Parallel wakes are a later, explicit trade (Era II) with their own ADR.
+(6) **The Runtime holds the clock, not a firm agent.** `CONTROL_CLOCK` moves from `management` to a
+reserved `runtime` identity (role or reserved name, never a squattable name, B-000f). The world's
+time is not a participant's lever (Art. 10, B-032) (R-3).
+(7) **Cassettes are the minds' ledger.** Every LLM exchange is stored in the run's directory as
+(wake id, sequence, request hash, request, response, usage), with its hash linked from the events
+the wake produced. Replay = the same scheduler with every provider swapped for `cassette`, into a
+fresh database in the same world → the same ledger event for event (the ADR-030 comparison),
+at $0 (R-4). `experiments/*/runs/` and cassettes are gitignored before the first one is written
+(B-000i).
+(8) **Order of slices** (BACKLOG "Runtime" section): R-1 skeleton + gates → R-2 scripted mind +
+native adapter over the tool surface → R-3 lockstep backtest + runtime clock identity (M1: PM +
+Analyst, scripted, a month, < 10 min) → R-4 cassettes + replay (M2) → R-5 agent-level halt, cap,
+look-ahead tests (M3) → R-6 metering v1 on a fake provisioner + firm-level costs (M4) → R-7
+`openclaw` adapter + static conformance (M5) → R-8 the first real-model month (M6, needs Q-0001).
+Physics holes stay a gate before any **spending** mind wakes (ADR-021): they must be closed or
+accepted before R-8 and before R-7's live probes, not before R-1…R-6.
+Why: (1) **Safer seal and budget**: a Runtime that can only act through the App's published tools
+cannot grow a second physics or a side door; the cap gate is code at every wake. (2) **Honest
+measurement**: lockstep plus cassettes make a run with minds as replayable as the cycle-18 probe,
+and the label keeps scripted months from passing as agent months. (3) **Deterministic over LLM**:
+the scheduler, context assembly and gates are code; only the mind's reply is a model's. (4)
+**More general**: provider, adapter and spec are the three seams the fork instrument
+(`09_BUILDER_VISION.md` §2), model swaps and OpenClaw all need. (5) **Smaller and reversible**:
+every slice is one cycle. Physics changes are limited to what a slice names: R-3 (the clock
+permission move to a `runtime` identity, a TRD role deviation, and the `minds` label in the run
+record), R-4 (if cassette hashes are linked from events), R-5 (B-023 halt events, if taken) and R-6
+(system-reported costs overriding self-reports, firm-level costs, a cost-report rate law). Each of
+these gets its own red-team pass. **Run criteria are ticked only by real minds:** R-3 and R-4
+deliver M1/M2 with scripted minds and do not tick EC1/EC2. Those, and EC7's live half, are ticked
+at R-8. EC3–EC6 are test criteria, and tests with scripted or fake providers may meet them
+(EC4's own text allows "the fake provider in tests"). (6) **Reuse**: `FundClient`, the MCP tool table and the probe's scripted pod.
+Dependency law (R-1): if `runtime` imports `mcp_server`, it transitively loads `app.config` +
+`app.limits`. Giving the runtime layer an app allowlist is a change to the law, recorded as an
+amendment here, with a planted counter-example showing every other `app.*` module is still refused.
+Not decided here: parallel wakes, live-mode wake policies (cron/event), the meter proxy (03 §4.3),
+memory policy, context packages beyond `/me` + charter + workflow input, and the cassette storage
+format (files vs table). Each is decided in its slice.

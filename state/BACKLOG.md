@@ -1,8 +1,51 @@
 # BACKLOG — ordered. Each item serves an exit criterion of the current Era.
 
+## The Runtime — Era I exit (ADR-032; cycle-20 retrospective: this is the frontier)
+One slice per cycle, in order. Each names the exit criterion (EC1–EC7, `05_ERAS.md` Era I, in
+order) and the vision milestone (M1–M6, `09_BUILDER_VISION.md` §3) it serves. Folded-in items
+keep their ids for history.
+- [ ] **R-1** **Next.** Runtime skeleton (was B-009, first half): `runtime/` package +
+      `fund-runtime` script in `pyproject.toml`; `AgentSpec` (pydantic; `03_WORLD.md` §3 fields,
+      file-backed for now); governance reader (fixed paths, read-only): HALT → nothing wakes, cap
+      `null` → fail closed, only the coded list `{scripted, cassette}` wakes, nothing is
+      provisioned (ADR-032 (4), Q-0005); `LLMProvider` protocol. Tests: an unknown provider, and a
+      provider claiming `spends_money=False`, are refused under null. Boundary: extend the
+      dynamic probe to `runtime` (transitive physics load ⊆ `app.config` + `app.limits`); an
+      allowlist for runtime is a law change → ADR-032 amendment + planted counter-example. Serves
+      EC5/EC6 (gates exist).
+- [ ] **R-2** Scripted mind + `native` adapter over the published MCP tool list (`build_server`
+      → LLM tool schema → calls through `FundClient`); per-wake tool-call budget; HALT re-checked
+      before every tool-call batch (03 §3); context =
+      charter + `/me` + workflow input, assembled by code and logged. The probe's `ScriptedPM`
+      becomes the first scripted mind. Serves M1.
+- [ ] **R-3** Lockstep backtest workflow (was B-011 `backtest`) + B-032 (CONTROL_CLOCK → a
+      reserved `runtime` identity, with B-000f; a TRD role deviation, logged as such): per step halt/cap check → wake in agent-id order
+      → advance. PM + Analyst (scripted; the Analyst messages a signal, the PM trades) live a
+      month < 10 min, every act over HTTP; run record says `minds: scripted`. **M1**. It
+      serves EC1 but does not tick it: EC1 is ticked only with real minds (R-8). Also `daily_cycle` workflow if it fits, else R-3b.
+- [ ] **R-4** Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
+      replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded
+      divergence. Reuses the ADR-030 comparison. **M2**. It
+      serves EC2 but does not tick it (R-8). Run label `minds: replay`.
+- [ ] **R-5** Agent-level gates: HALT created mid-run stops within one tick; a scripted mind
+      asking for tomorrow's price is refused through the tool layer; cap `null` refuses a
+      spending provider at wake. **EC3, EC5, EC6 / M3.** (B-023 halt observability if cheap.)
+- [ ] **R-6** Metering v1 on a fake provisioner (was B-013) + B-000k (firm-level costs) +
+      B-000n (cost-report rate law) + B-022 (secret scan, before any key exists): per-agent keys,
+      cost-sync posts system-reported costs; system cost overrides self-report. **EC4 / M4.**
+- [ ] **R-7** `openclaw` adapter + static conformance (was B-012, B-012a, B-012b, B-023s seal
+      keys, B-000l): `firm` profile only, backup first, live probes skipped while cap is null.
+      **EC7 (static half) / M5.** Before it: re-read `08_OPENCLAW.md` §1 (rule zero).
+- [ ] **R-8** The first real-model month + its replay (was B-015). **Needs Q-0001 (cap)** and the
+      physics-hole gate below closed or accepted. **EC1 + EC2 with real minds, EC7 live / M6.**
+- Parked until a Runtime slice needs it: B-037b (re-run driver; R-4 replay may subsume it),
+  B-037c (lived worlds; Era III out-of-sample), B-006 meetings/allocations (Era II), B-007 world
+  events (with R-5 if halt events need it), B-008 Truman v1 pack, B-014 two-pod chat (with R-7).
+
 ## Physics bugs (Art. 8 — Builder's bugs; priority 2, same tier as B-002/B-003 — ADR-021)
 **Gate:** every open hole below is fixed, or accepted by an ADR with its reason, before any
-agent wakes (before B-012's first live conformance probe and before B-015). Order inside the
+**spending** mind wakes (ADR-032 (8): before R-7's live probes and before R-8; scripted minds in
+R-1…R-6 may run with holes open — they are code, not subjects). Order inside the
 tier: B-002 + B-003 first, B-000d with or before B-016 (both touch `append_event`), B-000e with
 B-018, the rest when cheap or blocking.
 Each red-team hole has a strict-xfail test in `tests/test_redteam_000N.py`; fix = remove the marker.
@@ -17,6 +60,9 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       non-finite prices (→ clean `price_unavailable` rejection); settings `allow_inf_nan=False` +
       upper bounds; sweep isolates per-order failures. Red-team 0004 xfail
       `test_hole_non_finite_feed_price_is_a_500`. With B-005/B-008.
+- [ ] **B-039** (gate item, cycle-20 retrospective, IDEAS c16) Information-shape test: every
+      agent-reachable route answers identically in two worlds that agree up to `now` and differ
+      after it (needs a synthetic world with a branch day). Before any spending mind wakes.
 - [ ] **B-026** (low) Fee rounds to cents per order → any order under $5 notional pays $0.00;
       splitting a trade dodges fees; 5e-324-share orders fill. Fix: round fee up (min $0.01/fill)
       and/or a minimum order notional — an honest-measurement law (cost-adjusted ranking). Red-team
@@ -84,7 +130,7 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
 - [x] **B-037a** A run records its world — cycle 19 (ADR-031 + amendment): `run_started.world`
       (synthetic: law, origin, drift, vol, symbols, 128-bit HMAC fingerprint; static: its table);
       `install_run_clock` refuses another world. Red-team 0011: 1 low hole fixed, 8 held.
-- [ ] **B-037b** **Next.** `fund-env backtest` driver: re-run a ledger's world from the
+- [ ] **B-037b** (parked — see Runtime section) `fund-env backtest` driver: re-run a ledger's world from the
       operator's key file (fingerprint must match before anything runs) and diff the two ledgers —
       the probe as an operator tool. Keep red-team 0010/0011 held tests green.
 - [ ] **B-037c** Which agents have lived which worlds (re-running a lived world is not
@@ -110,7 +156,7 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       23:00 local (still after the close: under-conservative by 1 h, not a leak); (d) clip uses
       `as_of.date()` in `as_of`'s tz (UTC today); (e) live quote stamp hides the feed's delay;
       (f) `DailyCloseCache` dates Asian closes by UTC day (mis-dated metric, not a leak — red-team).
-- [ ] **B-032** Clock control belongs to the Runtime, not to a firm agent: before any LLM
+- [ ] **B-032** → R-3. Clock control belongs to the Runtime, not to a firm agent: before any LLM
       management agent wakes, move `CONTROL_CLOCK` from `management` to a Runtime/operator
       identity (ADR-027; Art. 10 — the world's time is not a participant's lever).
 - [ ] **B-033** (low, operator-only) ~~`advance` moves the clock before its commit~~ fixed cycle 17
@@ -142,10 +188,10 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       `_fetch_price` path (SURVEY §4a.3).
 - [ ] **B-000i** `.gitignore`: cassettes + `experiments/*/runs/` before Era I records anything
       (first writer expected: B-010 cassettes; earlier if an experiment run lands first).
-- [ ] **B-009** Runtime skeleton (`runtime/`, `uv run fund-runtime`): AgentSpec, scheduler on
-      the App clock, halt + cap checks, fake LLM provider for tests.
-- [ ] **B-010** Runtime: cassette recording + replay mode.
-- [ ] **B-011** Runtime: `daily_cycle` and `backtest` workflows.
+- [ ] **B-009** → R-1 + R-2. Runtime skeleton (`runtime/`, `uv run fund-runtime`): AgentSpec,
+      scheduler on the App clock, halt + cap checks, fake LLM provider for tests.
+- [ ] **B-010** → R-4. Runtime: cassette recording + replay mode.
+- [ ] **B-011** → R-3. Runtime: `daily_cycle` and `backtest` workflows.
 - [ ] **B-022** Secret-scan test: no tracked file contains an `fk_…` key, an OpenRouter
       `sk-or-…` key or another credential pattern (SURVEY §4b.1). Before any firm agent holds a key
       (i.e. before B-012/B-013). Reuse `survey_probe_openclaw.SECRET_VALUE` + filename check
@@ -153,7 +199,7 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       the filename heuristic flags `keynote.md`-style names (refine before reusing); URL
       redaction misses `user:pass@`; `relative_to(state)` crashes for a workspace outside the
       state dir.
-- [ ] **B-012** `openclaw` adapter to the `08_OPENCLAW.md` standard: render config + workspace
+- [ ] **B-012** → R-7. `openclaw` adapter to the `08_OPENCLAW.md` standard: render config + workspace
       (bootstrap files the installed version supports) from AgentSpec, own agentDir + local auth
       profile + metered key, `fund-env-mcp` per agent key via env, deny-by-default tools, no
       bindings, `firm-` namespace; OCT POC charters → AgentSpec templates.
@@ -162,7 +208,8 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       a literal; check which bootstrap files 2026.5.12 loads (`TOOLS.md`/`HEARTBEAT.md`?).
       Backup step: `openclaw backup` (exists in 2026.5.12) or tar under `umask 077` — the
       cycle-7 tarball came out 644 (Q-0004). Plan `doctor` (conformance check 5): firm profile only.
-- [ ] **B-023** Render every seal key explicitly, never rely on a default (newer OpenClaw
+- [ ] **B-023s** → R-7. *(id collision found cycle 20: two items were both B-023; this one,
+      the seal keys, is B-023s from now on.)* Render every seal key explicitly, never rely on a default (newer OpenClaw
       loosens them): `tools.web.*` off, `tools.sessions.visibility: self`,
       `tools.agentToAgent.enabled: false`, `tools.profile: minimal`, per-agent deny list,
       `subagents.allowAgents: []`. Conformance check reads `openclaw config schema` of the
@@ -172,13 +219,13 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
 - [ ] **B-012b** Conformance suite: `fund-runtime openclaw doctor` static checks + live probes
       (skipped while firm cap is null); integration tests skip when OpenClaw is absent.
 - [ ] **B-000l** MCP API base URL must be loopback (conformance check for Era I).
-- [ ] **B-013** Metering v1: provisioned per-agent keys (fake provider in tests), cost-sync job →
+- [ ] **B-013** → R-6. Metering v1: provisioned per-agent keys (fake provider in tests), cost-sync job →
       system-reported costs; system cost overrides self-report in metrics.
 - [ ] **B-000k** Costs from pod-less agents (management) appear on no leaderboard → firm-level spend.
       Before B-015 (every LLM dollar attributed — Era I exit criterion).
 - [ ] **B-014** Verify "chat restricted to central pod" with a two-pod test. Cycle 7 lead:
       cross-agent `sessions_spawn` needs `subagents.allowAgents` (default same-agent only).
-- [ ] **B-015** Era I milestone run: 1 pod, 1-month backtest < 10 min, replay identical.
+- [ ] **B-015** → R-8. Era I milestone run: 1 pod, 1-month backtest < 10 min, replay identical.
       Needs a firm cap → ask in QUESTIONS when reached.
 
 ## Residue of Era ½ (closed cycle 9, ADR-021)
@@ -193,14 +240,17 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
   S-007 (c9: SURVEY §10, exit criteria ticked, this reorder). Details: JOURNAL + git.
 
 ## Era ∞ (≤ 1 cycle in 5 during the Launch Pad)
-- [ ] **X-006** (retrospective c10) Counter-example check before the auditor: in `cycle.md`
-      step 5, list every "covers / finds / never / all / 0 found" claim in the diff and plant a
-      counter-example for each. 5/10 cycles needed a BLOCK for an overstated claim; metric =
-      auditor BLOCK rate over cycles 11–20 (baseline 50%). Cycle 11: done by hand, still
-      BLOCKed (1/1). Add a second question: "what in this diff can an unprotected file or env var
-      change?" (the configurable halt path), and "is every check inside the lock it protects?"
-- [ ] **X-004** Run `scripts/smoke_run.py` in the cycle's verify gate (step 5) — needs a
-      `.claude/commands/cycle.md` edit; cheap (~5 s) and catches "tests green, app won't start".
+- [x] **X-006** (retrospective c10) Counter-example check before the auditor. Measured at the
+      cycle-20 retrospective: BLOCK rate cycles 11–19 = 2/9 (c11, c12) vs 5/10 in cycles 1–10.
+      Written into `protocol/CYCLE.md` step 5 (cycle 20) with its three questions (claims, what an
+      unprotected file/env var can change, checks inside their lock) + "new laws audit old tests".
+      Keep the metric: BLOCK rate over cycles 21–30; revert if it rises above 50% (06 §8).
+- [x] **X-004** Run `scripts/smoke_run.py` in the verify gate — written into `protocol/CYCLE.md`
+      step 5 (cycle 20; P-0003 made the protocol Builder-owned). Metric: smoke failures caught
+      that the suite missed, cycles 21–30 (expected 0 — it is a tripwire).
+- [ ] **X-008** (retrospective c20) Size check at step 2: cycles 11–19 averaged ~45 min and 3 of 9
+      were interrupted (13, 16, 18 resumed via X-007). If a slice needs code + red-team + ADR, plan
+      the red-team fix budget up front or split before building. Metric: interrupted cycles 21–30.
 - [ ] **X-005** Capability probe for the Builder's own permissions (IDEAS cycle 6) — plan units
       against the headless allow list instead of hitting it.
 - [ ] **X-001** `state/METRICS.md` summariser script (success rate, turns, durations).
