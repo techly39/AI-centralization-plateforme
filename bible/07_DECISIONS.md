@@ -910,6 +910,35 @@ unchanged. Not yet (R-3b-2): provisioning agents from specs (binding the spec's 
 Analyst script and the PM + Analyst month, the `fund-runtime backtest` command, and the label in
 the run record. The record is returned, not stored (R-4).
 
+Amended (cycle 25, R-3b-2a shipped: `runtime/scripted.py`, `tests/test_runtime_pod.py`):
+(k) **A list stays a list on the tool surface.** MCP renders a list returned by a tool as one
+text block per item, so a list of one reached a mind as the bare object and an empty list as no
+content at all (probed). A PM reading an inbox of one message could not tell it from a message.
+Every MCP tool now answers a list as **one JSON array block** (`mcp_server.tools`' shared `call`).
+That is the surface every adapter shares, OpenClaw's included (R-7), so the fix is there, not in
+the native adapter. No existing test pinned the old shape.
+(l) **A pod of two scripted minds.** `ma-signal-analyst` reads the clock and the bars and sends
+its pod `{"kind": "signal", "as_of": <now>, "signals": {ticker: long|flat}}`. `signal-pm` reads
+the newest 50 messages it can see and trades only on the newest that is addressed to its pod,
+comes from an *active* analyst *of its pod by the directory* (not by anything the message
+claims), was stamped by physics (`ts`) with the clock's now, and whose payload's `as_of` says the
+same. A malformed signal, a stale or pre-dated one, another pod's, one pushed out of the 50 by
+later messages, or none means the PM holds (audit c25 NOTEs 1–3: in-sim data, worded exactly). Spec-id order (`a-…` analyst,
+`b-…` PM) is how the signal reaches the PM within the same step. In a 31-day month, a second pod
+whose PM has no analyst never trades, and every order of pod 1 cites a message its analyst sent
+that same simulated day. The same world twice leaves the same ledger and transcripts.
+(m) **Carry-overs from the c24 audit.** `WakeRecord.tool_failures` counts calls whose tool
+function raised something other than a `ToolError` (physics refusing, App unreachable) or a
+`ValidationError` (the mind's bad arguments): a bug under the tool, which the mind sees as an
+ordinary tool error. (A `ValidationError` raised by a bug *inside* a tool body would be taken for
+bad arguments; no tool body builds a pydantic model today — audit c25 NOTE 4.)
+`RunRecord.retired_at` records the step each retired mind left at (NOTE 5). If every
+mind is retired, the world still lives its remaining steps with no one awake: the clock is the
+Runtime's, not the minds' (NOTE 4). A `no_identity` refusal while the key still answers ends the
+run like any other refusal (NOTE 3, now pinned).
+Still R-3b-2b: provisioning agents from specs (the name bound), `fund-runtime backtest`, and the
+run label in physics' run record.
+
 ## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
 Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
 agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's

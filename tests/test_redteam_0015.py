@@ -112,6 +112,7 @@ def test_redteam_lockstep_a_firm_agent_cannot_stop_the_worlds_clock(
     # a-mgmt wakes first (id order) and fires b-pm in step 1, so b-pm is refused in
     # that same step, retired there, and absent from every later step.
     assert run.retired == ("b-pm",)
+    assert run.retired_at == (1,)  # audit c24-b NOTE 5: the step it left the world
     b_wakes = [[w.ended for w in st.wakes if w.spec_id == "b-pm"] for st in run.steps]
     assert b_wakes == [["done"], ["refused"], [], [], []], b_wakes
 

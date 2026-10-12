@@ -96,29 +96,162 @@ def moving_average_pm(request: CompletionRequest) -> CompletionResponse:
         if failed:
             return CompletionResponse(content=f"A read failed ({', '.join(failed)}); not trading.")
         book = results["book"]
-        held = {p["ticker"]: p["qty"] for p in book["positions"]}
-        cash = book["cash"]
-        sleeve = book["total_value"] / len(universe)
-        orders: list[ToolCall] = []
+        views: dict[str, tuple[str, str]] = {}
         for ticker in universe:
-            closes = [b["close"] for b in results[f"bars:{ticker}"]["bars"]]
-            if len(closes) < 20:
-                continue
-            fast, slow = sum(closes[-5:]) / 5, sum(closes[-20:]) / 20
-            price = results[f"price:{ticker}"]["price"]
-            if fast > slow and not held.get(ticker):
-                qty = math.floor(min(sleeve, cash) * 0.99 / price)
-                if qty:
-                    cash -= qty * price
-                    orders.append(_order(ticker, "buy", qty, f"5d avg {fast:.2f} > 20d avg {slow:.2f}"))
-            elif fast < slow and held.get(ticker):
-                orders.append(_order(ticker, "sell", held[ticker],
-                                     f"5d avg {fast:.2f} < 20d avg {slow:.2f}"))
+            view = _crossing([b["close"] for b in results[f"bars:{ticker}"]["bars"]])
+            if view is not None:
+                views[ticker] = view
+        orders = _rebalance(universe, views, results, book)
         if not orders:
             return CompletionResponse(content="No crossing today; holding.")
         return CompletionResponse(content=f"Placing {len(orders)} order(s).", tool_calls=orders)
 
     return CompletionResponse(content="Done for today.")
+
+
+def ma_signal_analyst(request: CompletionRequest) -> CompletionResponse:
+    """An analyst: the same 5-day vs 20-day crossing, sent to its pod as a dated signal.
+
+    Turn 0 reads the clock and the bars of every name in the input's ``universe``.
+    Turn 1 sends one message to ``pod:<own pod>`` whose structured payload is
+    ``{"kind": "signal", "as_of": <the clock's now>, "signals": {ticker: "long" |
+    "flat"}}`` — a name with under 20 bars, or no crossing, is left out. Turn 2 is
+    done. Any failed read ends the wake without a signal: no signal is not "flat".
+    """
+    context = _context(request)
+    pod_id = context["me"]["pod_id"]
+    universe = context["input"].get("universe")
+    if type(universe) is not list or not universe or pod_id is None:
+        return CompletionResponse(content="No pod or no universe in my input; nothing to do.")
+    turn = _turn(request)
+
+    if turn == 0:
+        calls = [ToolCall(id="clock", name="get_clock")]
+        calls += [ToolCall(id=f"bars:{t}", name="get_ohlcv", arguments={"ticker": t, "interval": "1d"})
+                  for t in universe]
+        return CompletionResponse(content="Reading the clock and the bars.", tool_calls=calls)
+
+    if turn == 1:
+        results = _results(request)
+        failed = sorted(k for k, v in results.items() if v is None)
+        if failed:
+            return CompletionResponse(content=f"A read failed ({', '.join(failed)}); no signal today.")
+        signals: dict[str, str] = {}
+        reasons: list[str] = []
+        for ticker in universe:
+            view = _crossing([b["close"] for b in results[f"bars:{ticker}"]["bars"]])
+            if view is not None:
+                signals[ticker], why = view
+                reasons.append(f"{ticker} {signals[ticker]} ({why})")
+        payload = {"kind": "signal", "as_of": results["clock"]["now"], "signals": signals}
+        body = "Signal: " + ("; ".join(reasons) if reasons else "no crossing in any name")
+        return CompletionResponse(content="Sending today's signal to my pod.", tool_calls=[
+            ToolCall(id="signal", name="send_message", arguments={
+                "to": f"pod:{pod_id}", "body": body, "structured_payload": payload})])
+
+    return CompletionResponse(content="Done for today.")
+
+
+def signal_pm(request: CompletionRequest) -> CompletionResponse:
+    """A PM that trades only on its own analyst's signal for today.
+
+    Turn 0 reads the clock, the book, the directory, the newest 50 messages it
+    can see and the price of every name in the input's ``universe``. Turn 1 takes
+    the newest of those that is addressed to its pod, comes from an active analyst
+    of its pod (by the directory, not by what the message says), was stamped by
+    physics with the clock's now (``ts``), and carries a ``signal`` payload whose
+    ``as_of`` says the same. A signal pushed out of the 50 by later messages is
+    not seen. With no such message it holds. Otherwise
+    it buys a sleeve of each ``long`` name it does not hold and sells each ``flat``
+    name it holds, citing the message id. Turn 2 is done. Any failed read ends the
+    wake without trading.
+    """
+    context = _context(request)
+    pod_id = context["me"]["pod_id"]
+    universe = context["input"].get("universe")
+    if type(universe) is not list or not universe or pod_id is None:
+        return CompletionResponse(content="No pod or no universe in my input; nothing to do.")
+    turn = _turn(request)
+
+    if turn == 0:
+        calls = [ToolCall(id="clock", name="get_clock"),
+                 ToolCall(id="book", name="get_portfolio", arguments={"pod_id": pod_id}),
+                 ToolCall(id="directory", name="list_agents"),
+                 ToolCall(id="inbox", name="get_messages", arguments={"latest": True, "limit": 50})]
+        calls += [ToolCall(id=f"price:{t}", name="get_price", arguments={"ticker": t})
+                  for t in universe]
+        return CompletionResponse(content="Reading the book, the inbox and the market.",
+                                  tool_calls=calls)
+
+    if turn == 1:
+        results = _results(request)
+        failed = sorted(k for k, v in results.items() if v is None)
+        if failed:
+            return CompletionResponse(content=f"A read failed ({', '.join(failed)}); not trading.")
+        now = results["clock"]["now"]
+        analysts = {a["id"] for a in results["directory"]
+                    if a["role"] == "analyst" and a["pod_id"] == pod_id and a["status"] == "active"}
+        today = [m for m in results["inbox"]
+                 if m["from_agent"] in analysts and m["to"] == f"pod:{pod_id}"
+                 and m["ts"] == now and _is_signal(m["structured_payload"], now)]
+        if not today:
+            return CompletionResponse(content="No signal from my analyst for today; holding.")
+        signal = max(today, key=lambda m: m["id"])
+        views = {t: (side, f"analyst signal #{signal['id']}: {side}")
+                 for t, side in signal["structured_payload"]["signals"].items()}
+        orders = _rebalance(universe, views, results, results["book"])
+        if not orders:
+            return CompletionResponse(content=f"Signal #{signal['id']} asks for no trade; holding.")
+        return CompletionResponse(content=f"Placing {len(orders)} order(s) on signal #{signal['id']}.",
+                                  tool_calls=orders)
+
+    return CompletionResponse(content="Done for today.")
+
+
+def _crossing(closes: list[float]) -> tuple[str, str] | None:
+    """``("long" | "flat", why)`` from the 5-day vs 20-day averages; ``None`` with
+    under 20 closes or no crossing."""
+    if len(closes) < 20:
+        return None
+    fast, slow = sum(closes[-5:]) / 5, sum(closes[-20:]) / 20
+    if fast > slow:
+        return "long", f"5d avg {fast:.2f} > 20d avg {slow:.2f}"
+    if fast < slow:
+        return "flat", f"5d avg {fast:.2f} < 20d avg {slow:.2f}"
+    return None
+
+
+def _is_signal(payload: object, now: str) -> bool:
+    """A ``signal`` payload stamped ``now`` whose every view is ``long`` or ``flat``."""
+    if not isinstance(payload, dict) or payload.get("kind") != "signal" or payload.get("as_of") != now:
+        return False
+    signals = payload.get("signals")
+    return isinstance(signals, dict) and all(
+        type(t) is str and v in {"long", "flat"} for t, v in signals.items())
+
+
+def _rebalance(universe: list, views: Mapping[str, tuple[str, str]], results: Mapping[str, object],
+               book: dict) -> list[ToolCall]:
+    """Orders for ``views`` (ticker → (long | flat, why)), one sleeve per name of the
+    universe, keeping a running cash figure so a buy never spends cash an earlier
+    buy used. A name outside the universe is never traded."""
+    held = {p["ticker"]: p["qty"] for p in book["positions"]}
+    cash = book["cash"]
+    sleeve = book["total_value"] / len(universe)
+    orders: list[ToolCall] = []
+    for ticker in universe:
+        if ticker not in views:
+            continue
+        side, why = views[ticker]
+        price = results[f"price:{ticker}"]["price"]
+        if side == "long" and not held.get(ticker):
+            qty = math.floor(min(sleeve, cash) * 0.99 / price)
+            if qty:
+                cash -= qty * price
+                orders.append(_order(ticker, "buy", qty, why))
+        elif side == "flat" and held.get(ticker):
+            orders.append(_order(ticker, "sell", held[ticker], why))
+    return orders
 
 
 def _order(ticker: str, side: str, qty: float, why: str) -> ToolCall:
@@ -131,4 +264,6 @@ def _order(ticker: str, side: str, qty: float, why: str) -> ToolCall:
 #: The closed table: script name → policy. A spec names one of these keys.
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
+    "ma-signal-analyst": ma_signal_analyst,
+    "signal-pm": signal_pm,
 })
