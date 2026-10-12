@@ -1291,3 +1291,44 @@ patch code to make it pass.
   exit criteria and, for each one, whether existing code might already meet it**. Hypothesis:
   this stops tick-blindness. Metric: exit criteria ticked per 10 cycles (c1–30: 0; target ≥ 4 by
   c40).
+
+Work:
+- **Tests.** 8 end-to-end tests in `tests/test_runtime_lockstep.py`, section "Era I exit
+  criteria". Every act is made by a conducted scripted mind through the MCP tools, over HTTP:
+  - EC3 ×3: tomorrow's window gives a 400 `no look-ahead`; a window across now is clipped to
+    ended bars; `advance_clock` gives a 403 and every advance is the runtime's.
+  - EC5 ×2: HALT as a call returns means no further call, no later wake, no advance and no new
+    event (max event id unchanged).
+  - EC6 ×3: a spending mind is never built under a null cap or under a numeric cap; zero-cost
+    minds still wake (the control).
+- **No production change.** ADR-036 says what each criterion means when tested. In
+  `05_ERAS.md`, EC3, EC5 and EC6 are ticked with their tests. EC6 is conditional on Q-0005 B.
+  New B-053. The R-4a seed is in the backlog. X-011 is in `protocol/CYCLE.md` step 2.
+- **Deviations from the plan:**
+  - EC6 spies on `native.build_provider`, not `PROVIDER_CLASSES`: `build_provider` never
+    reaches that table for a non-zero-cost name, so a spy there would be vacuous.
+  - EC5's second test became "HALT on the last call of a step".
+- **My first EC5 assertion was wrong:** I assumed `tool_calls` was cumulative, but it counts per
+  wake. I fixed the assertion; this was not a finding.
+- **Claim check:** I planted a mutation (no per-call HALT read) and EC5 went red; then I reverted
+  it.
+- **Auditor: PASS, 0 BLOCK, 6 NOTEs.**
+  - NOTEs 1–3 and 5 fixed: an explicit step count in the zip, the HALT timing named, the module
+    claims, X-011 written into the protocol.
+  - NOTE 4: EC6's dependence on Q-0005 is kept visible in STATE.
+  - NOTE 6 agreed with the scope.
+- No re-audit (no BLOCK). No red-team: no physics or gate code changed.
+Result: merged 6e04725 and pushed. **1452 passed + 6 xfailed** (+9). Smoke 21/21. Hypothesis
+**met**: every gate held, and no finding was needed. **Era I exit criteria: 0/7 → 3/7.**
+Learned:
+(1) **A gate built is not a criterion ticked.** The three gates held the first time they were
+driven as a run drives them. The work had been done for 8–14 cycles; what was missing was the
+question "is this criterion already met?". Hence X-011.
+(2) **A spy must sit where the code actually goes.** The architect's spy on `PROVIDER_CLASSES`
+would have passed while proving nothing, because `build_provider` never reads it for a spending
+name. Check the path before you trust a spy.
+(3) **"Refuses to wake agents" hides a question for the Human.** Read literally, EC6 is false
+today (scripted minds wake under null). The tick is honest only because Q-0005 B is written
+down and the box says what would re-open it.
+Next: R-4a (cassette writer, gitignore B-000i, B-047 redaction; seed in the backlog), then B-053
+(pre-gate before provisioning, with red-team).

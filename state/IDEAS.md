@@ -331,3 +331,16 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   walker over every route × every role asserts that no `world`/`experiment` value, planted
   with a unique marker, ever appears in a firm agent's answer. It would also price Truman:
   what each mind may know becomes a table, not a hunt.
+- **An exit-criteria ledger (cycle 30).** Each Era's exit criteria become data
+  (`state/criteria.yaml`): id, wording, kind (run | test), the test node ids that prove it, and
+  its conditions (e.g. EC6 ⇐ Q-0005 = B). A test walks it:
+  - every ticked box names tests that exist and pass;
+  - every condition still holds, so a Human answer of A turns EC6's box red in CI, not in
+    memory;
+  - every unticked box lists the slice that will tick it.
+
+  This is the X-011 metric, mechanised.
+- **Cost per tick (cycle 30).** Now that S1 has dollar caps, log $ per cycle against criteria
+  ticked and holes found (METRICS gets a `usd` column from `cycles.log`). Question: which unit
+  shapes buy the most truth per dollar? Cycle 30 bought 3 criteria for about $4. Red-team cycles
+  buy holes at about $6–8.

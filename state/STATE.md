@@ -1,9 +1,25 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 29 (B-049 the market's law is withheld from agents — merged d908dbe, 2026-10-12)
+**Last cycle:** 30 (retrospective + R-5a: EC3/EC5/EC6 proven end to end and ticked — merged
+6e04725, 2026-10-12)
 
 ## What is true now
+- **Era I exit criteria: 3 of 7 ticked** (cycle 30, ADR-036, `tests/test_runtime_lockstep.py`
+  section "Era I exit criteria"). The gates are driven as a run drives them: a conducted mind,
+  the MCP tools, HTTP, physics.
+  - **EC3:** tomorrow's window gives 400; a window across now is clipped; `advance_clock` gives
+    403.
+  - **EC5:** HALT as a tool call returns means no further call, wake, advance or event.
+  - **EC6:** a spending mind is never built under a null cap or a numeric cap.
+  - **EC6 holds only under Q-0005 answer B** (spending minds). If the Human answers A, the box
+    re-opens.
+  - Open: EC1, EC2 (real minds, R-8), EC4 (R-6), EC7 (R-7/R-8).
+  - New B-053: `fund-runtime backtest` provisions and declares before any wake gate refuses.
+- **Retrospective c21–30** (journal): direction right, pace slow. R-3 took 7 slices. Drift
+  named: tick-blindness. Auditor BLOCK rate is 4/9. Operator-surface hardening has hit
+  diminishing returns; the frontier is M2. Process change X-011 is in step 2 of
+  `protocol/CYCLE.md`.
 - **No agent reads the operator's facts about the experiment** (B-049, ADR-034,
   `tests/test_world_withheld.py`). `app.ledger.events.AGENT_WITHHELD_FIELDS` names
   `run_started.world` and `run_minds_declared.minds`; `EventOut` (the only response shape with a
@@ -196,10 +212,10 @@
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
   identity + the lockstep conductor + the run's minds label + the withheld world record.
-  **1443 passed + 6 xfailed** (with
+  **1452 passed + 6 xfailed** (with
   the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
-  B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
+  B-005); exit criteria 3 of 7 (EC3/5/6, cycle 30; the 1-month criterion needs real minds, R-8).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
   low), 0012, 0013 (Runtime), 0014 (clock identity), 0015 (conductor: 4 holes), 0016 (provisioning: 4 low) and 0017 (minds label: 4) fixed. 6 strict xfails open (0001: payload
   size ×2 = B-000g, message content = B-000e; 0004: fee = B-026; 0009:
@@ -212,11 +228,10 @@
   process.
 - **The Builder's process now lives in `protocol/`** (P-0003, Human intervention 2026-10-11,
   committed 6449135): `protocol/CYCLE.md` is the full cycle protocol (X-007 resume rule at step 0),
-  `protocol/agents/*-extra.md` extend auditor/red-team; `.claude/` is sealed. **`setup/`** (the
-  Human's one-shot installer: copies protected files, then deletes itself) is untracked and
-  untouched — never run or delete it. Until the Human runs it,
-  `test_every_python_directory_is_placed_in_the_law` fails in the working tree (only `setup/`);
-  step 0 must treat `?? setup/` as the Human's, not as junk.
+  `protocol/agents/*-extra.md` extend auditor/red-team; `.claude/` is sealed. The Human's
+  `setup/` installer has run and is gone (seen cycle 30): the suite is fully green in the
+  working tree. The Builder is a team (ADR-035): the architect plans at Gate 2 (first used
+  cycle 30), and the auditor and red-team are on the Human's models. Each cycle has an $8 cap.
 - **The Human (2026-10-11):** accepted P-0001/P-0002/P-0003. Open: Q-0001 (budget), Q-0002
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
@@ -231,11 +246,12 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **Cycle 30 is a retrospective** (re-read the Constitution and Genesis, `06_LOOP.md` §6),
-   alongside its unit of work.
-2. **R-4** Cassettes + replay (M2). Probably split (X-008): R-4a writes the RunRecord + every
-   exchange to a cassette (gitignore first, B-000i), redacting minted keys (B-047). R-4b
-   replays into a fresh DB in the same world: the same ledger, declared `cassette`, and a miss
-   or a redacted key is a recorded divergence. `retired_at`, `tool_failures` and `charter_ref`
-   go into the cassette. B-048 when cheap.
-3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`.
+1. **R-4a**: the RunRecord and every exchange go to a cassette.
+   - Gitignore first (B-000i).
+   - Redact minted keys (B-047).
+   - Hash each request before `complete`.
+   - The seed design is in the backlog under R-4.
+2. **R-4b**: replay into a fresh DB in the same world. It must produce the same ledger and be
+   declared `cassette`; a miss or a redacted key is a recorded divergence (M2).
+3. **B-053**: a pre-gate before provisioning in `fund-runtime backtest` (red-team). Then R-3c
+   `daily_cycle`. B-048 when cheap.

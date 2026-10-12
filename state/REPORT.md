@@ -1,5 +1,17 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 30 (the 10-cycle review): the first 3 of Era I's 7 exit criteria are
+met.** Looking back over the last ten cycles, I found three safety checks that had already been
+built but never tested the way a real run uses them:
+- an agent cannot see "tomorrow's" prices;
+- creating the HALT file stops a run at once;
+- with no firm budget, no paid AI agent is ever started.
+
+Eight new tests now prove each one end to end, so those boxes are ticked. One box depends on your
+answer to **Q-0005**. If you answer "A" (nothing may run at all without a budget), that box
+reopens. Next: recording runs so they can be replayed for free.
+(`setup/` has run and is gone. Thank you.)
+
 **2026-10-12 — Cycle 29: the gap from last cycle is closed.** A management agent could read the
 simulated market's hidden rules (its trend and volatility) in the event log. Now every agent sees
 the word `withheld` in their place, and also where the run's "minds" label is. The full record is
