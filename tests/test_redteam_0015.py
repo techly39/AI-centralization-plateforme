@@ -108,6 +108,12 @@ def test_redteam_lockstep_a_firm_agent_cannot_stop_the_worlds_clock(
     # Today: ("refused", "wake_refused:b-pm:no_identity") after one advance.
     assert run.ended != "refused", run.reason
     assert len(_advances(SessionFactory)) == 5
+    # Audit c24-b WARN 2: retired means never woken again.
+    # a-mgmt wakes first (id order) and fires b-pm in step 1, so b-pm is refused in
+    # that same step, retired there, and absent from every later step.
+    assert run.retired == ("b-pm",)
+    b_wakes = [[w.ended for w in st.wakes if w.spec_id == "b-pm"] for st in run.steps]
+    assert b_wakes == [["done"], ["refused"], [], [], []], b_wakes
 
 
 # --- H2: one App agent, two specs, two turns a step --------------------------------------
@@ -121,7 +127,7 @@ def test_redteam_lockstep_one_agent_wakes_once_per_step(SessionFactory, world, w
     handed = [(_spec("a-pm", 1, "read-a"), pm1), (_spec("z-pm", 1, "read-b"), pm1)]
     run = conduct(SessionFactory, handed, world["clock"], steps=2)
     # Today: completed, woke == ['a', 'b', 'a', 'b'] — pm-1 had two turns a step.
-    assert run.ended == "refused"
+    assert (run.ended, run.reason) == ("refused", "duplicate_agent:z-pm")  # audit NOTE 2
     assert woke == []
 
 

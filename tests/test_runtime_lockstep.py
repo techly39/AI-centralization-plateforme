@@ -36,6 +36,7 @@ from app.registry.pods import create_pod
 from app.registry.service import register_agent, seed_runtime_agent
 from app.run_clock import start_backtest
 from mcp_server import FundClient
+from mcp_server.client import FundAPIError
 from runtime import governance, lockstep, scripted
 from runtime.lockstep import Mind, run_backtest
 from runtime.providers import CompletionResponse, ToolCall
@@ -367,6 +368,47 @@ def test_a_clock_answer_without_now_ends_the_run_in_error(bad_on):
     run = asyncio.run(run_backtest([], _OddClock(bad_on), steps=2))  # type: ignore[arg-type]
     assert (run.ended, run.reason) == ("error", "clock_malformed")
     assert len(run.steps) == (1 if bad_on == "advance" else 0)
+
+
+class _FailingAdvance:
+    """An advance that fails (500), then a ``/clock`` re-read that says one of: the
+    clock moved, it stayed, physics cannot be asked, or the answer has no ``now``
+    (red-team 0015 H3, audit c24-b WARN 1)."""
+
+    def __init__(self, after: str) -> None:
+        self.after, self.advanced = after, False
+
+    async def get(self, path: str):
+        if path == "/me":
+            return {"role": "runtime"}
+        if not self.advanced:
+            return {"mode": "backtest", "now": "2024-01-02T15:00:00Z"}
+        if self.after == "unreadable":
+            raise FundAPIError(503, "physics unreachable", path=path)
+        if self.after == "malformed":
+            return {"mode": "backtest"}
+        moved = self.after == "moved"
+        return {"mode": "backtest",
+                "now": "2024-01-03T15:00:00Z" if moved else "2024-01-02T15:00:00Z"}
+
+    async def post(self, path: str, body: dict):
+        self.advanced = True
+        raise FundAPIError(500, "the sweep broke", path=path)
+
+
+@pytest.mark.parametrize(("after", "reason", "advanced_to"), [
+    ("moved", "advance_failed:500", "2024-01-03T15:00:00Z"),
+    ("stayed", "advance_failed:500", None),
+    ("unreadable", "advance_failed:500:clock_unknown", None),
+    ("malformed", "advance_failed:500:clock_unknown", None),
+])
+def test_a_failed_advance_records_what_physics_says_or_that_it_cannot(after, reason,
+                                                                      advanced_to):
+    """``advanced_to=None`` alone would mean both "stayed" and "nobody knows"; the
+    reason tells them apart."""
+    run = asyncio.run(run_backtest([], _FailingAdvance(after), steps=3))  # type: ignore[arg-type]
+    assert (run.ended, run.reason) == ("error", reason)
+    assert len(run.steps) == 1 and run.steps[0].advanced_to == advanced_to
 
 
 @pytest.mark.parametrize("kwargs", [

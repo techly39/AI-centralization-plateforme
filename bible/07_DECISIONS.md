@@ -900,7 +900,9 @@ Red-team 0015 (`tests/test_redteam_0015.py`) amended (j) the same cycle:
   (`duplicate_agent:<id>`), and an unreadable key refuses the run (`mind_unreadable:<id>:<status>`).
 - **A failed advance records what physics says** (H3). Physics commits `clock_advanced` before
   the sweep, so the clock may have moved. `/clock` is read again, and the step's `advanced_to` is
-  the new now if it moved.
+  the new now if it moved. If physics cannot be asked, or its answer has no `now`, the reason is
+  `advance_failed:<status>:clock_unknown`. Without that suffix, "stayed" and "nobody knows" would
+  look the same (audit WARN 1).
 - **The input is deep-copied once** (H4).
 
 The R-2 month test now drives `run_backtest` instead of its own loop; its assertions are

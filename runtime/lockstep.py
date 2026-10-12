@@ -127,7 +127,9 @@ async def run_backtest(
         if not isinstance(who, dict) or (who.get("role"), who.get("pod_id")) != (
                 mind.spec.role, mind.spec.pod):
             return RunRecord("refused", f"identity_mismatch:{mind.spec.id}", label)
-        if who.get("id") in agents or type(who.get("id")) is not int:
+        if type(who.get("id")) is not int:
+            return RunRecord("refused", f"identity_mismatch:{mind.spec.id}", label)
+        if who["id"] in agents:
             return RunRecord("refused", f"duplicate_agent:{mind.spec.id}", label)
         agents.add(who["id"])
 
@@ -176,9 +178,12 @@ async def run_backtest(
         except FundAPIError as exc:
             # Red-team 0015 H3: physics may have committed the advance and failed
             # after it (the sweep, the connection). Ask physics where the clock is,
-            # so the record says what the ledger says.
-            done.append(StepRecord(step, at, tuple(wakes), await _moved_from(clock, at)))
-            return end("error", f"advance_failed:{exc.status_code}")
+            # so the record says what the ledger says; if physics cannot say either,
+            # the reason says the record does not know (audit c24 WARN 1).
+            known, now = await _moved_from(clock, at)
+            done.append(StepRecord(step, at, tuple(wakes), now))
+            return end("error", f"advance_failed:{exc.status_code}"
+                       + ("" if known else ":clock_unknown"))
         done.append(StepRecord(step, at, tuple(wakes), _now_of(moved)))
         if done[-1].advanced_to is None:  # it moved, but the record cannot say where
             return end("error", "clock_malformed")
@@ -194,15 +199,17 @@ async def _key_dead(client: FundClient) -> bool:
     return False
 
 
-async def _moved_from(clock: FundClient, at: str) -> str | None:
-    """Where the clock is after a failed advance, if it moved off ``at``; else ``None``.
-    If physics cannot be asked either, ``None``: the record cannot know (the reason
-    still names the failure)."""
+async def _moved_from(clock: FundClient, at: str) -> tuple[bool, str | None]:
+    """``(known, now)`` after a failed advance: ``now`` is where the clock is if it
+    moved off ``at``, else ``None``. ``known`` is false if physics could not be
+    asked, or answered without a ``now``: then ``None`` means "cannot say"."""
     try:
         now = _now_of(await clock.get("/clock"))
     except FundAPIError:
-        return None
-    return now if now is not None and now != at else None
+        return False, None
+    if now is None:
+        return False, None
+    return True, (now if now != at else None)
 
 
 def _now_of(answer: Any) -> str | None:
