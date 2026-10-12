@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 import re
-import secrets
 import signal
 import socket
 import sqlite3
@@ -38,6 +38,8 @@ from mcp.client.stdio import stdio_client
 REPO = Path(__file__).resolve().parent.parent
 # Read-only tools a management agent may call on an empty firm.
 READ_TOOLS = ["get_health", "get_clock", "list_agents", "get_leaderboard", "list_events"]
+#: The backtest phase's market: always the same world, so a pass never rests on luck.
+SMOKE_WORLD_KEY = hashlib.sha256(b"fund-smoke-world/1").hexdigest()
 
 
 def step(name: str, ok: bool, detail: str = "") -> bool:
@@ -166,7 +168,10 @@ def backtest_check() -> bool:
         env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
         env["FUND_DATABASE_URL"] = f"sqlite:///{tmpdir / 'backtest.db'}"
         env["FUND_MARKETDATA__PROVIDER"] = "synthetic"
-        env["FUND_MARKETDATA__SYNTHETIC_KEY"] = secrets.token_hex(32)
+        # One fixed world (cycle 28): a fresh random key drew, now and then, five days in
+        # which the analyst never said long, and the step failed on the world's luck.
+        # This key opens nothing; it only names a throwaway synthetic market.
+        env["FUND_MARKETDATA__SYNTHETIC_KEY"] = SMOKE_WORLD_KEY
         keys = {}
         for args in (["init-db"], ["start-backtest", "--start", "2024-01-02T14:30:00Z"],
                      ["seed-admin", "--name", "smoke-mgmt"], ["seed-runtime"],

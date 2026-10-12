@@ -1035,6 +1035,47 @@ then `registered` names what may exist. Not done here: physics' own record of `m
 physics cannot see what drives a key, so the label is a declaration, and who may declare it is a
 design question for that slice), writing the RunRecord to a file (R-4's cassette).
 
+(p) **Physics records what drives a run's minds** (R-3b-2c-2, cycle 28, `tests/test_run_minds.py`).
+Physics cannot see what is behind a key, so the label is a *declaration*, and physics guarantees
+only *who* makes it and *when*:
+- *Who:* `POST /run/minds {minds: [...]}` under `CONTROL_CLOCK`, the conductor's hand (the runtime
+  identity; `system` in code). There is no new permission: the runtime role still holds
+  `READ_HALT`, `READ_CLOCK` and `CONTROL_CLOCK`, nothing else. A firm agent gets 403 and a
+  `permission_denied` event.
+- *What:* one or more kinds from the closed `app.run_clock.MIND_KINDS`: `scripted` (code),
+  `cassette` (recorded model output played back), and `model` (a model answering now). Each kind
+  appears once; extra fields get 422. The event is `run_minds_declared {minds}`, sorted. The
+  Runtime declares the kinds of its specs (`lockstep.mind_kinds`). **A provider it does not know
+  is declared `model`**, so an unknown mind is never labelled as code. ADR (4)'s
+  `minds: replay` is spelled `cassette` here: physics names what plays, not what the run is for.
+- *When:* backtest runs only (a live run's agents are not conducted), **once**, and only while the
+  clock has not moved and no firm agent (any non-physics actor) has written an event. A refused
+  act counts, because its `permission_denied` names the actor. Physics' own setup (seeds, actor
+  null) and the runtime's own events do not count. So a declaration covers everything the run's
+  agents did. `fund-runtime backtest` declares right after `check_clock` and **before it
+  registers anyone** (registrations by the registrar are firm acts). A run whose firm agent
+  already acted is refused (`minds_refused:409`) before any agent is made. Under HALT, physics
+  refuses with 423.
+- *Reading:* `run_minds(session)` returns the first declaration's kinds, or `None`. It also
+  returns `None` for a live run, an undeclared run, or a first declaration the ledger shows came
+  after a firm act or an advance. The check and the append run under `OMS_LOCK`, but writes that
+  take no lock (a message) can land between them. The reader trusts the ledger's id order, not
+  the lock. A second declaration can only exist through that race, and it is never read.
+- *Not done:* no `GET` of the run record. That would hand every agent `run_started.world`, the
+  market's law (drift, volatility). The claim check found that **management can already read
+  it** through `GET /events` (`READ_CROSS_POD`): B-049. Readers use the ledger, and a report
+  surface is later work. Undeclared runs stay legal: older tests and runs never declared, and they read as
+  `None`, never as `scripted`. Q-0005 is unchanged.
+- *Old test that changed, a finding of the new law:* red-team 0014's
+  `held_every_route_but_me_clock_halt_refuses_the_runtime_key` lists the routes that answer the
+  runtime key. `POST /run/minds` joined that list. The sweep still proves that every other
+  route refuses the key.
+- *Smoke run:* the backtest phase reads the database file and checks that there is exactly one
+  declaration, `["scripted"]`, before the first firm event. Its market key is now fixed (a
+  hash of `fund-smoke-world/1`). With a random key, some draws gave five days with no `long`
+  signal, so the "an order was accepted" step failed on the world's luck, both on this branch
+  and potentially on `main`.
+
 ## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
 Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
 agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's
