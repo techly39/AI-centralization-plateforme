@@ -5,11 +5,13 @@
 #   loop/run.sh          N = builder.cycles_per_run in governance/human.yaml
 #   loop/run.sh 2        at most 2 cycles
 #
-# Guard rails, all in governance/human.yaml (builder.*):
-#   model / effort / subagent_model   which model does the work, and how hard it thinks
-#   max_usd_per_cycle                 a cycle is cut off at this spend (claude --max-budget-usd)
-#   max_usd_per_run                   a cycle starts only if its whole budget fits under this
-#   max_usd_per_day, max_cycles_per_day   checked by preflight before every cycle (same rule)
+# The team (builder.team): the lead session runs on team.lead, or on team.lead_hard for a
+# diagnosis cycle, a retrospective (every 10th cycle) and the cycle after a failure. Architect,
+# auditor and red-team models live in their sealed agent files (loop/seal.sh writes them from
+# builder.team); every other subagent runs on team.helpers.
+#
+# Dollar guard rails (builder.*): a cycle is cut off at max_usd_per_cycle, and starts only if
+# that whole budget still fits under max_usd_per_run and max_usd_per_day — no cap is overshot.
 # It never retries on its own: a usage limit or any cap ends the run.
 # Stop after the current cycle: loop/builder.sh stop.  Stop everything now: touch governance/HALT.
 set -u
@@ -25,15 +27,15 @@ ge() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a >= b) }'; }   # float a >= b
 
 cycles="${1:-$(cfg builder.cycles_per_run)}"
 case "$cycles" in ''|*[!0-9]*) echo "usage: loop/run.sh [number of cycles]"; exit 2 ;; esac
-model="$(cfg builder.model)"
-effort="$(cfg builder.effort)"
-export CLAUDE_CODE_SUBAGENT_MODEL="$(cfg builder.subagent_model)"
+export CLAUDE_CODE_SUBAGENT_MODEL="$(cfg builder.team.helpers.model)"
 per_cycle="$(cfg builder.max_usd_per_cycle)"
 per_run="$(cfg builder.max_usd_per_run)"
 run_spent=0
 
-echo "[$(date '+%F %T')] run starting: $cycles cycle(s), model=$model effort=$effort" \
-     "subagents=$CLAUDE_CODE_SUBAGENT_MODEL, caps \$$per_cycle/cycle \$$per_run/run"
+echo "[$(date '+%F %T')] run starting: $cycles cycle(s); lead $(cfg builder.team.lead.model)," \
+     "hard cycles $(cfg builder.team.lead_hard.model), architect $(cfg builder.team.architect.model)," \
+     "auditor $(cfg builder.team.auditor.model), red-team $(cfg builder.team.red-team.model)," \
+     "helpers $CLAUDE_CODE_SUBAGENT_MODEL; caps \$$per_cycle/cycle \$$per_run/run"
 
 for ((i = 1; i <= cycles; i++)); do
   if [ -f governance/HALT ]; then echo "HALT present — stopping."; exit 0; fi
@@ -52,10 +54,20 @@ for ((i = 1; i <= cycles; i++)); do
     *)  echo "Stopped by preflight."; exit 1 ;;
   esac
 
+  # Choose the lead: hard cycles get the strongest model.
+  before="$(uv run --quiet python loop/preflight.py --last-cycle)"
+  failures="$(cat "$FIRM_HOME/failures" 2>/dev/null || echo 0)"
+  role=lead; why="routine"
+  if [ "$rc" -eq 10 ]; then role=lead_hard; why="diagnosis"
+  elif [ $(( (before + 1) % 10 )) -eq 0 ]; then role=lead_hard; why="retrospective"
+  elif [ "${failures:-0}" -gt 0 ]; then role=lead_hard; why="previous cycle failed"
+  fi
+  model="$(cfg "builder.team.$role.model")"
+  effort="$(cfg "builder.team.$role.effort")"
+
   ts="$(date +%Y%m%dT%H%M%S)"
   log="$FIRM_HOME/logs/cycle-$ts.json"
-  before="$(uv run --quiet python loop/preflight.py --last-cycle)"
-  echo "[$ts] cycle $i/$cycles starting (last finished cycle: $before, budget \$$per_cycle)"
+  echo "[$ts] cycle $i/$cycles starting (last finished: $before; lead $model/$effort — $why; budget \$$per_cycle)"
   claude -p "$prompt" \
     --permission-mode acceptEdits \
     --model "$model" \

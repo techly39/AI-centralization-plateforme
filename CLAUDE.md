@@ -76,10 +76,21 @@ wrong, write `state/SURVEY.md`. Build only once you understand what you're worki
 ## Running a cycle
 
 Headless: the Human runs `loop/builder.sh start` → a bounded batch of `claude -p "/cycle"` runs
-(model, effort and per-cycle / per-run / per-day USD caps in `governance/human.yaml`), then it
-stops. Interactive: type `/cycle`.
-The protocol is `.claude/commands/cycle.md`. Subagents: `auditor` (review every diff),
-`red-team` (attack physics).
+(per-cycle / per-run / per-day USD caps in `governance/human.yaml`), then it stops.
+Interactive: type `/cycle`. The protocol is `.claude/commands/cycle.md` → `protocol/CYCLE.md`.
+
+**The Builder team** (ADR-035; models set only in `governance/human.yaml` → `builder.team`):
+
+| Role | Default | Does |
+|---|---|---|
+| lead (you) | sonnet | orient, build, test, record |
+| lead on hard cycles | opus | diagnosis, every 10th (retrospective), the cycle after a failure |
+| `architect` | opus | plans each unit before code is written (Gate 2) |
+| `auditor` | opus | reviews every diff before merge (Gate 5) |
+| `red-team` | opus | attacks physics after risky changes |
+| helpers | sonnet | any other subagent: search, exploration |
+
+Launch the named roles without a `model` override, and brief them precisely.
 
 ## Project commands
 

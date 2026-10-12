@@ -2,7 +2,7 @@
 # HUMAN-ONLY (Constitution Art. 6). One command to drive the Builder loop.
 #
 #   loop/builder.sh start [N]   start a run of N cycles in the background (default: builder.cycles_per_run)
-#   loop/builder.sh status      is it running, which cycle, what it has spent, last lines of the log
+#   loop/builder.sh status      is it running, recent cycles (result, cost, models), last log lines
 #   loop/builder.sh stop        finish the current cycle, then stop
 #   loop/builder.sh stop now    stop immediately (kills the running cycle; it is counted as failed)
 #   loop/builder.sh log         follow the log live (Ctrl-C to leave; the run keeps going)
@@ -36,7 +36,8 @@ case "${1:-status}" in
     [ -f "$FIRM_HOME/stop-after-cycle" ] && echo "Stop requested: it will stop after the current cycle."
     echo "Spent today: \$$(uv run --quiet python loop/preflight.py --spent-today)" \
          "(daily cap \$$(uv run --quiet python loop/preflight.py --get builder.max_usd_per_day))"
-    echo "--- last log lines ---"; tail -12 "$LOG" 2>/dev/null
+    echo "--- recent cycles ---"; tail -5 "$FIRM_HOME/cycles.log" 2>/dev/null
+    echo "--- last log lines ---"; tail -8 "$LOG" 2>/dev/null
     ;;
   stop)
     if ! running; then echo "Nothing is running."; rm -f "$PID_FILE"; exit 0; fi

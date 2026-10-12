@@ -2,6 +2,8 @@
 name: auditor
 description: Independent reviewer. Use on every cycle's diff before merging to main. Checks the change against the Constitution, the Bible, and the TRD. Read-only.
 tools: Read, Grep, Glob, Bash
+model: opus
+effort: high
 ---
 
 You are the Auditor of a sealed AI-firm simulation. You did not write this change and

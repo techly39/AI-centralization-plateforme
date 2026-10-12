@@ -6,6 +6,20 @@ the three human-owned gates (0 stop checks, 5 verify, 7 merge) plus the `loop_st
 If this file ever conflicts with those gates, the gates win — record the conflict in
 `state/PROPOSALS.md`.
 
+**The team (ADR-035).** The Human assigns models in `governance/human.yaml` (`builder.team`):
+judgment on opus, execution on sonnet. You are the **lead**: you orient, build, test and record.
+The **architect** plans (step 2), the **auditor** reviews (step 5), the **red-team** attacks
+(step 5). Every other subagent you start (`Explore`, `general-purpose`) is a **helper** on the
+helpers' model. Launch the three named roles with no `model` override. Spend their time well:
+give each a precise brief so it does not re-discover what you already know.
+
+**Context hygiene.** Everything you read stays in your context for every later turn and is paid
+for again each turn. Never read these whole — `tail` the end or `grep` what you need:
+`state/JOURNAL.md`, `bible/07_DECISIONS.md`, `state/REPORT.md`, `state/IDEAS.md`,
+`state/SURVEY.md`, `state/METRICS.md`. Run tests with `-q` and show only the tail
+(`uv run pytest -q 2>&1 | tail -15`). For a wide search across many files, send a helper and
+take back only its conclusion.
+
 
 **0. Gate — stop checks.** If `governance/HALT` exists: write `state/loop_status.json`
 `{"result":"blocked","reason":"HALT"}` and stop. If `git status --porcelain` is not empty,
@@ -15,9 +29,9 @@ branch whose number is greater than `loop_status.cycle` is an interrupted cycle:
 check its journal entry (write the hypothesis if missing, saying it was written late), and resume
 it at step 5 — no new unit until it is merged, failed, or recorded as abandoned with its reason.
 
-**1. Orient.** Read `state/STATE.md`, last 3 entries of `state/JOURNAL.md`, top of
-`state/BACKLOG.md`, `state/QUESTIONS.md` (look for human answers), and the current Era in
-`bible/05_ERAS.md`. Cycle number = last cycle in `state/loop_status.json` + 1.
+**1. Orient.** Read `state/STATE.md`, last 3 entries of `state/JOURNAL.md` (tail, not the
+whole file), top of `state/BACKLOG.md`, `state/QUESTIONS.md` (look for human answers), and the
+current Era in `bible/05_ERAS.md`. Cycle number = last cycle in `state/loop_status.json` + 1.
 If the cycle number is a multiple of 10: re-read `bible/00_CONSTITUTION.md` and
 `bible/01_GENESIS.md` and do the retrospective (`bible/06_LOOP.md` §6) as part of this cycle.
 
@@ -28,11 +42,19 @@ Before touching OpenClaw, read `bible/08_OPENCLAW.md`.
 If it is too big for one session, split it in `BACKLOG.md` and take the first slice.
 Size check (X-008): a slice that changes physics will meet a red-team pass and its fixes in the
 same cycle — leave room for them, or split before building.
+**Plan (Gate 2).** Launch the `architect` with a brief: cycle number, current Era and its open
+exit criteria, the top 3–5 backlog items with ids, human answers, anything unfinished, and your
+proposed unit if you have one. It returns a `UNIT / SLICE / DESIGN / TESTS FIRST / RISKS /
+RED-TEAM / ADR / OUT OF SCOPE` plan. Its plan wins over your preference; if you disagree on a
+fact, show it the fact once and let it decide.
 
 **3. Hypothesis.** Append to `state/JOURNAL.md`:
-`## Cycle NNNN — <title> (<ISO date>)` / `Era:` / `Exit criterion served:` / `Hypothesis:`.
+`## Cycle NNNN — <title> (<ISO date>)` / `Era:` / `Exit criterion served:` / `Plan:` (the
+architect's `UNIT` and `SLICE` lines) / `Hypothesis:`.
 
-**4. Build** on `git switch -c cycle/NNNN-<slug>`. Tests first where possible.
+**4. Build** on `git switch -c cycle/NNNN-<slug>`, following the plan: its tests first, its
+design, nothing from `OUT OF SCOPE`. If reality forces a deviation, write it and its reason in
+the journal as you go.
 Small commits: `cycle NNNN: <what> — <why>`. Follow the TRD inside `app/`.
 Commit the build before step 5 begins (X-009, cycle 22): an interrupted cycle then resumes from a
 commit, not from an uncommitted tree.
@@ -50,9 +72,14 @@ Answer any open question with the prime rule; log it in `bible/07_DECISIONS.md`
   narrow the sentence. Ask: what in this diff can an unprotected file or env var change? Is
   every check inside the lock that protects the write it guards? Which old tests did a new law
   break — and is each one a finding (log it in the ADR), not a test to "fix"?
-- Launch the `auditor` subagent on `git diff main...HEAD`. Fix every `BLOCK` finding.
-  If the change touches `app/registry`, `app/oms`, `app/marketdata`, metering or the
-  Runtime's halt/budget code, also launch `red-team`.
+- Launch the `auditor` subagent on `git diff main...HEAD`. Brief it with: the plan (unit,
+  invariants, risks), the claim-check list and what you did about each, test and smoke results,
+  and any deviation from the plan. Fix every `BLOCK` finding. A re-audit after fixes is scoped:
+  give it the previous findings and the fix commits, and ask it to verify those fixes and check
+  the fix diff — not to re-review the whole change from scratch.
+  If the plan says `RED-TEAM: yes`, or the change touches `app/registry`, `app/oms`,
+  `app/marketdata`, metering or the Runtime's halt/budget code, also launch `red-team`, briefed
+  with the diff range, the new laws and the invariants they must hold.
 - Commit the red-team's test file as it wrote it, before any fix (X-010, re-audit c28 NOTE 5).
   Then every changed hole or guard is a diff in history, not just a sentence in a commit
   message.

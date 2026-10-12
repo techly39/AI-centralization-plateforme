@@ -1205,3 +1205,28 @@ holds the new law.
 Not done: the operator has no API read of the world (it reads the file; none is needed). The
 symbol universe is not otherwise published to agents (charters name it today). Truman will
 decide what a mind is told about its world.
+
+## ADR-035 — The Builder is a team: judgment on opus, execution on sonnet   (Human direction, 2026-10-12) — accepted
+Question: every Builder cycle ran on opus end to end, in an unbounded loop. Measured over 35 cycles:
+$1.2–4.8 a cycle, $6–7.6 with a red-team pass; most of that was the review subagents (runs that
+crashed after one lead turn still cost $3–4.7). The Human asked for cheaper cycles without
+weaker work, and a team robust enough that later adjustments stay safe.
+Answer from the future: **Models follow the kind of thinking, and the Human owns the
+assignment.** `governance/human.yaml` → `builder.team` is the single place models are chosen:
+lead (the main session) on sonnet; the lead on opus for diagnosis, every 10th cycle
+(retrospective) and the cycle after a failure; a new sealed `architect` subagent (opus) that
+plans every unit before code is written (Gate 2 in `.claude/commands/cycle.md`); `auditor` and
+`red-team` on opus; every other subagent on sonnet. `loop/seal.sh` writes the subagent models
+into their frontmatter, `loop/preflight.py` refuses to start a cycle if the two disagree or a
+value is invalid, and `--post` logs cost per model per cycle and flags a merge that used no
+auditor-model tokens. Frontmatter beats the `CLAUDE_CODE_SUBAGENT_MODEL` default (verified live).
+The loop is bounded (`loop/builder.sh start` runs `cycles_per_run`, then stops) with per-cycle,
+per-run and per-day USD caps that a cycle may never overshoot.
+Why this split: planning, review and attack are where a wrong call costs a cycle or lets a hole
+into physics; implementing a precise plan is where most tokens go. The plan makes the lead's
+job execution; the gates catch what execution misses; failure escalates the lead to opus.
+Process changes in `protocol/CYCLE.md`: plan step, scoped re-audits, precise briefs, context
+hygiene (big state files are tailed or grepped, never read whole).
+Not done: no automatic per-unit model choice (the architect cannot switch the lead's model
+mid-session); no haiku anywhere (review quality first). Measure with `cycles.log` (cost and
+models per cycle) and `state/METRICS.md` (results) before tuning further.

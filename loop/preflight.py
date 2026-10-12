@@ -6,11 +6,14 @@ Usage (from the repo root, via `uv run python loop/preflight.py ...`):
                   0  go
                   10 go, but run a DIAGNOSIS cycle (failure limit reached)
                   20 stop for today (daily cycle limit or daily USD budget reached)
-                  1  stop the loop (halt, seal broken, open incident, repeated failure)
+                  1  stop the loop (halt, seal broken, team misconfigured, open incident,
+                     repeated failure)
   --post N LOG  after a run: N = last cycle number before the run, LOG = its output file.
-                Records the run's cost. Counts the run only if state/loop_status.json advanced;
-                a usage/rate-limit stop exits 30 and is not counted (the runner stops).
+                Records cost and models used. Counts the run only if state/loop_status.json
+                advanced; a usage/rate-limit stop exits 30 and is not counted (the runner stops).
   --cost LOG    print the USD cost of one run, read from its output file
+  --apply-team  write builder.team models/efforts into the .claude/agents/ frontmatter
+                (loop/seal.sh runs this before sealing)
   --last-cycle  print the cycle number in state/loop_status.json
   --spent-today print the USD spent by Builder runs today
   --get a.b.c   print a value from governance/human.yaml
@@ -48,6 +51,14 @@ PROTECTED = [
 ]
 UNSEALED = {"governance/HALT"}
 
+# The Builder team (builder.team in governance/human.yaml). Subagent roles map to a sealed
+# .claude/agents/<role>.md whose frontmatter carries the model; frontmatter beats the
+# CLAUDE_CODE_SUBAGENT_MODEL default (verified live 2026-10-12), which `helpers` sets.
+AGENT_ROLES = ("architect", "auditor", "red-team")
+SESSION_ROLES = ("lead", "lead_hard", "helpers")
+MODELS = {"opus", "sonnet", "haiku", "fable"}
+EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
 
 def protected_files() -> list[Path]:
     files: list[Path] = []
@@ -80,6 +91,71 @@ def stop(msg: str, code: int = 1) -> None:
     sys.exit(code)
 
 
+# --- the team -------------------------------------------------------------------------
+
+def team() -> dict[str, dict]:
+    return config().get("builder", {}).get("team", {}) or {}
+
+
+def team_errors() -> list[str]:
+    """Everything wrong with builder.team: a typo here would burn a cycle, so it stops the loop."""
+    t, errors = team(), []
+    for role in SESSION_ROLES + AGENT_ROLES:
+        spec = t.get(role)
+        if not isinstance(spec, dict):
+            errors.append(f"builder.team.{role} is missing")
+            continue
+        model, effort = spec.get("model"), spec.get("effort")
+        if model not in MODELS and not str(model).startswith("claude-"):
+            errors.append(f"builder.team.{role}.model {model!r} is not one of {sorted(MODELS)} or a claude-* id")
+        if role != "helpers" and effort not in EFFORTS:
+            errors.append(f"builder.team.{role}.effort {effort!r} is not one of {sorted(EFFORTS)}")
+    for role in AGENT_ROLES:
+        if not agent_file(role).exists():
+            errors.append(f".claude/agents/{role}.md does not exist")
+        elif role in t and isinstance(t[role], dict):
+            fm = frontmatter(agent_file(role))
+            for key in ("model", "effort"):
+                if str(fm.get(key)) != str(t[role].get(key)):
+                    errors.append(f".claude/agents/{role}.md has {key}: {fm.get(key)!r}, builder.team says "
+                                  f"{t[role].get(key)!r} — run loop/seal.sh to apply the team")
+    return errors
+
+
+def agent_file(role: str) -> Path:
+    return ROOT / ".claude" / "agents" / f"{role}.md"
+
+
+def frontmatter(path: Path) -> dict[str, str]:
+    lines = path.read_text().splitlines()
+    out: dict[str, str] = {}
+    if lines and lines[0] == "---":
+        for line in lines[1:]:
+            if line == "---":
+                break
+            if ":" in line:
+                k, v = line.split(":", 1)
+                out[k.strip()] = v.strip()
+    return out
+
+
+def apply_team() -> None:
+    """Write builder.team model/effort into each agent's frontmatter (idempotent)."""
+    t = team()
+    for role in AGENT_ROLES:
+        path, spec = agent_file(role), t.get(role)
+        if not path.exists() or not isinstance(spec, dict):
+            continue
+        lines = path.read_text().splitlines(keepends=True)
+        end = next(i for i, line in enumerate(lines[1:], 1) if line.rstrip("\n") == "---")
+        head = [line for line in lines[1:end] if not re.match(r"(model|effort)\s*:", line)]
+        head += [f"model: {spec['model']}\n", f"effort: {spec['effort']}\n"]
+        path.write_text("".join([lines[0], *head, *lines[end:]]))
+        print(f"team: {role} → {spec['model']} ({spec['effort']})")
+
+
+# --- checks ---------------------------------------------------------------------------
+
 def check() -> None:
     if (ROOT / "governance" / "HALT").exists():
         stop("governance/HALT exists.")
@@ -92,6 +168,10 @@ def check() -> None:
         changed = sorted(set(sealed.items()) ^ set(now.items()))
         stop(f"protected files differ from the seal: {sorted({k for k, _ in changed})}. "
              "If you (the Human) changed them, run loop/seal.sh.")
+
+    errors = team_errors()
+    if errors:
+        stop("the Builder team is misconfigured:\n  " + "\n  ".join(errors))
 
     dirty = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     if dirty:
@@ -148,21 +228,39 @@ def spent_today() -> float:
     return total
 
 
-def run_cost(log_text: str) -> float:
-    """total_cost_usd from the `claude -p --output-format json` result; 0 if unreadable."""
+def result_json(log_text: str) -> dict:
+    """The final `claude -p --output-format json` object in a run's log; {} if unreadable."""
     for line in reversed(log_text.strip().splitlines()):
         try:
-            return float(json.loads(line).get("total_cost_usd") or 0)
-        except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
+            d = json.loads(line)
+        except json.JSONDecodeError:
             continue
-    return 0.0
+        if isinstance(d, dict):
+            return d
+    return {}
+
+
+def run_cost(log_text: str) -> float:
+    try:
+        return float(result_json(log_text).get("total_cost_usd") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def models_used(log_text: str) -> dict[str, float]:
+    """{'opus': 2.1, 'sonnet': 1.3}: cost per model family in this run."""
+    out: dict[str, float] = {}
+    for model_id, usage in (result_json(log_text).get("modelUsage") or {}).items():
+        family = next((m for m in MODELS if m in model_id), model_id)
+        out[family] = out.get(family, 0.0) + float(usage.get("costUSD") or 0)
+    return out
 
 
 def read_log(logfile: str | None) -> str:
     if not logfile:
         return ""
     try:
-        return Path(logfile).read_text(errors="replace")[-20000:]
+        return Path(logfile).read_text(errors="replace")[-50000:]
     except OSError:
         return ""
 
@@ -199,13 +297,22 @@ def post(before: int, logfile: str | None) -> None:
         result = "failed"
         print("POST: the run did not advance state/loop_status.json — counted as failed.")
 
+    used = models_used(log_text)
+    models = ",".join(f"{m}:{c:.2f}" for m, c in sorted(used.items())) or "none"
+    warn = ""
+    # Gate 5's auditor runs on its own model; a merge with no usage of that model means the
+    # review was skipped or downgraded. Flag it for the Human (it cannot be hidden from this log).
+    auditor_model = (team().get("auditor") or {}).get("model")
+    if result == "merged" and auditor_model and not any(auditor_model in m for m in used):
+        warn = f" warn=merged-without-{auditor_model}-usage"
     with CYCLES_LOG.open("a") as fh:
-        fh.write(f"{dt.date.today().isoformat()} cycle={after} result={result} cost={cost:.4f}\n")
+        fh.write(f"{dt.date.today().isoformat()} cycle={after} result={result} cost={cost:.4f} "
+                 f"models={models}{warn}\n")
     failures = int(FAILURES.read_text()) if FAILURES.exists() else 0
     failures = 0 if result == "merged" else failures + 1
     FAILURES.write_text(str(failures))
-    print(f"POST: result={result} cost=${cost:.2f} spent_today=${spent_today():.2f} "
-          f"consecutive_failures={failures}")
+    print(f"POST: result={result} cost=${cost:.2f} models={models} spent_today=${spent_today():.2f} "
+          f"consecutive_failures={failures}{warn}")
 
 
 if __name__ == "__main__":
@@ -213,6 +320,8 @@ if __name__ == "__main__":
         post(int(sys.argv[2]) if len(sys.argv) > 2 else 0, sys.argv[3] if len(sys.argv) > 3 else None)
     elif len(sys.argv) > 2 and sys.argv[1] == "--cost":
         print(f"{run_cost(read_log(sys.argv[2])):.4f}")
+    elif len(sys.argv) > 1 and sys.argv[1] == "--apply-team":
+        apply_team()
     elif len(sys.argv) > 1 and sys.argv[1] == "--last-cycle":
         print(last_cycle())
     elif len(sys.argv) > 1 and sys.argv[1] == "--spent-today":
