@@ -379,7 +379,7 @@ def test_spec_carries_every_03_world_field() -> None:
     assert fields - {
         "id", "name", "role", "pod", "parent_id", "generation_born", "adapter", "model",
         "charter", "tools", "memory_policy", "budget_usd", "wake_policy", "mutations",
-    } == {"provider"}  # ADR-032 (3): a mind = provider + adapter + spec
+    } == {"provider", "script"}  # ADR-032 (3) provider; amendment (g) script
 
 
 @pytest.mark.parametrize("over", [

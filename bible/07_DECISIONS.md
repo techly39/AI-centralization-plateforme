@@ -795,3 +795,35 @@ author can still hide an import (for example, a getattr chain built from compute
 - `memory_policy` is `none`, and `wake_policy` is one of {every_step, never}, until their slices
   widen them.
 - Specs are YAML files, one per agent, loaded in id order, which is the lockstep order.
+
+Amended (cycle 22, R-2 shipped: `runtime/registry.py`, `runtime/scripted.py`, `runtime/native.py`,
+`tests/test_runtime_native.py`):
+(g) **The name builds the mind, and a contradicting spec builds none.** `runtime.registry.build_provider`
+builds every mind from its spec through `PROVIDER_CLASSES`, a read-only table in code. Today that
+table has one entry: `scripted` → `ScriptedProvider`. `cassette` is on the gate's list, but the
+registry refuses it with `unavailable` until R-4, so it is never built from another class.
+`wake()` has no parameter that takes a provider object (a test pins its signature). Open question
+(b) is decided by the prime rule (safer budget, more honest measurement): a zero-cost spec that
+names a `model` or a non-zero `budget_usd` is **refused** (`contradiction`). A `$0` label on a
+model must not load as if it were valid. The spec still *loads*. The refusal happens where a mind
+would be built, so `fund-runtime status` can still show the spec. AgentSpec gains a **second added
+field, `script`**: the name of a policy in `runtime.scripted.SCRIPTS`, a read-only table in code.
+It is required when the provider is `scripted` and refused for any other provider. A spec names
+a script but can never supply one. `scripted.py` may import only the stdlib and
+`runtime.providers` (an AST check with planted counter-examples). A script is a pure function of
+the transcript it is shown. `Usage.cost_usd` is a provider's self-report and is never the meter
+(R-6).
+(h) **The native adapter.** A mind sees `build_server`'s published tool list, narrowed by
+`spec.tools`; an unknown name in that list refuses the wake. A call outside the list returns a
+tool error and reaches no endpoint. Every other call runs the MCP tool function over HTTP with the
+agent's own key, so physics' 403s reach the mind as tool errors. The context is assembled by code
+and is the start of the returned `WakeRecord.transcript`: the charter as the system message, then
+`{me: whoami, input: workflow_input}` as sorted JSON. The adapter checks HALT (`decide_batch`)
+before every batch, and a halted batch does not run. A per-wake tool-call budget (default 64) also
+stops the wake, and a batch that would pass the budget does not run. A wake ends `done | halted |
+tool_budget | refused`. Wall-clock timeouts wait for the first provider that can hang (R-6).
+Dynamic boundary, measured: with `runtime → mcp_server` in place, importing every runtime module
+loads `{app, app.limits}`, within (a)'s set. The probe's moving-average PM is now the script
+`moving-average-pm`. It trades a 31-day synthetic month through the adapter, and two runs of the
+same world leave the same ledger and the same transcripts. The test still advances the clock with
+management's key. R-3 moves that into the Runtime.
