@@ -11,7 +11,12 @@ Claims under test:
 * the conductor refuses, before anything wakes, a clock key that is not the
   runtime identity, a live run, an unreadable clock, and duplicate spec ids;
   ``steps`` and ``days_per_step`` are plain ints in range;
-* a clock that will not advance ends the run ``error`` with the status.
+* a clock that will not advance ends the run ``error`` with the status;
+* Era I exit criteria, end to end (R-5a, ADR-036): a conducted mind asking for
+  tomorrow's bars is refused, a window across now holds no unfinished bar, and its
+  ``advance_clock`` is refused (EC3); HALT appearing as a tool call returns lets no
+  further call, wake, advance or event happen (EC5); a spending mind is never built
+  under a null or numeric cap, while zero-cost minds still wake (EC6).
 """
 
 from __future__ import annotations
@@ -563,7 +568,7 @@ def test_ec3_a_window_past_now_holds_no_bar_that_has_not_ended(SessionFactory, w
         arguments={"ticker": "AAPL", "start": _day(now, -5), "end": _day(now, 5)})], seen))
     run = conduct(SessionFactory, [(_spec("a-pm", 1, "across"), world["pm"][1])],
                   world["clock"], steps=3)
-    assert run.ended == "completed" and len(seen) == 3
+    assert run.ended == "completed" and len(run.steps) == len(seen) == 3
     for step, [answer] in zip(run.steps, seen):
         at = datetime.fromisoformat(step.at.replace("Z", "+00:00"))
         assert not answer.is_error
@@ -617,7 +622,8 @@ def test_ec5_halt_created_during_a_tool_call_stops_the_run_within_that_call(
         SessionFactory, world, woke, gov, monkeypatch):
     """"Within one tick" (ADR-036): the tool call in flight when HALT appears finishes,
     and nothing after it happens — no further call, no wake, no advance, no event
-    (Art. 5.2)."""
+    (Art. 5.2). HALT is written as that call's answer returns, before the wake reads
+    on (audit c30 NOTE 1): for the Runtime that is the same moment as "during"."""
     wakes = {"n": 0}
 
     def three_reads(request):
