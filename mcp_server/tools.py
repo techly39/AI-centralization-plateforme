@@ -20,6 +20,7 @@ than how it is implemented.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Annotated, Any, Callable
 from urllib.parse import quote
@@ -114,12 +115,18 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
     ) -> Any:
         """Shared call path: one place where an API failure becomes a tool error."""
         try:
-            return await client.request(method, path, params=params, json=body)
+            result = await client.request(method, path, params=params, json=body)
         except FundAPIError as exc:
             # The API's own wording reaches the agent unchanged — it is written
             # to be actionable ("pod 2 is not your pod"), and rephrasing it here
             # would only add a second vocabulary to keep in sync.
             raise ToolError(str(exc)) from exc
+        if isinstance(result, list):
+            # MCP renders a list as one text block per item: a list of one would
+            # reach the agent as the bare object and an empty list as nothing.
+            # One JSON array block keeps a list a list (ADR-032 (k)).
+            return json.dumps(result, indent=2)
+        return result
 
     # --- Registry -----------------------------------------------------------
 

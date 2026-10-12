@@ -951,3 +951,25 @@ it fires, in the same step. The test caught my model of the conductor, which is 
 pinning shapes, not just outcomes.
 Next: R-3b-2. Provision agents from specs (bind the name), the Analyst script, the PM + Analyst
 month through the conductor, `fund-runtime backtest`, and the label in the run record (M1).
+
+## Cycle 0025 — R-3b-2a: a pod of two minds lives a month, and a list of one stays a list (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (the 1-month criterion needs a PM + Analyst *via the Runtime*; this
+builds it with scripted minds, which never tick it — R-8), M1. Size check (X-008): R-3b-2 is
+split. R-3b-2a (this cycle, no physics change): the Analyst script, a PM script that trades only
+on its own pod's analyst's signal for today, the PM + Analyst month through `run_backtest`, and
+the c24 carry-overs (tool-function failures counted, the step each mind was retired at, NOTE 3
+pinned, NOTE 4 written down). R-3b-2b: provisioning from specs (the name bound), `fund-runtime
+backtest`, the run label in physics' run record (touches physics → red-team).
+Discovery while orienting (probed, `/tmp/probe_list.py`): MCP renders a list result as one text
+block per item, so a **one-item list reaches a mind as the bare object** and an empty list as
+nothing. A PM reading an inbox of one message could not tell it from a message object. That is
+`None`-means-two-things again, on the tool surface every adapter shares.
+Hypothesis: If (a) every list-valued MCP tool answers with one JSON array block, (b) the Analyst
+(`ma-signal-analyst`) reads bars and the clock and posts `{"kind": "signal", "as_of": now,
+"signals": {ticker: long|flat}}` to its pod, and (c) the PM (`signal-pm`) trades only on the
+newest signal stamped with today's now from an analyst of its own pod (found by `list_agents`),
+then: a 31-day synthetic month of analyst `a-…` + PM `b-…` through the conductor completes, every
+PM order has a same-day analyst signal behind it, a PM without its analyst's signal holds, a
+signal from another pod or a stale one is ignored, two runs leave the same ledger and transcripts,
+and the month takes well under 10 minutes. Expected ~20 new tests, xfails unchanged (6).

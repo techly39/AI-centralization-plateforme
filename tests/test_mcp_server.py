@@ -74,9 +74,9 @@ async def call_expecting_error(server, tool, /, **arguments) -> str:
 def _payload(result):
     """Parse a tool result.
 
-    MCP returns a list-valued result as one content block per element, so a list
-    of two rows arrives as two blocks rather than one JSON array. Single results
-    are unwrapped; anything else comes back as a list.
+    MCP renders a list returned by a tool as one content block per element; the
+    tools answer a list as one JSON array block instead (ADR-032 (k)), so every
+    result is one block. Several blocks would still come back as a list.
     """
     parsed = [
         json.loads(block.text)
@@ -181,6 +181,32 @@ async def test_a_fresh_agent_can_work_through_mcp(
 
             portfolio = await call(pm, "get_portfolio", pod_id=pod_id)
             assert portfolio["positions"][0]["ticker"] == "AAPL"
+
+
+@pytest.mark.anyio
+async def test_a_list_of_one_or_none_reaches_the_agent_as_a_list(
+    mcp_client_factory, admin_key, make_pod
+):
+    """ADR-032 (k): MCP would render a list of one as the bare object and an
+    empty list as no content at all. Every list answer is one JSON array block."""
+    pod_id = make_pod(1)
+    async with mcp_client_factory(admin_key) as admin_conn:
+        management = build_server(admin_conn)
+        created = await call(management, "register_agent", name="pm-one", role="pm",
+                             pod_id=pod_id)
+        async with mcp_client_factory(created["api_key"]) as pm_conn:
+            pm = build_server(pm_conn)
+            for tool in ("get_messages", "list_orders"):
+                result = await pm.call_tool(tool, {})
+                assert [b.type for b in result.content] == ["text"], tool
+                assert json.loads(result.content[0].text) == [], tool
+            await call(pm, "send_message", to=f"pod:{pod_id}", body="note to self")
+            result = await pm.call_tool("get_messages", {})
+            assert [b.type for b in result.content] == ["text"]
+            (only,) = json.loads(result.content[0].text)
+            assert only["body"] == "note to self"
+        many = await management.call_tool("list_agents", {})
+        assert len(many.content) == 1 and len(json.loads(many.content[0].text)) >= 2
 
 
 @pytest.mark.anyio
