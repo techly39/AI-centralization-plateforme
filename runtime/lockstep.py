@@ -172,14 +172,22 @@ async def run_backtest(
             return end("error", f"clock_unreadable:{exc.status_code}")
         if at is None:
             return end("error", "clock_malformed")
+        if replay is not None and (stamp := replay.calendar(step)) and stamp[0] != at:
+            # Red-team 0018 H1: the recording's calendar is part of what is replayed.
+            done.append(StepRecord(step, at, (), None))
+            return end("diverged", f"diverged:clock:{step}:0:calendar")
         wakes: list[WakeRecord] = []
         stop: tuple[str, str] | None = None
         for mind in ordered:
             if mind.spec.id in retired:
                 continue
+            tape = None if replay is None else replay.tape(step, mind.spec.id)
+            # Red-team 0018 H2: a recorded wake that ran out of tool budget stops at the same
+            # place, whatever budget the replay was given (never above the caller's own).
+            budget = (min(tape.tool_calls, max_tool_calls)
+                      if tape is not None and tape.ended == "tool_budget" else max_tool_calls)
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
-                                max_tool_calls=max_tool_calls,
-                                tape=None if replay is None else replay.tape(step, mind.spec.id))
+                                max_tool_calls=budget, tape=tape)
             wakes.append(record)
             if record.ended == "halted":
                 stop = ("halted", "halted")
@@ -218,6 +226,8 @@ async def run_backtest(
         done.append(StepRecord(step, at, tuple(wakes), _now_of(moved)))
         if done[-1].advanced_to is None:  # it moved, but the record cannot say where
             return end("error", "clock_malformed")
+        if replay is not None and (stamp := replay.calendar(step)) and stamp[1] != done[-1].advanced_to:
+            return end("diverged", f"diverged:clock:{step}:0:calendar")
     return end("completed")
 
 

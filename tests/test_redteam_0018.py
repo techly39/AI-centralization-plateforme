@@ -76,6 +76,14 @@ def _record_to_recording(run, path: Path) -> Recording:
     return Recording.load(path)
 
 
+def _uncalendared(rec: Recording) -> Recording:
+    """The same tapes without the recording's calendar. The held tests below replay in the same
+    database *after* the recorded run, so the clock is later: the calendar check (fix for HOLE 1)
+    would end them first. This isolates the claim each one makes (input, charter, budget)."""
+    return Recording(rec.steps, {(s, i): rec.tape(s, i)
+                                 for s in range(rec.steps) for i in sorted(rec.spec_ids)})
+
+
 def _events(SessionFactory) -> list[tuple[str, dict]]:
     with SessionFactory() as s:
         return [(e.type, e.payload_json)
@@ -157,8 +165,12 @@ def test_hole_a_forged_refusal_lets_a_replay_with_a_dead_key_finish_completed(
         SessionFactory, world, rt_scripts):
     wake = {"spec_id": "a-pm", "ended": "refused", "reason": "no_identity", "tool_calls": 0,
             "tool_failures": 0, "transcript": [], "exchanges": []}
-    rec = Recording.from_outcome({"run": {"ended": "completed", "retired": [], "steps": [
-        {"step": 0, "at": "x", "wakes": [wake], "advanced_to": "y"}, {"step": 1, "wakes": []}]}})
+    try:
+        rec = Recording.from_outcome({"run": {"ended": "completed", "retired": [], "steps": [
+            {"step": 0, "at": "x", "wakes": [wake], "advanced_to": "y"},
+            {"step": 1, "at": "y", "wakes": [], "advanced_to": "z"}]}})
+    except RecordingError:
+        return  # fixed by refusing the forged recording (see the test above); no replay to run
     spec = _cassette_spec_of(_spec("a-pm", 1, "rt-hold"))
     # The key passes the conductor's pre-flight /me, then dies before the first wake: patch
     # nothing in the conductor, just kill the agent between the pre-flight and step 0.
@@ -213,12 +225,12 @@ class _CodeReply:
 # "no provider object" law (ADR-038: "data ..., never a provider") defeated one level down.
 def test_hole_a_tape_whose_turns_are_not_data_does_not_build_or_does_not_answer():
     spec = _cassette_spec_of(_spec("a-pm", 1, "rt-hold"))
-    tape = Tape((Turn(_AnyHash("0" * 64), _CodeReply(), ()),), "done", 0)  # type: ignore[arg-type]
     _CodeReply.ran = False
     try:
+        tape = Tape((Turn(_AnyHash("0" * 64), _CodeReply(), ()),), "done", 0)  # type: ignore[arg-type]
         provider = build_provider(spec, tape)
-    except ProviderRefused:
-        return  # fixed by refusing the tape
+    except (RecordingError, ProviderRefused):
+        return  # fixed by refusing the tape (here: at the turn's construction)
     request = CompletionRequest(messages=[Message(role="user", content="anything at all")])
     with pytest.raises(ReplayMiss):
         provider.complete(request)
@@ -226,8 +238,8 @@ def test_hole_a_tape_whose_turns_are_not_data_does_not_build_or_does_not_answer(
 
 
 def test_hole_a_recording_built_by_hand_does_not_hide_a_world_divergence():
-    turn = Turn(_AnyHash("0" * 64), CompletionResponse(content="hold"), ())
     try:
+        turn = Turn(_AnyHash("0" * 64), CompletionResponse(content="hold"), ())
         rec = Recording(1, {(0, "a-pm"): Tape((turn,), "done", 0)})
     except (RecordingError, TypeError, ValueError):
         return  # fixed by validating what a Recording holds
@@ -347,7 +359,7 @@ def test_held_a_changed_workflow_input_diverges(SessionFactory, world, rt_script
     spec = _spec("a-pm", 1, "rt-hold")
     recorded = conduct(SessionFactory, [(spec, world["pm"][1])], world["clock"], steps=1,
                        workflow_input={"universe": ["AAPL"]})
-    rec = _record_to_recording(recorded, tmp_path / "r.cassette.json")
+    rec = _uncalendared(_record_to_recording(recorded, tmp_path / "r.cassette.json"))
     replay = conduct(SessionFactory, [(_cassette_spec_of(spec), world["pm"][1])], world["clock"],
                      steps=1, workflow_input={"universe": ["MSFT"]}, replay=rec)
     assert replay.ended == "diverged" and replay.reason.endswith(":0:world"), replay.reason
@@ -357,11 +369,11 @@ def test_held_a_changed_workflow_input_diverges(SessionFactory, world, rt_script
 def test_held_a_changed_charter_diverges(SessionFactory, world, rt_scripts, tmp_path):
     spec = _spec("a-pm", 1, "rt-hold")
     recorded = conduct(SessionFactory, [(spec, world["pm"][1])], world["clock"], steps=1)
-    rec = _record_to_recording(recorded, tmp_path / "r.cassette.json")
+    rec = _uncalendared(_record_to_recording(recorded, tmp_path / "r.cassette.json"))
     other = _cassette_spec_of(spec).model_copy(update={"charter": "Do something else."})
     replay = conduct(SessionFactory, [(other, world["pm"][1])], world["clock"], steps=1,
                      replay=rec)
-    assert replay.ended == "diverged", replay.reason
+    assert replay.ended == "diverged" and ":calendar" not in replay.reason, replay.reason
 
 
 def test_held_a_replay_reports_zero_usage_and_a_smaller_budget_diverges(
@@ -369,7 +381,7 @@ def test_held_a_replay_reports_zero_usage_and_a_smaller_budget_diverges(
     spec = _spec("a-pm", 1, "rt-two-messages")
     recorded = conduct(SessionFactory, [(spec, world["pm"][1])], world["clock"], steps=1)
     assert recorded.steps[0].wakes[0].tool_calls == 2
-    rec = _record_to_recording(recorded, tmp_path / "r.cassette.json")
+    rec = _uncalendared(_record_to_recording(recorded, tmp_path / "r.cassette.json"))
     replay = conduct(SessionFactory, [(_cassette_spec_of(spec), world["pm"][1])], world["clock"],
                      steps=1, max_tool_calls=1, replay=rec)
     assert replay.ended == "diverged" and replay.reason.endswith(":ended"), replay.reason

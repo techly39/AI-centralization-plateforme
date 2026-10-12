@@ -1370,3 +1370,27 @@ to real minds, R-8). Plan by the architect; red-team: see the cycle-32 entry in 
   digests, each wake's model); a cassette step in the smoke run; hash links from events (physics,
   own red-team); `tools_sha256`; a size cap; replaying a run that did not complete; mixed
   live/replay minds (Era II fork instrument). EC1, EC2, EC4, EC7 stay unticked.
+
+**Amendment (a) to ADR-038 — red-team 0018 (6 holes, 8 tests, all fixed) and audit c32 (PASS, 0 BLOCK).**
+- **The recording's calendar is replayed** (H1). `Recording` keeps each step's `at` and
+  `advanced_to`; a replay whose step starts, or lands, on another time ends
+  `diverged:clock:<step>:0:calendar`. A changed start date or `days_per_step` can no longer finish
+  `completed` just because no mind read a dated value. (`max_tool_calls` and `days_per_step` are
+  still not recorded as parameters: v2.)
+- **A recorded `tool_budget` stop is reproduced** (H2): that wake gets `min(recorded calls, the
+  caller's budget)`, so a replay never runs a batch the recording never ran. A smaller caller
+  budget still diverges (`ended`), before any further act.
+- **A tape is data all the way down** (H3): `Turn`, `Tape` and `Recording` check exact types on
+  construction (a `str` subclass equal to every hash, or a "reply" with its own `model_copy`, is
+  refused with `RecordingError`).
+- **A completed run holds no refused or turn-less wake** (H4), and `seq` must be an exact int (H5):
+  a forged "completed, nobody retired" file can no longer retire a mind quietly.
+- Audit c32: a FIFO is refused (`O_NONBLOCK`; the Mac never blocked, Linux would); the cassette
+  builder is bound to the name `cassette`, so a later provider cannot fall through to it.
+- **Not done, on the backlog:** a setup error (contradiction, `unknown_tool`, `identity_mismatch`)
+  during a replay reads as `diverged:...:ended` with the real reason only in the wake record
+  (audit NOTE 4); `key` can mislabel a surface change when the recorded prefix holds a redacted
+  key (NOTE 5); `workflow_input`, `max_tool_calls` and `days_per_step` become recorded parameters
+  in cassette v2. The forged-reply limit stands: replies are not hashed, so a cassette with
+  consistent forged hashes encodes any policy, within the agent key's permissions.
+- Suite 1485 → 1554 passed + 6 xfailed; smoke 21/21.

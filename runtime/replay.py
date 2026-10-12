@@ -73,6 +73,16 @@ class Turn:
     #: The recorded (redacted) transcript before this turn.
     prefix: tuple[Message, ...]
 
+    def __post_init__(self) -> None:
+        # Data, not code (red-team 0018 H3): exact types, so a str subclass that equals every
+        # hash, or a "reply" with its own model_copy, cannot be a turn.
+        if type(self.request_sha256) is not str or not re.fullmatch(_SHA, self.request_sha256):
+            raise RecordingError("a request hash is 64 lowercase hex digits")
+        if self.response is not None and type(self.response) is not CompletionResponse:
+            raise RecordingError("a recorded reply is a CompletionResponse")
+        if type(self.prefix) is not tuple or any(type(m) is not Message for m in self.prefix):
+            raise RecordingError("a recorded prefix is a tuple of Messages")
+
 
 @dataclass(frozen=True)
 class Tape:
@@ -80,6 +90,11 @@ class Tape:
     turns: tuple[Turn, ...] = ()
     ended: str = ""
     tool_calls: int = 0
+
+    def __post_init__(self) -> None:
+        if (type(self.turns) is not tuple or any(type(t) is not Turn for t in self.turns)
+                or type(self.ended) is not str or type(self.tool_calls) is not int):
+            raise RecordingError("a tape is a tuple of Turns, how the wake ended and its calls")
 
 
 class CassetteProvider:
@@ -119,9 +134,16 @@ class Recording:
     """A completed run's cassette, validated, as tapes (build with :meth:`load` or
     :meth:`from_outcome`)."""
 
-    def __init__(self, steps: int, tapes: Mapping[tuple[int, str], Tape]) -> None:
+    def __init__(self, steps: int, tapes: Mapping[tuple[int, str], Tape],
+                 calendar: tuple[tuple[str, str], ...] = ()) -> None:
+        if type(steps) is not int or not all(
+                type(k) is tuple and len(k) == 2 and type(k[0]) is int and type(k[1]) is str
+                and type(t) is Tape for k, t in tapes.items()):
+            raise RecordingError("a recording is a step count and Tapes keyed by (step, spec id)")
         self.steps = steps
         self._tapes = dict(tapes)
+        #: ``(at, advanced_to)`` per recorded step; empty for a hand-built recording.
+        self._calendar = calendar
         self.spec_ids = frozenset(spec_id for _, spec_id in self._tapes)
 
     @classmethod
@@ -142,9 +164,13 @@ class Recording:
         if not isinstance(steps, list):
             raise RecordingError("the run has no steps")
         tapes: dict[tuple[int, str], Tape] = {}
+        calendar: list[tuple[str, str]] = []
         for n, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("step") != n:
                 raise RecordingError(f"step {n} is out of order")
+            if type(step.get("at")) is not str or type(step.get("advanced_to")) is not str:
+                raise RecordingError(f"step {n}: a completed step has a start and a landing time")
+            calendar.append((step["at"], step["advanced_to"]))
             for wake in step.get("wakes") or []:
                 try:
                     spec_id = wake["spec_id"]
@@ -155,7 +181,11 @@ class Recording:
                     if isinstance(exc, RecordingError):
                         raise
                     raise RecordingError(f"step {n}: a wake is malformed ({type(exc).__name__})") from exc
-        return cls(len(steps), tapes)
+        return cls(len(steps), tapes, tuple(calendar))
+
+    def calendar(self, step: int) -> tuple[str, str] | None:
+        """``(at, advanced_to)`` the recording had for ``step``; ``None`` for a hand-built one."""
+        return self._calendar[step] if 0 <= step < len(self._calendar) else None
 
     def tape(self, step: int, spec_id: str) -> Tape:
         """The wake recorded at ``step`` for ``spec_id``; an empty tape if none was."""
@@ -186,7 +216,12 @@ def _tape(wake: Mapping[str, Any]) -> Tape:
     messages = tuple(Message.model_validate(m) for m in wake["transcript"])
     exchanges = wake["exchanges"]
     stops = _assistants(messages)
-    if [e["seq"] for e in exchanges] != list(range(len(exchanges))):
+    # Every wake of a completed run asked at least one turn: a wake with none was refused, and a
+    # refusal is a retirement (red-team 0018 H4) or a bug, never something to replay.
+    if not exchanges or wake["ended"] == "refused":
+        raise RecordingError("a completed run holds no refused or turn-less wake")
+    if (any(type(e["seq"]) is not int for e in exchanges)
+            or [e["seq"] for e in exchanges] != list(range(len(exchanges)))):
         raise RecordingError("exchanges are not numbered 0..n-1")
     failed = [e["usage"] is None for e in exchanges]
     if any(failed[:-1]):
