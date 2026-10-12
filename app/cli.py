@@ -3,6 +3,7 @@
     uv run fund-env init-db          # create/upgrade schema via alembic
     uv run fund-env seed-admin       # create the first management agent (prints key once)
     uv run fund-env seed-runtime     # create the Runtime's clock identity (prints key once)
+    uv run fund-env rotate-runtime-key   # new Runtime key, the old one dies (prints key once)
     uv run fund-env create-pod       # create a trading pod and fund it
     uv run fund-env fund-pod         # change a pod's allocation
     uv run fund-env check-orders     # run one pending-limit-order sweep now
@@ -30,8 +31,10 @@ from app.logging_setup import setup_logging
 from app.registry.pods import create_pod, fund_pod
 from app.registry.service import (
     RegistryError,
+    check_reserved_identities,
     get_or_create_system_agent,
     register_agent,
+    rotate_runtime_key,
     seed_runtime_agent,
 )
 from app.run_clock import RunClockError, install_run_clock, start_backtest
@@ -88,6 +91,23 @@ def cmd_seed_runtime(_: argparse.Namespace) -> int:
     print("Runtime identity created (it may read and advance the clock, nothing else).")
     print(f"  id:   {agent.id}")
     print(f"  name: {agent.name}")
+    print()
+    print("API KEY (shown once — give it to the Runtime only, never to a firm agent):")
+    print(f"  {api_key}")
+    return 0
+
+
+def cmd_rotate_runtime_key(_: argparse.Namespace) -> int:
+    """Replace the Runtime's key; the old one stops working at once (B-041)."""
+    with session_scope() as session:
+        try:
+            agent, api_key = rotate_runtime_key(session)
+        except RegistryError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        agent_id = agent.id
+
+    print(f"Runtime identity {agent_id} has a new key; the old key no longer works.")
     print()
     print("API KEY (shown once — give it to the Runtime only, never to a firm agent):")
     print(f"  {api_key}")
@@ -214,6 +234,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_rt.set_defaults(func=cmd_seed_runtime)
 
+    p_rot = sub.add_parser(
+        "rotate-runtime-key", help="give the Runtime's identity a new key (the old one dies)"
+    )
+    p_rot.set_defaults(func=cmd_rotate_runtime_key)
+
     p_pod = sub.add_parser("create-pod", help="create a trading pod")
     p_pod.add_argument("--name", required=True, help="pod name (unique)")
     p_pod.add_argument(
@@ -261,10 +286,12 @@ def main(argv: list[str] | None = None) -> int:
         # A backtest database's operator commands stamp the run's simulated now,
         # never today's: one live stamp would hold every later event (ADR-025).
         # And in the run's own world, or not at all (B-037).
+        # And never on a database whose reserved identities are broken (B-041).
         try:
             with session_scope() as session:
+                check_reserved_identities(session)
                 install_run_clock(session)
-        except (RunClockError, ValueError) as exc:
+        except (RunClockError, ValueError, RegistryError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
     return args.func(args)

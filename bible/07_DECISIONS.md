@@ -866,6 +866,34 @@ loads `{app, app.limits}`, within (a)'s set. The probe's moving-average PM is no
 same world leave the same ledger and the same transcripts. The test still advances the clock with
 management's key. R-3 moves that into the Runtime.
 
+Amended (cycle 24, R-3b-1 shipped: `runtime/lockstep.py`, `tests/test_runtime_lockstep.py`):
+(j) **The conductor.** `run_backtest(minds, clock, steps=, days_per_step=1, workflow_input=,
+max_tool_calls=)` → `RunRecord(ended ∈ completed|halted|refused|error, reason, minds, steps)`.
+Each step: HALT is read; every mind wakes once through `native.wake`, one at a time, sorted by
+spec id (the caller's order is ignored); HALT is read again; then `POST /clock/advance`. Decisions
+made here by the prime rule:
+- **A refused wake ends the run** (`refused`, `wake_refused:<id>:<reason>`), with no advance. A
+  world that moves on without a mind the run names is not the run that was asked for (more honest
+  measurement). A mind that crashes (`error`) or spends its tool budget is data: it is recorded,
+  and the run goes on.
+- **The conductor checks what it is handed, before step 0.** The clock key's `/me` must have
+  role `runtime`, `/clock` must say `backtest`, and spec ids must be unique. Otherwise the run is
+  refused (`clock_identity`, `not_backtest`, `clock_unreadable:<status>`, `duplicate_spec_id`)
+  and nothing wakes. Physics would refuse a firm agent's advance anyway (403); refusing first
+  means no mind acts in a run that could never advance.
+- `steps` ∈ [0, 3660] and `days_per_step` ∈ [1, 366] (physics' own advance limit) must be exact
+  `int`s.
+- The run label `minds` is the sorted, `+`-joined set of providers (`scripted`). Writing it into
+  physics' run record is R-3b-2.
+- After an early end the clock never moves again, so the ledger shows exactly how far the run
+  got. A clock that will not advance (e.g. physics' own HALT, 423) ends the run with
+  `error`/`advance_failed:<status>`.
+
+The R-2 month test now drives `run_backtest` instead of its own loop; its assertions are
+unchanged. Not yet (R-3b-2): provisioning agents from specs (binding the spec's name), the
+Analyst script and the PM + Analyst month, the `fund-runtime backtest` command, and the label in
+the run record. The record is returned, not stored (R-4).
+
 ## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
 Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
 agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's
@@ -918,3 +946,20 @@ name stops it); attribution of `clock_advanced` and sweep fills; `seed-runtime` 
 alembic-built DB; rebuild-state. Left open, not holes: a lost runtime key freezes that backtest
 (B-041); a firm agent's own name can carry invisible characters to pass for a colleague's,
 which predates this ADR and is in-sim scheming (B-042).
+(b) **A way back from a lost clock key, and the reserved names checked at startup (B-041,
+cycle 24).** `tests/test_runtime_key.py`. `fund-env rotate-runtime-key` (`rotate_runtime_key`)
+replaces the one runtime identity's key hash. The old key gets 401 in the same commit. It
+records `agent_key_rotated` with payload `{agent_id}` and actor null: never the key or its hash.
+It refuses a database with no runtime identity, or with two. It is operator-only; no endpoint
+rotates a key, because a firm agent rotating the clock hand's key would be pulling a world lever.
+`reserved_identity_problems` / `check_reserved_identities` find (i) a non-physics agent whose
+name folds to a reserved one, and (ii) more than one runtime row. The server's lifespan runs
+the check *before* it installs the run's clock, so a refused start leaves the process clock
+alone. Every operator command that runs on the database's clock runs it too (all but
+`init-db`, `start-backtest` and `serve`, which gets it from the lifespan). A pre-ADR squatter
+now stops the world at startup, not at the first act that needs `system`. The operator repairs
+the database by hand. There is no rename command (prime rule: smaller; physics never renames
+an agent). Old test that changed, a finding of the new law: red-team 0014's
+`held_a_pre_adr_runtime_squatter_blocks_seeding_loudly` still gets exit 1 and no runtime row,
+but the reason is now the startup check naming the squatter, not `seed-runtime`'s "already
+exists". The assertion now checks the new, more precise message.

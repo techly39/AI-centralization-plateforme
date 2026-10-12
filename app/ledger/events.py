@@ -24,6 +24,7 @@ from app.limits import MAX_LEDGER_DEPTH
 # Lifecycle / audit events (no derived-state effect):
 EVENT_AGENT_REGISTERED = "agent_registered"
 EVENT_AGENT_DEACTIVATED = "agent_deactivated"
+EVENT_AGENT_KEY_ROTATED = "agent_key_rotated"  # payload: {agent_id} — never the key or its hash
 EVENT_PERMISSION_DENIED = "permission_denied"
 EVENT_HALT_REFUSED = "halt_refused"       # payload: {method, path, role}
 
