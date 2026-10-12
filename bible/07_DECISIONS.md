@@ -617,3 +617,36 @@ fresh `secrets.token_bytes(32)` world and finds nothing; a companion test shows 
 *does* recover a public test key, so the hole test is not vacuous. Auditor WARN (a running week's
 future days were computed then dropped) fixed: skipped before computing, spy-tested, mutation red.
 Lesson: a determinism tool and a secrecy tool are the same function; its input is the secret.
+
+## ADR-031 — A run records its world and lives in only one   (builder, cycle 19) — accepted
+Question: ADR-030 made a synthetic market a pure function of a secret key, but a backtest's
+ledger did not say which market it ran in — and nothing stopped a server restarted with another
+key (or `provider: yfinance`) from carrying on in the same database, splicing two markets into one
+run with no event saying so. What does a run record, and what does it refuse?
+Answer from the future: (1) **Every provider describes its world** (`MarketDataProvider.world()`,
+a JSON record): `{provider, reproducible}` by default — honest for a live feed or a table tests can
+move, whose answers are not a function of the record. The synthetic market's record is
+reproducible and complete except for the secret: `law` (`"hmac-sha256-gbm/1"`, a version — a new
+formula is a new law), `origin`, `drift`, `volatility`, `symbols` (normalised, sorted) and
+`key_fingerprint` = first 128 bits of `HMAC-SHA256(key, "fingerprint:v1")`. (2) **`run_started`
+carries it** (`world`), built from the installed provider at the moment the run opens — the world
+must be installed first. (3) **One run, one world:** `install_run_clock` (server lifespan, every
+operator command but `init-db`/`start-backtest`/`serve`) compares the recorded world with the
+installed provider's and refuses with `RunClockError` naming the differing fields; the server does
+not start, the CLI exits 1 with nothing appended. A run opened before this ADR has no `world` and
+is let through (its ledger never claimed one). Live databases have no `run_started` and are not
+checked.
+Why: (1) **Honest measurement** — a backtest is evidence only if its ledger names the market it
+was measured in; a run served by two worlds is a corrupted experiment that would look whole.
+(2) **Safer seal** — the fingerprint is a separate HMAC domain under a ≥ 128-bit key, so management
+reading `/events` learns a name, not a window onto any `return:`/`noise:` value nor a brute-force
+target (red-team 0010's lesson). (3) **Deterministic over LLM / smaller** — one method on the base,
+one check at the existing clock-install seam; no schema change (the record is an event payload).
+Not done (B-037 slices b, c): a `fund-env backtest` driver that re-runs a ledger's world from the
+operator's key file; a record of which agents have lived which worlds (re-running a lived world is
+not out-of-sample). `world()` is not sealed: it is operator/physics code, not agent-reachable. Two
+fixtures (the probe, `honest_backtest`) opened a run in the suite's static table and served it from
+another provider — exactly what the law now forbids; they install their world first.
+Evidence: `tests/test_run_world.py` (11 tests: record, golden fingerprint replica, restart in the
+same world, refusals for another key / symbols / provider, pre-ADR run, server lifespan, operator
+CLI, `/events` shows the fingerprint and not the key).
