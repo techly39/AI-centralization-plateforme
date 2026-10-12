@@ -79,8 +79,10 @@ def test_a_backtest_opens_with_run_started_at_its_start(SessionFactory, db):
     assert event.type == EVENT_RUN_STARTED and event.ts == START
     # A run records whether its market data had the look-ahead guard (auditor,
     # cycle 15): False before B-005, True since (ADR-028).
+    # And which market it lives in (B-037): here the suite's static table.
     assert event.payload_json == {"mode": "backtest", "start": START.isoformat(),
-                                  "look_ahead_guard": True}
+                                  "look_ahead_guard": True,
+                                  "world": {"provider": "static", "reproducible": False}}
 
 
 def test_a_backtest_refuses_a_database_that_holds_anything(SessionFactory, db, admin_key):

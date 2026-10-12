@@ -119,6 +119,8 @@ def run_month(world: int) -> ProbeRun:
     """A fresh database, a fresh copy of test world ``world``, one scripted pod, 31 days."""
     began = time.perf_counter()
     _, Sessions = _fresh_database()
+    # The world first: the run records it and is served only in it (B-037).
+    set_provider(SyntheticProvider(world_key(world), SYMBOLS))
     session = Sessions()
     try:
         start_backtest(session, start=START)
@@ -132,7 +134,6 @@ def run_month(world: int) -> ProbeRun:
     finally:
         session.close()
 
-    set_provider(SyntheticProvider(world_key(world), SYMBOLS))
     app = create_app()
 
     def _session():

@@ -236,6 +236,8 @@ def test_a_feed_answering_from_the_future_is_502_and_stores_nothing(client, db, 
 
 @pytest.fixture
 def honest_backtest(SessionFactory) -> Iterator[dict[str, str]]:
+    # The world first: the run records it and is served only in it (B-037).
+    set_provider(HistoricalProvider({"JPM": {YESTERDAY: 180.0, DAY: 190.0}}))
     session = SessionFactory()
     try:
         start_backtest(session, start=NOON)
@@ -247,7 +249,6 @@ def honest_backtest(SessionFactory) -> Iterator[dict[str, str]]:
         session.commit()
     finally:
         session.close()
-    set_provider(HistoricalProvider({"JPM": {YESTERDAY: 180.0, DAY: 190.0}}))
     yield {"admin": admin, "pm": pm}
     set_clock(LiveClock())
 

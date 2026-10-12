@@ -14,6 +14,11 @@ was. :func:`advance` is the one way to move it: bounded per step
 (:data:`~app.limits.MAX_ADVANCE_MINUTES`), never backwards, never past the real
 now (the world has no data from the future to show).
 
+**A run lives in one world** (B-037): ``run_started`` records the market's
+:meth:`~app.marketdata.base.MarketDataProvider.world` — a secret key only as a
+fingerprint — and :func:`install_run_clock` refuses a process whose provider
+describes another.
+
 Who may advance is a permission (``Action.CONTROL_CLOCK``, never universal);
 what an advance does next — the pending-order sweep — is the caller's
 (:mod:`app.api.clock`), the same sweep the live scheduler runs on a timer.
@@ -35,6 +40,7 @@ from app.ledger.events import (
     ledger_now,
 )
 from app.limits import MAX_ADVANCE_MINUTES
+from app.marketdata import get_provider
 from app.marketdata.base import LIVE_QUOTE_WINDOW
 from app.oms.service import OMS_LOCK
 
@@ -77,6 +83,7 @@ def start_backtest(session: Session, *, start: datetime) -> BacktestClock:
                 f"this database is not empty ({table.name} has rows): a backtest "
                 "is its own database — point FUND_DATABASE_URL at a new file"
             )
+    world = get_provider().world()
     clock = BacktestClock(start)
     set_clock(clock)
     append_event(
@@ -87,6 +94,7 @@ def start_backtest(session: Session, *, start: datetime) -> BacktestClock:
             "mode": clock.mode,
             "start": _iso(start),
             "look_ahead_guard": LOOK_AHEAD_GUARD,
+            "world": world,
         },
     )
     return clock
@@ -102,6 +110,7 @@ def install_run_clock(session: Session) -> BacktestClock | None:
     first = session.scalar(select(Event).order_by(Event.id).limit(1))
     if first is None or first.type != EVENT_RUN_STARTED:
         return None
+    _require_same_world(first.payload_json)
     latest = session.scalar(
         select(Event)
         .where(Event.type.in_((EVENT_RUN_STARTED, EVENT_CLOCK_ADVANCED)))
@@ -160,6 +169,30 @@ def advance(
             raise
         clock.move_to(end)
     return start, end
+
+
+def _require_same_world(run_started: dict) -> None:
+    """Refuse to put a process on a run whose ledger names another market.
+
+    One run, one world (B-037): a server restarted with another key, other
+    symbols or another provider would splice two markets into one ledger, and
+    nothing in it would say where. Runs opened before worlds were recorded
+    carry none and are let through — their ledger never claimed one.
+    """
+    recorded = run_started.get("world")
+    if recorded is None:
+        return
+    installed = get_provider().world()
+    if installed != recorded:
+        differs = sorted(
+            k for k in recorded.keys() | installed.keys()
+            if recorded.get(k) != installed.get(k)
+        )
+        raise RunClockError(
+            "this backtest run lives in another world than the configured market "
+            f"(differs in: {', '.join(differs)}): serve it with the provider, "
+            "symbols and key it was started with"
+        )
 
 
 def _iso(moment: datetime) -> str:

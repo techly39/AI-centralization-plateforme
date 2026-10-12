@@ -234,8 +234,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command not in _NO_RUN_CLOCK:
         # A backtest database's operator commands stamp the run's simulated now,
         # never today's: one live stamp would hold every later event (ADR-025).
-        with session_scope() as session:
-            install_run_clock(session)
+        # And in the run's own world, or not at all (B-037).
+        try:
+            with session_scope() as session:
+                install_run_clock(session)
+        except (RunClockError, ValueError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
     return args.func(args)
 
 

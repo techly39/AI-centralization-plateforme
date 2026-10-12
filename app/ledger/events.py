@@ -31,7 +31,7 @@ EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent
 
 # The run's time (ADR-027, app/run_clock.py). A backtest ledger opens with
 # ``run_started``; its simulated now moves only by ``clock_advanced``.
-EVENT_RUN_STARTED = "run_started"         # payload: {mode, start}
+EVENT_RUN_STARTED = "run_started"         # payload: {mode, start, look_ahead_guard, world}
 EVENT_CLOCK_ADVANCED = "clock_advanced"   # payload: {from, to, minutes}
 
 # Self-reported agent activity (TRD §7). Audit only: the app cannot verify these
