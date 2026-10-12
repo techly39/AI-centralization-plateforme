@@ -8,7 +8,7 @@ monitor sweep, so creating or deleting it takes effect on the next call — no
 restart, no cache. A request or sweep already past the check finishes ("the
 current tool call", Art. 5.2).
 
-Operator CLI commands (``fund-env seed-admin`` / ``create-pod`` / ``fund-pod``)
+Operator CLI commands (``fund-env seed-admin`` / ``seed-runtime`` / ``create-pod`` / ``fund-pod``)
 are the Human's own hands, not agent requests, and are not gated.
 
 While halted:

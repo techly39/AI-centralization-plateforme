@@ -904,3 +904,17 @@ Not done: key rotation for a lost runtime key (re-seed needs a fresh database or
 command, when R-3b needs it); B-034 (operator CLI ignores HALT) is unchanged; the Runtime does not
 use the key yet (R-3b). Tie-breaker: safer seal first. The conductor is built on the right
 identity, not moved onto it later.
+(a) **Red-team 0014: 1 hole (low), fixed in cycle 23.** `tests/test_redteam_0014.py` has 30
+held guards; the 20 hole tests are now guards too. **H1:** the fold dropped only Cf, so names
+like `runtime` + U+FE0F, U+034F, U+17B4, the Hangul fillers, U+2800 or NUL were accepted (201),
+and the directory showed a second "runtime". Physics was not fooled, because the role gates
+`CONTROL_CLOCK`. The fold now drops every category that draws nothing (Cc Cf Cn Co Cs Mn Me)
+plus the blank letters `U+115F U+1160 U+3164 U+FFA0 U+2800`. Dropping a visible combining mark
+only widens what counts as reserved. Held: every published route walked with the runtime key
+(a coverage assert proves the walk is complete); firm keys × every advance body; HALT × method
+tricks; deactivation; physics roles in HTTP, service and spec; a racing second seeder (the unique
+name stops it); attribution of `clock_advanced` and sweep fills; `seed-runtime` on a backtest DB
+(run-time stamp), on a live DB (409 on advance) and under HALT (it seeds; the key gets 423); an
+alembic-built DB; rebuild-state. Left open, not holes: a lost runtime key freezes that backtest
+(B-041); a firm agent's own name can carry invisible characters to pass for a colleague's,
+which predates this ADR and is in-sim scheming (B-042).

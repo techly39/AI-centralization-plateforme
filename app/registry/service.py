@@ -41,13 +41,25 @@ RUNTIME_AGENT_NAME = "runtime"
 _RESERVED_NAMES = frozenset({SYSTEM_AGENT_NAME, RUNTIME_AGENT_NAME})
 
 
+#: Categories that draw nothing of their own: controls, format characters,
+#: unassigned/private/surrogate code points, and combining marks (variation
+#: selectors, the grapheme joiner, Khmer U+17B4 — red-team 0014 H1). Dropping a
+#: visible mark too only widens what counts as reserved: the safe side.
+_INVISIBLE_CATEGORIES = frozenset({"Cc", "Cf", "Cn", "Co", "Cs", "Mn", "Me"})
+#: Letters and symbols that render blank (Hangul fillers, braille blank), after NFKC.
+_BLANK_CHARS = frozenset("ᅟᅠㅤﾠ⠀")
+
+
 def _name_key(name: str) -> str:
-    """The name as a reader sees it: NFKC, case-folded, invisible characters
-    (Unicode category Cf) dropped, surrounding space stripped. Lookalikes from
-    other scripts (Cyrillic 'с') are not folded — the identity is the role, the
-    reserved name only keeps the directory honest."""
+    """The name as a reader sees it: NFKC, case-folded, characters that draw
+    nothing dropped, surrounding space stripped. Lookalikes from other scripts
+    (Cyrillic 'с') are not folded — the identity is the role, the reserved name
+    only keeps the directory honest."""
     folded = unicodedata.normalize("NFKC", name).casefold()
-    return "".join(c for c in folded if unicodedata.category(c) != "Cf").strip()
+    return "".join(
+        c for c in folded
+        if unicodedata.category(c) not in _INVISIBLE_CATEGORIES and c not in _BLANK_CHARS
+    ).strip()
 
 
 def is_reserved_name(name: str) -> bool:
