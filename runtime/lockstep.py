@@ -14,7 +14,7 @@ The run ends ``completed`` after ``steps`` steps, or early:
 * ``halted`` — HALT before a step, inside a wake, or before an advance;
 * ``refused`` — a wake was refused (a mind the run names did not wake: the world
   must not move on without it), or the run itself was refused before step 0;
-* ``error`` — the clock would not advance.
+* ``error`` — the clock would not advance, or its answer had no ``now``.
 
 A mind that crashes (``error``) or spends its tool budget is data, recorded in
 its step, and the run goes on. After an early end the clock is never advanced
@@ -116,9 +116,11 @@ async def run_backtest(
         if not decide_batch().allowed:
             return end("halted")
         try:
-            at = (await clock.get("/clock"))["now"]
+            at = _now_of(await clock.get("/clock"))
         except FundAPIError as exc:
             return end("error", f"clock_unreadable:{exc.status_code}")
+        if at is None:
+            return end("error", "clock_malformed")
         wakes: list[WakeRecord] = []
         stop: tuple[str, str] | None = None
         for mind in ordered:
@@ -141,5 +143,14 @@ async def run_backtest(
         except FundAPIError as exc:
             done.append(StepRecord(step, at, tuple(wakes), None))
             return end("error", f"advance_failed:{exc.status_code}")
-        done.append(StepRecord(step, at, tuple(wakes), moved["now"]))
+        done.append(StepRecord(step, at, tuple(wakes), _now_of(moved)))
+        if done[-1].advanced_to is None:  # it moved, but the record cannot say where
+            return end("error", "clock_malformed")
     return end("completed")
+
+
+def _now_of(answer: Any) -> str | None:
+    """The ``now`` of a ``/clock`` or advance answer; ``None`` if it has none
+    (audit c24 NOTE 2: a malformed answer ends the run in a record, not a raise)."""
+    now = answer.get("now") if isinstance(answer, dict) else None
+    return now if type(now) is str else None

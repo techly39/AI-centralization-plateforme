@@ -248,6 +248,15 @@ def test_physics_rows_wearing_their_own_names_are_no_problem(db):
     assert reserved_identity_problems(db) == []
 
 
+def test_seeding_beside_a_runtime_squatter_is_refused_by_the_service(db):
+    """Audit c24 WARN 1: the startup check now fires first in the CLI, so this pins
+    the service's own guard for callers that bypass the CLI (R-3b-2 provisioning)."""
+    _squat(db, "runtime", AgentRole.management)
+    with pytest.raises(RegistryError, match="already exists"):
+        seed_runtime_agent(db)
+    assert not db.scalars(select(Agent).where(Agent.role == AgentRole.runtime)).all()
+
+
 def test_every_problem_is_named_at_once(db):
     a = _squat(db, "system")
     b = _squat(db, "Runtime", AgentRole.pm)

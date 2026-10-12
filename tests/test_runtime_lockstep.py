@@ -318,6 +318,31 @@ def test_a_clock_that_will_not_advance_ends_the_run_in_error(SessionFactory, wor
     assert woke == ["a"] and _advances(SessionFactory) == []
 
 
+class _OddClock:
+    """A clock hand whose answers lack ``now`` (audit c24 NOTE 2)."""
+
+    def __init__(self, bad_on: str) -> None:
+        self.bad_on, self.reads = bad_on, 0
+
+    async def get(self, path: str):
+        if path == "/me":
+            return {"role": "runtime"}
+        self.reads += 1
+        if self.bad_on == "step" and self.reads > 1:
+            return {"mode": "backtest"}
+        return {"mode": "backtest", "now": "2024-01-02T15:00:00Z"}
+
+    async def post(self, path: str, body: dict):
+        return {} if self.bad_on == "advance" else {"now": "2024-01-03T15:00:00Z"}
+
+
+@pytest.mark.parametrize("bad_on", ["step", "advance"])
+def test_a_clock_answer_without_now_ends_the_run_in_error(bad_on):
+    run = asyncio.run(run_backtest([], _OddClock(bad_on), steps=2))  # type: ignore[arg-type]
+    assert (run.ended, run.reason) == ("error", "clock_malformed")
+    assert len(run.steps) == (1 if bad_on == "advance" else 0)
+
+
 @pytest.mark.parametrize("kwargs", [
     {"steps": -1}, {"steps": True}, {"steps": 1.0}, {"steps": lockstep.MAX_STEPS + 1},
     {"steps": 1, "days_per_step": 0}, {"steps": 1, "days_per_step": False},
