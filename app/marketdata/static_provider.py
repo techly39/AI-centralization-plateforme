@@ -36,6 +36,12 @@ class StaticProvider(MarketDataProvider):
         self._prices: dict[str, float] = {
             normalise_ticker(k): float(v) for k, v in (prices or {}).items()
         }
+        #: The table as configured — the world a run records (red-team 0011).
+        self._configured = dict(sorted(self._prices.items()))
+
+    def world(self) -> dict[str, object]:
+        """The configured table. Not reproducible: :meth:`set_price` moves it."""
+        return {"provider": self.name, "reproducible": False, "prices": dict(self._configured)}
 
     def set_price(self, ticker: str, price: float) -> None:
         with self._lock:

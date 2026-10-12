@@ -109,7 +109,8 @@ def _fingerprint(key: bytes) -> str:
 # Not agent-reachable (only the operator chooses the provider and its prices),
 # hence low. Fix: StaticProvider.world() records its normalised price table
 # (reproducible: True), or start_backtest refuses a non-reproducible provider.
-@pytest.mark.xfail(strict=True, reason="red-team 0011: a static run restarts on another table")
+# FIXED cycle 19: StaticProvider.world() records its configured table (still
+# reproducible: False — set_price moves it — but another table is another world).
 def test_hole_a_static_run_does_not_restart_on_another_table(SessionFactory, db):
     _open_world(SessionFactory, StaticProvider({"SYNA": 100.0}))
     with pytest.raises(RunClockError):

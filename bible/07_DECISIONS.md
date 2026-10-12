@@ -650,3 +650,15 @@ another provider — exactly what the law now forbids; they install their world 
 Evidence: `tests/test_run_world.py` (11 tests: record, golden fingerprint replica, restart in the
 same world, refusals for another key / symbols / provider, pre-ADR run, server lifespan, operator
 CLI, `/events` shows the fingerprint and not the key).
+**Amendment (cycle 19, before merge — red-team 0011: 1 low hole, 8 held).** The static table is a
+function of its configuration, so recording only `{provider, reproducible: false}` let a static
+run restart on another table (other prices, extra symbols) — the splice this ADR forbids
+(operator-only, hence low). Fixed: `StaticProvider.world()` records its configured table as
+`prices` (still `reproducible: false`, because `set_price` moves it). Held: only management reads
+`/events`; no spelling of the key leaks; the fingerprint matches no served HMAC and is no
+brute-force target for a random key; equal records ⇔ equal markets (HMAC zero padding included);
+floats and spellings round-trip through the JSON payload; agent activity cannot block a restart.
+Auditor NOTE fixed: `start-backtest` without a key is `Error:` + exit 1. Left as noted: a
+format-valid zero-entropy key (`"00"*16`) is accepted (predates this ADR; config cannot judge
+entropy); `volatility=0` is code-only; a malformed configured symbol is a traceback (exits non-zero,
+writes nothing).

@@ -96,7 +96,8 @@ def test_the_fingerprint_names_the_key_and_nothing_else():
 
 
 def test_a_feed_that_is_not_a_function_of_its_record_says_so():
-    assert StaticProvider({"AAPL": 1.0}).world() == {"provider": "static", "reproducible": False}
+    assert StaticProvider({"AAPL": 1.0}).world() == {
+        "provider": "static", "reproducible": False, "prices": {"AAPL": 1.0}}
 
 
 # --- the ledger keeps it ----------------------------------------------------------
