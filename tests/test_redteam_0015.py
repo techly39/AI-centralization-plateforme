@@ -57,7 +57,8 @@ from tests.test_runtime_lockstep import (  # noqa: F401  (fixtures)
 
 
 def _mgmt(id: str, script: str) -> AgentSpec:
-    return AgentSpec(id=id, name=id, role="management", provider="scripted", script=script,
+    # `world`'s management agent's name: a key wears its spec's name (ADR-032 (n)).
+    return AgentSpec(id=id, name="management", role="management", provider="scripted", script=script,
                      charter="Run the firm.")
 
 
@@ -217,8 +218,9 @@ def test_held_a_mind_cannot_move_time_itself(SessionFactory, world, monkeypatch)
 def test_held_the_runtime_key_cannot_wear_a_mind(SessionFactory, world, woke):
     """Sloppy operator: the clock key handed as a mind's key. No spec role is
     'runtime', so the wake is refused and time does not move."""
-    run = conduct(SessionFactory, [(_mgmt("a-mgmt", "read-a"),
-                                    world["clock"])], world["clock"], steps=2)
+    # The spec wears the clock key's own name, so only the role differs (audit c26 BLOCK 1).
+    clock_spec = _mgmt("a-mgmt", "read-a").model_copy(update={"name": "runtime"})
+    run = conduct(SessionFactory, [(clock_spec, world["clock"])], world["clock"], steps=2)
     # Since the H2 fix the conductor reads every mind's /me before step 0, so the
     # refusal comes earlier and names the spec (was: wake_refused:a-mgmt:identity_mismatch).
     assert (run.ended, run.reason, run.steps) == ("refused", "identity_mismatch:a-mgmt", ())

@@ -29,14 +29,15 @@ records that (it may have moved before the failure, H3).
 
 Before step 0 the conductor checks what it is handed, not what it is told: the
 clock key's ``/me`` must be the ``runtime`` role, ``/clock`` must say
-``backtest``, spec ids must be unique, every mind's key must be its spec's role
-and pod, and no App agent may be handed in twice (H2); ``steps`` and
+``backtest``, spec ids must be unique, every mind's key must be its spec's name,
+role and pod, and no App agent may be handed in twice (H2); ``steps`` and
 ``days_per_step`` must be plain ints in range. Every act goes over HTTP; physics
 decides what is allowed.
 
-The record is returned, not stored: R-4 writes it to a cassette. Provisioning
-minds from their specs (binding the spec's name to the App agent) is R-3b-2b;
-until then the caller hands in each mind's client.
+The record is returned, not stored: R-4 writes it to a cassette. The minds come
+from :func:`runtime.provision.provision`, which registers each App agent from its
+spec (ADR-032 (n)); a caller may still hand in clients it made, and the name
+check holds them to their specs.
 """
 
 from __future__ import annotations
@@ -129,8 +130,8 @@ async def run_backtest(
             who = await mind.client.get("/me")
         except FundAPIError as exc:
             return RunRecord("refused", f"mind_unreadable:{mind.spec.id}:{exc.status_code}", label)
-        if not isinstance(who, dict) or (who.get("role"), who.get("pod_id")) != (
-                mind.spec.role, mind.spec.pod):
+        if not isinstance(who, dict) or (who.get("name"), who.get("role"), who.get("pod_id")) != (
+                mind.spec.name, mind.spec.role, mind.spec.pod):
             return RunRecord("refused", f"identity_mismatch:{mind.spec.id}", label)
         if type(who.get("id")) is not int:
             return RunRecord("refused", f"identity_mismatch:{mind.spec.id}", label)

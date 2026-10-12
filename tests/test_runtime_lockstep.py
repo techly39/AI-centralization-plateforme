@@ -90,7 +90,9 @@ def woke(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 def _spec(id: str, pod: int, script: str = "read-a", **fields) -> AgentSpec:
-    return AgentSpec(**({"id": id, "name": id, "role": "pm", "pod": pod, "provider": "scripted",
+    # The name is the pod's PM's in `world`: a key wears its spec's name (ADR-032 (n)).
+    return AgentSpec(**({"id": id, "name": f"pm-{pod}", "role": "pm", "pod": pod,
+                         "provider": "scripted",
                          "script": script, "charter": "Read the clock."} | fields))
 
 
@@ -251,8 +253,9 @@ def test_a_key_that_is_not_its_specs_agent_refuses_the_run_before_step_0(
         SessionFactory, world, woke):
     """pm-1's key under a spec for pod 2. Since red-team 0015 H2 every key is read
     before step 0, so nobody wakes at all (was: a woke once, then the run was refused)."""
+    # b-pm wears pm-1's own name, so only the pod differs (audit c26 BLOCK 1).
     handed = [(_spec("a-pm", 1, "read-a"), world["pm"][1]),
-              (_spec("b-pm", 2, "read-b"), world["pm"][1])]
+              (_spec("b-pm", 2, "read-b", name="pm-1"), world["pm"][1])]
     run = conduct(SessionFactory, handed, world["clock"], steps=3)
     assert (run.ended, run.reason, run.steps) == ("refused", "identity_mismatch:b-pm", ())
     assert woke == [] and _advances(SessionFactory) == []
@@ -450,7 +453,7 @@ def test_when_every_mind_is_retired_the_world_still_lives_its_steps(SessionFacto
 
     monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(
         dict(scripted.SCRIPTS) | {"firer": firer, "read-b": _read_once}))
-    handed = [(AgentSpec(id="a-mgmt", name="a-mgmt", role="management", provider="scripted",
+    handed = [(AgentSpec(id="a-mgmt", name="management", role="management", provider="scripted",
                          script="firer", charter="Run the firm."), world["admin"]),
               (_spec("b-pm", 2, "read-b"), world["pm"][2])]
     run = conduct(SessionFactory, handed, world["clock"], steps=5)

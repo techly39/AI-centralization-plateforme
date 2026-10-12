@@ -939,6 +939,60 @@ run like any other refusal (NOTE 3, now pinned).
 Still R-3b-2b: provisioning agents from specs (the name bound), `fund-runtime backtest`, and the
 run label in physics' run record.
 
+Amended (cycle 26, R-3b-2b-1 shipped: `runtime/provision.py`, `tests/test_runtime_provision.py`):
+(n) **Minds are made from their specs, and a key wears its spec's name.**
+`runtime.provision.provision(specs, registrar, connect)` registers one App agent per spec through
+`POST /agents/register`. Name, role and pod come from the spec, and `charter_ref` is
+`spec:<id>`.
+- *Who registers.* The registrar is a key the caller holds, and physics decides whether it may
+  register. The `runtime` identity was **not** given `REGISTER_AGENTS` (prime rule, safer seal):
+  the clock key stays the narrowest key in the world. A leaked clock key moves time but cannot
+  mint puppets. Today the registrar is the operator's seed admin, so every `agent_registered`
+  names it as actor. Whether an Era II workflow registers through its own identity is decided
+  then.
+- *All checked first.* Before anything is registered, every spec is checked, under one read of
+  the law:
+  - ids and names are unique;
+  - the wake gate is open (HALT or a cap refusal provisions nothing);
+  - `wake_policy` is not `never`;
+  - a mind can be built from it (registry contradictions).
+  A spec that could never wake gets no agent. HALT is read again before every registration
+  (claim check: a HALT created part-way was not seen until this was added).
+- *Part-way failure.* An answer is accepted only if it is the agent asked for: the name, role
+  and pod match, the id is an int not already seen in this call, and the key is not empty.
+  Otherwise `ProvisionError(reason, registered)` names the specs already registered, the failing
+  one included if its answer was wrong. Their clients are closed. Those agents exist, so the run
+  database is spoiled (ADR-027).
+- *The name is bound.* `native.wake` and `run_backtest` compare `/me`'s **name** as well as role
+  and pod (`identity_mismatch`). A caller may still hand in clients it made, and the name holds
+  them to their specs.
+- *Finding.* 65 older runtime tests broke because their fixtures handed a key under another
+  name: spec name = spec id, agent `pm-1`. That is the gap this law closes. Only the fixtures
+  were changed, to name the agent they register. No assertion changed. **But** (audit c26
+  BLOCK 1) in four guards whose purpose is a role or pod mismatch (0013 H2/H3, lockstep
+  wrong-pod, 0015 clock-key-as-mind), the new names also mismatched. Those guards would have
+  passed on the name check alone, so the role and pod checks were left unpinned. Fixed: each
+  spec now wears its key's own name, so only the role or pod differs. Two new tests check a
+  right name with a wrong role and a right name with a wrong pod, through both the wake and the
+  conductor.
+- *Red-team 0016 amendment* (4 low holes, all fixed, guards in `tests/test_redteam_0016.py`):
+  - H1: a 5xx answer (lost after physics committed) now names the failing spec as possibly
+    registered. Only a 4xx proves nothing was made.
+  - H1b: a failing `connect`, or any other exception from the POST, is a `ProvisionError`
+    naming what may exist.
+  - H2: names are unique **under physics' fold** (`provision.name_key`, a copy pinned to
+    `app.registry.service._name_key` by a test, since runtime imports no `app`).
+  - H3: reserved names (`name_reserved`) and names already in the directory (`name_taken`,
+    read through the registrar's `GET /agents`) are refused before anything is registered.
+    A registrar that cannot read the directory is refused (`directory_unreadable`). A name
+    taken in the window between that read and the POST still fails closed with a 409.
+  - Seen, not filed: management keeps `REGISTER_AGENTS`, so in Era II a management mind could
+    take a future spec's name first. It fails closed, but it is a way to block a spec (→
+    BACKLOG).
+- *Proof.* The R-3b-2a two-pod month now runs with minds provisioned over HTTP.
+Still **R-3b-2c**: `fund-runtime backtest` and the `minds:` label in physics' run record
+(physics → red-team).
+
 ## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
 Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
 agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's
