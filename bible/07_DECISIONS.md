@@ -732,8 +732,10 @@ every slice is one cycle. Physics changes are limited to what a slice names: R-3
 permission move to a `runtime` identity, a TRD role deviation, and the `minds` label in the run
 record), R-4 (if cassette hashes are linked from events), R-5 (B-023 halt events, if taken) and R-6
 (system-reported costs overriding self-reports, firm-level costs, a cost-report rate law). Each of
-these gets its own red-team pass. **Exit criteria are ticked only by real minds:** R-3 and R-4
-deliver M1/M2 with scripted minds and do not tick EC1/EC2. Those are ticked at R-8. (6) **Reuse**: `FundClient`, the MCP tool table and the probe's scripted pod.
+these gets its own red-team pass. **Run criteria are ticked only by real minds:** R-3 and R-4
+deliver M1/M2 with scripted minds and do not tick EC1/EC2. Those, and EC7's live half, are ticked
+at R-8. EC3–EC6 are test criteria, and tests with scripted or fake providers may meet them
+(EC4's own text allows "the fake provider in tests"). (6) **Reuse**: `FundClient`, the MCP tool table and the probe's scripted pod.
 Dependency law (R-1): if `runtime` imports `mcp_server`, it transitively loads `app.config` +
 `app.limits`. Giving the runtime layer an app allowlist is a change to the law, recorded as an
 amendment here, with a planted counter-example showing every other `app.*` module is still refused.

@@ -61,7 +61,9 @@ Options: A scripted minds and replays are also refused while the cap is null (th
 be tested end to end until you set a cap) / B the cap gate **fails closed**: under null, only the
 two providers named in code (`scripted`, `cassette`) may wake, and every other provider is
 refused, unknown ones included. Runs are labelled `minds: scripted` / `minds: replay` and are
-never reported as live agent runs. No Era I exit criterion is ticked by them.
+never reported as live agent runs. They never tick the Era I criteria about a real run (the month, its replay,
+and OpenClaw's live probes). The test criteria (look-ahead, cost attribution, halt, null cap) may
+be met by tests using them.
 Chosen: B. Art. 2.1 defines firm agents as "every AI inside the simulation". A script is not an
 AI and spends nothing, so B keeps the cap law exactly as strict for every model while M1–M5
 (`bible/09_BUILDER_VISION.md` §3) get built and tested. The exit-criterion test "cap null →

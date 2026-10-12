@@ -79,8 +79,9 @@ instrument is not worth having).
 - **M5** the `openclaw` adapter renders `firm-` agents that pass the static conformance suite;
 - **M6** (needs the Human's cap, Q-0001) the first real-model month, and its replay.
 
-M1–M5 need no money. M6 is the only step that waits for the Human, so it goes last. Scripted
-milestones tick no exit criterion: EC1 and EC2 are ticked only by real minds, at M6.
+M1–M5 need no money. M6 is the only step that waits for the Human, so it goes last. EC1, EC2 and
+EC7's live half are ticked only by real minds, at M6. EC3–EC6 are test criteria that tests with
+scripted or fake providers may meet.
 
 **Era II (the end of the Launch Pad)** as the Human wrote it, with the fork as its measuring tool.
 Generation N+1 is a fork of generation N's world, so "did the firm get better?" is asked against
