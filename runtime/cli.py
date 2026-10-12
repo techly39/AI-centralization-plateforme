@@ -7,7 +7,7 @@ every spec in ``DIR``, what the wake gate would decide right now. It wakes
 nothing. Exit 1 if a spec file is refused.
 
     fund-runtime backtest --specs DIR --steps N [--days-per-step D] [--input FILE]
-                          [--max-tool-calls K] [--server URL]
+                          [--max-tool-calls K] [--server URL] [--cassette PATH]
 
 lives ``N`` steps of a backtest run with the minds ``DIR``'s specs describe
 (R-3b-2c-1). The run's database is the one the App at ``URL`` serves; the
@@ -34,7 +34,10 @@ refusal part-way, the run's database is spoiled: ADR-027). ``run`` is the
 :class:`~runtime.lockstep.RunRecord`, or ``null`` if the run never began. No
 key in the form physics mints is printed (:func:`redact`). Exit 0 only if the run ``completed``; 1 if it was refused
 or ended early; 2 if the command itself is wrong (no specs, an unreadable
-input, a missing key, a server that is not on this machine).
+input, a missing key, a server that is not on this machine, a ``--cassette`` path that
+cannot be written). With ``--cassette PATH`` the same outcome is also written, redacted, to a
+new ``*.cassette.json`` file (:mod:`runtime.cassette`) whatever the run's end; a write that
+fails exits 1 after the outcome was printed.
 
 The server must be on this machine (``127.0.0.1`` or ``::1``), and no proxy from
 the environment is used (``FundClient``): agent keys never leave it.
@@ -46,7 +49,6 @@ import argparse
 import asyncio
 import json
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -55,6 +57,8 @@ from urllib.parse import urlsplit
 import httpx
 
 from mcp_server.client import FundClient
+from runtime import cassette
+from runtime.cassette import CassetteError, redact  # noqa: F401 - ``cli.redact`` is public
 from runtime.gate import decide_wake_under
 from runtime.governance import read_governance
 from runtime.lockstep import (
@@ -78,8 +82,6 @@ DEFAULT_SERVER = "http://127.0.0.1:8000"
 _LOOPBACK = frozenset({"127.0.0.1", "::1"})
 #: A wake's tool-call budget, at most (audit c27 WARN 2); the default is 64.
 MAX_TOOL_CALLS = 1024
-#: ``app.registry.security``: ``API_KEY_PREFIX`` + ``secrets.token_urlsafe(32)``.
-_MINTED_KEY = re.compile(r"fk_[A-Za-z0-9_-]+")
 
 
 class _Usage(Exception):
@@ -102,6 +104,8 @@ def main(argv: list[str] | None = None, *,
                     help="tool-call budget per wake")
     bt.add_argument("--server", default=os.environ.get(SERVER_ENV) or DEFAULT_SERVER,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
+    bt.add_argument("--cassette", type=Path, metavar="PATH",
+                    help=f"write the run's record to a new PATH{cassette.SUFFIX} (never overwritten)")
     args = parser.parse_args(argv)
     if args.command == "backtest":
         return _backtest(args, transport)
@@ -144,6 +148,11 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
             raise _Usage("the registrar key and the clock key are one key: the clock "
                          "identity registers nobody")
         server = _loopback(args.server)
+        if args.cassette is not None:
+            try:
+                cassette.check_path(args.cassette)
+            except CassetteError as exc:
+                raise _Usage(str(exc)) from exc
     except (SpecError, _Usage) as exc:
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
@@ -152,19 +161,16 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
                                workflow_input=workflow_input,
                                max_tool_calls=args.max_tool_calls))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
-    return 0 if out["ended"] == "completed" else 1
-
-
-def redact(text: str) -> str:
-    """Every key in the form physics mints (``fk_`` + url-safe base64) replaced.
-
-    A record can hold one: a management mind's ``register_agent`` result carries
-    the new agent's key, and the transcript keeps tool results as they came
-    (audit c27 BLOCK 1). JSON escapes none of the key's characters, so the
-    serialized text is searched whole. A key a mind re-encodes is in-world data
-    this cannot see (Art. 8): the claim is about keys as physics wrote them.
-    """
-    return _MINTED_KEY.sub("fk_<redacted>", text)
+    code = 0 if out["ended"] == "completed" else 1
+    if args.cassette is not None:  # every run that began is written, refused ones too (Art. 9)
+        try:
+            redactions = cassette.write(args.cassette, out)
+        except CassetteError as exc:
+            print(f"fund-runtime: {exc}", file=sys.stderr)
+            return 1
+        print(f"fund-runtime: cassette {args.cassette} ({redactions} redactions)",
+              file=sys.stderr)
+    return code
 
 
 async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, clock_key: str,

@@ -300,6 +300,19 @@ def test_a_pm_without_an_analyst_holds_all_month(months) -> None:
                for w in lone)
 
 
+def test_the_same_world_twice_writes_the_same_cassette_bytes(months) -> None:
+    """R-4a: the cassette is a pure function of the run — nothing in it is a clock or a dice."""
+    from runtime import cassette
+    from runtime.lockstep import record_json
+    a, b = (cassette.dumps({"run": record_json(months[k]["run"])}) for k in "ab")
+    assert a == b and a[1] == 0
+    wakes = [w for st in months["a"]["run"].steps for w in st.wakes]
+    assert wakes and all(len(w.exchanges) == sum(m.role == "assistant" for m in w.transcript)
+                         for w in wakes)
+    hashes = [e.request_sha256 for w in wakes for e in w.exchanges]
+    assert len(set(hashes)) > len(hashes) // 2  # days differ: requests are not all one request
+
+
 def test_the_same_world_twice_leaves_the_same_pod_ledger(months) -> None:
     a, b = months["a"], months["b"]
     assert len(a["ledger"]) == len(b["ledger"])

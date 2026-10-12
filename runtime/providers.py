@@ -14,8 +14,9 @@ system-reported cost overrides it (R-6).
 ``spends_money`` is a description for reports. The wake gate never reads it:
 what may run under the cap is decided by name, in :mod:`runtime.gate`.
 
-The request/response shapes are the minimum R-2 needs. Cassettes (R-4) will
-hash requests; that format is decided there.
+The request/response shapes are the minimum R-2 needs. A request is named by
+:func:`runtime.cassette.request_sha256` (R-4a); this module keeps to pydantic and
+``typing`` on purpose (``test_redteam_0013``: a script's only non-stdlib import).
 """
 
 from __future__ import annotations
