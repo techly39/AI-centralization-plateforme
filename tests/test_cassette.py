@@ -268,6 +268,30 @@ def test_the_open_itself_refuses_a_symlink_planted_after_the_check(
     assert not target.exists()
 
 
+def test_a_write_that_fails_part_way_leaves_no_file(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import errno
+    real_fdopen = os.fdopen
+
+    class Full:
+        def __init__(self, fd: int) -> None:
+            self.f = real_fdopen(fd, "w")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            self.f.close()
+
+        def write(self, text: str) -> None:
+            raise OSError(errno.ENOSPC, "No space left on device")
+    monkeypatch.setattr(cassette.os, "fdopen", lambda fd, *a, **kw: Full(fd))
+    path = tmp_path / "full.cassette.json"
+    with pytest.raises(CassetteError):
+        cassette.write(path, {"ended": "completed"})
+    assert not path.exists()
+
+
 def test_check_path_is_what_write_checks(tmp_path: Path) -> None:
     ok = tmp_path / "x.cassette.json"
     assert cassette.check_path(ok) == ok

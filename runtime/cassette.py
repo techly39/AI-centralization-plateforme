@@ -10,8 +10,10 @@ backtest`` prints), with every wake's exchanges (``request_sha256`` and usage; s
   written, and the number replaced is stored (``redactions``). The hash in an exchange
   is of the *unredacted* request, so a replay that meets a minted key diverges instead of
   matching by luck (B-047). A key a mind re-encodes is in-world data this cannot see (Art. 8).
-* **Careful with the disk.** The file is created exclusively, with mode 0600, never
-  through a symlink; a refusal leaves nothing behind. It is gitignored (B-000i).
+* **Careful with the disk.** The file is created exclusively (never overwritten), with mode
+  0600, and the file itself is never a symlink (``O_NOFOLLOW`` looks at the last component
+  only: a symlinked *directory* is the operator's choice). A refusal leaves no file behind.
+  It is gitignored (B-000i).
 
 Standard library only: this module imports nothing from physics or the conductor.
 """
