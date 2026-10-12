@@ -10,7 +10,8 @@ Claims under attack:
 * The runtime identity is created only by ``fund-env seed-runtime`` /
   :func:`seed_runtime_agent`, one per database. ``system`` is found by role.
 * The names ``system`` / ``runtime`` are reserved after NFKC + casefold + dropping
-  Cf characters + strip — "the name as a reader sees it".
+  Cf characters + strip — "the name as a reader sees it". (As attacked at 3cea548;
+  since the H1 fix the fold drops Cc Cf Cn Co Cs Mn Me and the blank letters.)
 
 Attacker: a firm agent (management, PM, analyst) holding its own key and the MCP
 tools; for the operator path, the operator CLI on backtest / live / halted DBs.

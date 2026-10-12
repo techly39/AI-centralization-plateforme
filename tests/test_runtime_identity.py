@@ -193,6 +193,7 @@ def test_management_cannot_switch_off_physics(client, world, db, target):
     denied = _events(db, EVENT_PERMISSION_DENIED)[-1]
     assert denied.payload_json["action"] == "deactivate_agents"
     assert denied.payload_json["target_agent_id"] == target_id
+    assert denied.payload_json["reason"] == "reserved_identity"
     assert not _events(db, "agent_deactivated")
     # ... and the clock hand still works.
     assert client.post("/clock/advance", headers=H(world["runtime"]),
