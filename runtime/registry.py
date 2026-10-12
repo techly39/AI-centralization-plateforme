@@ -69,7 +69,8 @@ def build_provider(spec: AgentSpec, tape: replay.Tape | None = None) -> LLMProvi
         if tape is not None:
             raise ProviderRefused("contradiction", "a tape is for provider 'cassette'")
         return PROVIDER_CLASSES["scripted"](scripted.SCRIPTS[spec.script])
-    # check_spec passed: the name is in the table, and it is "cassette".
+    if name != "cassette":  # a provider added to the table later needs its own branch here
+        raise ProviderRefused("unavailable", f"provider {name!r} has no builder")
     if type(tape) is not replay.Tape:  # a subclass, a dict or a provider is not a recording
         raise ProviderRefused("unavailable", "the cassette provider needs a recording of this wake")
     return PROVIDER_CLASSES["cassette"](tape)

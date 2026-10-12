@@ -113,7 +113,9 @@ def read(path: Path) -> tuple[dict[str, Any], int]:
     its own outcome. Anything else (pretty-printed, reordered, a second version) is refused.
     """
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        # O_NONBLOCK: opening a FIFO would otherwise wait for a writer, forever (audit c32 WARN 1);
+        # the regular-file check below refuses it. It does not change how a regular file reads.
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError as exc:
         raise CassetteError(f"cannot open {path}: {exc.strerror}") from exc
     try:

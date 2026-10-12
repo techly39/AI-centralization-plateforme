@@ -150,6 +150,11 @@ def test_read_refuses_a_symlink_a_directory_and_a_missing_file(tmp_path: Path) -
         cassette.read(folder)
     with pytest.raises(CassetteError):
         cassette.read(tmp_path / "none.cassette.json")
+    # A FIFO has no writer: opening it must be refused, not wait (audit c32 WARN 1).
+    fifo = tmp_path / "pipe.cassette.json"
+    os.mkfifo(fifo)
+    with pytest.raises(CassetteError, match="regular"):
+        cassette.read(fifo)
 
 
 # --- the recording ---------------------------------------------------------------------
@@ -286,6 +291,17 @@ def test_cassette_builds_exactly_the_cassette_class_and_only_from_a_tape() -> No
         with pytest.raises(ProviderRefused) as caught:
             build_provider(_cassette_spec(), not_a_tape)
         assert caught.value.reason == "unavailable"
+
+
+def test_the_cassette_class_is_built_for_the_name_cassette_only(monkeypatch) -> None:
+    """A provider added to the table later must not fall through to the cassette builder."""
+    from types import MappingProxyType
+    from runtime import registry
+    monkeypatch.setattr(registry, "PROVIDER_CLASSES",
+                        MappingProxyType({**registry.PROVIDER_CLASSES, "metered": object}))
+    with pytest.raises(ProviderRefused) as caught:
+        build_provider(_spec(provider="metered", script=None), Tape())
+    assert caught.value.reason == "unavailable"
 
 
 def test_a_tape_on_any_other_provider_is_a_contradiction() -> None:
