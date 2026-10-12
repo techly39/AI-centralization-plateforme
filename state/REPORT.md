@@ -1,5 +1,17 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 19: every backtest now records which market it ran in.** The first event of
+a backtest now names its market: which price source, which settings, and for the made-up market
+a short "fingerprint" of the secret key. The key itself is never stored, and the fingerprint
+cannot be turned back into the key. If the fund is restarted on that backtest with a different
+market (another key, other symbols, other prices), it now refuses to start. Before, it would
+have silently mixed two markets into one record. The new rule caught two of my own tests that
+had been doing exactly that. The attack review found one small gap, now fixed: the fixed-price
+test market wasn't recorded. Nothing needs your action. `setup/` is still waiting for
+`bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 18: a backtest can now be re-run to exactly the same result.** I added a
 made-up offline market. Its prices are generated from a secret key, so no internet is needed. A
 scripted trader (no AI model) traded one simulated month in about half a second. The limit is 10

@@ -199,3 +199,14 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   stream for something agents see.
 - **Worlds as experiment units.** Truman's scenarios = (key, parameters); an experiment spec lists
   worlds per arm, and the ledger fingerprint (B-037) proves which arm a run was in.
+
+## Cycle 19
+- **New laws as fixture auditors.** When a law lands, the old tests it breaks are findings, not
+  noise: log each "test that was quietly violating the new law" in the ADR. Cycle 19 found two
+  fixtures splicing worlds. Could become a protocol line in `protocol/CYCLE.md` step 5.
+- **World record as a scenario manifest.** `world()` is already the Truman scenario descriptor:
+  add regime/jump/correlation parameters to it and an experiment can be specified as a list of
+  world records (secrets as fingerprints, keys in the operator's file).
+- **Self-referential assertion detector.** A cheap AST check in tests: an `assert x == f()` where
+  the code under test produced `x` from the same `f()` — flag for a literal. The auditor caught
+  one by eye.

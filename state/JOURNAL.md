@@ -634,3 +634,27 @@ fingerprint, other key → other fingerprint); a server or operator command star
 the wrong key, symbols or provider refuses to start instead of silently splicing two markets into
 one ledger; and no agent-visible surface carries the key (red-team 0010's held test stays green,
 plus a new one: the fingerprint reveals no served noise or return).
+Work: `MarketDataProvider.world()` (default `{provider, reproducible: false}`); synthetic record
+(law `hmac-sha256-gbm/1`, origin, drift, volatility, sorted symbols, 128-bit fingerprint in its own
+HMAC domain); `start_backtest` writes `run_started.world` from the installed provider;
+`install_run_clock` → `_require_same_world` refuses naming the differing fields (server lifespan
+fails, CLI exits 1, nothing appended); pre-ADR runs without `world` pass. Two fixtures (probe,
+`honest_backtest`) had opened runs in the static table and served them from another provider —
+the law caught exactly that; they now install the world first. ADR-031 (+ amendment).
+`tests/test_run_world.py` (13). Auditor **PASS** (NOTE fixed: keyless `start-backtest` → Error,
+exit 1). Red-team 0011: **1 low hole** — a static run restarted on another table — fixed
+(`StaticProvider.world()` records its configured table), 8 held (only management reads `/events`,
+no key spelling leaks, fingerprint no window/no brute-force target, HMAC zero-padding keys are
+the same world, float/spelling round-trips, agents cannot block a restart). Re-audit **PASS**
+(NOTE fixed: a self-referential assertion made literal).
+Result: merged 842e958, pushed. 770+8xf → **796 passed + 8 xfailed** (working tree: +1 known
+`setup/` failure). Hypothesis **met**; widened by red-team: "reproducible" and "checkable" are
+different properties — a world can be checked for sameness without being re-runnable.
+Learned: (1) A new physics law is validated best by the old tests it breaks: two fixtures had
+been quietly splicing worlds for cycles. (2) "Not reproducible" was being used to mean "nothing
+to record"; any configuration that determines answers belongs in the record, even when the run
+cannot be replayed from it. (3) An assertion that compares a function's output with itself is
+not a test — the auditor caught one I wrote while updating an exact-shape check.
+Next: B-037b (a `fund-env backtest` driver that re-runs a ledger's world from the operator's key
+file and diffs the ledgers) or B-037c (which agents have lived which worlds) → the Runtime plan →
+`bible/09_BUILDER_VISION.md` at the cycle-20 retrospective.

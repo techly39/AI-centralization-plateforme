@@ -1,16 +1,24 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 18 (B-004c the Phase 3 probe — merged 71d6492, 2026-10-12)
+**Last cycle:** 19 (B-037a a run records its world — merged 842e958, 2026-10-12)
 
 ## What is true now
+- **A run records its world and lives in only one** (ADR-031 + amendment,
+  `tests/test_run_world.py`, `tests/test_redteam_0011.py`): every provider has `world()`;
+  `run_started.world` carries it (synthetic: law `hmac-sha256-gbm/1`, origin, drift, volatility,
+  symbols, `key_fingerprint` = 128 bits of `HMAC(key, "fingerprint:v1")`; static: its configured
+  table; yfinance: `{provider, reproducible: false}`). The world must be installed *before*
+  `start_backtest`. `install_run_clock` refuses a backtest DB whose recorded world differs (server
+  will not start; CLI exits 1). Pre-ADR runs carry no world and pass. Not yet: re-run driver
+  (B-037b), per-agent lived-worlds (B-037c).
 - **A backtest is reproducible** (ADR-030 + amendment, `tests/test_phase3_probe.py`): a keyed
   `SyntheticProvider` (`marketdata.provider: synthetic`) makes every daily bar a pure function of
   (key, symbol, day) — offline, request-order free, under the ADR-028 base. The key is ≥128 bits,
   `FUND_MARKETDATA__SYNTHETIC_KEY` only (a `config.yaml` carrying it refuses to load), no default.
   A scripted LLM-free pod lives 31 days through HTTP in ~0.55 s; the same world twice gives the
   same ledger event for event, curve, book and metrics; another world differs. TRD Phase 3
-  milestone met for a scripted pod. Runs do not yet record *which* world (B-037).
+  milestone met for a scripted pod.
 - **The world has one now** (ADR-029 + amendment, `tests/test_one_now.py`,
   `tests/test_redteam_0009.py`): `/price`, `/ohlcv` defaults, `/portfolio`, pod metrics, the
   leaderboard, the OMS reference price and the sweep all answer at `ledger_now(session)` — the
@@ -28,13 +36,15 @@
   live order** (ADR-025); **portable JSON ledger** (ADR-024); **halt is physics** (ADR-023);
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
-  clock + look-ahead guard + one now + keyed synthetic market. **770 passed + 8 xfailed**. No model
+  clock + look-ahead guard + one now + keyed synthetic market + world record. **796 passed + 8
+  xfailed**. No model
   has traded through the App yet (a scripted pod has). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
-- **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) fixed. 8 strict xfails open (0001: payload size ×2 = B-000g, message
+- **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
+  low) fixed. 8 strict xfails open (0001: payload size ×2 = B-000g, message
   content = B-000e, system squat = B-000f, MCP path = B-000h; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
-  B-025 (rest), B-028–B-030, B-033 (rest), B-035 (low).
+  B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038 (low).
 - Still-open time debts: B-017 Sharpe ×0.845, B-028 row stamps, B-029 live forward step, B-036.
   B-032: clock control moves off management before an LLM manager wakes.
 - **Constraint for Era III (ADR-028 amendment):** agent strategy code never runs inside the App's
@@ -58,10 +68,10 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. B-037 a run records its world: provider, symbols, parameters and a one-way key fingerprint
-   in `run_started` (never the key); a `fund-env backtest` driver re-runs a ledger's world.
-2. B-036 stamp-after-flush check (closes 2 xfails) or B-028 row stamps — use the probe as the
-   determinism harness for both.
-3. Plan the Runtime slice (Era I exit: PM + Analyst complete the month *via the Runtime*); write
-   `bible/09_BUILDER_VISION.md` by the cycle-20 retrospective at the latest. (S-004b stays blocked
-   on P-0002.)
+1. **Cycle 20 is a retrospective** (re-read 00 + 01, `06_LOOP` §6): write
+   `bible/09_BUILDER_VISION.md` (due now) and the Runtime plan (Era I exit: PM + Analyst complete
+   the month *via the Runtime*), split into backlog slices.
+2. B-037b `fund-env backtest` re-run driver (fingerprint check first, ledger diff) — or B-037c
+   lived-worlds, whichever the Runtime plan needs first.
+3. B-036 stamp-after-flush check (closes 2 xfails) or B-028 row stamps — the probe is the
+   determinism harness for both. (S-004b stays blocked on P-0002.)

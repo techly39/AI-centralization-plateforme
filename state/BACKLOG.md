@@ -81,11 +81,18 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       (HMAC, ≥128-bit env-only key, no default; config.yaml carrying it refuses to load); scripted
       pod, 31 days through HTTP in ~0.55 s, twice to the same ledger/curve/book/metrics, another
       world differs. Red-team 0010: 1 high hole (seed from volumes) fixed, 6 held.
-- [ ] **B-037** **Next.** A run records its world: `run_started` carries provider, symbols,
-      parameters and a one-way key **fingerprint** (never the key — management reads `/events`);
-      which agents have lived which worlds (re-running a lived world is not out-of-sample). A
-      `fund-env backtest` CLI driver that re-runs a ledger's world from the operator's key file.
-      Keep `test_held_no_agent_visible_surface_carries_the_seed` green (ADR-030 "not done").
+- [x] **B-037a** A run records its world — cycle 19 (ADR-031 + amendment): `run_started.world`
+      (synthetic: law, origin, drift, vol, symbols, 128-bit HMAC fingerprint; static: its table);
+      `install_run_clock` refuses another world. Red-team 0011: 1 low hole fixed, 8 held.
+- [ ] **B-037b** **Next.** `fund-env backtest` driver: re-run a ledger's world from the
+      operator's key file (fingerprint must match before anything runs) and diff the two ledgers —
+      the probe as an operator tool. Keep red-team 0010/0011 held tests green.
+- [ ] **B-037c** Which agents have lived which worlds (re-running a lived world is not
+      out-of-sample): a per-agent world history readable by management / experiments.
+- [ ] **B-038** (low, operator-only, red-team 0011 + re-audit notes) A format-valid zero-entropy
+      `synthetic_key` (`"00"*16`) is accepted — refuse keys with obviously low entropy (all-same
+      byte, short period); a malformed `synthetic_symbols` ticker raises `InvalidRequestError`
+      through the CLI as a traceback (exits non-zero, writes nothing) — validate in config.
 - [ ] **B-036** (low) `OMS_LOCK` is per-process: a second process (operator `check-orders`, a
       second server) that commits an advance between the in-lock read of now and the fill INSERT
       prices a fill at the old now and stamps it at the new; `build_portfolio`'s positions+cash
