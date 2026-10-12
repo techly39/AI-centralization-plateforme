@@ -527,6 +527,7 @@ async def test_malformed_arguments_are_a_tool_error_not_a_crash(fund_client, des
                                                          arguments={"ticker": 5})]))
     rec = await wake(_spec(script="bad"), fund_client(pm_key), workflow_input={})
     assert rec.ended == "done" and rec.transcript[3].is_error
+    assert rec.tool_failures == 0  # the mind's bad arguments, not a bug under the tool
     assert _orders(SessionFactory) == []
 
 
