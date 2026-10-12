@@ -135,12 +135,16 @@ def test_hole_a_replay_does_not_execute_a_batch_the_recording_never_ran(
                        max_tool_calls=1)
     (w,) = recorded.steps[0].wakes
     assert (recorded.ended, w.ended, w.tool_calls) == ("completed", "tool_budget", 0)
-    rec = _record_to_recording(recorded, tmp_path / "r.cassette.json")
+    # Uncalendared: the replay is in the same database, a day later; the calendar check would end
+    # it before any mind woke and this test would pass without the budget clamp (audit c32 re-audit).
+    rec = _uncalendared(_record_to_recording(recorded, tmp_path / "r.cassette.json"))
     before = [e for e in _events(SessionFactory) if e[0] != EVENT_CLOCK_ADVANCED]
     replay = conduct(SessionFactory, [(_cassette_spec_of(spec), world["pm"][1])], world["clock"],
                      steps=1, replay=rec)  # max_tool_calls: the default, 64
     after = [e for e in _events(SessionFactory) if e[0] != EVENT_CLOCK_ADVANCED]
-    assert replay.ended == "diverged"  # caught -- but look at the ledger
+    # With the clamp the wake gets budget 0, stops at once as the recording did, and matches its
+    # tape: the run completes and the ledger gained nothing. Without it, the batch runs.
+    assert replay.ended == "completed", replay.reason
     assert after == before, (
         f"the replay wrote {len(after) - len(before)} events the recorded run never wrote: "
         f"{[t for t, _ in after[len(before):]]}")

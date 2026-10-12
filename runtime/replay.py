@@ -93,7 +93,8 @@ class Tape:
 
     def __post_init__(self) -> None:
         if (type(self.turns) is not tuple or any(type(t) is not Turn for t in self.turns)
-                or type(self.ended) is not str or type(self.tool_calls) is not int):
+                or type(self.ended) is not str or type(self.tool_calls) is not int
+                or self.tool_calls < 0):
             raise RecordingError("a tape is a tuple of Turns, how the wake ended and its calls")
 
 
@@ -140,6 +141,10 @@ class Recording:
                 type(k) is tuple and len(k) == 2 and type(k[0]) is int and type(k[1]) is str
                 and type(t) is Tape for k, t in tapes.items()):
             raise RecordingError("a recording is a step count and Tapes keyed by (step, spec id)")
+        if calendar != () and (len(calendar) != steps or not all(
+                type(c) is tuple and len(c) == 2 and all(type(x) is str for x in c)
+                for c in calendar)):
+            raise RecordingError("a calendar is empty, or one (at, advanced_to) pair per step")
         self.steps = steps
         self._tapes = dict(tapes)
         #: ``(at, advanced_to)`` per recorded step; empty for a hand-built recording.

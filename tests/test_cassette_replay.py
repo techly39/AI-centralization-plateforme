@@ -216,6 +216,18 @@ def test_a_recording_refuses_what_is_not_a_completed_consistent_run(outcome) -> 
         Recording.from_outcome(outcome)
 
 
+def test_a_hand_built_tape_or_calendar_is_validated() -> None:
+    """A negative call count would make the conductor raise mid-run (audit c32 re-audit WARN 1);
+    a calendar that does not fit the steps would raise an IndexError there (NOTE 1)."""
+    with pytest.raises(RecordingError):
+        Tape((), "tool_budget", -1)
+    for calendar in ((("a", "b"),), (("a",), ("b",)), (("a", 1), ("b", "c"))):
+        with pytest.raises(RecordingError):
+            Recording(2, {}, calendar)
+    assert Recording(2, {}, (("a", "b"), ("b", "c"))).calendar(1) == ("b", "c")
+    assert Recording(2, {}).calendar(1) is None
+
+
 def test_a_recording_refuses_inconsistent_wakes() -> None:
     def mutate(f):
         w = _wake_json()

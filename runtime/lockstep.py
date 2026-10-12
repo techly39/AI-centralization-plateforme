@@ -175,7 +175,7 @@ async def run_backtest(
         if replay is not None and (stamp := replay.calendar(step)) and stamp[0] != at:
             # Red-team 0018 H1: the recording's calendar is part of what is replayed.
             done.append(StepRecord(step, at, (), None))
-            return end("diverged", f"diverged:clock:{step}:0:calendar")
+            return end("diverged", f"diverged:clock:{step}:0:calendar_at")
         wakes: list[WakeRecord] = []
         stop: tuple[str, str] | None = None
         for mind in ordered:
@@ -227,7 +227,7 @@ async def run_backtest(
         if done[-1].advanced_to is None:  # it moved, but the record cannot say where
             return end("error", "clock_malformed")
         if replay is not None and (stamp := replay.calendar(step)) and stamp[1] != done[-1].advanced_to:
-            return end("diverged", f"diverged:clock:{step}:0:calendar")
+            return end("diverged", f"diverged:clock:{step}:0:calendar_landed")
     return end("completed")
 
 
