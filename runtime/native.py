@@ -32,8 +32,10 @@ A wake ends when the mind replies with no tool calls (``done``), or with
 ``halted``, ``tool_budget``, ``refused`` or ``error`` (the provider raised or
 returned something that is not a :class:`CompletionResponse`). Every turn ends
 in one of those or in at least one tool call, so the budget bounds the loop. An
-exception from the provider or a tool function becomes a record or a tool error;
-the adapter's own bugs still raise. R-4 writes the record to a cassette.
+``Exception`` from the provider ends the wake with a record; one from a tool
+function becomes a tool error, so a bug inside a tool function shows up only as
+an error in the transcript. The adapter's own bugs still raise. R-4 writes the
+record to a cassette.
 There is no wall-clock timeout yet: a script that never returns hangs its wake.
 Timeouts arrive with the first provider that can hang on the network (R-6).
 """
@@ -144,7 +146,7 @@ async def wake(
                                     model=spec.model)
         try:
             response = provider.complete(request)
-        except Exception as exc:  # a mind's crash is a recorded end, never a lost wake
+        except Exception as exc:  # a mind's crash is a recorded end (SystemExit still escapes)
             return end("error", f"provider_error:{type(exc).__name__}")
         # A reply enters the record only as a copy, only if it is plain JSON, and only if
         # every call id is new in this wake (red-team 0013 H4–H6). Otherwise the wake ends
@@ -156,8 +158,8 @@ async def wake(
             ids = [c.id for c in response.tool_calls]
             if len(set(ids)) != len(ids) or used_ids & set(ids):
                 raise ValueError("a tool-call id is used twice")
-            if not all(_is_json(c.arguments) for c in response.tool_calls):
-                raise ValueError("arguments are not plain JSON")
+            if not _is_json(response.model_dump()):  # the whole reply, not only arguments
+                raise ValueError("the reply is not plain JSON")
         except Exception:
             return end("error", "bad_reply")
         used_ids |= set(ids)

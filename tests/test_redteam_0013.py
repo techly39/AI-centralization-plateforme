@@ -6,7 +6,8 @@ Claims under attack (ADR-032 amendment (g)(h)):
   budget, or a script for the wrong provider, builds no mind;
 * a mind acts only through ``build_server``'s tools, narrowed by ``spec.tools``; a
   call outside its list reaches no endpoint;
-* HALT is re-read before every tool-call batch; a per-wake tool budget bounds the
+* HALT is re-read before every tool-call batch (as first shipped; after the audit,
+  before every model turn and every tool call); a per-wake tool budget bounds the
   loop; every exit returns a :class:`WakeRecord`;
 * importing ``runtime`` loads no physics beyond ``{app, app.config, app.limits}``.
 

@@ -44,7 +44,7 @@ from mcp_server import FundClient, build_server
 from runtime import governance, native, registry, scripted
 from runtime.gate import ZERO_COST_PROVIDERS
 from runtime.native import wake
-from runtime.providers import CompletionResponse, ToolCall
+from runtime.providers import CompletionResponse, ToolCall, Usage
 from runtime.registry import PROVIDER_CLASSES, ProviderRefused, build_provider
 from runtime.spec import AgentSpec
 from tests.support import world_key
@@ -396,6 +396,9 @@ async def test_a_halted_mind_is_not_asked_to_think_again(fund_client, desk, gov,
     (lambda r: 1 / 0, "provider_error:ZeroDivisionError"),
     (lambda r: {"tool_calls": []}, "bad_reply"),
     (lambda r: None, "bad_reply"),
+    # re-audit c22 NOTE 2: model_construct skips validation; the whole reply is checked
+    (lambda r: CompletionResponse.model_construct(content=object(), tool_calls=[],
+                                                  usage=Usage()), "bad_reply"),
 ])
 async def test_a_crashing_or_lying_mind_ends_in_a_record(fund_client, desk, scripts,
                                                          reply, reason) -> None:
