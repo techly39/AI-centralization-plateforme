@@ -265,3 +265,17 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - **`fund-runtime status` as the Observatory's first panel.** It already prints the law and what
   would wake. In Era II it can answer "why didn't agent X wake?" with a reason code per wake,
   logged per step, which makes scheduler behaviour inspectable without reading code.
+- **Law migrations as checked scripts (cycle 23).** Moving a privilege broke 44 call sites. A
+  replacement script that asserts each count made the mass edit reviewable. Protocol candidate:
+  any law change that breaks more than 5 tests ships its migration script in `scripts/law/` next
+  to the ADR, and the auditor diffs old vs new assertions from it. Measure: auditor time per law
+  change, and weakened assertions found after merge.
+- **Every route × every role as one generated table (cycle 23).** Red-team 0014 walked the
+  OpenAPI document with the runtime key and asserted that the walk was complete. Generalise it:
+  one test that walks every route with every role's key and compares against the matrix.
+  That makes the permission matrix executable documentation, and a new endpoint without a
+  matrix row fails by itself.
+- **Physics identities don't get participant verbs (cycle 23).** The `runtime` role first held
+  the universal actions; the audit saw that its cost rows could pass for agent activity. The same
+  test applies to every future non-participant (Observatory reader, Truman feed, world-event
+  writer): each gets its own minimal role, never "universal + one".

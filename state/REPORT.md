@@ -1,5 +1,21 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 23: no firm agent controls the clock any more.** In a backtest, simulated
+time moves only when someone pushes it forward. Until now the firm's *management* agent could do
+that. Once management is a real AI, that would give a player in the game control over the game's
+time. Now only a dedicated "runtime" key can move the clock. That key can do nothing else: no
+trading, no messages, no reading prices. It is created with one command, `uv run fund-env
+seed-runtime`, once per database. Also fixed: an agent could have registered itself under the
+name "system", the app's own identity, and had the app's notices attributed to it. That name, and
+"runtime", are now reserved, including look-alike spellings with invisible characters (the attack
+review found those).
+
+Nothing needs your action. If you ever start a backtest by hand, you'll need `seed-runtime` to
+get the clock key. Q-0005 is still open; my default (B) is in force. `setup/` is still waiting
+for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 22: the first "mind" acted through the Runtime.** A scripted trader ran
 inside the Runtime. It is plain code with no AI model, and it costs $0. It read prices and
 placed orders only through the same tools a real agent will get, for one simulated month.

@@ -861,3 +861,35 @@ test that advanced the clock with management's key is a finding of the old law. 
 to the runtime key, the change is logged in the ADR, and no assertion is weakened. Expected: about
 25 new tests, 1 xfail fewer (7 → 6), no migration (the role column is a non-native enum with no
 CHECK constraint).
+Work: `AgentRole.runtime`; `PHYSICS_ROLES` in `permissions.py`; `ReservedIdentityError`,
+`is_reserved_name`, `seed_runtime_agent` and a role-based `get_or_create_system_agent` in
+`registry/service.py`; a refused physics deactivation gives 403 + `permission_denied`
+(`reason: reserved_identity`); `fund-env seed-runtime`; the MCP `advance_clock` description;
+ADR-033. The old law broke 9 test files plus `test_oms_permissions` (it registered a `system`
+agent) and the 0001 squat xfail (now XPASS). They were moved by a checked script (every
+replacement count was asserted), with every assertion kept; 3 got stronger (management is now
+403). Review:
+- Auditor **PASS**, no BLOCK. 4 of its 8 NOTEs applied: the runtime role is narrowed to halt +
+  clock, so no cost, task or inbox row can pass for agent activity; the refusal reason is
+  recorded; the month test proves 31 advances by one hand; the 0001 guard asserts the 409.
+- Red-team 0014: **1 hole (low)**. The name fold dropped only Cf, so `runtime` + U+FE0F, Hangul
+  fillers, U+2800 or NUL registered as a second "runtime" in the directory. It is fixed: the fold
+  drops Cc Cf Cn Co Cs Mn Me and the blank letters. 30 guards held, including a walk of every
+  published route with the runtime key.
+- Re-audit **PASS**; 2 NOTEs applied.
+Result: merged 5397ad2, pushed. 1084+7xf → **1178 passed + 6 xfailed** (the working tree also
+has the 1 known `setup/` failure). Smoke 12/12. Hypothesis **met**: management gets 403 and a
+record; the runtime key advances and does nothing else; the squat xfail is a guard; no migration.
+Wider than planned: the runtime role lost the universal actions too, and the name fold had to
+learn what "invisible" means. ~94 new tests (not ~25), most of them red-team guards.
+Learned: (1) **Moving a privilege is a test-suite event.** 44 call sites encoded the old law. A
+replacement script that asserts each count turned a risky mass edit into a reviewable one, and
+the auditor could check old vs new assertions table by table. (2) **"The universal actions" is
+not neutral for a non-agent.** The audit pointed out that a clock hand that can file cost reports
+writes rows that look like agent activity. An identity that is not a participant should get no
+participant-shaped verbs at all. (3) **"Invisible" is not a Unicode category.** Cf was my guess;
+Default_Ignorable spans Mn, Lo and So. A fold for humans' eyes needs a list of what draws nothing,
+and a red-team to grow it.
+Next: R-3b. The lockstep backtest workflow in `runtime/`: halt/cap → wake specs in id order →
+advance with the runtime key. A scripted PM + Analyst (the Analyst messages a signal, the PM
+trades on it) live a month, labelled `minds: scripted` (M1).

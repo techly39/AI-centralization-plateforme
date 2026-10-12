@@ -1,9 +1,21 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 22 (R-2 scripted mind + native adapter — merged db3e7ee, 2026-10-12)
+**Last cycle:** 23 (R-3a the world's clock belongs to the Runtime — merged 5397ad2, 2026-10-12)
 
 ## What is true now
+- **The world's clock has one hand, and it is not a firm agent's** (R-3a, ADR-033 + amendment
+  (a), `tests/test_runtime_identity.py`, `tests/test_redteam_0014.py`).
+  - Role `runtime` = `READ_HALT`, `READ_CLOCK`, `CONTROL_CLOCK`, nothing else. `management` lost
+    `CONTROL_CLOCK` (403 + `permission_denied`), a logged TRD §6 deviation.
+  - `PHYSICS_ROLES = {system, runtime}`: never registered (422 / `ReservedIdentityError`). A firm
+    agent cannot deactivate them (403, `reason: reserved_identity`).
+  - `fund-env seed-runtime` creates the one runtime identity per database, and the key is shown
+    once. No rotation yet (B-041, before R-3b gives the Runtime the key).
+  - `system` is found by role. The names `system` and `runtime` are reserved after NFKC,
+    casefold and dropping everything that draws nothing (Cc Cf Cn Co Cs Mn Me plus blank
+    letters). Cross-script lookalikes are not folded, on purpose.
+  - Tests advance the clock with a `runtime_key` fixture. No migration (non-native enum).
 - **A scripted mind wakes through the Runtime** (R-2, ADR-032 amendment (g)(h)(i),
   `tests/test_runtime_native.py`, `tests/test_redteam_0013.py`). `runtime.native.wake(spec,
   client, workflow_input=, max_tool_calls=64)` → `WakeRecord(ended ∈ done|halted|tool_budget|
@@ -17,8 +29,8 @@
     only if it is plain JSON with fresh call ids, else `error/bad_reply`. `wake_policy: never`
     and non-JSON input are refused.
   - `moving-average-pm` trades a 31-day synthetic month through MCP tools. Twice in the same
-    world, it gives the same ledger and the same transcripts. The clock is still advanced by
-    management's key in that test (R-3 moves it).
+    world, it gives the same ledger and the same transcripts, with 31 advances by the runtime
+    key, still driven by the test (R-3b moves the loop into the Runtime).
   - MCP path values are escaped (`mcp_server.tools._segment`, B-000h closed).
   - Importing runtime loads `{app, app.limits}`.
 - **The Runtime's gates** (R-1, ADR-032 amendment (a)–(f),
@@ -77,18 +89,18 @@
   live order** (ADR-025); **portable JSON ledger** (ADR-024); **halt is physics** (ADR-023);
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
-  clock + look-ahead guard + one now + keyed synthetic market + world record. **1084 passed + 7
-  xfailed** (with the runtime). No model
+  clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
+  identity. **1178 passed + 6 xfailed** (with the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
-  low), 0012 and 0013 (Runtime) fixed. 7 strict xfails open (0001: payload size ×2 = B-000g, message
-  content = B-000e, system squat = B-000f; 0004: fee = B-026; 0009:
+  low), 0012, 0013 (Runtime) and 0014 (clock identity) fixed. 6 strict xfails open (0001: payload
+  size ×2 = B-000g, message content = B-000e; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
   B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038, B-040 (low; physics' halt check is
   milder than the Runtime's).
 - Still-open time debts: B-017 Sharpe ×0.845, B-028 row stamps, B-029 live forward step, B-036.
-  B-032: clock control moves off management before an LLM manager wakes.
+  B-032 done (cycle 23).
 - **Constraint for Era III (ADR-028 amendment):** agent strategy code never runs inside the App's
   process.
 - **The Builder's process now lives in `protocol/`** (P-0003, Human intervention 2026-10-11,
@@ -110,10 +122,11 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-3** Lockstep backtest + `runtime` clock identity (B-032, B-000f; a physics change → red-team):
-   per step halt/cap → wake specs in id order via `native.wake` → advance. A scripted PM +
-   Analyst (new script: the Analyst messages a signal, the PM trades on it) live a month, run
-   labelled `minds: scripted` (M1). R-2 carry-overs in BACKLOG (provision agents from specs, bind
-   name; count tool-function errors). Size check (X-008): split `daily_cycle` off as R-3b.
+1. **R-3b** Lockstep backtest workflow in `runtime/`: per step halt/cap → wake specs in id order
+   via `native.wake` → advance with the runtime key. A scripted PM + Analyst (new script: the
+   Analyst messages a signal, the PM trades on it) live a month, run labelled `minds: scripted`
+   (M1). R-2 carry-overs (provision agents from specs, bind name; count tool-function errors).
+   B-041 (runtime key rotation + startup squat check) first, or as the first commit. If it is
+   too big: provisioning from specs → R-3b, the month → R-3b'.
 2. **R-4** Cassettes + replay (M2): `WakeRecord` transcripts already serialise by construction.
-3. **R-5** Agent-level gates (EC3/5/6). B-040 when cheap. Retrospective due at cycle 30.
+3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 when cheap. Retrospective at 30.

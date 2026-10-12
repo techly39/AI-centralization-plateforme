@@ -34,11 +34,19 @@ keep their ids for history.
       before every tool-call batch (03 §3); context =
       charter + `/me` + workflow input, assembled by code and logged. The probe's `ScriptedPM`
       becomes the first scripted mind. Serves M1.
-- [ ] **R-3** **Next.** Lockstep backtest workflow (was B-011 `backtest`) + B-032 (CONTROL_CLOCK → a
-      reserved `runtime` identity, with B-000f; a TRD role deviation, logged as such): per step halt/cap check → wake in agent-id order
-      → advance. PM + Analyst (scripted; the Analyst messages a signal, the PM trades) live a
-      month < 10 min, every act over HTTP; run record says `minds: scripted`. **M1**. It
-      serves EC1 but does not tick it: EC1 is ticked only with real minds (R-8). Also `daily_cycle` workflow if it fits, else R-3b.
+- [ ] **R-3** Split cycle 23 (X-008):
+  - [x] **R-3a** **Done cycle 23** (merged 5397ad2; ADR-033 + amendment (a),
+        `tests/test_runtime_identity.py`, red-team 0014: 1 low hole, fixed). B-032 + B-000f:
+        `runtime` role = READ_HALT/READ_CLOCK/CONTROL_CLOCK; management lost CONTROL_CLOCK;
+        `fund-env seed-runtime`; `system` found by role; reserved names.
+  - [ ] **R-3b** **Next.** Lockstep backtest workflow (was B-011 `backtest`) in `runtime/`: per
+        step halt/cap check → wake specs in id order (`native.wake`) → advance with the runtime
+        key. PM + Analyst (scripted; new script: the Analyst messages a signal, the PM trades on
+        it) live a month < 10 min, every act over HTTP; run record says `minds: scripted`. **M1**.
+        Serves EC1, does not tick it (R-8). R-2 carry-overs: provision agents from specs and bind
+        the spec's name; count tool-function errors in the wake record. Before the Runtime holds
+        the key: B-041.
+  - [ ] **R-3c** `daily_cycle` workflow.
 - [ ] **R-4** Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
       replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded
       divergence. Reuses the ADR-030 comparison. **M2**. It
@@ -103,7 +111,17 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       PM without pod accepted (can never trade). → 404/422. SURVEY §4a.6, probe P5/P6.
 - [ ] **B-000n** (low) Cost-report rate is unbounded per agent (spam inflates rows; token totals
       lose exactness past ~9e7 max-size reports). Decide on a per-agent rate law. With B-013.
-- [ ] **B-000f** 'system' identity looked up by role/reserved name, not a squattable name.
+- [x] **B-000f** 'system' identity looked up by role/reserved name — **done cycle 23** (ADR-033;
+      the 0001 xfail is a guard).
+- [ ] **B-041** (with R-3b) No way back from a lost or leaked runtime key: no rotation, no operator
+      deactivate, `seed-runtime` refuses while any runtime row exists. Add `fund-env
+      rotate-runtime-key` (new key, old hash replaced, event recorded) before the Runtime holds
+      the key. Also (audit c23 NOTE 7): a pre-ADR-033 DB with a non-system agent named `system`
+      fails only at first use. Add a startup check.
+- [ ] **B-042** (low, in-sim, red-team 0014 + re-audit NOTE 3) Directory honesty for firm names:
+      uniqueness is on the exact string, so `pm-alpha` + an invisible character passes for a
+      colleague, and a name that is only blanks (U+3164…) is accepted. Make uniqueness and
+      non-emptiness use `_name_key`. A one-off check of existing names is needed first.
 - [ ] **B-000g** Byte-size caps on `structured_payload` and task `outcome` (depth is capped since
       cycle 12, size is not — 2 xfails in red-team 0001).
 - [x] **B-000h** MCP client: URL-escape path params — **done cycle 22** (`mcp_server.tools._segment`,
@@ -183,9 +201,8 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
       23:00 local (still after the close: under-conservative by 1 h, not a leak); (d) clip uses
       `as_of.date()` in `as_of`'s tz (UTC today); (e) live quote stamp hides the feed's delay;
       (f) `DailyCloseCache` dates Asian closes by UTC day (mis-dated metric, not a leak — red-team).
-- [ ] **B-032** → R-3. Clock control belongs to the Runtime, not to a firm agent: before any LLM
-      management agent wakes, move `CONTROL_CLOCK` from `management` to a Runtime/operator
-      identity (ADR-027; Art. 10 — the world's time is not a participant's lever).
+- [x] **B-032** **Done cycle 23** (R-3a, ADR-033). Clock control belongs to the Runtime, not to a
+      firm agent: `CONTROL_CLOCK` moved from `management` to the `runtime` identity.
 - [ ] **B-033** (low, operator-only) ~~`advance` moves the clock before its commit~~ fixed cycle 17
       (ledger first, clock second — red-team 0009). Left: two concurrent `start-backtest` on one empty file, or a
       stale live write between its emptiness check and `run_started` (run check and insert are two
