@@ -14,6 +14,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validat
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
 from app.finite import json_problem
+from app.ledger.events import agent_payload
 from app.limits import (
     MAX_ADVANCE_DAYS,
     MAX_ADVANCE_MINUTES,
@@ -96,6 +97,9 @@ class DeactivateResponse(BaseModel):
 
 
 class EventOut(BaseModel):
+    """An event as an agent reads it: the fields physics withholds from every
+    agent (``AGENT_WITHHELD_FIELDS``, B-049) read ``"withheld"``."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -103,6 +107,11 @@ class EventOut(BaseModel):
     actor_agent_id: int | None
     type: str
     payload_json: dict
+
+    @model_validator(mode="after")
+    def _withhold(self) -> "EventOut":
+        self.payload_json = agent_payload(self.type, self.payload_json)
+        return self
 
 
 class ClockOut(BaseModel):

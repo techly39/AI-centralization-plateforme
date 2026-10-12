@@ -128,8 +128,11 @@ def test_hole_a_static_run_does_not_restart_on_another_table(SessionFactory, db)
 # =============================================================================
 
 def test_held_only_management_reads_the_world(SessionFactory, client):
-    """PM and analyst get a bare 403 on /events (every filter), so the world
-    record, its symbols and fingerprint are management's alone."""
+    """PM and analyst get a bare 403 on /events (every filter).
+
+    Cycle 29 (B-049, ADR-034): this guard said "the world record is management's
+    alone" and asserted management reads the fingerprint. The new law withholds
+    the record from every agent, management included; the guard now pins that."""
     secret = secrets.token_bytes(32)
     world = _open_world(SessionFactory, SyntheticProvider(secret, SYMBOLS))
     fp = _fingerprint(secret)
@@ -140,7 +143,8 @@ def test_held_only_management_reads_the_world(SessionFactory, client):
             assert fp not in r.text and "key_fingerprint" not in r.text
     r = client.get("/events", headers=H(world["admin"]), params={"type": "run_started"})
     assert r.status_code == 200
-    assert r.json()[0]["payload_json"]["world"]["key_fingerprint"] == fp
+    assert r.json()[0]["payload_json"]["world"] == "withheld"
+    assert fp not in r.text and "key_fingerprint" not in r.text
 
 
 def test_held_management_sees_a_name_not_the_key(SessionFactory, client):

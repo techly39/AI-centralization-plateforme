@@ -54,6 +54,25 @@ EVENT_ORDER_CANCELLED = "order_cancelled" # payload: {order_id}
 EVENT_ALLOCATION_SET = "allocation_set"   # payload: {pod_id, delta}
 EVENT_ORDER_FILLED = "order_filled"       # payload: {pod_id, ticker, side, qty, fill_price, fee}
 
+# --- What no agent reads (B-049, ADR-034) -------------------------------------
+# The operator's facts about the experiment stay in the ledger, whole, for
+# physics and the operator's tools. An agent reads an event only as
+# ``EventOut``, which replaces each field named here with :data:`WITHHELD`:
+# the world's generating law (drift, volatility, symbols, fingerprint) is an
+# edge no participant may hold, and what drives the minds is the scientists'
+# label, not a fact of the world.
+WITHHELD = "withheld"
+AGENT_WITHHELD_FIELDS: dict[str, frozenset[str]] = {
+    EVENT_RUN_STARTED: frozenset({"world"}),
+    EVENT_RUN_MINDS_DECLARED: frozenset({"minds"}),
+}
+
+
+def agent_payload(type: str, payload: dict | None) -> dict:
+    """A new dict: ``payload`` as an agent may read it. Never mutates ``payload``."""
+    hidden = AGENT_WITHHELD_FIELDS.get(type, frozenset())
+    return {k: (WITHHELD if k in hidden else v) for k, v in (payload or {}).items()}
+
 
 def append_event(
     session: Session,

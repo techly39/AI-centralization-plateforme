@@ -1177,3 +1177,30 @@ an agent). Old test that changed, a finding of the new law: red-team 0014's
 `held_a_pre_adr_runtime_squatter_blocks_seeding_loudly` still gets exit 1 and no runtime row,
 but the reason is now the startup check naming the squatter, not `seed-runtime`'s "already
 exists". The assertion now checks the new, more precise message.
+
+## ADR-034 — The operator's facts about the experiment are withheld from every agent   (builder, cycle 29) — accepted
+Question: ADR-031 put the market's record in `run_started.world` (synthetic: law, origin, drift,
+volatility, symbols, fingerprint; static: the price table). ADR-032 (p) put the minds' kinds in
+`run_minds_declared.minds`. Management reads both through `GET /events` (`READ_CROSS_POD`).
+The drift and volatility of a GBM world are the edge itself: a participant holding them is not
+measured, it is told the answer (Art. 9, Art. 10). Found by the cycle-28 claim check (B-049).
+Answer from the future: **The ledger keeps the full record; an agent never reads it.**
+`app.ledger.events.AGENT_WITHHELD_FIELDS` names, per event type, the fields an agent reads as
+`"withheld"`: `run_started.world` and `run_minds_declared.minds`. The rule has one home:
+`EventOut`, the only response shape in `app.api.schemas` that carries a payload (a test pins
+that), applies `agent_payload` after validation. It builds a new dict, so the ORM row is never
+touched and no commit can write the redaction back. Physics (`install_run_clock`, `run_minds`)
+and the operator's tools read the database, whole. The minds' kinds are withheld too (prime
+rule: safer seal): whether the colleagues are code or a model is the scientists' label, not a
+fact of the world, and a mind that knew its peers were scripted could exploit them. The field
+stays, with a marker, so a transcript shows that something was withheld rather than nothing
+recorded. `mode`, `start` and `look_ahead_guard` still pass through (`/clock` already says the
+mode).
+Old tests that broke, findings of the new law: red-team 0011's
+`held_only_management_reads_the_world` and `test_run_world`'s
+`management_sees_the_fingerprint_never_the_key` asserted that management reads the fingerprint.
+Both now assert it is withheld; every other assertion is kept. `tests/test_world_withheld.py`
+holds the new law.
+Not done: the operator has no API read of the world (it reads the file; none is needed). The
+symbol universe is not otherwise published to agents (charters name it today). Truman will
+decide what a mind is told about its world.
