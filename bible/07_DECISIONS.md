@@ -865,3 +865,40 @@ loads `{app, app.limits}`, within (a)'s set. The probe's moving-average PM is no
 `moving-average-pm`. It trades a 31-day synthetic month through the adapter, and two runs of the
 same world leave the same ledger and the same transcripts. The test still advances the clock with
 management's key. R-3 moves that into the Runtime.
+
+## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
+Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
+agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's
+clock: a participant would hold a world lever (Art. 10, B-032). The lockstep conductor (R-3b)
+needs a hand on the clock that no mind holds. Separately, `system` was found by *name*, and
+management could register an analyst called `system` first (red-team 0001, B-000f).
+Answer from the future: (1) **A new role, `runtime`**, holds `CONTROL_CLOCK` plus the universal
+actions (read inbox, report own cost and task, read halt, read clock), and nothing a participant
+does: no orders, messages, registrations, market data, directory or events.
+**`management` loses `CONTROL_CLOCK`. This deviates from the TRD:** TRD §6 implies
+management/system, and ADR-027 says management. `system` keeps every action (it never
+authenticates). (2) **Physics' roles** (`PHYSICS_ROLES = {system, runtime}`, in
+`permissions.py`) are never registered: `RegisterableRole` excludes them (422), and
+`register_agent` raises `ReservedIdentityError`. Firm agents cannot deactivate them: a 403 plus a
+`permission_denied` event with `target_agent_id`. (3) **The runtime identity is created only by
+`fund-env seed-runtime`** (`seed_runtime_agent`). There is one per database: a second is refused,
+and the unique name `runtime` backs that up at the database level. It is recorded as an
+`agent_registered` event (actor null), and its key is shown once. (4) **`system` is found by
+role** (`role == system`, lowest id). The names `system` and `runtime` are reserved, compared
+after NFKC, casefold, dropping Unicode Cf characters and stripping whitespace. Cross-script
+lookalikes (Cyrillic `с`) are *not* folded. The identity is the role; the reserved name only keeps
+the directory honest. A database written before this ADR that has a non-system agent named
+`system` makes `get_or_create_system_agent` raise. It never borrows that identity; the operator
+must rename the agent. (5) **No migration**: the role column is a non-native enum (VARCHAR 16)
+with no CHECK constraint, so `runtime` fits as it is.
+Old tests that broke and are findings of the old law (not fixed to pass): 11 test files advanced
+the clock with management's key. They now use a runtime key, with every assertion kept. Three
+assertions got *stronger*. Management is now in the 403 list (`test_only_clock_control_advances`).
+A live run gives management 403 *and* the runtime identity 409 (`test_redteam_0005`,
+`test_redteam_0007`). `test_oms_permissions` covers every `AgentRole`, `runtime` included. Rows for
+physics' roles are built through the private `_create_agent`. The red-team 0001 squat xfail is now
+a guard (xfails 7 → 6). `tests/test_runtime_identity.py` holds the new law.
+Not done: key rotation for a lost runtime key (re-seed needs a fresh database or a new operator
+command, when R-3b needs it); B-034 (operator CLI ignores HALT) is unchanged; the Runtime does not
+use the key yet (R-3b). Tie-breaker: safer seal first. The conductor is built on the right
+identity, not moved onto it later.

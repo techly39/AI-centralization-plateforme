@@ -29,7 +29,11 @@ from app.marketdata import (
     set_provider,
 )
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import LOOK_AHEAD_GUARD, start_backtest
 from tests.support import HistoricalProvider
 
@@ -246,10 +250,11 @@ def honest_backtest(SessionFactory) -> Iterator[dict[str, str]]:
         fund_pod(session, pod_id=pod.id, delta=100_000.0,
                  actor=get_or_create_system_agent(session), reason="seed")
         _, pm = register_agent(session, name="pm", role=AgentRole.pm, pod_id=pod.id)
+        _, runtime = seed_runtime_agent(session)
         session.commit()
     finally:
         session.close()
-    yield {"admin": admin, "pm": pm}
+    yield {"admin": admin, "pm": pm, "runtime": runtime}
     set_clock(LiveClock())
 
 
@@ -257,7 +262,7 @@ def test_a_backtest_is_honest_now(honest_backtest, client, db):
     """At simulated noon a PM sees, and trades at, yesterday's close; today's
     close appears only once the clock has passed the end of today."""
     assert LOOK_AHEAD_GUARD is True
-    pm, admin = honest_backtest["pm"], honest_backtest["admin"]
+    pm, runtime = honest_backtest["pm"], honest_backtest["runtime"]
     assert client.get("/price/JPM", headers=H(pm)).json()["price"] == 180.0
     bars = client.get("/ohlcv/JPM", headers=H(pm)).json()["bars"]
     assert [b["close"] for b in bars] == [180.0]
@@ -266,7 +271,7 @@ def test_a_backtest_is_honest_now(honest_backtest, client, db):
         "justification": "t"}).json()
     assert (fill["status"], fill["fill_price"]) == ("filled", 180.0)
 
-    assert client.post("/clock/advance", headers=H(admin),
+    assert client.post("/clock/advance", headers=H(runtime),
                        json={"minutes": 12 * 60}).status_code == 200
     assert client.get("/price/JPM", headers=H(pm)).json()["price"] == 190.0
     bars = client.get("/ohlcv/JPM", headers=H(pm)).json()["bars"]

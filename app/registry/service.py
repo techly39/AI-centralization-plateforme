@@ -6,6 +6,7 @@ The caller (API layer / CLI) owns the transaction.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Sequence
 
 from sqlalchemy import func, select
@@ -18,11 +19,39 @@ from app.ledger.events import (
     EVENT_AGENT_REGISTERED,
     append_event,
 )
+from app.registry.permissions import PHYSICS_ROLES
 from app.registry.security import generate_api_key, hash_api_key
 
 
 class RegistryError(Exception):
     """Raised for registry-level problems (duplicate name, missing agent)."""
+
+
+class ReservedIdentityError(RegistryError):
+    """An act on one of physics' own identities that no caller may do (ADR-033)."""
+
+
+#: Name of the built-in identity the app itself acts under (rejection notices,
+#: scheduled fills). It is a real row so that foreign keys and the audit trail
+#: work, but it is never handed an API key anyone can use.
+SYSTEM_AGENT_NAME = "system"
+#: Name of the Runtime's identity, the only holder of ``CONTROL_CLOCK`` besides
+#: ``system`` (ADR-033). Created by ``fund-env seed-runtime``, one per database.
+RUNTIME_AGENT_NAME = "runtime"
+_RESERVED_NAMES = frozenset({SYSTEM_AGENT_NAME, RUNTIME_AGENT_NAME})
+
+
+def _name_key(name: str) -> str:
+    """The name as a reader sees it: NFKC, case-folded, invisible characters
+    (Unicode category Cf) dropped, surrounding space stripped. Lookalikes from
+    other scripts (Cyrillic 'с') are not folded — the identity is the role, the
+    reserved name only keeps the directory honest."""
+    folded = unicodedata.normalize("NFKC", name).casefold()
+    return "".join(c for c in folded if unicodedata.category(c) != "Cf").strip()
+
+
+def is_reserved_name(name: str) -> bool:
+    return _name_key(name) in _RESERVED_NAMES
 
 
 def register_agent(
@@ -39,7 +68,29 @@ def register_agent(
 
     The plaintext key exists only in this return value — it is never stored, so
     the caller must surface it to the operator immediately and once.
+
+    Physics' identities (``system``, ``runtime``) are not registered here, and
+    no agent may take their names (ADR-033, B-000f).
     """
+    if role in PHYSICS_ROLES:
+        raise ReservedIdentityError(f"role {role.value!r} is physics' own; it is not registered")
+    if is_reserved_name(name):
+        raise ReservedIdentityError(f"the name {name!r} is reserved")
+    return _create_agent(session, name=name, role=role, pod_id=pod_id,
+                         charter_ref=charter_ref, research_domains=research_domains,
+                         actor_agent_id=actor_agent_id)
+
+
+def _create_agent(
+    session: Session,
+    *,
+    name: str,
+    role: AgentRole,
+    pod_id: int | None,
+    charter_ref: str | None,
+    research_domains: list[str] | None,
+    actor_agent_id: int | None,
+) -> tuple[Agent, str]:
     if session.scalar(select(Agent).where(Agent.name == name)) is not None:
         raise RegistryError(f"an agent named {name!r} already exists")
 
@@ -80,6 +131,10 @@ def deactivate_agent(
     agent = session.get(Agent, agent_id)
     if agent is None:
         raise RegistryError(f"no agent with id {agent_id}")
+    if agent.role in PHYSICS_ROLES:
+        # A firm agent switching off the world's clock hand (or physics' own
+        # notices) would be a participant pulling a world lever (Art. 10).
+        raise ReservedIdentityError(f"agent {agent_id} is physics' own identity")
 
     agent.status = AgentStatus.inactive
     session.flush()
@@ -92,22 +147,28 @@ def deactivate_agent(
     return agent
 
 
-#: Name of the built-in identity the app itself acts under (rejection notices,
-#: scheduled fills). It is a real row so that foreign keys and the audit trail
-#: work, but it is never handed an API key anyone can use.
-SYSTEM_AGENT_NAME = "system"
-
-
 def get_or_create_system_agent(session: Session) -> Agent:
     """The app's own identity, created on first use.
 
     Its API key is generated, hashed, and immediately discarded: nothing can
     authenticate as ``system`` over HTTP, which is the point — internal actions
     are attributable without opening a back door.
+
+    Found by *role*, never by name (B-000f): a name is something an agent could
+    have been given; the role is not.
     """
-    agent = session.scalar(select(Agent).where(Agent.name == SYSTEM_AGENT_NAME))
+    agent = session.scalar(
+        select(Agent).where(Agent.role == AgentRole.system).order_by(Agent.id).limit(1)
+    )
     if agent is not None:
         return agent
+    if session.scalar(select(Agent).where(Agent.name == SYSTEM_AGENT_NAME)) is not None:
+        # Only a database written before ADR-033 can hold this: an ordinary agent
+        # registered as 'system'. Fail loudly rather than borrow its identity.
+        raise ReservedIdentityError(
+            f"the name {SYSTEM_AGENT_NAME!r} is held by a non-system agent "
+            "(registered before ADR-033); the operator must rename it"
+        )
 
     agent = Agent(
         name=SYSTEM_AGENT_NAME,
@@ -121,6 +182,25 @@ def get_or_create_system_agent(session: Session) -> Agent:
     session.add(agent)
     session.flush()
     return agent
+
+
+def seed_runtime_agent(session: Session) -> tuple[Agent, str]:
+    """Create the Runtime's identity and return it with its key (shown once).
+
+    One per database: the Runtime is one conductor, and a second clock hand
+    would be a second, unaccounted lever on the world's time (ADR-033). Like
+    ``system`` it is found by role; the name is reserved so no agent wears it.
+    """
+    existing = session.scalar(
+        select(Agent).where(Agent.role == AgentRole.runtime).order_by(Agent.id).limit(1)
+    )
+    if existing is not None:
+        raise ReservedIdentityError(
+            f"this database already has a runtime identity (id {existing.id})"
+        )
+    return _create_agent(session, name=RUNTIME_AGENT_NAME, role=AgentRole.runtime,
+                         pod_id=None, charter_ref=None, research_domains=None,
+                         actor_agent_id=None)
 
 
 def get_agent_by_api_key(session: Session, api_key: str) -> Agent | None:

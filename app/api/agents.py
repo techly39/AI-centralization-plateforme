@@ -14,10 +14,11 @@ from app.api.schemas import (
 )
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
-from app.registry.auth import get_current_agent, require
+from app.registry.auth import deny, get_current_agent, require
 from app.registry.permissions import Action
 from app.registry.service import (
     RegistryError,
+    ReservedIdentityError,
     deactivate_agent,
     list_directory,
     register_agent,
@@ -96,6 +97,10 @@ def deactivate(
     try:
         agent = deactivate_agent(session, agent_id=agent_id, actor_agent_id=actor.id)
         session.commit()
+    except ReservedIdentityError as exc:  # physics' own identity (ADR-033)
+        session.rollback()
+        raise deny(session, actor, Action.DEACTIVATE_AGENTS, detail=str(exc),
+                   context={"target_agent_id": agent_id})
     except RegistryError as exc:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

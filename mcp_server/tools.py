@@ -503,7 +503,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         days: Annotated[int, Field(description="Whole days to move forward.", ge=0, le=MAX_ADVANCE_DAYS)] = 0,
         minutes: Annotated[int, Field(description="Minutes to move forward.", ge=0, le=MAX_ADVANCE_MINUTES)] = 0,
     ) -> Any:
-        """Move a backtest's simulated clock forward. Management only; backtest runs only.
+        """Move a backtest's simulated clock forward. The Runtime's identity only (no firm agent); backtest runs only.
 
         Time never goes back, and never past today. Pending limit orders are
         checked on arrival; the answer lists the ones that filled or were rejected.

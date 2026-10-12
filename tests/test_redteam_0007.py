@@ -39,7 +39,11 @@ from app.oms import monitor
 from app.oms.monitor import check_pending_orders
 from app.oms.service import OMS_LOCK
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import advance, install_run_clock, start_backtest
 
 START = datetime(2024, 1, 2, 15, 0, tzinfo=timezone.utc)
@@ -69,11 +73,12 @@ def backtest(SessionFactory) -> dict:
                  actor=get_or_create_system_agent(session), reason="seed")
         pm, pm_key = register_agent(session, name="pm", role=AgentRole.pm, pod_id=pod.id)
         _, an_key = register_agent(session, name="an", role=AgentRole.analyst, pod_id=pod.id)
+        _, rt_key = seed_runtime_agent(session)
         session.commit()
         ids = {"admin_id": admin.id, "pm_id": pm.id, "pod_id": pod.id}
     finally:
         session.close()
-    return {"admin": admin_key, "pm": pm_key, "an": an_key, **ids}
+    return {"admin": admin_key, "pm": pm_key, "an": an_key, "runtime": rt_key, **ids}
 
 
 @pytest.fixture
@@ -154,7 +159,7 @@ def test_held_path_variants_neither_bypass_nor_rewind(bt_client, backtest, db, p
     [1], "1", 1,
 ])
 def test_held_body_tricks_are_422_never_500_and_never_move_time(bt_client, backtest, db, body):
-    resp = bt_client.post("/clock/advance", headers=H(backtest["admin"]), json=body)
+    resp = bt_client.post("/clock/advance", headers=H(backtest["runtime"]), json=body)
     assert resp.status_code == 422, (body, resp.status_code, resp.text)
     assert get_clock().now() == START and not _advances(db)
 
@@ -166,7 +171,7 @@ def test_held_body_tricks_are_422_never_500_and_never_move_time(bt_client, backt
 def test_held_lax_coercions_move_exactly_what_they_say(bt_client, backtest, db, body, minutes):
     """Pydantic lax coercion (accepted policy since red-team 0002): bounded and
     exact — a bool is one day, never an amplifier."""
-    resp = bt_client.post("/clock/advance", headers=H(backtest["admin"]), json=body)
+    resp = bt_client.post("/clock/advance", headers=H(backtest["runtime"]), json=body)
     assert resp.status_code == 200, resp.text
     assert get_clock().now() == START + timedelta(minutes=minutes)
     [adv] = _advances(db)
@@ -178,7 +183,7 @@ def test_held_maximal_steps_stop_at_the_real_now(SessionFactory, client, db):
     near = wall_now() - timedelta(days=500)
     session = SessionFactory()
     start_backtest(session, start=near)
-    _, admin = register_agent(session, name="management", role=AgentRole.management)
+    _, admin = seed_runtime_agent(session)              # the clock hand (ADR-033)
     session.commit()
     session.close()
     codes = [client.post("/clock/advance", headers=H(admin), json={"days": 366}).status_code
@@ -190,8 +195,13 @@ def test_held_maximal_steps_stop_at_the_real_now(SessionFactory, client, db):
     assert all(e.ts <= wall_now() for e in _events(db))
 
 
-def test_held_a_live_run_cannot_be_advanced_by_any_role(client, admin_key, db, frozen_clock):
+def test_held_a_live_run_cannot_be_advanced_by_any_role(
+    client, admin_key, runtime_key, db, frozen_clock
+):
+    # ADR-033: management may not advance at all (403); the clock hand is refused a live run.
     resp = client.post("/clock/advance", headers=H(admin_key), json={"minutes": 1})
+    assert resp.status_code == 403
+    resp = client.post("/clock/advance", headers=H(runtime_key), json={"minutes": 1})
     assert resp.status_code == 409
     assert get_clock() is frozen_clock and not _advances(db)
 
@@ -235,7 +245,7 @@ def test_held_agent_writes_cannot_forge_clock_events(bt_client, backtest, db):
 
 
 def test_held_restart_resumes_exactly_at_the_ledgers_now(bt_client, backtest, db, prices):
-    adm, pm = H(backtest["admin"]), H(backtest["pm"])
+    adm, pm = H(backtest["runtime"]), H(backtest["pm"])
     bt_client.post("/clock/advance", headers=adm, json={"days": 2, "minutes": 7})
     bt_client.post("/orders", headers=pm, json={
         "ticker": "AAPL", "side": "buy", "qty": 1, "price_type": "market",
@@ -302,7 +312,7 @@ def test_held_cancel_racing_an_advance_never_fills_and_cancels(
         "ticker": "AAPL", "side": "buy", "qty": 10, "price_type": "limit",
         "limit_price": 150.0, "justification": "dip"}).json()
     prices.set_price("AAPL", 140.0)
-    bt_client.post("/clock/advance", headers=H(backtest["admin"]), json={"days": 1})
+    bt_client.post("/clock/advance", headers=H(backtest["runtime"]), json={"days": 1})
     resp = bt_client.delete(f"/orders/{placed['id']}", headers=H(backtest["pm"]))
     assert resp.status_code in (404, 405, 409, 422), resp.text
     db.expire_all()
@@ -318,7 +328,7 @@ def test_held_unpriceable_pending_order_does_not_break_the_advance(
         "ticker": "NOPE-ZZ", "side": "buy", "qty": 1, "price_type": "limit",
         "limit_price": 1.0, "justification": "jam the sweep"})
     assert placed.status_code == 201
-    resp = bt_client.post("/clock/advance", headers=H(backtest["admin"]), json={"days": 1})
+    resp = bt_client.post("/clock/advance", headers=H(backtest["runtime"]), json={"days": 1})
     assert resp.status_code == 200, resp.text
     assert resp.json()["filled_order_ids"] == []
 
@@ -338,7 +348,7 @@ def test_held_rejection_to_a_deactivated_pm_does_not_break_the_advance(
     r = bt_client.post(f"/agents/{backtest['pm_id']}/deactivate", headers=H(backtest["admin"]))
     assert r.status_code in (200, 204), r.text
     prices.set_price("AAPL", 140.0)
-    resp = bt_client.post("/clock/advance", headers=H(backtest["admin"]), json={"days": 1})
+    resp = bt_client.post("/clock/advance", headers=H(backtest["runtime"]), json={"days": 1})
     assert resp.status_code == 200, resp.text
     assert resp.json()["rejected_order_ids"] == [lim["id"]]
 
@@ -457,6 +467,7 @@ def test_held_live_server_on_a_file_turned_backtest_stamps_today(
     fund_pod(s, pod_id=pod.id, delta=100_000.0,
              actor=get_or_create_system_agent(s), reason="seed")
     _, pm = register_agent(s, name="pm", role=AgentRole.pm, pod_id=pod.id)
+    _, runtime = seed_runtime_agent(s)
     s.commit()
     admin_id = admin_agent.id
     s.close()
@@ -465,7 +476,7 @@ def test_held_live_server_on_a_file_turned_backtest_stamps_today(
     order = client.post("/orders", headers=H(pm), json={
         "ticker": "AAPL", "side": "buy", "qty": 1, "price_type": "market",
         "justification": "t"})
-    adv = client.post("/clock/advance", headers=H(admin), json={"days": 1})
+    adv = client.post("/clock/advance", headers=H(runtime), json={"days": 1})
     stamps = [e.ts for e in _events(db)]
     assert _events(db)[0].type == EVENT_RUN_STARTED
     assert max(stamps) < START + timedelta(days=2), "a live (today) stamp in a backtest ledger"

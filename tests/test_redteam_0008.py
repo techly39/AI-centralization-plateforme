@@ -39,7 +39,11 @@ from app.marketdata import (
 )
 from app.oms.monitor import check_pending_orders
 from app.registry.pods import create_pod, fund_pod
-from app.registry.service import get_or_create_system_agent, register_agent
+from app.registry.service import (
+    get_or_create_system_agent,
+    register_agent,
+    seed_runtime_agent,
+)
 from app.run_clock import start_backtest
 
 UTC = timezone.utc
@@ -139,8 +143,9 @@ def _open_backtest(SessionFactory, start: datetime) -> dict[str, object]:
         fund_pod(session, pod_id=pod.id, delta=100_000.0,
                  actor=get_or_create_system_agent(session), reason="seed")
         _, pm = register_agent(session, name="pm", role=AgentRole.pm, pod_id=pod.id)
+        _, runtime = seed_runtime_agent(session)
         session.commit()
-        return {"admin": admin, "pm": pm, "pod_id": pod.id}
+        return {"admin": admin, "pm": pm, "runtime": runtime, "pod_id": pod.id}
     finally:
         session.close()
 
@@ -187,7 +192,7 @@ def test_hole_cached_quote_outlives_the_bar_that_replaced_it(monkeypatch, Sessio
     keys = _open_backtest(SessionFactory, DAY_BAR_END - timedelta(minutes=1))
     assert client.get("/price/JPM", headers=H(keys["pm"])).json()["price"] == 180.0
 
-    assert client.post("/clock/advance", headers=H(keys["admin"]),
+    assert client.post("/clock/advance", headers=H(keys["runtime"]),
                        json={"minutes": 1}).status_code == 200
     daily = client.get("/ohlcv/JPM", headers=H(keys["pm"])).json()["bars"]
     assert daily[-1]["close"] == 250.0              # DAY's bar has ended, and is served

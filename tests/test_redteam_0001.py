@@ -323,17 +323,15 @@ def test_hole_message_content_not_on_ledger(client, two_desks, db):
 
 
 # =============================================================================
-# HOLE — identity: squatting the built-in 'system' name
+# HELD (was a HOLE until cycle 23, B-000f) — identity: squatting the built-in 'system' name
 # =============================================================================
 
-@pytest.mark.xfail(strict=True, reason="red-team 0001: an agent registered with name 'system' "
-                   "before first use becomes the app's system identity (forgeable OMS notices)")
 def test_hole_system_identity_name_squat(client, make_pod, admin_key, db):
-    """``get_or_create_system_agent`` looks the identity up by *name*. On a fresh
-    fund (no pod funded yet) management registers an ordinary analyst called
-    ``system``; from then on every OMS rejection notice and allocation event is
-    attributed to that analyst, and whoever holds its key can send messages
-    indistinguishable from the app's own."""
+    """``get_or_create_system_agent`` looked the identity up by *name*. On a fresh
+    fund (no pod funded yet) management registered an ordinary analyst called
+    ``system``; from then on every OMS rejection notice and allocation event was
+    attributed to that analyst. Since ADR-033 the name is reserved (409) and the
+    identity is found by role. The test keeps its name: it is the 0001 guard."""
     make_pod(1)
     resp = client.post("/agents/register", headers=H(admin_key),
                        json={"name": "system", "role": "analyst", "pod_id": None})

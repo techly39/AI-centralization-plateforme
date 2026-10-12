@@ -84,12 +84,21 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.BROADCAST,
             Action.REGISTER_AGENTS,
             Action.DEACTIVATE_AGENTS,
-            Action.CONTROL_CLOCK,
         }
     ),
+    # 'runtime' is the Runtime's identity (ADR-033, B-032): it moves a backtest's
+    # clock between lockstep steps and does nothing a participant does. The
+    # world's time is not a firm agent's lever (Art. 10), so management lost
+    # CONTROL_CLOCK — a TRD §6 deviation, logged in the ADR.
+    AgentRole.runtime: _UNIVERSAL | frozenset({Action.CONTROL_CLOCK}),
     # 'system' is the internal/bootstrap identity and may do anything.
     AgentRole.system: frozenset(Action),
 }
+
+#: Physics' own identities (ADR-033): created only by code or the operator CLI,
+#: never registered over HTTP, never deactivated by a firm agent, and their
+#: names are reserved so no agent can wear them.
+PHYSICS_ROLES: frozenset[AgentRole] = frozenset({AgentRole.system, AgentRole.runtime})
 
 
 def has_permission(role: AgentRole, action: Action) -> bool:
