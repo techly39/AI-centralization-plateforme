@@ -109,7 +109,9 @@ Deliverables:
    Built and tested against a fake provider if no provisioning credential exists.
 8. Verify the "chat restricted to central pod" report with two pods.
 
-Exit criteria *(plan: ADR-032 — every criterion below is served by at least one backlog slice R-1…R-8)*:
+Exit criteria *(plan: ADR-032 — every criterion below is served by at least one backlog slice R-1…R-8. Scripted-mind
+runs prove the plumbing but tick nothing: the first two criteria are ticked only by real minds, at
+R-8)*:
 - [ ] One pod (PM + Analyst) completes a 1-month backtest via the Runtime in < 10 min
       real time, every action through the App.
 - [ ] Replaying that run from cassettes reproduces an identical event ledger (except ids/

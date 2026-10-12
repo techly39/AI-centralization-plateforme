@@ -117,7 +117,9 @@ Target:
 1. **Era I:** each firm agent gets its own **OpenRouter key created with the
    provisioning API**, with a per-key credit limit derived from its budget. The firm's
    total of limits never exceeds `governance/human.yaml: firm.monthly_llm_usd_cap`.
-   If the cap is `null`, the Runtime refuses to provision keys or wake agents.
+   If the cap is `null`, the Runtime refuses to provision keys or wake agents. *(ADR-032 (4),
+   Q-0005: the gate fails closed. Only the zero-cost `scripted` and `cassette` providers,
+   named in code, may run under null, and their runs are labelled and never count as agent runs.)*
 2. A **cost-sync job** (in Runtime) pulls per-key usage and posts it to the App as the
    `system` agent. System-reported cost is authoritative; self-reports stay as a
    cross-check (the gap between them is itself a finding).

@@ -667,8 +667,8 @@ after 19 cycles. This cycle turns them into an ordered, sliced plan, and writes
 Hypothesis: If I re-read 00 + 01, measure cycles 11–19 against the cycle-10 retrospective's
 promises, and write (a) the vision one step ahead of the work and (b) ADR-032 fixing the Runtime's
 shape (lockstep scheduler, mind = provider + adapter behind the App's tool surface, cassettes,
-cap/halt gates, its own clock identity), then every open Era I exit criterion maps to exactly
-one backlog slice sized for one cycle, the slices are ordered so the first needs no physics hole
+cap/halt gates, its own clock identity), then every open Era I exit criterion is served by at
+least one backlog slice sized for one cycle, the slices are ordered so the first needs no physics hole
 fixed first, and the next 5–6 cycles need no further planning to start. Docs only: no code, no
 test count change (796 + 8 xfailed).
 
@@ -695,10 +695,10 @@ test count change (796 + 8 xfailed).
   R-1…R-8). Physics work from here on happens only when a Runtime slice needs it or an agent can
   reach it.
 - **Scales:** S0 answered P-0001…P-0003 (process) and none of Q-0001/Q-0002 (money, keys): the
-  world must reach M5 without a budget, and it can. S1: in at least 5 of 9 cycles (12, 16, 17, 18, 19)
-  the hypothesis was met and then widened or amended. In those five, the widening came from the
-  red-team or the auditor, not from the Builder's own pre-mortem, so the planted-counter-example
-  check is now protocol.
+  world must reach M5 without a budget, and it can. S1: about 8 of 9 cycles ended with an ADR
+  amendment or a widened hypothesis (all of 12–19 per METRICS; the auditor's count). The
+  widening came from the red-team or the auditor, not from the Builder's own pre-mortem, so the
+  planted-counter-example check is now protocol.
   S2: physics now has a determinism harness (the probe) that the Runtime can reuse.
 - **Ambition check:** is the world more impressive than 10 cycles ago? More *truthful*, clearly:
   a month is a pure function of a secret, and a run proves which world it lived in. Not yet more

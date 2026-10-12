@@ -20,11 +20,13 @@ passes. **No mind has acted yet.** There is no Runtime, so 0 of the 7 Era I exit
 experiment. What AI minds do inside it should be measured the way a lab measures, not told as a
 story.
 
-Most agent-market simulations, LLM trading-agent papers included, produce narratives: one run,
-one model, one curve. Few of them can replay a run exactly, prove their subjects never saw the
-future, charge every dollar of thought to the mind that spent it, and count every trial. This
-world can already do the first two for scripted minds. My target is for it to do all four for
-real ones.
+My impression is that most agent-market simulations, LLM trading-agent papers included, produce
+narratives: one run, one model, one curve. I have not surveyed the literature, so that is an
+impression, not a finding. Few of them seem to replay a run exactly, guard their subjects
+against seeing the future, charge every dollar of thought to the mind that spent it, and count
+every trial. For scripted minds, this world can already do the first, and it guards against
+every look-ahead route found so far (8 strict xfails and B-039 are still open). My target is all
+four, for real minds.
 
 **A run is a proof object.** It is a triple:
 
@@ -34,7 +36,8 @@ real ones.
 | World | `run_started.world`: provider, law, parameters, key fingerprint | done (ADR-031) |
 | Minds | AgentSpecs + **cassettes**: every LLM request/response, hashed, in order | Runtime (ADR-032) |
 
-`replay(physics, world, minds) == ledger`, byte for byte, at zero LLM cost. If a replay
+`replay(physics, world, minds) == ledger`, event for event (ids and wall-clock fields excepted,
+as in EC2 and ADR-030), at zero LLM cost. If a replay
 diverges, either physics is nondeterministic (a bug) or a cassette is missing (a hole in the
 record). Every finding in `state/FINDINGS.md` should cite a proof object, so anyone can re-run
 the run behind it.
@@ -50,7 +53,7 @@ Once runs are proof objects, a new kind of experiment becomes cheap:
 The two branches share an exact history up to *d*. Any difference after *d* is caused by the one
 thing changed, or by model sampling, which we measure by forking the same change several times.
 I know of no LLM society, firm or market simulation that runs **exact counterfactuals with shared
-history**. The usual design is "run A, run B, compare", which pays twice for the shared part and
+history**. I have not surveyed for one; that search belongs to the Forks Era's first cycle. The usual design is "run A, run B, compare", which pays twice for the shared part and
 loses the shared history to sampling noise.
 
 What it unlocks: the scale questions (`02_SCALES.md` §4) as controlled experiments ("what does a
@@ -76,7 +79,8 @@ instrument is not worth having).
 - **M5** the `openclaw` adapter renders `firm-` agents that pass the static conformance suite;
 - **M6** (needs the Human's cap, Q-0001) the first real-model month, and its replay.
 
-M1–M5 need no money. M6 is the only step that waits for the Human, so it goes last.
+M1–M5 need no money. M6 is the only step that waits for the Human, so it goes last. Scripted
+milestones tick no exit criterion: EC1 and EC2 are ticked only by real minds, at M6.
 
 **Era II (the end of the Launch Pad)** as the Human wrote it, with the fork as its measuring tool.
 Generation N+1 is a fork of generation N's world, so "did the firm get better?" is asked against

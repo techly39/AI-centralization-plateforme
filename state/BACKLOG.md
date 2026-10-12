@@ -7,22 +7,26 @@ keep their ids for history.
 - [ ] **R-1** **Next.** Runtime skeleton (was B-009, first half): `runtime/` package +
       `fund-runtime` script in `pyproject.toml`; `AgentSpec` (pydantic; `03_WORLD.md` §3 fields,
       file-backed for now); governance reader (fixed paths, read-only): HALT → nothing wakes, cap
-      `null` → no spending provider wakes or is provisioned (ADR-032 (4), Q-0005); `LLMProvider`
-      protocol with `spends_money`. Boundary: extend the dynamic probe to `runtime` (transitive
-      physics load ⊆ `app.config` + `app.limits`). Serves EC5/EC6 (gates exist), EC6 test with a
-      fake spending provider.
+      `null` → fail closed, only the coded list `{scripted, cassette}` wakes, nothing is
+      provisioned (ADR-032 (4), Q-0005); `LLMProvider` protocol. Tests: an unknown provider, and a
+      provider claiming `spends_money=False`, are refused under null. Boundary: extend the
+      dynamic probe to `runtime` (transitive physics load ⊆ `app.config` + `app.limits`); an
+      allowlist for runtime is a law change → ADR-032 amendment + planted counter-example. Serves
+      EC5/EC6 (gates exist).
 - [ ] **R-2** Scripted mind + `native` adapter over the published MCP tool list (`build_server`
-      → LLM tool schema → calls through `FundClient`); per-wake tool-call budget; context =
+      → LLM tool schema → calls through `FundClient`); per-wake tool-call budget; HALT re-checked
+      before every tool-call batch (03 §3); context =
       charter + `/me` + workflow input, assembled by code and logged. The probe's `ScriptedPM`
       becomes the first scripted mind. Serves M1.
 - [ ] **R-3** Lockstep backtest workflow (was B-011 `backtest`) + B-032 (CONTROL_CLOCK → a
-      reserved `runtime` identity, with B-000f): per step halt/cap check → wake in agent-id order
+      reserved `runtime` identity, with B-000f; a TRD role deviation, logged as such): per step halt/cap check → wake in agent-id order
       → advance. PM + Analyst (scripted; the Analyst messages a signal, the PM trades) live a
-      month < 10 min, every act over HTTP; run record says `minds: scripted`. **EC1 (scripted
-      variant) / M1.** Also `daily_cycle` workflow if it fits, else R-3b.
+      month < 10 min, every act over HTTP; run record says `minds: scripted`. **M1**. It
+      serves EC1 but does not tick it: EC1 is ticked only with real minds (R-8). Also `daily_cycle` workflow if it fits, else R-3b.
 - [ ] **R-4** Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
       replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded
-      divergence. Reuses the ADR-030 comparison. **EC2 / M2.**
+      divergence. Reuses the ADR-030 comparison. **M2**. It
+      serves EC2 but does not tick it (R-8). Run label `minds: replay`.
 - [ ] **R-5** Agent-level gates: HALT created mid-run stops within one tick; a scripted mind
       asking for tomorrow's price is refused through the tool layer; cap `null` refuses a
       spending provider at wake. **EC3, EC5, EC6 / M3.** (B-023 halt observability if cheap.)

@@ -169,6 +169,10 @@ because no agent can run (`monthly_llm_usd_cap: null`); that is a reason for ord
 the tier, not for demotion. Gate: every open hole is fixed or accepted by an ADR with its reason
 before any agent wakes (before B-012's first live probe and before B-015). B-000d (non-finite
 floats in event payloads) goes with or before B-016, since both touch `append_event`.
+Amended (cycle 20, ADR-032 (8), Q-0005): "any agent" means any **spending** mind. The gated
+milestones are unchanged: B-012's live probe is now R-7's and B-015 is now R-8. Scripted and
+cassette minds in R-1…R-6 are code, not subjects, and may run while holes are open. If the Human
+answers Q-0005 with A, this reverts to "any mind".
 
 ## ADR-022 — The dependency law, placed and enforced   (builder, cycle 10) — accepted
 Question: 03 §1 states the law for `app`, `runtime`, `ui`, `quant`, `truman` but not for
@@ -685,12 +689,17 @@ network client, $0, no model), `cassette` (replays a recorded exchange by reques
 **refuses on a miss**; a miss is a divergence, recorded, never papered over) and later a
 `metered` provider (an OpenRouter key per agent, R-6/M6). Each provider declares
 `spends_money: bool`.
-(4) **The cap gate reads the law literally.** Before every wake the Runtime reads
-`governance/human.yaml` and `governance/HALT` (read-only, fixed paths). Under HALT nothing wakes.
-Under cap `null`, no mind whose provider `spends_money` wakes, and no key is provisioned. A
-`scripted` provider is not a firm agent (Art. 2.1: "every AI inside the simulation"); it is a
-script with an API key, like the cycle-18 probe pod. Its runs are labelled `minds: scripted` in
-the run record so a scripted month can never be reported as an agent month (Q-0005).
+(4) **The cap gate reads the law literally and fails closed.** Before every wake **and before
+every tool-call batch** (`03_WORLD.md` §3) the Runtime reads `governance/HALT`; before every wake
+it reads `governance/human.yaml` (read-only, fixed paths). Under HALT nothing wakes and no further
+batch runs. Under cap `null` no key is provisioned and only the providers on a closed list in
+code, `{scripted, cassette}`, may wake. Every other provider is refused, including an unknown
+one or one that claims `spends_money = False`; `metered` and the `openclaw` adapter are always
+treated as spending. A `scripted` provider is not a firm agent (Art. 2.1: "every AI inside the
+simulation"). It is a script with an API key, like the cycle-18 probe pod. A `cassette` provider
+replays recorded model output at $0 and calls nothing. Runs are labelled `minds: scripted` or
+`minds: replay` in the run record, so neither can be reported as a live agent run (Q-0005 covers
+both).
 (5) **Lockstep scheduler in backtest mode.** For each step: check halt and cap; wake the agents
 whose wake policy fires, **one at a time in a fixed order** (agent id); each wake ends when the
 mind says done, or hits its tool-call budget or a wall-clock timeout (recorded as such); then the
@@ -719,8 +728,15 @@ and the label keeps scripted months from passing as agent months. (3) **Determin
 the scheduler, context assembly and gates are code; only the mind's reply is a model's. (4)
 **More general**: provider, adapter and spec are the three seams the fork instrument
 (`09_BUILDER_VISION.md` §2), model swaps and OpenClaw all need. (5) **Smaller and reversible**:
-every slice is one cycle and adds a layer without changing physics, except R-3's one permission
-move. (6) **Reuse**: `FundClient`, the MCP tool table and the probe's scripted pod.
+every slice is one cycle. Physics changes are limited to what a slice names: R-3 (the clock
+permission move to a `runtime` identity, a TRD role deviation, and the `minds` label in the run
+record), R-4 (if cassette hashes are linked from events), R-5 (B-023 halt events, if taken) and R-6
+(system-reported costs overriding self-reports, firm-level costs, a cost-report rate law). Each of
+these gets its own red-team pass. **Exit criteria are ticked only by real minds:** R-3 and R-4
+deliver M1/M2 with scripted minds and do not tick EC1/EC2. Those are ticked at R-8. (6) **Reuse**: `FundClient`, the MCP tool table and the probe's scripted pod.
+Dependency law (R-1): if `runtime` imports `mcp_server`, it transitively loads `app.config` +
+`app.limits`. Giving the runtime layer an app allowlist is a change to the law, recorded as an
+amendment here, with a planted counter-example showing every other `app.*` module is still refused.
 Not decided here: parallel wakes, live-mode wake policies (cron/event), the meter proxy (03 §4.3),
 memory policy, context packages beyond `/me` + charter + workflow input, and the cassette storage
 format (files vs table). Each is decided in its slice.
