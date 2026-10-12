@@ -1080,6 +1080,28 @@ only *who* makes it and *when*:
   `held_every_route_but_me_clock_halt_refuses_the_runtime_key` lists the routes that answer the
   runtime key. `POST /run/minds` joined that list. The sweep still proves that every other
   route refuses the key.
+- *Red-team 0017* (`tests/test_redteam_0017.py`: 4 holes, all fixed the same cycle) amended (p):
+  - **H1 (medium), H2 (low): the ledger has the last word on the answer too.** After its commit,
+    `declare_minds` re-reads the ledger. If its event is not the first physics-written
+    declaration, or a firm act precedes it, the endpoint answers 409 ("lost a race"). The event
+    stays (append-only) and is never read. Before, a firm message in the check/append gap, or a
+    second process's declaration, got 201, and the Runtime lived a month that read as `None`.
+  - **H4 (medium): a declaration covers only the agents registered after it.** It names kinds,
+    not agents, and an older agent's key could be in any hand (an OpenClaw model). `run_minds`
+    returns `None` if any firm agent not registered after the declaration writes any event other
+    than a registration after it. The exemption for registrations is the registrar making the
+    run's minds: it trusts the holder of the registrar key, and each agent it registers is
+    covered. So a pre-existing agent can void a label after the fact by any act, a refused one
+    included. That is a true statement about the run (an undeclared hand acted), not a forgery.
+    The red-team's own HELD guard `firm_acts_after_the_declaration_never_void_it` first acted
+    through pm-1, an older agent. It now acts through an agent registered after the declaration:
+    a finding of the H4 fix, which makes pm-1's acts void the label on purpose.
+  - **H3 (low, every route): a lone surrogate (`"\ud800"`) in a body made the 422 handler 500.**
+    `json_safe` now re-encodes strings (keys included) with replacement.
+  - Held: firm agents cannot declare (HTTP or MCP); lookalike, padded, huge, deep or mistyped
+    kinds get 422 and write nothing; deactivated agents still count; actor-null setup and key
+    rotation do not spoil; HALT fails closed; forged rows by null or firm actors are never read;
+    a live run never reads one.
 - *Smoke run:* the backtest phase reads the database file and checks that there is exactly one
   declaration, `["scripted"]`, before the first firm event. Its market key is now fixed (a
   hash of `fund-smoke-world/1`). With a random key, some draws gave five days with no `long`

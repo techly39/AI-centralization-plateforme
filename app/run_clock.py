@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 from app.clock import BacktestClock, get_clock, set_clock, wall_now
 from app.db.models import Agent, Base, Event
 from app.ledger.events import (
+    EVENT_AGENT_REGISTERED,
     EVENT_CLOCK_ADVANCED,
     EVENT_RUN_MINDS_DECLARED,
     EVENT_RUN_STARTED,
@@ -237,17 +238,36 @@ def declare_minds(
         except Exception:
             session.rollback()
             raise
+        # The ledger has the last word (red-team 0017 H1/H2): a firm act that took
+        # no lock, or another process's declaration, may have landed first. The
+        # event stays (append-only), but the caller is told it counts for nothing.
+        first = _first_declaration(session)
+        if first is None or first.id != event.id or _acted_before(session, event.id):
+            raise RunMindsError(
+                "lost a race: a firm agent acted or another declaration landed "
+                "first, so the ledger does not take this one"
+            )
     return event
 
 
 def run_minds(session: Session) -> tuple[str, ...] | None:
-    """The kinds this run declared, or ``None``: a live run, no declaration, or a
-    first declaration the ledger shows came after a firm agent acted or the clock
-    moved. Only the first declaration is ever read."""
+    """The kinds this run declared, or ``None``: a live run, no declaration, a first
+    declaration the ledger shows came after a firm agent acted or the clock moved,
+    or one that an agent older than it acted under. Only the first declaration is
+    ever read.
+
+    A declaration names kinds, not agents, so it covers only the agents
+    registered after it (red-team 0017 H4): an older agent's key could be in any
+    hand. The one act an older agent may take afterwards is registering (the
+    operator's registrar making the run's minds): that trusts the registrar's
+    holder, and a registered agent is itself covered.
+    """
     if not _is_backtest(session):
         return None
     first = _first_declaration(session)
-    if first is None or _acted_before(session, first.id):
+    if first is None or _acted_before(session, first.id) or _older_agent_acted_after(
+        session, first.id
+    ):
         return None
     return tuple(first.payload_json["minds"])
 
@@ -281,6 +301,22 @@ def _acted_before(session: Session, before_id: int | None) -> bool:
     )
     if before_id is not None:
         query = query.where(Event.id < before_id)
+    return session.scalar(query.limit(1)) is not None
+
+
+def _older_agent_acted_after(session: Session, declared_id: int) -> bool:
+    """Did a firm agent not registered after event ``declared_id`` write anything
+    but a registration after it?"""
+    firm_actors = select(Agent.id).where(Agent.role.not_in(PHYSICS_ROLES))
+    registered_after = select(
+        func.json_extract(Event.payload_json, "$.agent_id")
+    ).where(Event.type == EVENT_AGENT_REGISTERED, Event.id > declared_id)
+    query = select(Event.id).where(
+        Event.id > declared_id,
+        Event.type != EVENT_AGENT_REGISTERED,
+        Event.actor_agent_id.in_(firm_actors),
+        Event.actor_agent_id.not_in(registered_after),
+    )
     return session.scalar(query.limit(1)) is not None
 
 
