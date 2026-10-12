@@ -15,8 +15,13 @@ the mind as tool errors). The adapter only decides *what the mind sees*:
 
 And it enforces the Runtime's own limits (03 §3):
 
-* the wake gate before anything else; the mind is built from the spec by
-  :mod:`runtime.registry`, never handed in;
+* the wake gate before anything else; a spec with ``wake_policy: never`` and a
+  workflow input that is not plain JSON are refused; the mind is built from the
+  spec by :mod:`runtime.registry`, never handed in;
+* the key must be the agent the spec describes: ``/me``'s role and pod must equal
+  the spec's, or the wake is refused (``identity_mismatch``);
+* a reply is recorded only if its call ids are new in this wake and its
+  arguments are plain JSON; otherwise the wake ends ``error``/``bad_reply``;
 * **HALT is re-read before every model turn and before every tool call** (03 §3
   asks for every batch; Art. 5.2 allows nothing beyond the current tool call);
 * a per-wake **tool-call budget**; a batch that would pass it does not run;
@@ -89,6 +94,8 @@ async def wake(
         raise ValueError("max_tool_calls is a non-negative int")
     if spec.adapter != "native":
         return WakeRecord(spec.id, "refused", "wrong_adapter", 0)
+    if spec.wake_policy == "never":  # red-team 0013 H8: a spec kept on file stays asleep
+        return WakeRecord(spec.id, "refused", "wake_policy_never", 0)
     decision = decide_wake(spec.provider, spec.adapter)
     if not decision.allowed:
         return WakeRecord(spec.id, "refused", decision.reason, 0)
@@ -106,16 +113,24 @@ async def wake(
         tools = [t for t in tools if t.name in spec.tools]
     visible = frozenset(t.name for t in tools)
 
+    if type(workflow_input) is not dict or not _is_json(workflow_input):
+        return WakeRecord(spec.id, "refused", "bad_input", 0)  # red-team 0013 H7
+
     me = await _execute(server, None, ToolCall(id="context:me", name="whoami"))
     if me.is_error:
         return WakeRecord(spec.id, "refused", "no_identity", 0)
+    identity = json.loads(me.content)
+    # Red-team 0013 H2/H3: the key must be the agent the spec describes.
+    if (identity.get("role"), identity.get("pod_id")) != (spec.role, spec.pod):
+        return WakeRecord(spec.id, "refused", "identity_mismatch", 0)
     transcript: list[Message] = [
         Message(role="system", content=spec.charter),
         Message(role="user", content=json.dumps(
-            {"me": json.loads(me.content), "input": workflow_input}, sort_keys=True)),
+            {"me": identity, "input": workflow_input}, sort_keys=True)),
     ]
 
     made = 0
+    used_ids: set[str] = set()
 
     def end(ended: str, reason: str | None = None) -> WakeRecord:
         return WakeRecord(spec.id, ended, reason or ended, made, tuple(transcript))
@@ -131,9 +146,21 @@ async def wake(
             response = provider.complete(request)
         except Exception as exc:  # a mind's crash is a recorded end, never a lost wake
             return end("error", f"provider_error:{type(exc).__name__}")
-        if type(response) is not CompletionResponse:
+        # A reply enters the record only as a copy, only if it is plain JSON, and only if
+        # every call id is new in this wake (red-team 0013 H4–H6). Otherwise the wake ends
+        # here and the reply is not recorded: a record must always serialise.
+        try:
+            if type(response) is not CompletionResponse:
+                raise TypeError(type(response).__name__)
+            response = response.model_copy(deep=True)
+            ids = [c.id for c in response.tool_calls]
+            if len(set(ids)) != len(ids) or used_ids & set(ids):
+                raise ValueError("a tool-call id is used twice")
+            if not all(_is_json(c.arguments) for c in response.tool_calls):
+                raise ValueError("arguments are not plain JSON")
+        except Exception:
             return end("error", "bad_reply")
-        response = response.model_copy(deep=True)
+        used_ids |= set(ids)
         transcript.append(Message(role="assistant", content=response.content,
                                   tool_calls=response.tool_calls))
         batch = response.tool_calls
@@ -171,6 +198,15 @@ async def _execute(server: Any, visible: frozenset[str] | None, call: ToolCall) 
     if getattr(result, "is_error", True) is not False:
         return error("\n".join(texts) or "the tool failed")
     return Message(role="tool", content=_payload(texts), tool_call_id=call.id)
+
+
+def _is_json(value: Any) -> bool:
+    """True if ``value`` survives a strict JSON round trip unchanged (no NaN, no
+    tuples, no non-string keys, no objects), so a record holding it serialises exactly."""
+    try:
+        return json.loads(json.dumps(value, allow_nan=False)) == value
+    except (TypeError, ValueError, RecursionError):
+        return False
 
 
 def _payload(texts: list[str]) -> str:

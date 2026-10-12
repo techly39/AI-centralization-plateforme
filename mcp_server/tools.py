@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Annotated, Any, Callable
+from urllib.parse import quote
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -50,6 +51,19 @@ class ToolRoute:
 
 #: tool name -> the endpoint it wraps. Filled in by :func:`api_tool`.
 TOOL_ROUTES: dict[str, ToolRoute] = {}
+
+
+def _segment(value: str) -> str:
+    """One path segment, escaped, so a tool reaches only the endpoint it declares.
+
+    Red-team 0001 / 0013 H1: ``get_price('../agents')`` used to reach ``GET /agents``.
+    ``/`` and every other reserved character are percent-encoded; the two dot
+    segments, which encoding leaves alone and a URL resolver would follow, and
+    the empty segment are refused.
+    """
+    if value in {"", ".", ".."}:
+        raise ToolError(f"{value!r} is not a valid path value")
+    return quote(value, safe="")
 
 
 def api_tool(
@@ -269,7 +283,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         In backtest mode this is the price at the *simulated* moment, never a
         later one — you cannot see the future here, by construction.
         """
-        return await call("GET", f"/price/{ticker}")
+        return await call("GET", f"/price/{_segment(ticker)}")
 
     @api_tool(server, method="GET", path="/ohlcv/{ticker}")
     async def get_ohlcv(
@@ -284,7 +298,7 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """
         return await call(
             "GET",
-            f"/ohlcv/{ticker}",
+            f"/ohlcv/{_segment(ticker)}",
             params={"start": start, "end": end, "interval": interval},
         )
 
