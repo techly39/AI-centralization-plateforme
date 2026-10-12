@@ -1045,22 +1045,32 @@ only *who* makes it and *when*:
 - *What:* one or more kinds from the closed `app.run_clock.MIND_KINDS`: `scripted` (code),
   `cassette` (recorded model output played back), and `model` (a model answering now). Each kind
   appears once; extra fields get 422. The event is `run_minds_declared {minds}`, sorted. The
-  Runtime declares the kinds of its specs (`lockstep.mind_kinds`). **A provider it does not know
-  is declared `model`**, so an unknown mind is never labelled as code. ADR (4)'s
+  Runtime declares the kinds of its specs (`lockstep.mind_kinds`). **A mind is `scripted` or
+  `cassette` only if both its provider and its adapter are in the gate's zero-cost sets.
+  Anything else is declared `model`**, so an unknown mind is never labelled as code. Audit c28
+  WARN 1: the first version looked at the provider only, which would have labelled `scripted` +
+  `openclaw` (OpenClaw's own model) as code. ADR (4)'s
   `minds: replay` is spelled `cassette` here: physics names what plays, not what the run is for.
 - *When:* backtest runs only (a live run's agents are not conducted), **once**, and only while the
   clock has not moved and no firm agent (any non-physics actor) has written an event. A refused
   act counts, because its `permission_denied` names the actor. Physics' own setup (seeds, actor
-  null) and the runtime's own events do not count. So a declaration covers everything the run's
-  agents did. `fund-runtime backtest` declares right after `check_clock` and **before it
+  null) and the runtime's own events do not count. So a declaration precedes every event a firm
+  agent wrote. Reads write nothing, so an agent that already existed (the registrar) may have
+  read before it (audit c28 WARN 3). The run's own minds are registered after it. `fund-runtime backtest` declares right after `check_clock` and **before it
   registers anyone** (registrations by the registrar are firm acts). A run whose firm agent
   already acted is refused (`minds_refused:409`) before any agent is made. Under HALT, physics
-  refuses with 423.
+  refuses with 423. A firm agent cannot forge a label, but one that already exists can spoil a
+  run before its declaration by writing any event, a refused one included. The run then stops
+  as `minds_refused:409`: that is a way to stop a run, not to fake one. If provisioning refuses
+  after the declaration, the declaration stays and the database cannot be declared again. That
+  is acceptable: a backtest database is single-use (ADR-027; audit c28 NOTE 4).
 - *Reading:* `run_minds(session)` returns the first declaration's kinds, or `None`. It also
   returns `None` for a live run, an undeclared run, or a first declaration the ledger shows came
-  after a firm act or an advance. The check and the append run under `OMS_LOCK`, but writes that
-  take no lock (a message) can land between them. The reader trusts the ledger's id order, not
-  the lock. A second declaration can only exist through that race, and it is never read.
+  after a firm act or an advance. It reads only declarations a physics hand wrote (audit c28
+  NOTE 3). The check and the append run under `OMS_LOCK`, but writes that take no lock (a
+  message) can land between them. The reader trusts the ledger's id order, not the lock. A
+  second declaration needs a second process on the same database (`OMS_LOCK` is per process,
+  B-036) or a direct ledger write. It is never read (audit c28 WARN 2).
 - *Not done:* no `GET` of the run record. That would hand every agent `run_started.world`, the
   market's law (drift, volatility). The claim check found that **management can already read
   it** through `GET /events` (`READ_CROSS_POD`): B-049. Readers use the ledger, and a report

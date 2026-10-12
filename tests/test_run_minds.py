@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.api.schemas import MindKind
-from app.db.models import Agent, AgentRole, Event
+from app.db.models import Agent, AgentRole, AgentStatus, Event
 from app.ledger.events import (
     EVENT_AGENT_REGISTERED,
     EVENT_MESSAGE_SENT,
@@ -248,11 +248,50 @@ def test_the_schema_and_the_runtime_name_physics_kinds():
     assert set(lockstep._KIND.values()) | {"model"} == MIND_KINDS
 
 
-def _spec(provider: str) -> AgentSpec:
-    return AgentSpec(id=f"x-{provider}", name=f"x-{provider}", role="pm", pod=1,
-                     provider=provider, script="read-a", charter="c")
+def _spec(provider: str, adapter: str = "native") -> AgentSpec:
+    return AgentSpec(id=f"x-{provider}-{adapter}", name=f"x-{provider}-{adapter}", role="pm",
+                     pod=1, provider=provider, adapter=adapter, script="read-a", charter="c")
 
 
 def test_an_unknown_provider_is_declared_a_model():
     assert lockstep.mind_kinds([_spec("scripted"), _spec("scripted")]) == ["scripted"]
     assert lockstep.mind_kinds([_spec("scripted"), _spec("metered")]) == ["model", "scripted"]
+
+
+def test_a_zero_cost_provider_through_a_spending_adapter_is_a_model():
+    """Audit c28 WARN 1: ``scripted`` through ``openclaw`` runs OpenClaw's own model."""
+    assert lockstep.mind_kinds([_spec("scripted", "openclaw")]) == ["model"]
+    assert lockstep.mind_kinds([_spec("cassette", "openclaw")]) == ["model"]
+    assert lockstep.mind_kinds([_spec("cassette")]) == ["cassette"]
+
+
+# --- audit c28 notes ------------------------------------------------------------------------
+
+def test_a_deactivated_agents_event_still_counts_as_acting(SessionFactory, world, on_run_clock):
+    rid = _runtime_id(SessionFactory)
+    with SessionFactory() as s:
+        pm = s.scalar(select(Agent).where(Agent.name == "pm-1"))
+        append_event(s, type=EVENT_MESSAGE_SENT, actor_agent_id=pm.id,
+                     payload={"message_id": 0, "to": "broadcast", "from_agent_id": pm.id})
+        pm.status = AgentStatus.inactive
+        s.commit()
+        with pytest.raises(RunMindsError, match="too late"):
+            declare_minds(s, minds=["scripted"], actor_agent_id=rid)
+
+
+def test_a_declaration_a_firm_agent_wrote_is_never_read(SessionFactory, world, on_run_clock):
+    """No route lets a firm agent write the type; the reader does not rely on that."""
+    with SessionFactory() as s:
+        admin = s.scalar(select(Agent.id).where(Agent.name == "management"))
+        rid = s.scalar(select(Agent.id).where(Agent.role == AgentRole.runtime))
+        append_event(s, type=EVENT_RUN_MINDS_DECLARED, actor_agent_id=admin,
+                     payload={"minds": ["scripted"]})
+        s.commit()
+        assert run_minds(s) is None
+        append_event(s, type=EVENT_RUN_MINDS_DECLARED, actor_agent_id=None,
+                     payload={"minds": ["scripted"]})
+        s.commit()
+        assert run_minds(s) is None
+        # The forged one is a firm agent's event: the runtime's own declaration is now late.
+        with pytest.raises(RunMindsError, match="too late"):
+            declare_minds(s, minds=["model"], actor_agent_id=rid)

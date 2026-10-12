@@ -51,7 +51,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime.gate import decide_batch
+from runtime.gate import ZERO_COST_ADAPTERS, ZERO_COST_PROVIDERS, decide_batch
 from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
 from runtime.spec import AgentSpec
 
@@ -214,15 +214,20 @@ async def check_clock(clock: FundClient) -> str | None:
 
 
 #: Physics' kind for each zero-cost provider (``app.run_clock.MIND_KINDS``; a test
-#: pins the copy). Any other provider is a model answering now: ``model``.
+#: pins the copy). Any other mind is a model answering now: ``model``.
 _KIND = {"scripted": "scripted", "cassette": "cassette"}
 
 
 def mind_kinds(specs: Sequence[AgentSpec]) -> list[str]:
-    """The kinds physics records for minds made from ``specs``, sorted. A
-    provider this map does not name is declared ``model``: an unknown mind is
-    never labelled as code."""
-    return sorted({_KIND.get(s.provider, "model") for s in specs})
+    """The kinds physics records for minds made from ``specs``, sorted. A mind is
+    ``scripted`` or ``cassette`` only if its provider *and* its adapter are
+    zero-cost (the gate's own sets): ``scripted`` through ``openclaw`` runs
+    OpenClaw's model (audit c28 WARN 1). Anything else is declared ``model``."""
+    def kind(s: AgentSpec) -> str:
+        if s.provider in ZERO_COST_PROVIDERS and s.adapter in ZERO_COST_ADAPTERS:
+            return _KIND.get(s.provider, "model")
+        return "model"
+    return sorted({kind(s) for s in specs})
 
 
 async def declare_minds(clock: FundClient, specs: Sequence[AgentSpec]) -> str | None:

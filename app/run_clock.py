@@ -27,8 +27,9 @@ what an advance does next — the pending-order sweep — is the caller's
 {minds}``, by the same hand that moves the clock. Physics cannot see behind a
 key, so this is a declaration, not a measurement. What physics can guarantee is
 *when* it was made: once, before the clock has moved and before any firm agent
-has acted, so it covers everything the run's agents did. :func:`run_minds`
-trusts a declaration only if the ledger's order still says so.
+has written an event, so it precedes every event a firm agent wrote (a read
+writes nothing). :func:`run_minds` trusts a declaration only if the ledger's
+order still says so.
 """
 
 from __future__ import annotations
@@ -257,9 +258,12 @@ def _is_backtest(session: Session) -> bool:
 
 
 def _first_declaration(session: Session) -> Event | None:
+    """The first declaration written by a physics hand. Only :func:`declare_minds`
+    writes the type today; the reader does not rely on that (audit c28 NOTE 3)."""
+    physics = select(Agent.id).where(Agent.role.in_(PHYSICS_ROLES))
     return session.scalar(
         select(Event)
-        .where(Event.type == EVENT_RUN_MINDS_DECLARED)
+        .where(Event.type == EVENT_RUN_MINDS_DECLARED, Event.actor_agent_id.in_(physics))
         .order_by(Event.id)
         .limit(1)
     )
