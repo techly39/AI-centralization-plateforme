@@ -619,3 +619,18 @@ one audit, not a rebuild.
 Next: B-037 (a run records its world by fingerprint) → B-036 / B-028 (the probe now gives a
 determinism harness to test them against) → toward the Runtime (Era I exit: one pod via the
 Runtime).
+
+## Cycle 0019 — A run records its world, and lives in only one (2026-10-12)
+Era: I — The Desk
+Exit criterion served: "Boundary + determinism tests pass" and the Era I backtest criterion — a
+backtest is evidence only if its ledger says which world it ran in (B-037 slice a; ADR-030 "not
+done").
+Hypothesis: If every provider describes its world as a JSON record (`world()` — provider name,
+whether it is reproducible, and for the synthetic market the law version, origin, drift,
+volatility, symbols and an `HMAC-SHA256(key, "fingerprint:v1")` fingerprint), `run_started`
+carries that record, and `install_run_clock` refuses a backtest database whose recorded world
+differs from the installed provider's, then: the probe's ledger names its world (same key → same
+fingerprint, other key → other fingerprint); a server or operator command started on a run with
+the wrong key, symbols or provider refuses to start instead of silently splicing two markets into
+one ledger; and no agent-visible surface carries the key (red-team 0010's held test stays green,
+plus a new one: the fingerprint reveals no served noise or return).

@@ -218,6 +218,19 @@ class MarketDataProvider(metaclass=_SealedEntries):
             )
         return ended
 
+    def world(self) -> dict[str, object]:
+        """The market this provider serves, as a JSON record a run's ledger keeps.
+
+        ``run_started`` carries it, and a backtest database refuses to start
+        under a provider whose record differs (B-037): one run, one world. A
+        ``reproducible`` world names everything needed to serve the same bars
+        again — except any secret, which appears only as a one-way fingerprint
+        (management reads ``/events``). The default is honest for any feed
+        whose answers are not a function of its record (a live feed, a table
+        tests can move).
+        """
+        return {"provider": self.name, "reproducible": False}
+
     @abstractmethod
     def _quote(self, symbol: str, *, as_of: datetime) -> Quote:
         """The implementation's price for a normalised ``symbol`` at ``as_of``.

@@ -57,6 +57,14 @@ DEFAULT_VOLATILITY = 0.015
 #: The shortest world key accepted: 128 bits, out of any brute-force reach.
 MIN_KEY_BYTES = 16
 
+#: The formula's version, recorded with every run: changing how bars are
+#: derived from the key is a new law, and an old run names the one it lived.
+LAW = "hmac-sha256-gbm/1"
+
+#: A world is named by ``HMAC-SHA256(key, FINGERPRINT_MESSAGE)``, first 128 bits.
+FINGERPRINT_MESSAGE = b"fingerprint:v1"
+FINGERPRINT_HEX = 32
+
 _TWO_53 = float(1 << 53)
 
 
@@ -152,6 +160,27 @@ class SyntheticProvider(MarketDataProvider):
             self._day_bar(symbol, first + timedelta(days=k), closes)
             for k in range((stop - first).days)
         ]
+
+    # --- the world's record -----------------------------------------------------
+
+    def world(self) -> dict[str, object]:
+        """Everything that fixes this market, the key only as a fingerprint.
+
+        The fingerprint is its own HMAC domain (``fingerprint:``), so it is no
+        window onto any ``return:`` or ``noise:`` value; and the key is ≥ 128
+        bits, so it cannot be searched for from the fingerprint either.
+        """
+        fingerprint = hmac.new(self._key, FINGERPRINT_MESSAGE, hashlib.sha256)
+        return {
+            "provider": self.name,
+            "reproducible": True,
+            "law": LAW,
+            "origin": ORIGIN.isoformat(),
+            "drift": self._drift,
+            "volatility": self._volatility,
+            "symbols": dict(sorted(self._starts.items())),
+            "key_fingerprint": fingerprint.hexdigest()[:FINGERPRINT_HEX],
+        }
 
     # --- the provider interface ------------------------------------------------
 
