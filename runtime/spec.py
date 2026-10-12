@@ -6,8 +6,10 @@ agent in a directory); "stored in the App, mirrored to files" comes when the
 App grows a spec table.
 
 Fields are 03 §3's, plus ``provider`` (ADR-032 (3): a mind = provider + adapter
-+ spec — the gate decides on it). The spec carries no cost claim: what may run
-under the cap is the gate's list, not the spec's word.
++ spec — the gate decides on it) and ``script`` (R-2: which scripted policy).
+The spec carries no cost claim: what may run under the cap is the gate's list,
+not the spec's word. A spec loads even if its fields contradict each other
+(``scripted`` + a model); :mod:`runtime.registry` refuses to build a mind from it.
 
 ``role`` is a role a mind may hold: ``system`` is physics' own identity and the
 clock-holding ``runtime`` identity (R-3) is the Runtime's, never a mind's.
@@ -38,6 +40,8 @@ class AgentSpec(BaseModel):
     parent_id: str | None = None
     generation_born: int = Field(default=0, ge=0)
     provider: str = Field(min_length=1)
+    #: For ``provider: scripted`` only: which policy in :data:`runtime.scripted.SCRIPTS`.
+    script: str | None = None
     adapter: Literal["native", "openclaw"] = "native"
     model: str | None = None
     charter: str = Field(min_length=1)
