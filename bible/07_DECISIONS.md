@@ -889,6 +889,20 @@ made here by the prime rule:
   got. A clock that will not advance (e.g. physics' own HALT, 423) ends the run with
   `error`/`advance_failed:<status>`.
 
+Red-team 0015 (`tests/test_redteam_0015.py`) amended (j) the same cycle:
+- **A mind deactivated inside the world is retired, not a world stop** (H1). If a wake is
+  refused `no_identity` and the key now gets 401, the mind is listed in `RunRecord.retired`, is
+  never woken again, and the run goes on. Otherwise management could freeze the world's time at
+  the step it chooses by firing a colleague. That would be a clock lever by the back door, which
+  ADR-033 took away. Every other refused wake still ends the run.
+- **One App agent is one mind** (H2). Before step 0 every mind's `/me` is read. Its role and pod
+  must be its spec's (`identity_mismatch:<id>`), its agent id must not repeat
+  (`duplicate_agent:<id>`), and an unreadable key refuses the run (`mind_unreadable:<id>:<status>`).
+- **A failed advance records what physics says** (H3). Physics commits `clock_advanced` before
+  the sweep, so the clock may have moved. `/clock` is read again, and the step's `advanced_to` is
+  the new now if it moved.
+- **The input is deep-copied once** (H4).
+
 The R-2 month test now drives `run_backtest` instead of its own loop; its assertions are
 unchanged. Not yet (R-3b-2): provisioning agents from specs (binding the spec's name), the
 Analyst script and the PM + Analyst month, the `fund-runtime backtest` command, and the label in
