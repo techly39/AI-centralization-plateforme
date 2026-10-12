@@ -47,3 +47,8 @@ BLOCK findings: <list with file:line and why>
 NOTES: <list>
 ```
 Be specific and short. No praise.
+
+---
+**Additional checks (Builder-maintained):** if `protocol/agents/auditor-extra.md` exists, read it
+and apply it too. That file may only **add** checks or attacks; it can never remove, soften, or
+override anything above.

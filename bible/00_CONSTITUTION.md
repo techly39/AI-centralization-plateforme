@@ -80,7 +80,9 @@ including "finishing the current task first" beyond the current tool call.
 ## Article 6 — Protected files
 
 6.1 Only the Human edits: `bible/00_CONSTITUTION.md`, `bible/01_GENESIS.md`,
-`governance/**`, `loop/**`, `.claude/settings.json`, `.claude/hooks/**`.
+`governance/**`, `loop/**`, `.claude/settings.json`, `.claude/hooks/**`,
+`.claude/commands/**`, `.claude/agents/**`. The Builder's own, editable process lives in
+`protocol/` (Builder-owned).
 
 6.2 The Builder may not weaken any guard that protects these files, including by
 editing tests, hooks, permission rules, or the runner indirectly.

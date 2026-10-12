@@ -75,7 +75,9 @@ wrong, write `state/SURVEY.md`. Build only once you understand what you're worki
 
 ## Running a cycle
 
-Headless: `loop/run_forever.sh` calls `claude -p "/cycle"`. Interactive: type `/cycle`.
+Headless: the Human runs `loop/builder.sh start` → a bounded batch of `claude -p "/cycle"` runs
+(model, effort and per-cycle / per-run / per-day USD caps in `governance/human.yaml`), then it
+stops. Interactive: type `/cycle`.
 The protocol is `.claude/commands/cycle.md`. Subagents: `auditor` (review every diff),
 `red-team` (attack physics).
 

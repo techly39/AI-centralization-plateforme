@@ -27,6 +27,8 @@ PROTECTED = (
     "loop/",
     ".claude/settings.json",
     ".claude/hooks/",
+    ".claude/commands/",
+    ".claude/agents/",
 )
 
 READ_ONLY_VERBS = {
@@ -36,7 +38,7 @@ READ_ONLY_VERBS = {
 # P-0001 (accepted 2026-10-11): match protected PATH tokens, not bare words, so prose in a
 # commit message or `state/loop_status.json` is not mistaken for a protected file.
 PROTECTED_TOKEN = re.compile(
-    r"(^|[\s'\"/=:(])(bible/0[01]_|governance(/|\b(?!\s))|loop/|\.claude/settings\.json|\.claude/hooks|\.firm(/|\b))"
+    r"(^|[\s'\"/=:(])(bible/0[01]_|governance(/|\b(?!\s))|loop/|\.claude/settings\.json|\.claude/(hooks|commands|agents)|\.firm(/|\b))"
 )
 READ_ONLY_GIT = {"diff", "log", "show", "status", "blame", "ls-files"}
 WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}

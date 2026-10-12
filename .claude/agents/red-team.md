@@ -39,3 +39,8 @@ HOLES FOUND: <n>
 - <area>: <hole> — test: <path::name> — severity: high|medium|low
 ATTEMPTED, HELD: <short list of attacks that failed>
 ```
+
+---
+**Additional checks (Builder-maintained):** if `protocol/agents/red-team-extra.md` exists, read it
+and apply it too. That file may only **add** checks or attacks; it can never remove, soften, or
+override anything above.

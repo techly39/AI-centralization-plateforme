@@ -58,7 +58,9 @@
       "Bash(git rm *)",
       "Bash(rm *.DS_Store)",
       "Bash(cd *)",
-      "Bash(pwd)"
+      "Bash(pwd)",
+      "Edit(.claude/skills/**)",
+      "Write(.claude/skills/**)"
     ],
     "deny": [
       "Edit(bible/00_CONSTITUTION.md)",
@@ -78,7 +80,9 @@
       "Bash(rm -rf ~*)",
       "Edit(~/.firm/**)",
       "Bash(git rm -r*)",
-      "Bash(git rm -rf*)"
+      "Bash(git rm -rf*)",
+      "Edit(.claude/commands/**)",
+      "Edit(.claude/agents/**)"
     ],
     "additionalDirectories": [
       "~/.openclaw",

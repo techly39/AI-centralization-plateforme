@@ -5,12 +5,14 @@ Usage (from the repo root, via `uv run python loop/preflight.py ...`):
   (no args)     run every check before a cycle. Exit codes:
                   0  go
                   10 go, but run a DIAGNOSIS cycle (failure limit reached)
-                  20 wait (daily cycle limit reached)
+                  20 stop for today (daily cycle limit or daily USD budget reached)
                   1  stop the loop (halt, seal broken, open incident, repeated failure)
   --post N LOG  after a run: N = last cycle number before the run, LOG = its output file.
-                Counts the run only if state/loop_status.json advanced; a usage/rate-limit
-                stop exits 30 and is not counted (the runner waits instead).
+                Records the run's cost. Counts the run only if state/loop_status.json advanced;
+                a usage/rate-limit stop exits 30 and is not counted (the runner stops).
+  --cost LOG    print the USD cost of one run, read from its output file
   --last-cycle  print the cycle number in state/loop_status.json
+  --spent-today print the USD spent by Builder runs today
   --get a.b.c   print a value from governance/human.yaml
 
 Reference hashes live OUTSIDE the repo ($FIRM_HOME/protected.sha256, default ~/.firm),
@@ -41,6 +43,8 @@ PROTECTED = [
     "loop",
     ".claude/settings.json",
     ".claude/hooks",
+    ".claude/commands",
+    ".claude/agents",
 ]
 UNSEALED = {"governance/HALT"}
 
@@ -108,6 +112,11 @@ def check() -> None:
         ran_today = sum(1 for line in CYCLES_LOG.read_text().splitlines() if line.startswith(today))
     if ran_today >= int(cfg.get("max_cycles_per_day", 24)):
         stop(f"daily cycle limit reached ({ran_today}).", 20)
+    # A cycle starts only if its whole budget still fits under today's cap: the day never overshoots.
+    spent, cap, per_cycle = spent_today(), cfg.get("max_usd_per_day"), float(cfg.get("max_usd_per_cycle", 0))
+    if cap is not None and spent + per_cycle > float(cap):
+        stop(f"daily budget reached (${spent:.2f} spent, a cycle may cost ${per_cycle:.2f}, "
+             f"cap ${float(cap):.2f}).", 20)
 
     failures = int(FAILURES.read_text()) if FAILURES.exists() else 0
     limit = int(cfg.get("max_consecutive_failures", 3))
@@ -126,6 +135,38 @@ LIMIT_MARKERS = re.compile(
 )
 
 
+def spent_today() -> float:
+    """USD spent by Builder runs today, summed from the cost= field of $FIRM_HOME/cycles.log."""
+    if not CYCLES_LOG.exists():
+        return 0.0
+    today = dt.date.today().isoformat()
+    total = 0.0
+    for line in CYCLES_LOG.read_text().splitlines():
+        m = re.search(r"\bcost=([0-9.]+)", line)
+        if line.startswith(today) and m:
+            total += float(m.group(1))
+    return total
+
+
+def run_cost(log_text: str) -> float:
+    """total_cost_usd from the `claude -p --output-format json` result; 0 if unreadable."""
+    for line in reversed(log_text.strip().splitlines()):
+        try:
+            return float(json.loads(line).get("total_cost_usd") or 0)
+        except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def read_log(logfile: str | None) -> str:
+    if not logfile:
+        return ""
+    try:
+        return Path(logfile).read_text(errors="replace")[-20000:]
+    except OSError:
+        return ""
+
+
 def last_cycle() -> int:
     status_file = ROOT / "state" / "loop_status.json"
     try:
@@ -136,45 +177,46 @@ def last_cycle() -> int:
 
 def post(before: int, logfile: str | None) -> None:
     """Classify the run that just ended. Exit codes:
-         0  a real cycle ran (merged / failed / blocked) — counted toward the daily cap
-         30 no cycle ran because of a usage/rate limit — not counted, the runner waits
+         0  a real cycle ran (merged / failed / blocked) — counted toward the daily caps
+         30 no cycle ran because of a usage/rate limit — not counted, the runner stops
     A run that did not advance state/loop_status.json is NEVER counted as merged.
     """
     FIRM_HOME.mkdir(parents=True, exist_ok=True)
     status_file = ROOT / "state" / "loop_status.json"
     after = last_cycle()
-    log_text = ""
-    if logfile:
-        try:
-            log_text = Path(logfile).read_text(errors="replace")[-20000:]
-        except OSError:
-            pass
+    log_text = read_log(logfile)
+    cost = run_cost(log_text)
 
     if after > before:
         try:
             result = json.loads(status_file.read_text()).get("result", "failed")
         except (OSError, json.JSONDecodeError):
             result = "failed"
-    elif LIMIT_MARKERS.search(log_text):
-        print("POST: no cycle ran — usage/rate limit hit. Not counted; waiting.")
+    elif LIMIT_MARKERS.search(log_text) and cost == 0:
+        print("POST: no cycle ran — usage/rate limit hit. Not counted.")
         sys.exit(30)
     else:
         result = "failed"
         print("POST: the run did not advance state/loop_status.json — counted as failed.")
 
     with CYCLES_LOG.open("a") as fh:
-        fh.write(f"{dt.date.today().isoformat()} cycle={after} result={result}\n")
+        fh.write(f"{dt.date.today().isoformat()} cycle={after} result={result} cost={cost:.4f}\n")
     failures = int(FAILURES.read_text()) if FAILURES.exists() else 0
     failures = 0 if result == "merged" else failures + 1
     FAILURES.write_text(str(failures))
-    print(f"POST: result={result} consecutive_failures={failures}")
+    print(f"POST: result={result} cost=${cost:.2f} spent_today=${spent_today():.2f} "
+          f"consecutive_failures={failures}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--post":
         post(int(sys.argv[2]) if len(sys.argv) > 2 else 0, sys.argv[3] if len(sys.argv) > 3 else None)
+    elif len(sys.argv) > 2 and sys.argv[1] == "--cost":
+        print(f"{run_cost(read_log(sys.argv[2])):.4f}")
     elif len(sys.argv) > 1 and sys.argv[1] == "--last-cycle":
         print(last_cycle())
+    elif len(sys.argv) > 1 and sys.argv[1] == "--spent-today":
+        print(f"{spent_today():.2f}")
     elif len(sys.argv) > 2 and sys.argv[1] == "--get":
         print(get(sys.argv[2]))
     elif len(sys.argv) > 1 and sys.argv[1] == "--hashes":
