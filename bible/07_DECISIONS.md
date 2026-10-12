@@ -742,3 +742,36 @@ amendment here, with a planted counter-example showing every other `app.*` modul
 Not decided here: parallel wakes, live-mode wake policies (cron/event), the meter proxy (03 §4.3),
 memory policy, context packages beyond `/me` + charter + workflow input, and the cassette storage
 format (files vs table). Each is decided in its slice.
+
+Amended (cycle 21, R-1 shipped: `runtime/`, `tests/test_runtime_gates.py`):
+(a) **The dependency law has two halves.** Statically, the runtime layer still imports **no** `app`
+module. Its Layer is unchanged, and a planted `runtime/direct.py: app.config` is caught.
+Dynamically, importing every `runtime` module may load no physics module beyond
+`RUNTIME_MAY_LOAD_FROM_APP` = `{app, app.config, app.limits}`. That is the MCP wrapper's set, and
+the Runtime will reach `FundClient` through the wrapper. The probe imports every file under
+`runtime/`, so a new module is probed without a test edit. A planted package that imports
+`app.ledger.events` is reported. Today the Runtime loads no `app` module at all.
+(b) **The gate decides on a name, never on a flag.** `runtime.gate` matches the AgentSpec's
+`provider` string exactly (no case folding, no trimming) against `ZERO_COST_PROVIDERS`. The gate
+module never names `spends_money`, and a static test checks this. The other half of the closed
+list lands in R-2. There, the name→class registry must map `scripted` and `cassette` each to
+exactly one class with no model and no network client, so a spec cannot name `scripted` and get a
+spending mind.
+(c) **A cap set is not yet a licence to spend.** Under a numeric cap, a spending provider is
+still refused, with `no_metered_key`, until per-agent metered keys exist (R-6). A cap the Runtime
+cannot meter is a cap it cannot keep (prime rule: safer budget).
+(d) **Both levers fail closed.** The reader turns into `null`, with a recorded `cap_problem`,
+every cap it cannot read as a finite, non-negative number: a missing file or key, a YAML error, a
+duplicate key, a string, a bool, ±inf, NaN, a negative, or an integer too large for a float. HALT
+counts if anything is at the path, or if the path cannot be checked: only `FileNotFoundError`
+means the world runs. The claim check found this: `os.path.lexists` answers False on any
+OSError, which would have failed open. (Physics' `Path.exists()` has a milder form of the same
+gap → B-040.)
+(e) **AgentSpec deviations from 03 §3, recorded.**
+- One added field, `provider`.
+- `role` is one of {pm, analyst, management}. `system` and R-3's `runtime` identity are never a
+  mind's role.
+- A PM or Analyst needs a pod.
+- `memory_policy` is `none`, and `wake_policy` is one of {every_step, never}, until their slices
+  widen them.
+- Specs are YAML files, one per agent, loaded in id order, which is the lockstep order.
