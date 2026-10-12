@@ -44,14 +44,21 @@ keep their ids for history.
           ADR-033 (b), `tests/test_runtime_lockstep.py`, red-team 0015: 4 holes, all fixed).
           `runtime.lockstep.run_backtest`, B-041. A mind deactivated in-world is *retired*,
           not a world stop; one App agent = one mind; a failed advance records physics' now.
-    - [ ] **R-3b-2** **Next.** Provision agents from specs and bind the spec's name to the App
-          agent; the Analyst script (messages a signal, the PM trades on it); the PM + Analyst
-          month through `run_backtest` < 10 min; `fund-runtime backtest` CLI; the run label
-          `minds: scripted` in physics' run record. **M1**. Serves EC1, does not tick it (R-8).
-          Carry-overs: count tool-function errors in the wake record; audit c24-b NOTE 3 (a
-          `no_identity` refusal with a live key still ends the run: untested), NOTE 4 (all minds
-          retired → the clock still advances: say so in the ADR), NOTE 5 (record the step a
-          mind was retired at, for R-4).
+    - [ ] **R-3b-2** Split cycle 25 (X-008):
+      - [x] **R-3b-2a** **Done cycle 25** (merged b0c83a1; ADR-032 (k)(l)(m),
+            `tests/test_runtime_pod.py`). `ma-signal-analyst` + `signal-pm`; a two-pod month
+            through the conductor, twice; MCP list answers are one array block; `tool_failures`,
+            `retired_at`; c24 NOTE 3/4 pinned.
+      - [ ] **R-3b-2b** **Next.** Provision agents from specs and bind the spec's name to the App
+            agent; `fund-runtime backtest` CLI (specs dir + DB + world key → RunRecord); the run
+            label `minds: scripted` in physics' run record (physics → red-team). **M1**. Serves
+            EC1, does not tick it (R-8).
+      - [ ] **B-043** (cycle 25, low) `get_messages`' description should say `ts` is physics'
+            stamp and a payload's dates are the sender's claim (journal c25 Learned 2). Era II
+            LLM agents will trust whichever one the tool tells them about.
+      - [ ] **B-044** (cycle 25, low) `tool_failures` takes a `ValidationError` raised *inside*
+            a tool body for the mind's bad arguments (audit c25 NOTE 4). No tool body builds a
+            pydantic model today. If one ever does, classify by where the error was raised.
   - [ ] **R-3c** `daily_cycle` workflow.
 - [ ] **R-4** Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
       replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded

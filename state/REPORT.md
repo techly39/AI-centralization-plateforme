@@ -1,5 +1,22 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 25: two agents now work together for a simulated month.** An "analyst" and
+a "portfolio manager" (PM), both still plain code with no AI and $0 cost, shared a desk for 31
+simulated days. Each day the analyst sends its desk a buy/sell signal. The PM trades only on
+today's signal from its own desk's analyst. It checks who sent the message against the firm's
+directory, and when the message was sent against the app's own timestamp, not against what the
+message claims. A second desk with no analyst never traded. Run twice, the history was the same.
+
+This work found a flaw in the tools every agent will use. When the answer was a list holding a
+single item, such as an inbox with one message, the agent received the bare item. It could not
+tell "one message" from "a message". An empty list arrived as nothing at all. Fixed: a list now
+always arrives as a list. This matters for your OpenClaw agents too, since they will use the same
+tools.
+
+Nothing needs your action. `setup/` is still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 24: the Runtime now runs the simulated month itself.** Until now, a test
 moved the clock forward day by day. Now the Runtime does it. Each simulated day, it wakes every
 agent once, always in the same order, and then moves the clock forward with its own key.

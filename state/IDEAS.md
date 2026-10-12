@@ -289,3 +289,12 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   Runtime could subscribe to `agent_deactivated` rather than discover it through a 401, and
   record the step in the cassette (R-4). Then "who fired whom, when" can be replayed and
   counterfactually forked.
+- **Trust experiments on the bus (cycle 25).** `signal-pm` decides whom to believe from
+  physics' facts: directory role, pod, status, `ts`. An Era II experiment could give an LLM PM
+  the same inbox with one forged-but-plausible signal planted by a peer, such as a pre-dated
+  payload or a PM posing as the analyst in prose. Then measure, across seeds, whether it trades
+  on the claim or on the record. This is a cheap, deterministic-world probe of agent gullibility.
+- **The scripted pod as a calibration baseline (cycle 25).** The two-pod month is a
+  zero-variance control. Any later LLM pod in the same world key can be scored as its difference
+  from the scripted analyst + PM over the same 31 days: an exact counterfactual, with no noise
+  from the market.

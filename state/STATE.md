@@ -1,9 +1,25 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 24 (R-3b-1 the conductor + B-041 runtime key rotation — merged c3cbfd4, 2026-10-12)
+**Last cycle:** 25 (R-3b-2a a pod of two minds lives a month + a list stays a list — merged b0c83a1, 2026-10-12)
 
 ## What is true now
+- **A pod of two scripted minds lives a month through the conductor** (R-3b-2a, ADR-032 (l),
+  `tests/test_runtime_pod.py`).
+  - `ma-signal-analyst` sends its pod `{"kind": "signal", "as_of", "signals": {t: long|flat}}`.
+  - `signal-pm` trades only on the newest of its 50 newest visible messages that meets all of
+    these: addressed to `pod:<own>`; from an *active* analyst of its pod (checked against the
+    directory); physics' `ts` == the clock's now; payload `as_of` == now. Otherwise it holds.
+  - Two pods, 31 days: every pod-1 order cites a same-instant signal from its analyst, pod 2
+    (no analyst) never trades, and two runs are identical. It runs in seconds.
+- **A list stays a list on the MCP surface** (ADR-032 (k)). Every list answer is one JSON array
+  block. Before, a list of one reached an agent as the bare object, and an empty list as nothing.
+- **The records say more** (ADR-032 (m)):
+  - `WakeRecord.tool_failures` counts bugs under a tool, told apart from refusals and bad
+    arguments by the `ToolError`'s `__cause__`.
+  - `RunRecord.retired_at` gives the step at which each mind was retired.
+  - If every mind is retired, time still moves.
+  - A `no_identity` refusal while the key is still live ends the run.
 - **The Runtime conducts a backtest** (R-3b-1, ADR-032 (j) + its red-team amendment,
   `tests/test_runtime_lockstep.py`, `tests/test_redteam_0015.py`).
   `runtime.lockstep.run_backtest(minds, clock, steps=, days_per_step=1, workflow_input=,
@@ -114,7 +130,7 @@
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
-  identity + the lockstep conductor. **1261 passed + 6 xfailed** (with the runtime). No model
+  identity + the lockstep conductor. **1287 passed + 6 xfailed** (with the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
@@ -139,7 +155,7 @@
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
 - No Truman, Quant Lab or Observatory yet. The Runtime conducts a lockstep backtest. There is no
   live scheduler yet (R-3c). Agents are not yet provisioned from specs: the caller hands in keys
-  (R-3b-2).
+  (R-3b-2b).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -147,11 +163,9 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-3b-2** Provision App agents from specs and bind the spec's name. Then the Analyst script
-   (it messages a signal, the PM trades on it), and a PM + Analyst month through `run_backtest`
-   in under 10 min. Then `fund-runtime backtest`, and the label `minds: scripted` in physics'
-   run record (M1). Carry-overs: count tool-function errors, plus audit c24-b NOTE 3–5. If too
-   big: provisioning + CLI first, the Analyst month second.
-2. **R-4** Cassettes + replay (M2). Record the step at which a mind was retired.
+1. **R-3b-2b** Provision App agents from specs and bind the spec's name. Add `fund-runtime
+   backtest` (specs dir + DB + world → a run), and write the label `minds: scripted` into
+   physics' run record. That closes M1. It touches physics, so red-team.
+2. **R-4** Cassettes + replay (M2). `retired_at` and `tool_failures` go into the cassette.
 3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 / B-042 when cheap.
    Retrospective at cycle 30.

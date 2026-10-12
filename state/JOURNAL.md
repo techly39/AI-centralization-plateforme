@@ -973,3 +973,38 @@ then: a 31-day synthetic month of analyst `a-…` + PM `b-…` through the condu
 PM order has a same-day analyst signal behind it, a PM without its analyst's signal holds, a
 signal from another pod or a stale one is ignored, two runs leave the same ledger and transcripts,
 and the month takes well under 10 minutes. Expected ~20 new tests, xfails unchanged (6).
+Work:
+- `mcp_server.tools`' shared `call` answers a list as one JSON array block (ADR-032 (k)). No
+  existing test pinned the old shape; a new one fails without the fix (mutation checked).
+- `ma-signal-analyst` + `signal-pm` in `SCRIPTS`; `_crossing` / `_rebalance` factored out of
+  `moving-average-pm` with its behaviour unchanged (auditor checked branch by branch).
+- `WakeRecord.tool_failures`. The first version counted nothing: MCPServer wraps *every* tool
+  exception in a `ToolError`, so the adapter's `except Exception` branch is almost dead. A probe
+  showed the original rides in `__cause__`: `ToolError` (the tool speaking), `ValidationError`
+  (the mind's arguments), none (unknown tool), anything else (a bug). Classified by that.
+- `RunRecord.retired_at`; NOTE 3 and NOTE 4 pinned by tests (management fires the PM, then
+  itself; steps 4–5 wake no one and the clock still moves).
+- `tests/test_runtime_pod.py`: 13 script cases on crafted transcripts, and a two-pod month
+  (pod 1: analyst + PM; pod 2: a PM with no analyst) through `run_backtest`, twice.
+- Mutations: dropping the sender-is-analyst check fails 2 cases; dropping the same-day check
+  fails 1.
+- Auditor: **PASS**, 0 BLOCK, 7 NOTEs. Applied: the PM now also requires physics' own stamp
+  `ts == now` (a pre-dated signal was trusted on its claim) and an *active* analyst; the
+  50-message window is written down; `ensure_ascii=False`; stale docstrings; ADR wording. NOTE 4
+  (a `ValidationError` from a bug inside a tool body) is written into the ADR as a known limit.
+- No physics change (`app/` untouched), so no red-team pass.
+Result: merged b0c83a1, pushed. 1261+6xf → **1287 passed + 6 xfailed** (plus the 1 known `setup/`
+failure in the working tree). Smoke 12/12. Hypothesis **met**. The month runs in seconds, not
+minutes. Every pod-1 order cites a message its analyst sent at the same simulated instant. Pod 2
+held all 31 days. The two runs were identical event for event.
+Learned: (1) **Probe the layer you wrap before you count through it.** The `tool_failures` test
+failed first because the MCP server had already turned every exception into a `ToolError`. The
+R-2 docstring had said for three cycles that tool bugs land in `except Exception`; they never did.
+(2) **A mind's trust rule needs physics' facts, not the message's claims.** My first PM trusted
+`as_of` from the payload. That is what the sender *says*. The auditor saw that a pre-dated signal
+would be believed. `ts` is what physics *recorded*. The same rule will hold for every LLM agent
+in Era II, which is a reason to show `ts` prominently in the tool's description. (3) **Multi-mind
+work found a single-mind blind spot.** One PM alone never reads a list of one, so the MCP list
+shape went unnoticed through R-2 and R-3b-1.
+Next: R-3b-2b. Provision App agents from specs (bind the spec's name), `fund-runtime backtest`,
+and the run label `minds: scripted` in physics' run record (physics → red-team).
