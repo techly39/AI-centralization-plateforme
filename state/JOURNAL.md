@@ -1116,3 +1116,24 @@ Next: R-3b-2c-2, the `minds:` label in physics' run record. It is a design quest
 physics cannot see what drives a key, so the label is a declaration. Decide who may declare it.
 The likely answer is the runtime identity, once, before the first wake, as an event. Then
 red-team. After that, R-4 cassettes, which must redact keys.
+
+## Cycle 0028 — R-3b-2c-2: physics records what drives a run's minds (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (M1: physics labels the scripted PM + Analyst month, so it can never
+be reported as an agent month). Serves EC1, does not tick it (R-8).
+Step 0: `?? setup/` is the Human's P-0003 installer. It was left untouched.
+Hypothesis: Suppose physics accepts `POST /run/minds {minds: [...]}` with these limits:
+- only from the `CONTROL_CLOCK` hand (the runtime identity; no new permission);
+- on backtest runs only, and only once;
+- only while no firm agent has acted and the clock has not moved;
+- with kinds from a closed list (`scripted`, `cassette`, `model`).
+
+It records `run_minds_declared {minds}`. A reader, `run_minds(session)`, trusts a declaration
+only if the ledger order still says it came first. Then:
+- `fund-runtime backtest` declares before provisioning, and the smoke month's ledger names
+  `scripted`;
+- a firm agent, a second declaration, a late one, a live run and an unknown kind are each
+  refused, with nothing written;
+- an undeclared run reads as `None`.
+
+Expected ~15 new tests. Xfails stay at 6.
