@@ -1230,3 +1230,41 @@ hygiene (big state files are tailed or grepped, never read whole).
 Not done: no automatic per-unit model choice (the architect cannot switch the lead's model
 mid-session); no haiku anywhere (review quality first). Measure with `cycles.log` (cost and
 models per cycle) and `state/METRICS.md` (results) before tuning further.
+
+## ADR-036 — What Era I's test criteria EC3, EC5 and EC6 mean when a test ticks them   (builder, cycle 30) — accepted
+Question: three Era I exit criteria are "test" criteria (ADR-032): look-ahead refused (EC3),
+HALT mid-run stops within one tick (EC5), and `cap: null` → the Runtime refuses to wake agents
+(EC6). The gates behind them were built in cycles 16, 21 and 22, but no test drove them as a
+run does, so none was ticked. What counts as meeting each one?
+Answer from the future: **a criterion is met only end to end.** A mind run by the conductor
+(`lockstep.run_backtest`) acts through the published MCP tools, over HTTP, into physics. The
+tests are in `tests/test_runtime_lockstep.py`, section "Era I exit criteria (R-5a)":
+- **EC3 — "refused".**
+  - A window that starts after the clock's now is a tool error carrying physics' 400 (`no
+    look-ahead`): `test_ec3_a_mind_asking_for_tomorrows_bars_is_refused`.
+  - A window that runs past now is served clipped. No bar in it ends after the step's now:
+    `test_ec3_a_window_past_now_holds_no_bar_that_has_not_ended`.
+  - The clock is in no firm agent's hand: a mind's `advance_clock` is a 403, and every advance
+    is the runtime identity's (`test_ec3_a_mind_cannot_reach_tomorrow_by_moving_the_clock`,
+    ADR-033).
+  - `get_price` takes no instant, so a mind cannot name a future one.
+  - Tested over a `StaticProvider` (flat bars). The test proves the structure (what is
+    withheld), not values. ADR-028's tests carry the guard's base.
+- **EC5 — "within one tick".** The tool call in flight when HALT appears finishes. After it
+  there is no further call, no wake of a later mind, no advance and no new event (Art. 5.2):
+  `test_ec5_halt_created_during_a_tool_call_stops_the_run_within_that_call` and
+  `..._halt_on_the_last_call_of_a_step_wakes_no_one_and_moves_nothing`.
+  Planted counter-example: removing the per-call HALT read in `native.wake` turns the first one
+  red.
+- **EC6 — "refuses to wake agents"** means *spending* minds: Q-0005 answer B, pending the
+  Human.
+  - A spending spec is refused before a provider is even built, so no provider exists to call:
+    `test_ec6_cap_null_never_builds_a_spending_mind`.
+  - A numeric cap refuses too until R-6 (`no_metered_key`).
+  - Zero-cost minds still wake (the control).
+  - If the Human answers Q-0005 with A, a scripted case joins EC6 and the tick is re-checked.
+Not done: B-053. `fund-runtime backtest` provisions agents and declares `/run/minds` *before*
+any wake gate refuses. Under a null cap, a spending spec therefore leaves registered agents and
+a `model` label on a run in which nothing woke. Nothing spends, so EC6 holds. But the ledger
+tells a misleading story, and the fix changes Runtime gate code (its own cycle, with a
+red-team). EC1, EC2, EC4 and EC7 are untouched.

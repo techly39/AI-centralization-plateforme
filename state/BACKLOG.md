@@ -105,9 +105,26 @@ keep their ids for history.
       replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded
       divergence. Reuses the ADR-030 comparison. **M2**. It
       serves EC2 but does not tick it (R-8). Run label `minds: replay`.
-- [ ] **R-5** Agent-level gates: HALT created mid-run stops within one tick; a scripted mind
-      asking for tomorrow's price is refused through the tool layer; cap `null` refuses a
-      spending provider at wake. **EC3, EC5, EC6 / M3.** (B-023 halt observability if cheap.)
+      **R-4a seed** (from the cycle-30 architect; not built yet):
+      - The request hash is sha256 of the sorted, compact JSON of `request.model_dump(mode="json")`.
+        Compute it in `native.wake` *before* `provider.complete`, because a mind could change
+        its argument dicts.
+      - Hash the unredacted request. A minted key then always diverges on replay (B-047).
+      - Redact at write time, per string value and per object key, and count the redactions.
+      - Each wake record gets `exchanges: (seq, request_sha256, usage)`.
+      - The code goes in `runtime/cassette.py` with `CASSETTE_VERSION = 1`. Files are written
+        with `open(path, "x")` and mode 0o600, and paths end `.cassette.json`.
+      - `.gitignore` gets `*.cassette.json` and `experiments/*/runs/`.
+- [ ] **R-5** Agent-level gates. **EC3, EC5, EC6 / M3.** Split cycle 30 (cycle-30 retrospective:
+      tick-blindness).
+  - [x] **R-5a** **Done cycle 30** (ADR-036, `tests/test_runtime_lockstep.py` "Era I exit
+        criteria"): 8 end-to-end tests, no production change; **EC3, EC5, EC6 ticked**.
+  - [ ] **B-053** (cycle 30, medium for honest records) `fund-runtime backtest` provisions agents
+        and declares `/run/minds` *before* any wake gate refuses. Under a null cap, a spending
+        spec therefore leaves registered agents and a `model` label on a run in which nothing
+        woke. Fix: a pre-gate in `runtime/cli.py::_conduct` using `decide_wake_under` (one law
+        read) before provisioning. This is Runtime gate code, so it needs a red-team. B-023 (halt
+        observability) if cheap.
 - [ ] **R-6** Metering v1 on a fake provisioner (was B-013) + B-000k (firm-level costs) +
       B-000n (cost-report rate law) + B-022 (secret scan, before any key exists): per-agent keys,
       cost-sync posts system-reported costs; system cost overrides self-report. **EC4 / M4.**

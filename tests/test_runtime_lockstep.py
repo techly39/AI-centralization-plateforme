@@ -507,3 +507,197 @@ def test_a_no_identity_refusal_with_a_live_key_still_ends_the_run(SessionFactory
     assert (run.ended, run.reason) == ("refused", "wake_refused:a-pm:no_identity")
     assert run.retired == () and len(run.steps) == 2 and run.steps[1].advanced_to is None
     assert len(_advances(SessionFactory)) == 1
+
+
+# --- Era I exit criteria (R-5a, ADR-036): EC3, EC5, EC6 ---------------------------------
+# Each gate below existed before these tests. They prove it end to end: a mind run by the
+# conductor, every act through the published MCP tools, over HTTP, into physics.
+
+def _asks(calls_for, seen: list[list]):
+    """A test script: read the clock, then make ``calls_for(now)``'s calls in one batch,
+    then report every tool answer of that batch to ``seen`` (one list per wake)."""
+    def script(request):
+        turns = sum(m.role == "assistant" for m in request.messages)
+        if turns == 0:
+            return CompletionResponse(content="", tool_calls=[ToolCall(id="now", name="get_clock")])
+        if turns == 1:
+            now = datetime.fromisoformat(
+                json.loads(request.messages[-1].content)["now"].replace("Z", "+00:00"))
+            return CompletionResponse(content="", tool_calls=calls_for(now))
+        last = max(i for i, m in enumerate(request.messages) if m.role == "assistant")
+        seen.append([m.model_copy() for m in request.messages[last + 1:]])
+        return CompletionResponse(content="done")
+    return script
+
+
+def _install(monkeypatch, **scripts) -> None:
+    monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(dict(scripted.SCRIPTS) | scripts))
+
+
+def _day(now: datetime, days: int) -> str:
+    return (now.date() + timedelta(days=days)).isoformat()
+
+
+def test_ec3_a_mind_asking_for_tomorrows_bars_is_refused(SessionFactory, world, monkeypatch):
+    seen: list[list] = []
+    _install(monkeypatch, ahead=_asks(lambda now: [ToolCall(
+        id="ahead", name="get_ohlcv",
+        arguments={"ticker": "AAPL", "start": _day(now, 1), "end": _day(now, 3)})], seen))
+    run = conduct(SessionFactory, [(_spec("a-pm", 1, "ahead"), world["pm"][1])],
+                  world["clock"], steps=2)
+    assert (run.ended, len(run.steps)) == ("completed", 2)
+    assert [w.ended for st in run.steps for w in st.wakes] == ["done", "done"]
+    assert len(seen) == 2
+    for [answer] in seen:
+        assert answer.is_error and "no look-ahead" in answer.content and "400" in answer.content
+
+
+def test_ec3_a_window_past_now_holds_no_bar_that_has_not_ended(SessionFactory, world,
+                                                                monkeypatch):
+    """Counter-example to "only ``start`` is guarded": a window that ends after now is
+    served, but clipped — every bar in it had ended by the step's now (ADR-028)."""
+    from app.marketdata.base import bar_end
+    seen: list[list] = []
+    _install(monkeypatch, across=_asks(lambda now: [ToolCall(
+        id="across", name="get_ohlcv",
+        arguments={"ticker": "AAPL", "start": _day(now, -5), "end": _day(now, 5)})], seen))
+    run = conduct(SessionFactory, [(_spec("a-pm", 1, "across"), world["pm"][1])],
+                  world["clock"], steps=3)
+    assert run.ended == "completed" and len(seen) == 3
+    for step, [answer] in zip(run.steps, seen):
+        at = datetime.fromisoformat(step.at.replace("Z", "+00:00"))
+        assert not answer.is_error
+        bars = json.loads(answer.content)["bars"]
+        assert bars, "the window before now must still be served"
+        for bar in bars:
+            ts = datetime.fromisoformat(bar["ts"].replace("Z", "+00:00"))
+            assert bar_end(ts, "1d") <= at
+
+
+def test_ec3_a_mind_cannot_reach_tomorrow_by_moving_the_clock(SessionFactory, world,
+                                                               monkeypatch):
+    seen: list[list] = []
+    _install(monkeypatch, mover=_asks(lambda now: [ToolCall(
+        id="move", name="advance_clock", arguments={"days": 1})], seen))
+    run = conduct(SessionFactory, [(_spec("a-pm", 1, "mover"), world["pm"][1])],
+                  world["clock"], steps=2)
+    assert run.ended == "completed" and len(seen) == 2
+    for [answer] in seen:
+        assert answer.is_error and "403" in answer.content
+    advances = _advances(SessionFactory)
+    with SessionFactory() as s:
+        from app.db.models import Agent
+        assert {s.get(Agent, e.actor_agent_id).role for e in advances} == {AgentRole.runtime}
+    assert len(advances) == 2  # the runtime's own advances, one per step, and no other
+
+
+def _max_event_id(SessionFactory) -> int:
+    with SessionFactory() as s:
+        return max(s.execute(select(Event.id)).scalars())
+
+
+def _halting_execute(monkeypatch, gov, SessionFactory, on_call: str) -> dict:
+    """After the tool call with id ``on_call`` returns, the Human creates HALT. Records
+    the newest event id at that moment."""
+    from runtime import native
+    original = native._execute
+    when: dict = {}
+
+    async def execute(*args, **kwargs):
+        message = await original(*args, **kwargs)
+        if message.tool_call_id == on_call and not when:
+            (gov / "HALT").write_text("")
+            when["last_event"] = _max_event_id(SessionFactory)
+        return message
+    monkeypatch.setattr(native, "_execute", execute)
+    return when
+
+
+def test_ec5_halt_created_during_a_tool_call_stops_the_run_within_that_call(
+        SessionFactory, world, woke, gov, monkeypatch):
+    """"Within one tick" (ADR-036): the tool call in flight when HALT appears finishes,
+    and nothing after it happens — no further call, no wake, no advance, no event
+    (Art. 5.2)."""
+    wakes = {"n": 0}
+
+    def three_reads(request):
+        turns = sum(m.role == "assistant" for m in request.messages)
+        if turns == 0:
+            wakes["n"] += 1
+            n = wakes["n"]
+            return CompletionResponse(content="", tool_calls=[
+                ToolCall(id=f"w{n}-{i}", name="get_clock") for i in (1, 2, 3)])
+        return CompletionResponse(content="done")
+    _install(monkeypatch, three=three_reads)
+    when = _halting_execute(monkeypatch, gov, SessionFactory, on_call="w2-1")
+    handed = [(_spec("a-pm", 1, "three"), world["pm"][1]),
+              (_spec("b-pm", 2, "read-b"), world["pm"][2])]
+    run = conduct(SessionFactory, handed, world["clock"], steps=5)
+    assert (run.ended, len(run.steps)) == ("halted", 2)
+    [halted] = run.steps[1].wakes                 # b, later in id order, never woke that step
+    assert halted.ended == "halted" and halted.tool_calls == 1  # of 3 asked for (per wake)
+    assert [w.tool_calls for w in run.steps[0].wakes] == [3, 1]  # day one ran whole
+    last = max(i for i, m in enumerate(halted.transcript) if m.role == "assistant")
+    assert [m.tool_call_id for m in halted.transcript[last + 1:]] == ["w2-1"]
+    assert woke == ["b"]
+    assert run.steps[1].advanced_to is None and len(_advances(SessionFactory)) == 1
+    assert _max_event_id(SessionFactory) == when["last_event"]
+
+
+def test_ec5_halt_on_the_last_call_of_a_step_wakes_no_one_and_moves_nothing(
+        SessionFactory, world, woke, gov, monkeypatch):
+    _install(monkeypatch, last=_asks(lambda now: [ToolCall(id="last", name="get_clock")], []))
+    when = _halting_execute(monkeypatch, gov, SessionFactory, on_call="last")
+    handed = [(_spec("a-pm", 1, "read-a"), world["pm"][1]),
+              (_spec("b-pm", 2, "last"), world["pm"][2])]
+    run = conduct(SessionFactory, handed, world["clock"], steps=3)
+    assert (run.ended, len(run.steps)) == ("halted", 1)
+    assert [w.ended for w in run.steps[0].wakes] == ["done", "halted"]
+    assert woke == ["a"] and run.steps[0].advanced_to is None
+    assert _advances(SessionFactory) == []
+    assert _max_event_id(SessionFactory) == when["last_event"]
+
+
+def _built(monkeypatch) -> list[str]:
+    """Every spec a mind is built for. A gate that refuses first builds nothing, so no
+    provider exists to be called."""
+    from runtime import native
+    original, built = native.build_provider, []
+
+    def build(spec):
+        built.append(spec.id)
+        return original(spec)
+    monkeypatch.setattr(native, "build_provider", build)
+    return built
+
+
+def test_ec6_cap_null_never_builds_a_spending_mind(SessionFactory, world, woke, monkeypatch):
+    built = _built(monkeypatch)
+    handed = [(_spec("a-pm", 1, "read-a"), world["pm"][1]),
+              (_spec("b-pm", 2, provider="metered", script=None), world["pm"][2])]
+    run = conduct(SessionFactory, handed, world["clock"], steps=3)
+    assert (run.ended, run.reason) == ("refused", "wake_refused:b-pm:cap_null")
+    assert built == ["a-pm"] and woke == ["a"]
+    assert run.steps[0].advanced_to is None and _advances(SessionFactory) == []
+
+
+def test_ec6_a_numeric_cap_still_refuses_spending_until_metering(SessionFactory, world, woke,
+                                                                 gov, monkeypatch):
+    """Counter-example to "only null refuses": until R-6 gives a mind a metered key, a
+    number in the cap wakes no spending mind either (ADR-032 (4))."""
+    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 5\n")
+    built = _built(monkeypatch)
+    run = conduct(SessionFactory, [(_spec("a-pm", 1, provider="metered", script=None),
+                                    world["pm"][1])], world["clock"], steps=2)
+    assert (run.ended, run.reason) == ("refused", "wake_refused:a-pm:no_metered_key")
+    assert built == [] and _advances(SessionFactory) == []
+
+
+def test_ec6_zero_cost_minds_still_wake_under_cap_null(SessionFactory, world, woke,
+                                                       monkeypatch):
+    """The positive control, and today's law (Q-0005, answer B pending the Human)."""
+    built = _built(monkeypatch)
+    run = conduct(SessionFactory, [(_spec("a-pm", 1, "read-a"), world["pm"][1])],
+                  world["clock"], steps=3)
+    assert run.ended == "completed" and woke == ["a"] * 3 and built == ["a-pm"] * 3
+    assert len(_advances(SessionFactory)) == 3

@@ -116,11 +116,19 @@ test criteria and may be met by tests using scripted or fake providers)*:
       real time, every action through the App.
 - [ ] Replaying that run from cassettes reproduces an identical event ledger (except ids/
       wall-clock fields) at zero LLM cost.
-- [ ] Look-ahead guard has a test that an agent asking for tomorrow's price gets refused.
+- [x] Look-ahead guard has a test that an agent asking for tomorrow's price gets refused.
+      *(Cycle 30, ADR-036: `test_ec3_*` in `tests/test_runtime_lockstep.py` — a conducted
+      mind through the MCP tools: tomorrow's window 400, a window across now clipped, the
+      clock not in its hand.)*
 - [ ] Every LLM dollar of the run is attributed to an agent via system-reported cost
       (or the fake provider in tests).
-- [ ] Creating `governance/HALT` mid-run stops the run within one tick (test).
-- [ ] `firm.monthly_llm_usd_cap: null` → Runtime refuses to wake agents (test).
+- [x] Creating `governance/HALT` mid-run stops the run within one tick (test).
+      *(Cycle 30, ADR-036: `test_ec5_*` — the call in flight finishes; no further call, wake,
+      advance or event.)*
+- [x] `firm.monthly_llm_usd_cap: null` → Runtime refuses to wake agents (test).
+      *(Cycle 30, ADR-036: `test_ec6_*` — a spending mind is never built, under null or a
+      numeric cap until R-6. "Agents" = spending minds per Q-0005 answer B, pending the Human;
+      an answer A re-opens this box. B-053: the CLI provisions before the gate refuses.)*
 - [ ] OpenClaw conformance: 100% of static checks pass for every `firm-` agent; live
       probes pass once a firm budget exists. No agent woke without passing.
 
