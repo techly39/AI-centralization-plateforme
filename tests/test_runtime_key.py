@@ -172,6 +172,28 @@ def test_cli_refuses_a_database_with_a_reserved_name_squatter(cli_on_test_db, db
     assert "reserved" in err and "operator must repair" in err
 
 
+_ARGS = {"seed-admin": [], "seed-runtime": [], "rotate-runtime-key": [],
+         "create-pod": ["--name", "desk"], "fund-pod": ["--pod-id", "1", "--delta", "1"],
+         "check-orders": [], "rebuild-state": []}
+
+
+def test_the_cli_table_above_is_every_command_on_the_database_clock():
+    commands = set(cli.build_parser()._subparsers._group_actions[0].choices)
+    assert set(_ARGS) == commands - cli._NO_RUN_CLOCK
+
+
+@pytest.mark.parametrize("command", sorted(_ARGS))
+def test_every_command_on_the_database_clock_refuses_a_squatted_database(
+        cli_on_test_db, db, capsys, command):
+    _squat(db, "system")
+    db.commit()
+    count = len(db.scalars(select(Event)).all())
+    assert cli.main([command, *_ARGS[command]]) == 1
+    assert "holds the reserved name 'system'" in capsys.readouterr().err
+    db.expire_all()
+    assert len(db.scalars(select(Event)).all()) == count   # nothing was written
+
+
 # --- startup ----------------------------------------------------------------------------
 
 def _app_on(SessionFactory):
