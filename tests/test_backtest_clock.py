@@ -21,10 +21,10 @@ from app.db.models import AgentRole, CashBalance, Event, Position
 from app.ledger.events import EVENT_CLOCK_ADVANCED, EVENT_RUN_STARTED
 from app.ledger.rebuild import rebuild_state
 from app.limits import MAX_ADVANCE_DAYS
-from app.marketdata import get_provider
 from app.registry.pods import create_pod, fund_pod
 from app.registry.service import get_or_create_system_agent, register_agent
 from app.run_clock import RunClockError, install_run_clock, start_backtest
+from tests.conftest import DEFAULT_PRICES
 
 START = datetime(2024, 1, 2, 15, 0, tzinfo=timezone.utc)
 
@@ -83,8 +83,8 @@ def test_a_backtest_opens_with_run_started_at_its_start(SessionFactory, db):
     # And which market it lives in (B-037): here the suite's static table.
     assert event.payload_json == {"mode": "backtest", "start": START.isoformat(),
                                   "look_ahead_guard": True,
-                                  "world": get_provider().world()}
-    assert event.payload_json["world"]["provider"] == "static"
+                                  "world": {"provider": "static", "reproducible": False,
+                                            "prices": dict(sorted(DEFAULT_PRICES.items()))}}
 
 
 def test_a_backtest_refuses_a_database_that_holds_anything(SessionFactory, db, admin_key):
