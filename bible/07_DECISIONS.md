@@ -1189,8 +1189,9 @@ Answer from the future: **The ledger keeps the full record; an agent never reads
 `"withheld"`: `run_started.world` and `run_minds_declared.minds`. The rule has one home:
 `EventOut`, the only response shape in `app.api.schemas` that carries a payload (a test pins
 that), applies `agent_payload` after validation. It builds a new dict, so the ORM row is never
-touched and no commit can write the redaction back. Physics (`install_run_clock`, `run_minds`)
-and the operator's tools read the database, whole. The minds' kinds are withheld too (prime
+touched and no commit can write the redaction back. Physics (`install_run_clock`, `run_minds`,
+both tested after agent reads) reads the database, whole, as does the operator, who reads the
+file. The minds' kinds are withheld too (prime
 rule: safer seal): whether the colleagues are code or a model is the scientists' label, not a
 fact of the world, and a mind that knew its peers were scripted could exploit them. The field
 stays, with a marker, so a transcript shows that something was withheld rather than nothing

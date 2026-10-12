@@ -96,7 +96,10 @@ def test_management_reads_the_world_and_the_minds_as_withheld(opened):
         for e in r.json():
             if e["type"] == EVENT_RUN_STARTED:
                 assert e["payload_json"]["world"] == WITHHELD
-                assert e["payload_json"]["mode"] == "backtest"  # the rest passes through
+                # the rest passes through
+                assert e["payload_json"]["mode"] == "backtest"
+                assert e["payload_json"]["look_ahead_guard"] is True
+                assert e["payload_json"]["start"].startswith("2024-01-02")
             if e["type"] == EVENT_RUN_MINDS_DECLARED:
                 assert e["payload_json"] == {"minds": WITHHELD}
         for spelling in _secrets_of(opened):
@@ -113,7 +116,12 @@ def test_both_withheld_events_are_in_the_read(opened):
 def test_the_symbol_list_is_withheld_with_the_world(opened):
     r = opened["client"].get("/events", headers=H(opened["admin"]),
                              params={"type": EVENT_RUN_STARTED})
-    assert "SYNB" not in r.text and "SYNC" not in r.text
+    [event] = r.json()
+    blob = json.dumps(event["payload_json"])
+    record = opened["provider"].world()
+    for symbol, price in SYMBOLS.items():
+        assert symbol not in blob and json.dumps(price) not in blob
+    assert json.dumps(record["origin"]) not in blob
 
 
 @pytest.mark.anyio
@@ -149,8 +157,9 @@ def test_validating_an_orm_event_leaves_it_whole(SessionFactory, opened):
     with SessionFactory() as s:
         event = s.scalar(select(Event).where(Event.type == EVENT_RUN_STARTED))
         assert EventOut.model_validate(event).payload_json["world"] == WITHHELD
+        # the guard: a plain JSON column would not mark an in-place edit dirty, so
+        # compare the row's value itself, not the session's dirty set
         assert event.payload_json["world"] == opened["provider"].world()
-        assert event not in s.dirty
 
 
 def test_the_world_check_still_reads_the_full_record(db, opened):
