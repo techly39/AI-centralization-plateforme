@@ -1137,3 +1137,50 @@ only if the ledger order still says it came first. Then:
 - an undeclared run reads as `None`.
 
 Expected ~15 new tests. Xfails stay at 6.
+Work:
+- **Physics.** `POST /run/minds` (`app/api/clock.py`) under `CONTROL_CLOCK`, with no new
+  permission. Behind it: `app.run_clock.declare_minds` / `run_minds` / `MIND_KINDS`, the event
+  `run_minds_declared {minds}` and the schema `RunMindsIn`. The MCP tool is `declare_run_minds`.
+- **Runtime.** `lockstep.mind_kinds` / `declare_minds`. `fund-runtime backtest` declares
+  between `check_clock` and `provision`.
+- **Tests.** `tests/test_run_minds.py` (32 tests). Red-team 0014's route allowlist gains the
+  route: a finding of the new law, logged.
+- **Smoke run.** A new step reads the declaration from the database file. The backtest market
+  key is now fixed: a random key had failed the "order accepted" step on the world's luck, which
+  I found because this branch's first smoke drew 0 orders while `main` drew 3.
+- **Claim check.** I had written that an agent must not read the market's law. Management can
+  already read it through `/events`: B-049.
+- **Auditor: PASS, 0 BLOCK.** I fixed the 3 WARNs:
+  - `scripted` through `openclaw` was labelled code; it is now `model`;
+  - the "only by a race" wording was wrong;
+  - "covers everything" claimed too much.
+
+  I also took NOTE 3: the reader takes only a physics-written declaration.
+- **Red-team 0017: 4 holes, all fixed.**
+  - H1/H2 (medium/low): a lost race got 201. It now gets a 409 after a re-read of the ledger.
+  - H4 (medium): an agent older than the declaration acted under its label. A declaration now
+    covers only the agents registered after it.
+  - H3 (low, every route): a lone surrogate made the 422 handler return a 500.
+
+  The H4 fix contradicted one of the red-team's own HELD guards (it acted through pm-1). I
+  rewrote that guard to act through an agent registered after the declaration, and logged why.
+- **Re-audit: PASS.** I applied 2 NOTEs: no NULL inside `NOT IN`, and the H4 guard asserts
+  `None` exactly.
+
+Result: merged 2cd2cb2 and pushed. Tests went from 1369+6xf to **1433 passed + 6 xfailed**
+(plus the known `setup/` failure). Smoke 21/21, twice. Hypothesis **met**, plus one rule I had
+not foreseen (H4). **M1 is closed for scripted minds:** physics labels the desk month `scripted`.
+Learned:
+(1) **A label that names kinds must also say whom it covers.** "Declared before anything
+happened" sounded complete. But an agent that existed before the declaration and acted after it
+was never declared at all. Physics *can* see which agents came after a declaration, so the
+reader checks.
+(2) **An answer that the ledger will later contradict is a lie told in advance.** The lock could
+not cover lock-free writes, so I made the reader trust the ledger's order. The endpoint still
+said 201. Re-reading the ledger after the commit made the answer agree with the reader.
+(3) **A smoke check that depends on a random world is a coin flip.** It hid behind 20 green runs
+until a branch drew the wrong world. Deterministic over random applies to the checks as well as
+to the physics.
+Next: R-4 cassettes + replay (M2). A cassette must redact minted keys (B-047), and a replay run
+declares `cassette`. Cheap items first if they fit: B-049 (the market's law visible through
+`/events`), B-048.

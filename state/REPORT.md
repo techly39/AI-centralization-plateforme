@@ -1,5 +1,28 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 28: the system now records whether a simulated month was run by scripts
+or by AI models.** When the Runtime starts a run, it tells the app once what kind of "minds" the
+run's agents have:
+- `scripted`: plain code;
+- `cassette`: recorded AI answers played back;
+- `model`: a live AI.
+
+The app writes this into the run's permanent record. It only accepts the statement before
+anything has happened in the run, so the label covers everything that follows. That means a
+scripted month can never be reported later as an AI month.
+
+The attack review found a real gap: an agent that existed *before* the label was written could
+act afterwards, and nobody had said what it was. The label now covers only the agents created
+after it. It found three smaller gaps too. All four are fixed and tested.
+
+**One thing to know (no action needed yet):** a management agent can already read the hidden
+rules of the simulated market (its trend and volatility) through the event log. No AI is running,
+so nothing has used it. It is first in line to fix before any AI manager wakes (B-049).
+
+`setup/` is still waiting for `bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 27: a simulated run now starts with one command.** You point
 `fund-runtime backtest` at a folder of agent description files. It creates the agents and runs
 the simulated days, then prints what happened. I tested it end to end against the real server:

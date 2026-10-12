@@ -60,10 +60,26 @@ keep their ids for history.
               `tests/test_runtime_cli_backtest.py`, smoke backtest phase). `fund-runtime
               backtest`; clock checked before any registration; keys from env, redacted
               output, no proxy, loopback only; `specs/desk-month/`.
-        - [ ] **R-3b-2c-2** **Next.** The `minds:` label in physics' run record: a
-              declaration by the runtime identity, once, before the first wake (design in the
-              slice; physics → red-team). `fund-runtime backtest` declares it. **M1**. Serves
-              EC1, does not tick it (R-8).
+        - [x] **R-3b-2c-2** **Done cycle 28** (merged 2cd2cb2; ADR-032 (p) + red-team 0017
+              amendment, `tests/test_run_minds.py`, red-team 0017: 4 holes, all fixed).
+              `POST /run/minds` under CONTROL_CLOCK: once, before any firm act or advance.
+              The reader trusts ledger order and covers only agents registered after the
+              declaration. **M1 closed** (scripted). Serves EC1, does not tick it (R-8).
+      - [ ] **B-049** (cycle 28, medium, **before any LLM management mind wakes**) Management
+            reads `run_started.world` (law, drift, volatility, symbols) through `GET /events`
+            (`READ_CROSS_POD`). The world's generating law is an edge that no participant
+            should hold. Redact `world` from agent reads of the ledger (the operator's tools
+            read the file), or decide by ADR that it is harmless. Found by the c28 claim
+            check.
+      - [ ] **B-050** (cycle 28, low, Era II) A declaration exempts an older agent's
+            *registrations* (the registrar making the run's minds). An older management mind
+            driven by a model could register agents after the declaration, and they would
+            count as covered. Today the registrar is the operator's key. Decide this with
+            B-045 (provisioning's own identity).
+      - [ ] **B-051** (cycle 28, low) The smoke run checks the minds label with raw SQL (it
+            imports no `app`), not with `run_minds()`, so the H4 rule is not exercised over
+            the real 5-day run. Add an operator read (`fund-env run-minds`) and have the
+            smoke call it.
       - [ ] **B-047** (cycle 27, low) A transcript keeps tool results as they came, so it can
             hold a minted key (`register_agent`). The CLI redacts its output. R-4's cassette
             must redact too, and replay must treat a redacted key as a divergence. Also decide

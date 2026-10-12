@@ -53,6 +53,9 @@ Answer any open question with the prime rule; log it in `bible/07_DECISIONS.md`
 - Launch the `auditor` subagent on `git diff main...HEAD`. Fix every `BLOCK` finding.
   If the change touches `app/registry`, `app/oms`, `app/marketdata`, metering or the
   Runtime's halt/budget code, also launch `red-team`.
+- Commit the red-team's test file as it wrote it, before any fix (X-010, re-audit c28 NOTE 5).
+  Then every changed hole or guard is a diff in history, not just a sentence in a commit
+  message.
 
 **6. Experiment** (only if this unit is an experiment): spec in
 `experiments/<id>/spec.yaml`, results in `experiments/<id>/`, conclusion appended to

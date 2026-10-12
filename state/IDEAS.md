@@ -316,3 +316,13 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   operator's real commands into a scripted pod's days. When R-8 arrives, the same script with
   `--steps 21` and real specs *is* the EC1 run. Keep it the single path an operator would take,
   so the first real month is not a new code path.
+- **A label per agent, not per run (cycle 28).** H4 showed that a run label is a claim about a
+  set of agents. If the declaration listed the spec ids it covers, and physics bound each later
+  registration to one of them (`charter_ref: spec:<id>`), then `run_minds` could say *which*
+  agents are code and which are models. Mixed runs (a scripted analyst, a model PM) are what
+  the Proving Ground needs: the fork instrument compares one changed mind against a fixed
+  background.
+- **Every check that draws a world draws it on purpose (cycle 28).** The smoke run's random
+  market hid a flaky step for 20 runs. A cheap law, like the time law: a scanner flags any
+  `secrets.`/`random` call in `scripts/` and `tests/` that feeds a world key without a reason
+  on an allowlist.

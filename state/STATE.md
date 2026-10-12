@@ -1,9 +1,30 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 27 (R-3b-2c-1 `fund-runtime backtest` — merged 6d8e08d, 2026-10-12)
+**Last cycle:** 28 (R-3b-2c-2 physics records the run's minds — merged 2cd2cb2, 2026-10-12)
 
 ## What is true now
+- **Physics records what drives a run's minds** (R-3b-2c-2, ADR-032 (p) + red-team 0017
+  amendment, `tests/test_run_minds.py`, `tests/test_redteam_0017.py`). **M1 is closed for
+  scripted minds.**
+  - `POST /run/minds {minds}` uses the `CONTROL_CLOCK` hand; the runtime gets no new permission.
+    It records `run_minds_declared`.
+  - Kinds come from the closed `MIND_KINDS = {scripted, cassette, model}`.
+  - Physics takes the declaration on backtest runs only, once, and only before the clock moves
+    and before any firm agent writes an event (a refused act counts).
+  - After its commit it re-reads the ledger. If it lost a race, the answer is 409, not 201.
+  - `run_minds(session)` returns the first physics-written declaration's kinds, or `None`. It
+    returns `None` if a firm act or an advance precedes the declaration. It also returns `None`
+    if **an agent older than the declaration** writes anything other than a registration after
+    it: a declaration covers only the agents registered after it.
+  - `fund-runtime backtest` declares `lockstep.mind_kinds(specs)` before it registers anyone.
+    A mind is `model` unless both its provider and its adapter are zero-cost.
+  - The smoke run checks the database: one declaration, `["scripted"]`, before the first firm
+    event. The smoke market key is now fixed (a hash of `fund-smoke-world/1`); a random key
+    could fail the order step on luck.
+  - A lone surrogate in any request body is now a 422, not a 500 (`json_safe`).
+  - **B-049 (found):** management reads `run_started.world` (drift, volatility) through
+    `/events`.
 - **A run starts from one operator command** (R-3b-2c-1, ADR-032 (o) + audit amendment,
   `tests/test_runtime_cli_backtest.py`).
   `fund-runtime backtest --specs DIR --steps N [--days-per-step D] [--input FILE]
@@ -169,11 +190,12 @@
   **dependency law** (ADR-022).
 - Physics (`app/`): TRD Phases 0–2 + halt + portable JSON + monotonic time + clock read + backtest
   clock + look-ahead guard + one now + keyed synthetic market + world record + runtime clock
-  identity + the lockstep conductor. **1369 passed + 6 xfailed** (with the runtime). No model
+  identity + the lockstep conductor + the run's minds label. **1433 passed + 6 xfailed** (with
+  the runtime). No model
   has traded through the App yet (a scripted mind has, through the Runtime). Era I deliverables 2 of 8 done (+ B-004a/b/c,
   B-005); exit criteria 0 of 7 (the 1-month criterion needs a PM + Analyst *via the Runtime*).
 - **Physics-hole gate (ADR-021):** red-team 0010 (seed recovery, high) and 0011 (static world,
-  low), 0012, 0013 (Runtime), 0014 (clock identity), 0015 (conductor: 4 holes) and 0016 (provisioning: 4 low) fixed. 6 strict xfails open (0001: payload
+  low), 0012, 0013 (Runtime), 0014 (clock identity), 0015 (conductor: 4 holes), 0016 (provisioning: 4 low) and 0017 (minds label: 4) fixed. 6 strict xfails open (0001: payload
   size ×2 = B-000g, message content = B-000e; 0004: fee = B-026; 0009:
   cross-process `OMS_LOCK` ×2 = B-036). Plus untested-by-xfail items B-019, B-000n, B-000b,
   B-025 (rest), B-028–B-030, B-033 (rest), B-035, B-038, B-040 (low; physics' halt check is
@@ -193,9 +215,9 @@
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
 - No Truman, Quant Lab or Observatory yet. The Runtime conducts a lockstep backtest. There is no
-  live scheduler yet (R-3c). Agents are provisioned from specs and a run is one command
-  (`fund-runtime backtest`), but physics' run record does not carry the `minds:` label yet
-  (R-3b-2c-2), and the RunRecord is printed, not stored (R-4).
+  live scheduler yet (R-3c). Agents are provisioned from specs, a run is one command
+  (`fund-runtime backtest`) and physics records its minds. The RunRecord is printed, not stored
+  (R-4).
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -203,12 +225,13 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-3b-2c-2** The `minds:` label in physics' run record. Physics cannot see what drives a key,
-   so the label is a declaration. Likely design: the runtime identity declares it once, before
-   the first wake, as an event; physics refuses a second declaration and any declaration after
-   a wake. `fund-runtime backtest` declares it. That closes M1. Physics change, so red-team.
-2. **R-4** Cassettes + replay (M2). `retired_at`, `tool_failures` and the spec behind each
-   agent (`charter_ref`) go into the cassette. **A cassette must redact minted keys**
-   (ADR-032 (o)), and a replay that meets a redacted key is a divergence.
-3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. B-040 / B-042 / B-046 when cheap.
-   Retrospective at cycle 30.
+1. **R-4** Cassettes + replay (M2). Probably split (X-008): R-4a writes the RunRecord + every
+   exchange to a cassette (gitignore first, B-000i), redacting minted keys (B-047). R-4b
+   replays into a fresh DB in the same world: the same ledger, declared `cassette`, and a miss
+   or a redacted key is a recorded divergence. `retired_at`, `tool_failures` and `charter_ref`
+   go into the cassette.
+2. **B-049** (physics, before any LLM management mind wakes) `run_started.world` (the market's
+   law) is readable through `/events`. Redact it from agent reads, or prove it harmless. Then
+   B-048 when cheap.
+3. **R-5** Agent-level gates (EC3/5/6); R-3c `daily_cycle`. **Retrospective at cycle 30**
+   (re-read the Constitution and Genesis).
