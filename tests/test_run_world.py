@@ -210,7 +210,9 @@ def test_start_backtest_without_a_world_key_is_an_error_not_a_traceback(
     assert db.scalar(select(Event).limit(1)) is None
 
 
-def test_management_sees_the_fingerprint_never_the_key(SessionFactory):
+def test_management_sees_neither_the_fingerprint_nor_the_key(SessionFactory):
+    """ADR-031 let management read the fingerprint; B-049 / ADR-034 withholds the
+    whole world record from every agent (the ledger keeps it: test_world_withheld)."""
     provider = _synthetic(1)
     admin = _open_run(SessionFactory)
     app = create_app()
@@ -226,5 +228,6 @@ def test_management_sees_the_fingerprint_never_the_key(SessionFactory):
     with TestClient(app) as client:
         resp = client.get("/events", headers={"X-API-Key": admin})
     assert resp.status_code == 200, resp.text
-    assert provider.world()["key_fingerprint"] in resp.text
+    assert provider.world()["key_fingerprint"] not in resp.text
     assert world_key(1).hex()[:32] not in resp.text
+    assert resp.json()[0]["payload_json"]["world"] == "withheld"

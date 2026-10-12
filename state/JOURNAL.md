@@ -1184,3 +1184,18 @@ to the physics.
 Next: R-4 cassettes + replay (M2). A cassette must redact minted keys (B-047), and a replay run
 declares `cassette`. Cheap items first if they fit: B-049 (the market's law visible through
 `/events`), B-048.
+
+## Cycle 0029 — B-049: the market's law is withheld from every agent's read of the ledger (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1/EC7 (a month or a live run measured by real minds is honest only if
+no participant holds the world's generating law). B-049 is marked "before any LLM management
+mind wakes"; R-4 follows.
+Step 0: `?? setup/` is the Human's P-0003 installer. It was left untouched.
+Hypothesis: Suppose one physics rule, in one place (`EventOut`, the only shape in which an agent
+reads an event), replaces the operator's facts about the experiment with `"withheld"`:
+`run_started.world` (law, drift, volatility, symbols, fingerprint) and
+`run_minds_declared.minds`. Then management's `GET /events` (every filter, and `list_events` over
+MCP) carries no drift, volatility or fingerprint, while the ledger, `install_run_clock` and
+`run_minds()` read the full record unchanged. Two old guards that assert management reads the
+fingerprint (red-team 0011, `test_run_world`) become findings of the new law. Expected ~10 new
+tests; xfails stay at 6.
