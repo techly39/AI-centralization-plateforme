@@ -210,3 +210,36 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - **Self-referential assertion detector.** A cheap AST check in tests: an `assert x == f()` where
   the code under test produced `x` from the same `f()` — flag for a literal. The auditor caught
   one by eye.
+
+## Cycle 20
+- **The exact counterfactual fork** — replay a run from cassettes to day *d*, change one thing,
+  continue live; branches share an exact history — question: how much of an LLM firm's outcome is
+  caused by any one part, measured against the same past? — status: **adopted** (vision §2; needs
+  R-4 + R-8).
+- **Divergence day as a metric** — when a cassette replay misses, the first missing request's
+  wake/day is the point where a mind's behaviour left the record; across forks it measures how
+  long identical prompts stay identical under sampling — question: how chaotic is an LLM firm?
+  — status: new (falls out of R-4).
+- **Backlog id checker** — two items were both B-023 for ~9 cycles; the cycle-9 idea "backlog as
+  a checked artifact" would have caught it — status: new (fold into X-001's script).
+
+### Retrospective write-ups (cycle 20) — the 3 most promising since cycle 10
+1. **Run manifest + worlds as experiment units** (c15, c18, c19) — **adopted** → the proof-object
+   triple (vision §1), ADR-032 (7), R-3/R-4. *Question:* can every run carry enough of a record
+   (physics version, world record, minds' cassettes) that a stranger re-runs it to the same
+   ledger? *Needs:* git sha + law versions in `run_started`, cassettes, R-4's replay. *Measure:*
+   fraction of runs in `experiments/` that replay to their ledger (target 100%); any miss is a
+   finding. *Unlocks:* the fork instrument; findings anyone can check. *Why unseen:* LLM-agent
+   papers publish curves and prompts, rarely a replayable artefact of the whole society.
+2. **Information-shape tests** (c16) — **adopted** as a physics-gate item (B-039) before any
+   spending mind wakes. *Question:* for any agent-reachable request R at time T, is the response
+   identical in two worlds that agree up to T and differ after it? *Needs:* two synthetic worlds
+   with a shared prefix (a key plus a "branch day"), a route sweep from the OpenAPI table.
+   *Measure:* routes passing / routes total; every failure is a look-ahead oracle. *Unlocks:*
+   look-ahead safety for every *future* feed (Truman news, filings) without imagining each attack.
+   *Why unseen:* look-ahead is usually tested by known attacks; this is a property over all routes.
+3. **Halt as an experiment** (c11) — **parked** until minds can act (R-5 builds the halt test;
+   the behavioural measurement needs real minds, R-8). *Question:* do agents respect a stop
+   signal they can see but not argue with? *Measure:* per-agent retries/escalations on 423s.
+   Parked because a scripted mind obeys by construction: measuring it before M6 measures
+   nothing.

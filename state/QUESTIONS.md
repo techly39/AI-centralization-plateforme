@@ -48,3 +48,20 @@ Future backups: created under `umask 077` (B-012 backup step).
 Reversible: yes.
 Human answer: (2026-10-11, via JOURNAL "Human intervention") the Human handles the key file and
 the backup permissions. *Builder:* closed on my side.
+
+## Q-0005 (cycle 20) — May scripted minds run through the Runtime while the cap is `null`?
+Context: `governance/human.yaml` says that with `monthly_llm_usd_cap: null` "the firm's agents do
+not run. The Runtime refuses to provision keys or wake agents." The Runtime (ADR-032) is built
+and tested with **scripted** minds: deterministic code with an App API key, no model, no network
+client, $0, like the cycle-18 probe pod that already trades through the API in the test suite.
+Options: A scripted minds also refused while the cap is null (the Runtime cannot be tested end
+to end until you set a cap) / B the cap gate refuses every mind whose provider can spend money;
+scripted minds run, and every such run is labelled `minds: scripted` so it is never reported as
+an agent run.
+Chosen: B. Art. 2.1 defines firm agents as "every AI inside the simulation". A script is not an
+AI and spends nothing, so B keeps the cap law exactly as strict for every model while M1–M5
+(`bible/09_BUILDER_VISION.md` §3) get built and tested. The exit-criterion test "cap null →
+Runtime refuses to wake agents" will use a spending provider.
+Reversible: yes. Tell me A, and the gate will refuse every provider; the scripted tests would then
+run only in-process, as the probe does today.
+Human answer:

@@ -109,7 +109,7 @@ Deliverables:
    Built and tested against a fake provider if no provisioning credential exists.
 8. Verify the "chat restricted to central pod" report with two pods.
 
-Exit criteria:
+Exit criteria *(plan: ADR-032 — every criterion below is served by at least one backlog slice R-1…R-8)*:
 - [ ] One pod (PM + Analyst) completes a 1-month backtest via the Runtime in < 10 min
       real time, every action through the App.
 - [ ] Replaying that run from cassettes reproduces an identical event ledger (except ids/
@@ -220,8 +220,9 @@ and logged in `07_DECISIONS.md`.
 ## Era ∞ — The factory that builds the factory
 
 Runs **in parallel** with every Era (during the Launch Pad, at most 1 cycle in 5; after it, as often as the Builder judges worth it):
-- the Builder improves its own process: skills in `.claude/skills/`, subagents in
-  `.claude/agents/`, commands, test harnesses, the experiment runner;
+- the Builder improves its own process: the cycle protocol, skills, helper roles and extra
+  auditor/red-team checks in `protocol/` (P-0003; `.claude/` is sealed), test harnesses, the
+  experiment runner;
 - meta-metrics in `state/METRICS.md`: cycle success rate, regressions caught by the
   auditor, time and turns per cycle, test count and runtime, cost per experiment;
 - the scale research program (`02_SCALES.md` §4);

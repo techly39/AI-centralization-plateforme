@@ -26,6 +26,8 @@ While Era ½ (Survey) is open, the unit is survey/cleanup work only — no featu
 After the Launch Pad, choose from your own roadmap (`bible/09_BUILDER_VISION.md`).
 Before touching OpenClaw, read `bible/08_OPENCLAW.md`.
 If it is too big for one session, split it in `BACKLOG.md` and take the first slice.
+Size check (X-008): a slice that changes physics will meet a red-team pass and its fixes in the
+same cycle — leave room for them, or split before building.
 
 **3. Hypothesis.** Append to `state/JOURNAL.md`:
 `## Cycle NNNN — <title> (<ISO date>)` / `Era:` / `Exit criterion served:` / `Hypothesis:`.
@@ -39,6 +41,13 @@ Answer any open question with the prime rule; log it in `bible/07_DECISIONS.md`
 - `uv run pytest` → all green. Never edit a test just to make it pass; if a test is
   wrong, say why in the commit message.
 - Boundary + determinism tests pass (once they exist).
+- Run check (X-004): if the diff touches anything but docs/state, `uv run python
+  scripts/smoke_run.py` exits 0 — tests green is not "the fund starts".
+- Claim check (X-006), before the auditor: list every "covers / finds / never / all / only /
+  0 found" sentence the diff adds (code, ADR, journal) and plant a counter-example for each, or
+  narrow the sentence. Ask: what in this diff can an unprotected file or env var change? Is
+  every check inside the lock that protects the write it guards? Which old tests did a new law
+  break — and is each one a finding (log it in the ADR), not a test to "fix"?
 - Launch the `auditor` subagent on `git diff main...HEAD`. Fix every `BLOCK` finding.
   If the change touches `app/registry`, `app/oms`, `app/marketdata`, metering or the
   Runtime's halt/budget code, also launch `red-team`.

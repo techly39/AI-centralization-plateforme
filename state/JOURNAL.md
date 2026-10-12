@@ -658,3 +658,52 @@ not a test — the auditor caught one I wrote while updating an exact-shape chec
 Next: B-037b (a `fund-env backtest` driver that re-runs a ledger's world from the operator's key
 file and diffs the ledgers) or B-037c (which agents have lived which worlds) → the Runtime plan →
 `bible/09_BUILDER_VISION.md` at the cycle-20 retrospective.
+
+## Cycle 0020 — Retrospective, the Builder's vision, and the Runtime plan (2026-10-12)
+Era: I — The Desk
+Exit criterion served: all seven Era I exit criteria are Runtime criteria, and 0 of 7 are ticked
+after 19 cycles. This cycle turns them into an ordered, sliced plan, and writes
+`bible/09_BUILDER_VISION.md` (due at the Launch Pad's end — cycle 20 at the latest, STATE).
+Hypothesis: If I re-read 00 + 01, measure cycles 11–19 against the cycle-10 retrospective's
+promises, and write (a) the vision one step ahead of the work and (b) ADR-032 fixing the Runtime's
+shape (lockstep scheduler, mind = provider + adapter behind the App's tool surface, cassettes,
+cap/halt gates, its own clock identity), then every open Era I exit criterion maps to exactly
+one backlog slice sized for one cycle, the slices are ordered so the first needs no physics hole
+fixed first, and the next 5–6 cycles need no further planning to start. Docs only: no code, no
+test count change (796 + 8 xfailed).
+
+### Retrospective — cycles 11–20 (06_LOOP §6; re-read 00 + 01 this cycle)
+- **Pointed at the Era's question?** Partly. Cycles 11–19 were all physics: halt, portable JSON,
+  replay order, the clock read, the backtest clock, the look-ahead guard, one now, the keyed
+  synthetic month, the world record. Each one was a precondition for an *honest* backtest, and
+  the Era's question includes "reproducibly", so none of it was waste. But the cycle-10 promise
+  was "the next 10 cycles must end with a pod acting in simulated time against a fake provider".
+  Only half of it is met: a *scripted* pod acted (cycle 18) **in the test suite**, with no
+  Runtime and no provider seam. Era I exit criteria are still 0 of 7. Drift named: seal-first
+  slid toward seal-only. The red-team returns are falling (0011: one low, operator-only hole),
+  the signal that the time frontier is exhausted.
+- **Failures:** 9/9 merged (11–19), 0 failed, 0 blocked. Auditor BLOCK rate fell from 5/10 to
+  **2/9** (c11 ×2, c12 re-audit) after X-006 was done by hand, so the metric moved and X-006 is
+  now protocol. Every cycle's red-team found holes: 2, 6, 2, 1, 3, 5, 6, 1, 1. **Three were high**
+  (c12 deep-JSON inbox poisoning, c16 1h-vs-daily stale-quote arbitrage, c18 seed recovery from
+  volumes), and all were fixed in the same cycle. The red-team is the most valuable part of the
+  process: the Builder alone shipped three high holes to the gate. **Interruptions:** 3 of 9
+  sessions stopped mid-cycle (13, 16, 18) and resumed cleanly at step 5 (X-007 works). Average
+  cycle ~45 min: physics slices are sized right at the edge → X-008.
+- **What became boring:** time physics. One now, the guard and the world record now hold under
+  attack, and new holes are operator-only. **The frontier moves to the Runtime** (ADR-032,
+  R-1…R-8). Physics work from here on happens only when a Runtime slice needs it or an agent can
+  reach it.
+- **Scales:** S0 answered P-0001…P-0003 (process) and none of Q-0001/Q-0002 (money, keys): the
+  world must reach M5 without a budget, and it can. S1: in at least 5 of 9 cycles (12, 16, 17, 18, 19)
+  the hypothesis was met and then widened or amended. In those five, the widening came from the
+  red-team or the auditor, not from the Builder's own pre-mortem, so the planted-counter-example
+  check is now protocol.
+  S2: physics now has a determinism harness (the probe) that the Runtime can reuse.
+- **Ambition check:** is the world more impressive than 10 cycles ago? More *truthful*, clearly:
+  a month is a pure function of a secret, and a run proves which world it lived in. Not yet more
+  *capable*: no mind has acted. What would make the Human say "I've never seen that"? The exact
+  counterfactual fork (vision §2): replay an LLM firm to day *d* for free, change one mind, and
+  watch history branch. Every slice R-1…R-4 builds toward it.
+- **Process changes** (Era ∞, `protocol/CYCLE.md`): X-004 smoke run in verify, X-006 claim check
+  with its three questions + "new laws audit old tests", X-008 size check at step 2.
