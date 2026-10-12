@@ -732,3 +732,19 @@ different strictnesses across three files in one cycle. (3) Writing the vision e
 ambition gap: the world is more truthful than ever but no more capable. The fork gives the
 next ten cycles a destination.
 Next: R-1 Runtime skeleton + gates → R-2 scripted mind + native adapter → R-3 lockstep month (M1).
+
+## Cycle 0021 — R-1: the Runtime's skeleton and its gates (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC5 (HALT stops agents) and EC6 (cap `null` → the Runtime refuses to wake
+agents). The gates come first so no later slice can wake anything without passing through them.
+This slice does not tick either criterion: R-5 ticks them, with agent-level tests through the tool layer.
+Hypothesis: If `runtime/` gets (a) an `AgentSpec` (the 03 §3 fields, frozen, extra fields
+forbidden, file-backed, ids unique and ordered), (b) a governance reader on fixed paths that reads
+`governance/HALT` and `human.yaml` fresh on every call and turns every unreadable or malformed cap
+into `null`, (c) a wake gate keyed on a closed list in code, `{scripted, cassette}`, that never asks a
+provider what it costs, (d) an `LLMProvider` protocol, and (e) a `fund-runtime status` command that
+wakes nothing, then: under HALT no provider passes; under cap `null` an unknown provider and one
+that claims `spends_money=False` are both refused; a malformed cap fails closed; and the dynamic
+boundary probe shows that importing the Runtime loads no physics module outside
+`{app, app.config, app.limits}`. A planted counter-example proves the probe can fail. Expected:
+about 30 new tests, no physics change.

@@ -30,6 +30,8 @@ firm app/                      (git: origin = AI-centralization-plateforme)
 
 ```
 runtime ──HTTP/MCP──▶ app ──imports──▶ quant, truman   (pure, deterministic libraries)
+runtime imports no app module; through mcp_server it loads at most app.config + app.limits
+                                                        (dynamic probe — ADR-032 amendment)
 ui ──HTTP──▶ app
 mcp_server ──HTTP──▶ app       (imports only app.config + app.limits — ADR-022)
 scripts ──MCP/HTTP──▶ app      (except named in-process probes on a throwaway DB)

@@ -58,6 +58,14 @@ REPO_PACKAGES = frozenset({
 #: the OMS — the wrapper reaches those only over HTTP (ADR-022).
 MCP_SERVER_MAY_IMPORT_FROM_APP = frozenset({"app", "app.config", "app.limits"})
 
+#: What importing the Runtime may *load* from physics: no more than the MCP
+#: wrapper it reaches the App through (ADR-032 amendment, cycle 21). Statically
+#: the runtime layer still imports no ``app`` module at all (its Layer below).
+RUNTIME_MAY_LOAD_FROM_APP = MCP_SERVER_MAY_IMPORT_FROM_APP
+
+#: What the scanner reports for an import whose target it cannot read.
+COMPUTED_IMPORT = "<computed import>"
+
 #: Operator scripts that run physics in-process on a throwaway database, by
 #: design. Every other script is a client (HTTP/MCP) and never imports ``app``.
 IN_PROCESS_SCRIPTS = frozenset({"scripts/survey_probe_physics.py"})
@@ -115,14 +123,20 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
     ``from a.b import c`` yields both ``a.b`` and ``a.b.c`` (``c`` may be a
     submodule: ``from google import genai``). Relative imports are resolved
     against ``module_name``. ``__import__("x")`` and ``import_module("x")``
-    with a literal name count too; a computed name cannot be seen statically.
+    with a literal name count too. A computed name, or a load from a file path
+    (``spec_from_file_location``), cannot be seen statically: it yields
+    :data:`COMPUTED_IMPORT`, a violation in every layer (red-team 0012 H8).
     """
     found: set[str] = set()
     for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Call) and _is_dynamic_import(node.func):
+        if isinstance(node, ast.Call) and _is_file_import(node.func):
+            found.add(COMPUTED_IMPORT)
+        elif isinstance(node, ast.Call) and _is_dynamic_import(node.func):
             arg = node.args[0] if node.args else None
             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                 found.add(arg.value)
+            else:
+                found.add(COMPUTED_IMPORT)
         elif isinstance(node, ast.Import):
             found.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -142,10 +156,25 @@ def imported_modules(source: str, module_name: str, is_package: bool) -> set[str
     return found
 
 
+def _is_file_import(func: ast.expr) -> bool:
+    """Calls whose target module the scanner cannot read at all: a load from a
+    path, code run from a string, or an import function fetched by name."""
+    if isinstance(func, ast.Name) and func.id in {"exec", "eval", "compile"}:  # builtins only
+        return True
+    name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+    if name in {"spec_from_file_location", "SourceFileLoader"}:
+        return True
+    return (  # getattr(importlib, "import_module")(x)
+        isinstance(func, ast.Call) and getattr(func.func, "id", None) == "getattr"
+        and len(func.args) >= 2 and isinstance(func.args[1], ast.Constant)
+        and func.args[1].value in {"import_module", "__import__"}
+    )
+
+
 def _is_dynamic_import(func: ast.expr) -> bool:
     if isinstance(func, ast.Name):
         return func.id in {"__import__", "import_module"}
-    return isinstance(func, ast.Attribute) and func.attr == "import_module"
+    return isinstance(func, ast.Attribute) and func.attr in {"import_module", "__import__"}
 
 
 def _matches(module: str, banned: str) -> bool:
@@ -168,6 +197,9 @@ def violations(root: Path, layer: Layer) -> list[str]:
         parts = rel.with_suffix("").parts
         module_name = ".".join(parts[:-1] if is_package else parts)
         for module in sorted(imported_modules(path.read_text(), module_name, is_package)):
+            if module == COMPUTED_IMPORT:  # no layer can prove what it would load
+                out.append(f"{rel}: {module}")
+                continue
             for banned in layer.forbidden:
                 if not _matches(module, banned):
                     continue
@@ -228,15 +260,18 @@ def test_nothing_imports_legacy_or_runtime_outside_tests() -> None:
 # --- dynamic: what actually loads ------------------------------------------------------
 
 
-def _loaded_modules(*imports: str) -> list[str]:
+def _loaded_modules(*imports: str, plant_dir: Path | None = None) -> list[str]:
     code = (
         "import importlib, json, sys\n"
         f"for m in {list(imports)!r}: importlib.import_module(m)\n"
         "print(json.dumps(sorted(sys.modules)))\n"
     )
-    # No FUND_* overrides or PYTHONPATH from the caller: the probe sees the repo only.
+    # No FUND_* overrides or PYTHONPATH from the caller: the probe sees the repo
+    # only (plus a planted tree, when a test plants one).
     env = {k: v for k, v in os.environ.items()
            if not k.startswith("FUND_") and k != "PYTHONPATH"}
+    if plant_dir is not None:
+        env["PYTHONPATH"] = str(plant_dir)
     done = subprocess.run(
         [sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True,
         text=True, timeout=120, check=True,
@@ -259,6 +294,43 @@ def test_mcp_server_loads_no_physics_internals() -> None:
     from_app = {m for m in loaded if _matches(m, "app")}
     assert from_app <= MCP_SERVER_MAY_IMPORT_FROM_APP, sorted(from_app)
     assert "sqlalchemy" not in loaded
+
+
+def _physics_beyond(loaded: list[str], allowlist: frozenset[str]) -> list[str]:
+    return sorted(m for m in loaded if _matches(m, "app") and m not in allowlist)
+
+
+def _runtime_modules() -> list[str]:
+    """Every module of the runtime layer, so a new one is probed without a test edit."""
+    root = REPO_ROOT / "runtime"
+    return sorted(
+        ".".join(p.relative_to(REPO_ROOT).with_suffix("").parts).removesuffix(".__init__")
+        for p in root.rglob("*.py")
+    )
+
+
+def test_runtime_loads_no_physics_internals() -> None:
+    """The Runtime reaches the App over HTTP; importing it opens no database."""
+    modules = _runtime_modules()
+    assert {"runtime.gate", "runtime.governance", "runtime.cli"} <= set(modules)
+    loaded = _loaded_modules(*modules)
+    assert "runtime.gate" in loaded  # the probe really imported the Runtime
+    assert _physics_beyond(loaded, RUNTIME_MAY_LOAD_FROM_APP) == []
+    assert "sqlalchemy" not in loaded
+
+
+def test_runtime_probe_catches_a_planted_physics_import(tmp_path: Path) -> None:
+    """Counter-example: the same probe, on a planted package that reaches into
+    the ledger, reports it; one that only goes through the MCP wrapper is clean."""
+    _plant(tmp_path, {
+        "plant_dirty/__init__.py": "import mcp_server.client\nimport app.ledger.events\n",
+        "plant_clean/__init__.py": "import mcp_server.tools\n",
+    })
+    dirty = _loaded_modules("plant_dirty", plant_dir=tmp_path)
+    assert "app.ledger.events" in _physics_beyond(dirty, RUNTIME_MAY_LOAD_FROM_APP)
+    clean = _loaded_modules("plant_clean", plant_dir=tmp_path)
+    assert "plant_clean" in clean and "mcp_server.tools" in clean
+    assert _physics_beyond(clean, RUNTIME_MAY_LOAD_FROM_APP) == []
 
 
 # --- the scanner, on a planted tree ----------------------------------------------------
@@ -291,6 +363,8 @@ def test_scanner_catches_planted_violations(tmp_path: Path) -> None:
         "scripts/client.py": "import app.main\n",
         "scripts/survey_probe_physics.py": "from app.main import create_app\n",
         "quant/ic.py": "from app.clock import get_clock\n",
+        # The Runtime may *load* app.config through mcp_server, never import it itself.
+        "runtime/direct.py": "from app.config import get_settings\nimport mcp_server.client\n",
     })
     by_name = {layer.name: layer for layer in LAYERS}
     assert violations(tmp_path, by_name["app"]) == [
@@ -313,6 +387,32 @@ def test_scanner_catches_planted_violations(tmp_path: Path) -> None:
         "quant/ic.py: app.clock",
         "quant/ic.py: app.clock.get_clock",
     ]
+    assert violations(tmp_path, by_name["runtime"]) == [
+        "runtime/direct.py: app.config",
+        "runtime/direct.py: app.config.get_settings",
+    ]
+
+
+@pytest.mark.parametrize("source", [
+    "import importlib\ndef f(x):\n    return importlib.import_module('app.' + x)\n",
+    "import importlib\ndef f(x):\n    return importlib.__import__('app.' + x)\n",
+    "import builtins\ndef f(x):\n    return builtins.__import__(x)\n",
+    "def f(x):\n    return __import__(x)\n",
+    "import importlib\ndef f(x):\n    return getattr(importlib, 'import_module')(x)\n",
+    "def f():\n    exec('import app.ledger')\n",
+    "def f(s):\n    return eval(s)\n",
+    "def f(s):\n    return compile(s, 'x', 'exec')\n",
+    "import importlib.util\nspec = importlib.util.spec_from_file_location('m', '/x.py')\n",
+])
+def test_scanner_refuses_every_import_it_cannot_read(source: str) -> None:
+    """Re-audit c21: the computed-import rule names every spelling it claims."""
+    assert COMPUTED_IMPORT in imported_modules(source, "runtime.x", False)
+
+
+def test_scanner_does_not_mistake_re_compile_for_code_loading() -> None:
+    assert COMPUTED_IMPORT not in imported_modules(
+        "import re\nP = re.compile('x')\n", "runtime.x", False,
+    )
 
 
 def test_relative_imports_resolve() -> None:

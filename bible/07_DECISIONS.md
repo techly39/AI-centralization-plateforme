@@ -742,3 +742,56 @@ amendment here, with a planted counter-example showing every other `app.*` modul
 Not decided here: parallel wakes, live-mode wake policies (cron/event), the meter proxy (03 §4.3),
 memory policy, context packages beyond `/me` + charter + workflow input, and the cassette storage
 format (files vs table). Each is decided in its slice.
+
+Amended (cycle 21, R-1 shipped: `runtime/`, `tests/test_runtime_gates.py`):
+(a) **The dependency law has two halves.** Statically, the runtime layer still imports **no** `app`
+module. Its Layer is unchanged, and a planted `runtime/direct.py: app.config` is caught.
+Dynamically, importing every `runtime` module may load no physics module beyond
+`RUNTIME_MAY_LOAD_FROM_APP` = `{app, app.config, app.limits}`. That is the MCP wrapper's set, and
+the Runtime will reach `FundClient` through the wrapper. The probe imports every file under
+`runtime/`, so a new module is probed without a test edit. A planted package that imports
+`app.ledger.events` is reported. Today the Runtime loads no `app` module at all.
+(b) **The gate decides on names, never on a flag.** `runtime.gate` matches the AgentSpec's
+`provider` **and `adapter`** strings exactly (type exactly `str`, no case folding, no trimming)
+against `ZERO_COST_PROVIDERS` and `ZERO_COST_ADAPTERS = {native}`. Red-team 0012 H1 (high): with
+the provider alone, `provider: scripted` + `adapter: openclaw` woke under null, though an OpenClaw
+agent runs its own model on its own key. H4: a `str` subclass could answer the membership test
+itself. The gate's code never names `spends_money`; a static test checks attributes, identifiers
+and string constants (a `getattr` spelling is caught, with a planted counter-example). The other half of the closed
+list lands in R-2. There, the name→class registry must map `scripted` and `cassette` each to
+exactly one class with no model and no network client, so a spec cannot name `scripted` and get a
+spending mind.
+(c) **A cap set is not yet a licence to spend.** Under a numeric cap, a spending provider is
+still refused, with `no_metered_key`, until per-agent metered keys exist (R-6). A cap the Runtime
+cannot meter is a cap it cannot keep (prime rule: safer budget).
+(d) **Both levers fail closed.** The reader turns into `null`, with a recorded `cap_problem`,
+every cap it cannot read as a finite, non-negative number: a missing file or key, a YAML error, a
+duplicate key, a string, a bool, ±inf, NaN, a negative, an integer too large for a float, a YAML
+1.1 base-60 value (`1:30` would read as 90; red-team H7), or **any** parser failure. The
+auditor's BLOCK: non-UTF-8 bytes, an unhashable key and deep nesting raised out of the reader
+instead. HALT is read first, independently of the cap file. HALT counts if anything is at the
+path, if the path cannot be checked, or if `governance/` itself is missing (red-team H3: a
+non-editable install or a copied tree moves `REPO_ROOT` away from the Human's real HALT). Only
+"the directory is there and the file is not" means the world runs. The claim check found the
+first form: `os.path.lexists` answers False on any OSError, which would have failed open.
+(Physics' `Path.exists()` has a milder form of the same gap → B-040.) The spec loader uses the
+same duplicate-refusing loader, and it refuses `.yml`/`.YAML` files instead of skipping them.
+(f) **The boundary scanner refuses what it cannot read** (red-team H8, widened at re-audit).
+In every layer, each of these is itself a violation:
+- `import_module` or `__import__` called with a non-literal name, whether as a bare name or as an
+  attribute (`importlib.__import__`, `builtins.__import__`);
+- `getattr(…, "import_module" | "__import__")(…)`;
+- the builtins `exec`, `eval` and `compile`;
+- a load from a file path (`spec_from_file_location`, `SourceFileLoader`).
+
+No layer had any of these. Planted tests cover each spelling, plus one showing that `re.compile`
+is not mistaken for one. This is a lint on code the Builder writes, not a seal: a determined
+author can still hide an import (for example, a getattr chain built from computed strings).
+(e) **AgentSpec deviations from 03 §3, recorded.**
+- One added field, `provider`.
+- `role` is one of {pm, analyst, management}. `system` and R-3's `runtime` identity are never a
+  mind's role.
+- A PM or Analyst needs a pod.
+- `memory_policy` is `none`, and `wake_policy` is one of {every_step, never}, until their slices
+  widen them.
+- Specs are YAML files, one per agent, loaded in id order, which is the lockstep order.
