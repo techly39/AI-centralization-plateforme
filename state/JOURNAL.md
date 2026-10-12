@@ -1346,7 +1346,31 @@ event links to hashes (physics, own red-team), smoke step, `tools_sha256`.
 RED-TEAM: no (nothing under `app/`, no halt/budget order change; auditor must attack secret
 handling, overwrite and symlinks).
 Hypothesis: a run's whole exchange with its minds can be written to a deterministic, redacted,
-exclusive 0600 file, with each request hashed before the mind sees it, without changing any
-any HALT order. Metric: two identical runs that mint no key give byte-identical cassettes (with a
-minted key the unredacted hashes differ by design); no minted key in file or stdout.
-(Audit c31 BLOCK 1: the printed JSON does gain `exchanges`; I first wrote "unchanged".)
+exclusive 0600 file, with each request hashed before the mind sees it, without changing any HALT order. Metric: two identical runs that mint no key give byte-identical
+cassettes (with a minted key the unredacted hashes differ by design); no minted key in file or
+stdout. (Audit c31 BLOCK 1: the printed JSON does gain `exchanges`; I first wrote "unchanged".)
+Work:
+- `runtime/cassette.py` (new, stdlib only): `request_sha256`, `HASH_FORMAT`, `CASSETTE_VERSION`,
+  `redact_count`/`redact` (moved from the CLI), `dumps`, `check_path`, `write` (O_EXCL,
+  O_NOFOLLOW, 0600, no partial file).
+- `native.wake`: `Exchange(seq, request_sha256, usage|None)` per model turn, hash taken before
+  `complete`; `WakeRecord.exchanges`. HALT order untouched.
+- `fund-runtime backtest --cassette PATH` (checked in the usage phase, written for every outcome).
+- `.gitignore` (B-000i). ADR-037. 33 new tests (1452 → 1485), smoke 21/21.
+- **Deviation:** the hash lives in `cassette.py`, not `providers.py` (plan): an old test pins
+  `providers.py` to pydantic + typing and went red on `hashlib`. The law stayed, the code moved.
+- X-011 check: the architect verified EC1/EC2/EC4/EC7 as not met; none ticked.
+- Mutation check: moving the digest after `complete` turned two tests red.
+Result: merged fba3b1c and pushed. Hypothesis **met**. Auditor: **BLOCK ×2, both wrong claims**
+("printed JSON unchanged" — it gains `exchanges`; "equal runs give equal bytes" — not with a
+minted key, because the hash is of the unredacted request). Both fixed in text, plus NOTEs 4–6
+(an interrupt leaves no partial file; symlink claim narrowed in the test docstring; "every
+invocation that passed the usage checks"). Not re-audited: the fixes were wording and one
+`except BaseException`; the suite was green before and after.
+Learned: (1) I wrote two sentences about surfaces without testing them: the claim check (X-006)
+needs "what else prints this?" for any new field on a record that is dumped whole. (2) An old
+import-pin test shaped the design again, the way law-first should work. (3) The unredacted-hash
+decision (B-047) has a cost: cassettes of runs that mint keys are not byte-reproducible. R-4b
+treats that as a divergence by design; revisit if hiring runs must replay.
+Next: R-4b (cassette provider, replay, `minds: replay`, duplicate-key-rejecting reader, red-team
+planned), then B-053.

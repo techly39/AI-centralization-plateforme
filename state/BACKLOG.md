@@ -101,7 +101,14 @@ keep their ids for history.
             a tool body for the mind's bad arguments (audit c25 NOTE 4). No tool body builds a
             pydantic model today. If one ever does, classify by where the error was raised.
   - [ ] **R-3c** `daily_cycle` workflow.
-- [ ] **R-4** Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
+- [ ] **R-4** Split cycle 31. **R-4a done cycle 31** (merged fba3b1c, ADR-037: `runtime/cassette.py`,
+      `--cassette`, `WakeRecord.exchanges`; B-000i closed; B-047 decided: redact on the way out,
+      hash the unredacted request). **R-4b next**, with these carry-overs from R-4a:
+      the reader rejects duplicate JSON keys (`object_pairs_hook`); a changed tool surface is a
+      "surface changed" divergence, a minted key a "key divergence"; add a cassette step to the
+      smoke run; link hashes from events only as a separate physics slice with a red-team;
+      optional `tools_sha256` per wake; no size cap on a cassette yet.
+      Original text: Cassettes + replay (was B-010) + B-000i (gitignore first): record every exchange,
       replay into a fresh DB in the same world → identical ledger, $0; a miss is a recorded
       divergence. Reuses the ADR-030 comparison. **M2**. It
       serves EC2 but does not tick it (R-8). Run label `minds: replay`.
@@ -298,8 +305,7 @@ Open strict xfails: 8 (0001: payload size ×2, message content, system squat, MC
 - [ ] **B-008** Truman v1: local cache of real daily history, prices-only pack, one scripted
       scenario, served via `MarketDataProvider`; pack hashing. Must not reuse yfinance's
       `_fetch_price` path (SURVEY §4a.3).
-- [ ] **B-000i** `.gitignore`: cassettes + `experiments/*/runs/` before Era I records anything
-      (first writer expected: B-010 cassettes; earlier if an experiment run lands first).
+- [x] **B-000i** **Done cycle 31** (ADR-037): `*.cassette.json` and `experiments/*/runs/` ignored.
 - [ ] **B-009** → R-1 + R-2. Runtime skeleton (`runtime/`, `uv run fund-runtime`): AgentSpec,
       scheduler on the App clock, halt + cap checks, fake LLM provider for tests.
 - [ ] **B-010** → R-4. Runtime: cassette recording + replay mode.

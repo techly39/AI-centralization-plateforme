@@ -344,3 +344,7 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   ticked and holes found (METRICS gets a `usd` column from `cycles.log`). Question: which unit
   shapes buy the most truth per dollar? Cycle 30 bought 3 criteria for about $4. Red-team cycles
   buy holes at about $6–8.
+- [cycle 31] **A golden file for the printed surface** — I wrote "printed JSON unchanged" while
+  the diff added a field to every wake record; the auditor caught it. A test that pins the CLI
+  output's key set per level would make "unchanged" checkable and any change a visible diff.
+  Question: how many of my BLOCKs are claims about surfaces a golden file would pin? — status: new

@@ -1,10 +1,20 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 30 (retrospective + R-5a: EC3/EC5/EC6 proven end to end and ticked — merged
-6e04725, 2026-10-12)
+**Last cycle:** 31 (R-4a: a run writes a cassette — merged fba3b1c, 2026-10-12)
 
 ## What is true now
+- **A run can leave a cassette** (R-4a, ADR-037, `tests/test_cassette.py`).
+  `fund-runtime backtest --cassette PATH` writes the printed outcome to a new `*.cassette.json`
+  (redacted, mode 0600, exclusive, the file never a symlink), refused runs included.
+  - Every `WakeRecord` now has `exchanges: (seq, request_sha256, usage | None)`, one per model
+    turn asked. The hash (`runtime.cassette.request_sha256`, `HASH_FORMAT`) is of the unredacted
+    request, taken before the mind sees it. Request and response are not stored twice: they are
+    the transcript prefix and the assistant message.
+  - Printed JSON gained `exchanges`. Equal runs give equal bytes unless a mind was handed a
+    minted key (hashes of the unredacted request then differ by design).
+  - `*.cassette.json` and `experiments/*/runs/` are gitignored (B-000i closed).
+  - No replay yet (R-4b), no EC ticked. **1485 passed + 6 xfailed**, smoke 21/21.
 - **Era I exit criteria: 3 of 7 ticked** (cycle 30, ADR-036, `tests/test_runtime_lockstep.py`
   section "Era I exit criteria"). The gates are driven as a run drives them: a conducted mind,
   the MCP tools, HTTP, physics.
@@ -246,12 +256,9 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **R-4a**: the RunRecord and every exchange go to a cassette.
-   - Gitignore first (B-000i).
-   - Redact minted keys (B-047).
-   - Hash each request before `complete`.
-   - The seed design is in the backlog under R-4.
-2. **R-4b**: replay into a fresh DB in the same world. It must produce the same ledger and be
-   declared `cassette`; a miss or a redacted key is a recorded divergence (M2).
-3. **B-053**: a pre-gate before provisioning in `fund-runtime backtest` (red-team). Then R-3c
-   `daily_cycle`. B-048 when cheap.
+1. **R-4b**: the `cassette` provider reads a cassette (reject duplicate JSON keys), replays into
+   a fresh DB in the same world; same ledger, declared `minds: replay`; a miss, a changed tool
+   surface or a minted key is a recorded divergence (M2). Physics-adjacent (`/run/minds` label):
+   plan a red-team.
+2. **B-053**: a pre-gate before provisioning in `fund-runtime backtest` (red-team).
+3. R-3c `daily_cycle`. B-048 when cheap. Tick-check (X-011) EC2 after R-4b.
