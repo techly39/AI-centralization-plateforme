@@ -308,9 +308,11 @@ def _older_agent_acted_after(session: Session, declared_id: int) -> bool:
     """Did a firm agent not registered after event ``declared_id`` write anything
     but a registration after it?"""
     firm_actors = select(Agent.id).where(Agent.role.not_in(PHYSICS_ROLES))
-    registered_after = select(
-        func.json_extract(Event.payload_json, "$.agent_id")
-    ).where(Event.type == EVENT_AGENT_REGISTERED, Event.id > declared_id)
+    registered = func.json_extract(Event.payload_json, "$.agent_id")
+    # No NULL in the set: one would make NOT IN NULL for every row, failing open.
+    registered_after = select(registered).where(
+        Event.type == EVENT_AGENT_REGISTERED, Event.id > declared_id, registered.is_not(None)
+    )
     query = select(Event.id).where(
         Event.id > declared_id,
         Event.type != EVENT_AGENT_REGISTERED,

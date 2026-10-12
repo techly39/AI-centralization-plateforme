@@ -123,7 +123,7 @@ def test_hole_an_agent_older_than_the_declaration_does_not_act_under_its_label(
     # ...but pm-1, seeded before the run, is driven by something no one declared:
     assert client.post("/messages", headers=H(world["pm"][1]),
                        json={"to": "broadcast", "body": "a model wrote this"}).status_code == 201
-    assert _minds(SessionFactory) != ("scripted",)
+    assert _minds(SessionFactory) is None  # re-audit c28 NOTE 3: exact, not just "not scripted"
 
 
 # =====================================================================================
