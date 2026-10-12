@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any, Callable, Literal
 from urllib.parse import quote
 
 from mcp.server.mcpserver import MCPServer
@@ -516,6 +516,20 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         checked on arrival; the answer lists the ones that filled or were rejected.
         """
         return await call("POST", "/clock/advance", body={"days": days, "minutes": minutes})
+
+    @api_tool(server, method="POST", path="/run/minds")
+    async def declare_run_minds(
+        minds: Annotated[
+            list[Literal["cassette", "model", "scripted"]],
+            Field(description="What drives the run's minds: code (scripted), replayed model output (cassette), a live model (model).", min_length=1, max_length=3),
+        ],
+    ) -> Any:
+        """Say what drives this backtest run's minds. The Runtime's identity only (no firm agent).
+
+        Once per run, before the clock has moved and before any firm agent has
+        acted; refused after that.
+        """
+        return await call("POST", "/run/minds", body={"minds": minds})
 
     @api_tool(server, method="GET", path="/halt")
     async def get_halt() -> Any:

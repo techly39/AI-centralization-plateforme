@@ -7,6 +7,10 @@ simulated date, and an agent has no other honest way to learn it.
 Moving it is ``POST /clock/advance``: backtest runs only, ``CONTROL_CLOCK``
 (the Runtime's ``runtime`` identity and ``system`` — never a firm agent, ADR-033). There is no ``POST /clock/mode``: the
 mode is a fact of the run's database, fixed when it was created (ADR-027).
+
+``POST /run/minds`` is the same hand saying what drives the run's minds, once,
+before anything has happened in it (ADR-032 (p)). It lives here because it is
+the conductor's word about the run, under the conductor's permission.
 """
 
 from __future__ import annotations
@@ -14,7 +18,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import ClockAdvanceIn, ClockAdvanceOut, ClockOut
+from app.api.schemas import (
+    ClockAdvanceIn,
+    ClockAdvanceOut,
+    ClockOut,
+    RunMindsIn,
+    RunMindsOut,
+)
 from app.clock import get_clock
 from app.db.base import get_session
 from app.db.models import Agent
@@ -22,7 +32,7 @@ from app.ledger.events import ledger_now
 from app.oms.monitor import check_pending_orders
 from app.registry.auth import require
 from app.registry.permissions import Action
-from app.run_clock import RunClockError, advance
+from app.run_clock import RunClockError, RunMindsError, advance, declare_minds
 
 router = APIRouter(tags=["clock"])
 
@@ -58,4 +68,19 @@ def advance_clock(
         now=now,
         filled_order_ids=sweep.filled,
         rejected_order_ids=sweep.rejected,
+    )
+
+
+@router.post("/run/minds", response_model=RunMindsOut, status_code=status.HTTP_201_CREATED)
+def declare_run_minds(
+    body: RunMindsIn,
+    agent: Agent = Depends(require(Action.CONTROL_CLOCK)),
+    session: Session = Depends(get_session),
+) -> RunMindsOut:
+    try:
+        event = declare_minds(session, minds=body.minds, actor_agent_id=agent.id)
+    except RunMindsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    return RunMindsOut(
+        minds=event.payload_json["minds"], declared_at=event.ts, event_id=event.id
     )

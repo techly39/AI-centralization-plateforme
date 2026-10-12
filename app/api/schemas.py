@@ -129,6 +129,32 @@ class ClockAdvanceIn(BaseModel):
         return self
 
 
+#: ``app.run_clock.MIND_KINDS`` as a type (a test pins the two together).
+MindKind = Literal["cassette", "model", "scripted"]
+
+
+class RunMindsIn(BaseModel):
+    """What drives this run's minds, declared once by the Runtime (ADR-032 (p))."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    minds: list[MindKind] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode="after")
+    def _unique(self) -> RunMindsIn:
+        if len(set(self.minds)) != len(self.minds):
+            raise ValueError("each kind once")
+        return self
+
+
+class RunMindsOut(BaseModel):
+    """The declaration as the ledger holds it: kinds sorted, stamped and numbered."""
+
+    minds: list[str]
+    declared_at: datetime
+    event_id: int
+
+
 class ClockAdvanceOut(BaseModel):
     """Where the clock went, and what the pending-order sweep did on arrival."""
 

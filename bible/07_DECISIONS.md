@@ -1035,6 +1035,79 @@ then `registered` names what may exist. Not done here: physics' own record of `m
 physics cannot see what drives a key, so the label is a declaration, and who may declare it is a
 design question for that slice), writing the RunRecord to a file (R-4's cassette).
 
+(p) **Physics records what drives a run's minds** (R-3b-2c-2, cycle 28, `tests/test_run_minds.py`).
+Physics cannot see what is behind a key, so the label is a *declaration*, and physics guarantees
+only *who* makes it and *when*:
+- *Who:* `POST /run/minds {minds: [...]}` under `CONTROL_CLOCK`, the conductor's hand (the runtime
+  identity; `system` in code). There is no new permission: the runtime role still holds
+  `READ_HALT`, `READ_CLOCK` and `CONTROL_CLOCK`, nothing else. A firm agent gets 403 and a
+  `permission_denied` event.
+- *What:* one or more kinds from the closed `app.run_clock.MIND_KINDS`: `scripted` (code),
+  `cassette` (recorded model output played back), and `model` (a model answering now). Each kind
+  appears once; extra fields get 422. The event is `run_minds_declared {minds}`, sorted. The
+  Runtime declares the kinds of its specs (`lockstep.mind_kinds`). **A mind is `scripted` or
+  `cassette` only if both its provider and its adapter are in the gate's zero-cost sets.
+  Anything else is declared `model`**, so an unknown mind is never labelled as code. Audit c28
+  WARN 1: the first version looked at the provider only, which would have labelled `scripted` +
+  `openclaw` (OpenClaw's own model) as code. ADR (4)'s
+  `minds: replay` is spelled `cassette` here: physics names what plays, not what the run is for.
+- *When:* backtest runs only (a live run's agents are not conducted), **once**, and only while the
+  clock has not moved and no firm agent (any non-physics actor) has written an event. A refused
+  act counts, because its `permission_denied` names the actor. Physics' own setup (seeds, actor
+  null) and the runtime's own events do not count. So a declaration precedes every event a firm
+  agent wrote. Reads write nothing, so an agent that already existed (the registrar) may have
+  read before it (audit c28 WARN 3). The run's own minds are registered after it. `fund-runtime backtest` declares right after `check_clock` and **before it
+  registers anyone** (registrations by the registrar are firm acts). A run whose firm agent
+  already acted is refused (`minds_refused:409`) before any agent is made. Under HALT, physics
+  refuses with 423. A firm agent cannot forge a label, but one that already exists can spoil a
+  run before its declaration by writing any event, a refused one included. The run then stops
+  as `minds_refused:409`: that is a way to stop a run, not to fake one. If provisioning refuses
+  after the declaration, the declaration stays and the database cannot be declared again. That
+  is acceptable: a backtest database is single-use (ADR-027; audit c28 NOTE 4).
+- *Reading:* `run_minds(session)` returns the first declaration's kinds, or `None`. It also
+  returns `None` for a live run, an undeclared run, or a first declaration the ledger shows came
+  after a firm act or an advance. It reads only declarations a physics hand wrote (audit c28
+  NOTE 3). The check and the append run under `OMS_LOCK`, but writes that take no lock (a
+  message) can land between them. The reader trusts the ledger's id order, not the lock. A
+  second declaration needs a second process on the same database (`OMS_LOCK` is per process,
+  B-036) or a direct ledger write. It is never read (audit c28 WARN 2).
+- *Not done:* no `GET` of the run record. That would hand every agent `run_started.world`, the
+  market's law (drift, volatility). The claim check found that **management can already read
+  it** through `GET /events` (`READ_CROSS_POD`): B-049. Readers use the ledger, and a report
+  surface is later work. Undeclared runs stay legal: older tests and runs never declared, and they read as
+  `None`, never as `scripted`. Q-0005 is unchanged.
+- *Old test that changed, a finding of the new law:* red-team 0014's
+  `held_every_route_but_me_clock_halt_refuses_the_runtime_key` lists the routes that answer the
+  runtime key. `POST /run/minds` joined that list. The sweep still proves that every other
+  route refuses the key.
+- *Red-team 0017* (`tests/test_redteam_0017.py`: 4 holes, all fixed the same cycle) amended (p):
+  - **H1 (medium), H2 (low): the ledger has the last word on the answer too.** After its commit,
+    `declare_minds` re-reads the ledger. If its event is not the first physics-written
+    declaration, or a firm act precedes it, the endpoint answers 409 ("lost a race"). The event
+    stays (append-only) and is never read. Before, a firm message in the check/append gap, or a
+    second process's declaration, got 201, and the Runtime lived a month that read as `None`.
+  - **H4 (medium): a declaration covers only the agents registered after it.** It names kinds,
+    not agents, and an older agent's key could be in any hand (an OpenClaw model). `run_minds`
+    returns `None` if any firm agent not registered after the declaration writes any event other
+    than a registration after it. The exemption for registrations is the registrar making the
+    run's minds: it trusts the holder of the registrar key, and each agent it registers is
+    covered. So a pre-existing agent can void a label after the fact by any act, a refused one
+    included. That is a true statement about the run (an undeclared hand acted), not a forgery.
+    The red-team's own HELD guard `firm_acts_after_the_declaration_never_void_it` first acted
+    through pm-1, an older agent. It now acts through an agent registered after the declaration:
+    a finding of the H4 fix, which makes pm-1's acts void the label on purpose.
+  - **H3 (low, every route): a lone surrogate (`"\ud800"`) in a body made the 422 handler 500.**
+    `json_safe` now re-encodes strings (keys included) with replacement.
+  - Held: firm agents cannot declare (HTTP or MCP); lookalike, padded, huge, deep or mistyped
+    kinds get 422 and write nothing; deactivated agents still count; actor-null setup and key
+    rotation do not spoil; HALT fails closed; forged rows by null or firm actors are never read;
+    a live run never reads one.
+- *Smoke run:* the backtest phase reads the database file and checks that there is exactly one
+  declaration, `["scripted"]`, before the first firm event. Its market key is now fixed (a
+  hash of `fund-smoke-world/1`). With a random key, some draws gave five days with no `long`
+  signal, so the "an order was accepted" step failed on the world's luck, both on this branch
+  and potentially on `main`.
+
 ## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
 Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
 agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's

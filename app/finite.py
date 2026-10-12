@@ -61,10 +61,15 @@ def json_safe(value: Any, *, max_depth: int = 64, _depth: int = 0) -> Any:
     """
     if isinstance(value, float) and not math.isfinite(value):
         return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+    if isinstance(value, str):
+        # A lone surrogate (JSON "\ud800") is a str UTF-8 cannot encode: the
+        # reply would fail to render, a 500 (red-team 0017 H3).
+        return value.encode("utf-8", "replace").decode("utf-8")
     if isinstance(value, (dict, list, tuple)) and _depth >= max_depth:
         return "…"
     if isinstance(value, dict):
-        return {k: json_safe(v, max_depth=max_depth, _depth=_depth + 1) for k, v in value.items()}
+        return {json_safe(k): json_safe(v, max_depth=max_depth, _depth=_depth + 1)
+                for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [json_safe(v, max_depth=max_depth, _depth=_depth + 1) for v in value]
     return value

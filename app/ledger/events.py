@@ -34,6 +34,8 @@ EVENT_MESSAGE_SENT = "message_sent"       # payload: {message_id, to, from_agent
 # ``run_started``; its simulated now moves only by ``clock_advanced``.
 EVENT_RUN_STARTED = "run_started"         # payload: {mode, start, look_ahead_guard, world}
 EVENT_CLOCK_ADVANCED = "clock_advanced"   # payload: {from, to, minutes}
+# What drives the run's minds, as the Runtime declares it (ADR-032 (p)).
+EVENT_RUN_MINDS_DECLARED = "run_minds_declared"  # payload: {minds: [kind, ...] sorted}
 
 # Self-reported agent activity (TRD §7). Audit only: the app cannot verify these
 # numbers, it can only guarantee they were reported by the agent they name.
