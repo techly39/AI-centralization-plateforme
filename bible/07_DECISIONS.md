@@ -1002,14 +1002,26 @@ the RunRecord, `record_json`). Exit 0 only for `completed`; 1 for a refusal or a
 when the command itself is wrong, before anything is contacted.
 - *Keys from the environment only* (`FUND_RUNTIME__REGISTRAR_KEY`, `FUND_RUNTIME__CLOCK_KEY`):
   argv is visible to every user through `ps`. One key for both jobs is refused (the clock identity
-  registers nobody). No key is printed; a test greps the output for any `fk_` key.
+  registers nobody).
+- *No key in the form physics mints is printed* (`cli.redact`, `fk_` + url-safe base64, over the
+  serialized text). Audit c27 BLOCK 1: the first version claimed "no key is printed" because no
+  record holds one. False: a management mind's `register_agent` result carries the new key, and
+  the transcript keeps tool results as they came. Tested with a scripted management mind that
+  hires; the test fails without `redact`. A key a mind re-encodes is in-world data (Art. 8), not
+  covered. **R-4 inherits this:** a cassette stores the same transcripts, so it must redact too,
+  and a replay that meets a redacted key is a recorded divergence.
+- *No proxy* (audit c27 WARN 1): `FundClient` sets `trust_env=False`, so neither `HTTP(S)_PROXY`
+  / `ALL_PROXY` nor the OS proxy settings can route a key off the machine. This covers every
+  `FundClient`, the MCP server's included.
 - *The clock is checked before anything is registered* (`lockstep.check_clock`, shared with the
   conductor): the clock key must be the `runtime` role on a `backtest` run. Without this, a live
   database, or a wrong clock key, would gain the run's agents and only then be refused.
-- *Sizes are checked before anything is registered*, against the conductor's own bounds.
-- *The server must be on this machine* (`127.0.0.1`, `localhost`, `::1`; http(s); no userinfo):
-  the keys go wherever the URL points. Prime rule, safer seal; widening it is a later, explicit
-  decision.
+- *Sizes are checked before anything is registered*, against the conductor's own bounds, plus
+  `--steps ≥ 1` (0 would make the run's agents and live nothing, audit NOTE 3) and
+  `--max-tool-calls ≤ 1024` (WARN 2).
+- *The server must be on this machine* (`127.0.0.1` or `::1`; http(s); no userinfo): the keys go
+  wherever the URL points. `localhost` is refused: it is whatever `/etc/hosts` says (NOTE 1).
+  Prime rule, safer seal; widening it is a later, explicit decision.
 - *No specs* is refused: a run with no minds would only move a run database's clock.
 - `specs/desk-month/` is the R-3b-2a pod (analyst + PM, pod 1) as files. The smoke run now
   builds a synthetic backtest database with the real `fund-env` commands, serves it, and runs

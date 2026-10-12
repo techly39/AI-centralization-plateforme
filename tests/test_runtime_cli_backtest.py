@@ -18,6 +18,7 @@ Claims under test:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
@@ -121,6 +122,52 @@ def test_the_output_carries_no_key(SessionFactory, keys, specs, woke, capsys):
     assert re.findall(r"fk_[A-Za-z0-9_-]{20,}", out + err) == []  # no minted mind key either
 
 
+def test_a_key_a_mind_was_handed_is_not_printed(SessionFactory, keys, tmp_path, monkeypatch,
+                                                capsys):
+    """Audit c27 BLOCK 1: a management mind's ``register_agent`` result carries the
+    new agent's key, and the transcript keeps tool results as they came."""
+    from types import MappingProxyType
+
+    from runtime import scripted
+
+    def hires(request):
+        if not any(m.role == "assistant" for m in request.messages):
+            return CompletionResponse(content="hiring", tool_calls=[ToolCall(
+                id="hire", name="register_agent",
+                arguments={"name": "hire-1", "role": "analyst", "pod_id": 1})])
+        return CompletionResponse(content="done")
+    monkeypatch.setattr(scripted, "SCRIPTS", MappingProxyType(dict(scripted.SCRIPTS) | {"hire": hires}))
+    specs = _write_specs(tmp_path / "specs", {
+        "id": "m-boss", "name": "desk-boss", "role": "management", "pod": None,
+        "provider": "scripted", "script": "hire", "charter": "Hire."})
+    app = _app(SessionFactory)
+    with TestClient(app):
+        assert cli.main(["backtest", "--specs", str(specs), "--steps", "1"],
+                        transport=httpx.ASGITransport(app=app)) == 0
+    out, err = capsys.readouterr()
+    assert "hire-1" in _made(SessionFactory)  # the hire happened: a key was in the record
+    assert "fk_<redacted>" in out
+    assert re.findall(r"fk_[A-Za-z0-9_-]{20,}", out + err) == []
+
+
+def test_redact_replaces_every_minted_key():
+    from app.registry.security import generate_api_key
+    minted = [generate_api_key() for _ in range(200)]
+    text = json.dumps({"k": minted, "nested": json.dumps({"api_key": minted[0]})})
+    assert not any(k in cli.redact(text) for k in minted)
+    assert cli.redact('{"note": "fk_ alone, and fk"}') == '{"note": "fk_ alone, and fk"}'
+
+
+def test_a_key_goes_through_no_proxy_from_the_environment(monkeypatch):
+    """Audit c27 WARN 1: httpx honours HTTP(S)_PROXY / ALL_PROXY and the OS's proxy
+    settings unless told not to; the key must reach the App and nothing else."""
+    from mcp_server import FundClient
+    monkeypatch.setenv("ALL_PROXY", "http://proxy.example:3128")
+    client = FundClient(base_url="http://127.0.0.1:8000", api_key="fk_x")
+    assert client._client.trust_env is False
+    asyncio.run(client.aclose())
+
+
 def test_a_run_that_ends_early_exits_1(SessionFactory, keys, specs, woke, gov, monkeypatch,
                                        capsys):
     from types import MappingProxyType
@@ -201,10 +248,11 @@ def test_an_input_that_is_not_a_json_object_is_refused(SessionFactory, keys, spe
     assert (code, out) == (2, None) and _made(SessionFactory) == {}
 
 
-@pytest.mark.parametrize("flags", [["--steps", "-1"], ["--steps", "3661"],
+@pytest.mark.parametrize("flags", [["--steps", "-1"], ["--steps", "0"], ["--steps", "3661"],
                                    ["--steps", "2", "--days-per-step", "0"],
                                    ["--steps", "2", "--days-per-step", "367"],
-                                   ["--steps", "2", "--max-tool-calls", "-1"]])
+                                   ["--steps", "2", "--max-tool-calls", "-1"],
+                                   ["--steps", "2", "--max-tool-calls", "1025"]])
 def test_sizes_out_of_range_are_refused_before_anything(SessionFactory, keys, specs, capsys,
                                                         flags):
     code, out, _ = _run(SessionFactory, ["--specs", str(specs), *flags], capsys)
@@ -213,7 +261,8 @@ def test_sizes_out_of_range_are_refused_before_anything(SessionFactory, keys, sp
 
 @pytest.mark.parametrize("url", ["http://example.com:8000", "ftp://127.0.0.1:8000",
                                  "http://user:pw@127.0.0.1:8000", "http://127.0.0.1:port",
-                                 "http://127.0.0.1.evil.example", "127.0.0.1:8000"])
+                                 "http://127.0.0.1.evil.example", "127.0.0.1:8000",
+                                 "http://localhost:8000"])
 def test_a_server_off_this_machine_is_refused(SessionFactory, keys, specs, capsys, url):
     code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "2",
                                            "--server", url], capsys)

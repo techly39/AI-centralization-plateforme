@@ -59,6 +59,9 @@ class FundClient:
             headers={API_KEY_HEADER: api_key},
             timeout=timeout_seconds,
             transport=transport,
+            # No proxy from the environment or the OS: the key goes to the App
+            # and nowhere else (audit c27 WARN 1).
+            trust_env=False,
         )
 
     async def aclose(self) -> None:

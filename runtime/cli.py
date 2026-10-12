@@ -29,11 +29,12 @@ One JSON object goes to stdout: ``{ended, reason, registered, run}``.
 ``registered`` lists the spec ids whose agent exists or may exist (after a
 refusal part-way, the run's database is spoiled: ADR-027). ``run`` is the
 :class:`~runtime.lockstep.RunRecord`, or ``null`` if the run never began. No
-key is ever printed. Exit 0 only if the run ``completed``; 1 if it was refused
+key in the form physics mints is printed (:func:`redact`). Exit 0 only if the run ``completed``; 1 if it was refused
 or ended early; 2 if the command itself is wrong (no specs, an unreadable
 input, a missing key, a server that is not on this machine).
 
-The server must be on this machine (loopback): agent keys never leave it.
+The server must be on this machine (``127.0.0.1`` or ``::1``), and no proxy from
+the environment is used (``FundClient``): agent keys never leave it.
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -68,7 +70,12 @@ REGISTRAR_KEY_ENV = "FUND_RUNTIME__REGISTRAR_KEY"
 CLOCK_KEY_ENV = "FUND_RUNTIME__CLOCK_KEY"
 SERVER_ENV = "FUND_RUNTIME__SERVER_URL"
 DEFAULT_SERVER = "http://127.0.0.1:8000"
-_LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
+#: Addresses, not names: ``localhost`` is whatever ``/etc/hosts`` says (audit c27 NOTE 1).
+_LOOPBACK = frozenset({"127.0.0.1", "::1"})
+#: A wake's tool-call budget, at most (audit c27 WARN 2); the default is 64.
+MAX_TOOL_CALLS = 1024
+#: ``app.registry.security``: ``API_KEY_PREFIX`` + ``secrets.token_urlsafe(32)``.
+_MINTED_KEY = re.compile(r"fk_[A-Za-z0-9_-]+")
 
 
 class _Usage(Exception):
@@ -121,11 +128,12 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         specs = load_specs(args.specs)
         if not specs:
             raise _Usage(f"no specs in {args.specs}: a run needs minds")
-        for flag, value, low, top in (("--steps", args.steps, 0, MAX_STEPS),
+        # --steps 0 would make the run's agents and live nothing (audit c27 NOTE 3).
+        for flag, value, low, top in (("--steps", args.steps, 1, MAX_STEPS),
                                       ("--days-per-step", args.days_per_step, 1, MAX_DAYS_PER_STEP),
-                                      ("--max-tool-calls", args.max_tool_calls, 0, None)):
-            if value < low or (top is not None and value > top):
-                raise _Usage(f"{flag} is in [{low}, {top if top is not None else '∞'}]")
+                                      ("--max-tool-calls", args.max_tool_calls, 0, MAX_TOOL_CALLS)):
+            if not low <= value <= top:
+                raise _Usage(f"{flag} is in [{low}, {top}]")
         workflow_input = _read_input(args.input)
         registrar_key, clock_key = (_key(REGISTRAR_KEY_ENV), _key(CLOCK_KEY_ENV))
         if registrar_key == clock_key:
@@ -139,8 +147,20 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
                                steps=args.steps, days_per_step=args.days_per_step,
                                workflow_input=workflow_input,
                                max_tool_calls=args.max_tool_calls))
-    print(json.dumps(out, indent=2, sort_keys=True))
+    print(redact(json.dumps(out, indent=2, sort_keys=True)))
     return 0 if out["ended"] == "completed" else 1
+
+
+def redact(text: str) -> str:
+    """Every key in the form physics mints (``fk_`` + url-safe base64) replaced.
+
+    A record can hold one: a management mind's ``register_agent`` result carries
+    the new agent's key, and the transcript keeps tool results as they came
+    (audit c27 BLOCK 1). JSON escapes none of the key's characters, so the
+    serialized text is searched whole. A key a mind re-encodes is in-world data
+    this cannot see (Art. 8): the claim is about keys as physics wrote them.
+    """
+    return _MINTED_KEY.sub("fk_<redacted>", text)
 
 
 async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, clock_key: str,
