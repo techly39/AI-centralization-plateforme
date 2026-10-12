@@ -993,6 +993,34 @@ Amended (cycle 26, R-3b-2b-1 shipped: `runtime/provision.py`, `tests/test_runtim
 Still **R-3b-2c**: `fund-runtime backtest` and the `minds:` label in physics' run record
 (physics → red-team).
 
+Amended (cycle 27, R-3b-2c-1 shipped: `runtime/cli.py`, `specs/desk-month/`,
+`tests/test_runtime_cli_backtest.py`, `scripts/smoke_run.py` backtest phase):
+(o) **A run starts from one operator command.** `fund-runtime backtest --specs DIR --steps N
+[--days-per-step D] [--input FILE] [--max-tool-calls K] [--server URL]` provisions one App agent
+per spec and conducts the run, then prints `{ended, reason, registered, run}` as JSON (`run` =
+the RunRecord, `record_json`). Exit 0 only for `completed`; 1 for a refusal or an early end; 2
+when the command itself is wrong, before anything is contacted.
+- *Keys from the environment only* (`FUND_RUNTIME__REGISTRAR_KEY`, `FUND_RUNTIME__CLOCK_KEY`):
+  argv is visible to every user through `ps`. One key for both jobs is refused (the clock identity
+  registers nobody). No key is printed; a test greps the output for any `fk_` key.
+- *The clock is checked before anything is registered* (`lockstep.check_clock`, shared with the
+  conductor): the clock key must be the `runtime` role on a `backtest` run. Without this, a live
+  database, or a wrong clock key, would gain the run's agents and only then be refused.
+- *Sizes are checked before anything is registered*, against the conductor's own bounds.
+- *The server must be on this machine* (`127.0.0.1`, `localhost`, `::1`; http(s); no userinfo):
+  the keys go wherever the URL points. Prime rule, safer seal; widening it is a later, explicit
+  decision.
+- *No specs* is refused: a run with no minds would only move a run database's clock.
+- `specs/desk-month/` is the R-3b-2a pod (analyst + PM, pod 1) as files. The smoke run now
+  builds a synthetic backtest database with the real `fund-env` commands, serves it, and runs
+  `fund-runtime backtest` on it for 5 days: 10 wakes, all `done`, at least one PM order
+  accepted by physics, no key in the output.
+Why: (1) M1 needs the month to be started by the operator, not by a test harness. (2) Safer seal:
+every refusal the command can make is made before the first registration (ADR-027: a part-way
+refusal spoils the run's database). Not done here: physics' own record of `minds:` (R-3b-2c-2:
+physics cannot see what drives a key, so the label is a declaration, and who may declare it is a
+design question for that slice), writing the RunRecord to a file (R-4's cassette).
+
 ## ADR-033 — The world's clock belongs to the Runtime: a reserved `runtime` identity   (builder, cycle 23) — accepted
 Question: ADR-027 gave `CONTROL_CLOCK` to `management` (TRD §6). A management agent is a firm
 agent, a participant. Once an LLM manager wakes, it could stop, speed up or time its own world's
