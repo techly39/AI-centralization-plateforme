@@ -43,9 +43,12 @@ check holds them to their specs.
 from __future__ import annotations
 
 import copy
+import dataclasses
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel
 
 from mcp_server.client import FundAPIError, FundClient
 from runtime.gate import decide_batch
@@ -113,15 +116,9 @@ async def run_backtest(
     # document, whoever else holds a nested value (red-team 0015 H4).
     step_input = copy.deepcopy(dict(workflow_input or {}))
 
-    try:
-        me = await clock.get("/me")
-        now = await clock.get("/clock")
-    except FundAPIError as exc:
-        return RunRecord("refused", f"clock_unreadable:{exc.status_code}", label)
-    if not isinstance(me, dict) or me.get("role") != "runtime":
-        return RunRecord("refused", "clock_identity", label)
-    if not isinstance(now, dict) or now.get("mode") != "backtest":
-        return RunRecord("refused", "not_backtest", label)
+    refusal = await check_clock(clock)
+    if refusal is not None:
+        return RunRecord("refused", refusal, label)
     # Red-team 0015 H2: one App agent is one mind. Every key is read before step 0;
     # a key that is not its spec's agent, or an agent handed in twice, refuses the run.
     agents: set[int] = set()
@@ -197,6 +194,35 @@ async def run_backtest(
         if done[-1].advanced_to is None:  # it moved, but the record cannot say where
             return end("error", "clock_malformed")
     return end("completed")
+
+
+async def check_clock(clock: FundClient) -> str | None:
+    """Why ``clock`` cannot conduct a backtest, or ``None`` if it can: its key's
+    ``/me`` must be the ``runtime`` role and ``/clock`` must say ``backtest``.
+    A caller about to register agents asks first (``fund-runtime backtest``):
+    a live database must not gain a run's agents."""
+    try:
+        me = await clock.get("/me")
+        now = await clock.get("/clock")
+    except FundAPIError as exc:
+        return f"clock_unreadable:{exc.status_code}"
+    if not isinstance(me, dict) or me.get("role") != "runtime":
+        return "clock_identity"
+    if not isinstance(now, dict) or now.get("mode") != "backtest":
+        return "not_backtest"
+    return None
+
+
+def record_json(record: Any) -> Any:
+    """A record as plain JSON values: dataclasses → objects, tuples → arrays,
+    transcript messages → their JSON dump. Holds no key: no record does."""
+    if dataclasses.is_dataclass(record) and not isinstance(record, type):
+        return {f.name: record_json(getattr(record, f.name)) for f in dataclasses.fields(record)}
+    if isinstance(record, BaseModel):
+        return record.model_dump(mode="json")
+    if isinstance(record, (list, tuple)):
+        return [record_json(x) for x in record]
+    return record
 
 
 async def _key_dead(client: FundClient) -> bool:

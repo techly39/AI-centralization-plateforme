@@ -17,8 +17,10 @@ Exit code 0 means every step passed; each step prints one line either way.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import secrets
 import signal
 import socket
 import subprocess
@@ -136,7 +138,83 @@ def main() -> int:
             server_log.close()
         ok &= step("server stopped cleanly on SIGINT", not killed and server.returncode == 0,
                    f"rc={server.returncode}")
-        return 0 if ok else 1
+    ok &= backtest_check()
+    return 0 if ok else 1
+
+
+def stop(server: subprocess.Popen) -> bool:
+    """SIGINT, as an operator would; True if it shut down cleanly."""
+    server.send_signal(signal.SIGINT)
+    try:
+        server.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        server.kill()
+        server.wait()
+        return False
+    return server.returncode == 0
+
+
+def backtest_check() -> bool:
+    """The desk month's first days through the operator's commands (R-3b-2c-1): a
+    synthetic backtest database, ``fund-env serve`` on it, and ``fund-runtime
+    backtest`` provisioning ``specs/desk-month`` and conducting the run."""
+    with tempfile.TemporaryDirectory(prefix="fund-smoke-bt-") as tmp:
+        tmpdir = Path(tmp)
+        port = free_port()
+        base = f"http://127.0.0.1:{port}"
+        env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
+        env["FUND_DATABASE_URL"] = f"sqlite:///{tmpdir / 'backtest.db'}"
+        env["FUND_MARKETDATA__PROVIDER"] = "synthetic"
+        env["FUND_MARKETDATA__SYNTHETIC_KEY"] = secrets.token_hex(32)
+        keys = {}
+        for args in (["init-db"], ["start-backtest", "--start", "2024-01-02T14:30:00Z"],
+                     ["seed-admin", "--name", "smoke-mgmt"], ["seed-runtime"],
+                     ["create-pod", "--name", "desk-1", "--allocation", "1000000"]):
+            r = run_cli(env, *args)
+            key = re.search(r"\bfk_\S+", r.stdout)
+            if key:
+                keys[args[0]] = key.group(0)
+            if not step(f"backtest db: fund-env {args[0]}", r.returncode == 0,
+                        "" if r.returncode == 0 else (r.stdout + r.stderr).strip()[-300:]):
+                return False
+        server_log = (tmpdir / "serve.log").open("w")
+        server = subprocess.Popen(
+            ["uv", "run", "fund-env", "serve", "--port", str(port)],
+            cwd=REPO, env=env, stdout=server_log, stderr=subprocess.STDOUT,
+        )
+        try:
+            if not step("backtest db: fund-env serve answers /health", wait_for_health(base)):
+                print((tmpdir / "serve.log").read_text()[-2000:])
+                return False
+            run_env = {**env, "FUND_RUNTIME__SERVER_URL": base,
+                       "FUND_RUNTIME__REGISTRAR_KEY": keys.get("seed-admin", ""),
+                       "FUND_RUNTIME__CLOCK_KEY": keys.get("seed-runtime", "")}
+            r = subprocess.run(
+                ["uv", "run", "fund-runtime", "backtest", "--specs", "specs/desk-month",
+                 "--input", "specs/desk-month/input.json", "--steps", "5"],
+                cwd=REPO, env=run_env, capture_output=True, text=True, timeout=300,
+            )
+            try:
+                out = json.loads(r.stdout)
+                wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
+                # An order the PM placed and physics accepted (its tool result is no error).
+                filled = [m for w in wakes if w["spec_id"] == "b-pm" for m in w["transcript"]
+                          if m["role"] == "tool" and m["tool_call_id"].startswith("order:")
+                          and not m["is_error"]]
+                fine = (r.returncode == 0 and out["ended"] == "completed"
+                        and out["registered"] == ["a-analyst", "b-pm"] and len(wakes) == 10
+                        and all(w["ended"] == "done" and w["tool_failures"] == 0 for w in wakes)
+                        and filled
+                        and not any(k in r.stdout + r.stderr for k in keys.values()))
+                detail = (f"{out['ended']}, {len(out['run']['steps'])} steps, {len(wakes)} wakes,"
+                          f" {len(filled)} orders accepted")
+            except (ValueError, KeyError, TypeError):
+                fine, detail = False, (r.stdout + r.stderr).strip()[-300:]
+            ok = step("fund-runtime backtest: specs/desk-month lives 5 days", fine, detail)
+        finally:
+            clean = stop(server)
+            server_log.close()
+        return ok & step("backtest server stopped cleanly on SIGINT", clean)
 
 
 if __name__ == "__main__":

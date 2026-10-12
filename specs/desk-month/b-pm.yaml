@@ -1,0 +1,11 @@
+# The desk month (R-3b-2a, ADR-032 (l)): the PM of pod 1. Trades only on today's signal
+# from its own pod's analyst, and cites it. A scripted mind (Q-0005 B), not a firm agent.
+id: b-pm
+name: desk-1-pm
+role: pm
+pod: 1
+provider: scripted
+script: signal-pm
+charter: >-
+  Trade your pod's book on today's signal from your analyst, and cite it in every order.
+  Without a signal for today, hold.
