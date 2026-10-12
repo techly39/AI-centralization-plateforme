@@ -891,8 +891,8 @@ the directory honest. A database written before this ADR that has a non-system a
 `system` makes `get_or_create_system_agent` raise. It never borrows that identity; the operator
 must rename the agent. (5) **No migration**: the role column is a non-native enum (VARCHAR 16)
 with no CHECK constraint, so `runtime` fits as it is.
-Old tests that broke and are findings of the old law (not fixed to pass): 11 test files advanced
-the clock with management's key. They now use a runtime key, with every assertion kept. Three
+Old tests that broke and are findings of the old law (not fixed to pass): 9 test files advanced
+the clock over HTTP with management's key. They now use a runtime key, with every assertion kept. Three
 assertions got *stronger*. Management is now in the 403 list (`test_only_clock_control_advances`).
 A live run gives management 403 *and* the runtime identity 409 (`test_redteam_0005`,
 `test_redteam_0007`). `test_oms_permissions` covers every `AgentRole`, `runtime` included. Rows for
