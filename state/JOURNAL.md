@@ -1228,3 +1228,66 @@ reading the value back proves the row is whole.
 label; the new test tripped it. Laws written last cycle are already doing work.
 Next: R-4a — the RunRecord and every exchange to a cassette (gitignore first, B-000i; redact
 minted keys, B-047). Cycle 30 is a retrospective (re-read the Constitution and Genesis).
+
+## Cycle 0030 — Retrospective + R-5a: three Era I gates proven end to end (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC3 (look-ahead refused), EC5 (HALT mid-run stops within one tick), EC6
+(`cap: null` → the Runtime refuses to wake spending minds).
+Step 0: tree clean, no unmerged cycle branch, no HALT. `setup/` is gone (the Human ran it).
+Plan (architect, Gate 2):
+UNIT: R-5a — end-to-end tests that show three gates that already exist (look-ahead, HALT
+mid-run, null cap) holding through the published tool layer, then tick EC3, EC5, EC6.
+SLICE: tests, ticks and one ADR (ADR-036) only; no change under `app/`, `runtime/` or
+`mcp_server/`. B-053 (the backtest CLI provisions and declares `/run/minds` before any wake gate
+refuses) is deferred to its own cycle with a red-team. R-4a moves to cycle 31.
+Why R-5a over R-4a: after 30 cycles the exit criteria are at 0 of 7. R-5a can honestly tick
+three of them, while R-4a ticks none (EC2 needs R-4b and real minds). This was my retrospective
+fact; the architect decided.
+Hypothesis: The gates already hold through the tool layer. Then about 8 new tests pass with no
+production change:
+- a scripted mind's `get_ohlcv` for tomorrow is a tool error (400), and a window across now
+  holds no bar that has not ended;
+- its `advance_clock` is a 403;
+- HALT written during a tool call lets no further call, wake, advance or event happen;
+- a spending mind under a null cap (and under a numeric cap, until metering) is never even
+  built.
+If any of these tests fails, that is a finding: I record it and leave that EC unticked. I do not
+patch code to make it pass.
+
+### Retrospective — cycles 21–30 (06_LOOP §6; re-read 00 + 01 this cycle)
+- **Pointed at the Era's question?** Yes in direction, too slow in pace. The cycle-20
+  retrospective moved the frontier to the Runtime. Cycles 21–29 built R-1, R-2 and R-3, plus
+  B-049. **M1 is closed** (scripted): a pod is provisioned from specs, conducted for a month by
+  one command, and labelled in the ledger. But R-3 alone took **7 cycles** of slices
+  (3a, 3b-1, 3b-2a, 3b-2b-1, 3b-2c-1, 3b-2c-2, plus B-049), and the exit criteria stayed at
+  **0 of 7** for 30 cycles.
+  **Drift named: tick-blindness.** I followed the R-order of the plan, and nobody asked which
+  criteria were already within reach. Three test criteria (EC3, EC5, EC6) rest on gates built in
+  cycles 16, 21 and 22, yet they were never proven end to end, and never ticked. This cycle fixes
+  that.
+- **Failures:** 9/9 merged (21–29), 0 failed, 0 blocked. Two sessions were interrupted (22, 24),
+  and both resumed cleanly (X-007, X-009). **Auditor BLOCK rate rose: 2/9 → 4/9** (c21, c22,
+  c26, c27). Each BLOCK was in new code at a boundary nobody had attacked yet:
+  - a parse error or ordering mistake in the reader;
+  - HALT per call;
+  - renamed fixtures that unpinned guards;
+  - a minted key printed by the CLI.
+
+  X-006 (the claim check) catches wide sentences, not missing guards. Red-team found holes in
+  **every** run (10, 8, 1, 4, 4, 4; none high after R-1's "scripted + openclaw woke under
+  null"). The red-team remains the highest-yield step.
+- **What became boring:** hardening slices of the Runtime's *operator* surface (provisioning,
+  the CLI, labels). Recent holes are low and operator-only (0016: 4 low; B-050, B-051, B-052 are
+  all "low"). Lesson: operator-surface hardening has hit diminishing returns. Physics stays
+  first, but the frontier is **M2 (cassettes + exact replay)**, the instrument the vision's
+  counterfactual fork rests on, and then the money gate (Q-0001).
+- **Scales:** S0 (the Human) answered process questions again: P-0003, then the bounded loop and
+  the Builder team (ADR-035). Money and keys are still unanswered (Q-0001, Q-0002, Q-0005), so the
+  world must reach M5 without a budget. S1 now works as a team, with an architect at Gate 2;
+  this cycle is the first with that gate. **Cost is now a variable for S1 too.** A cycle has an
+  $8 ceiling, and an opus red-team pass costs a large part of it. That favours slices whose
+  physics surface is either zero (tests and docs) or large enough to justify a red-team.
+- **Process change (Era ∞, X-011):** at step 2, the architect brief must list the **unticked
+  exit criteria and, for each one, whether existing code might already meet it**. Hypothesis:
+  this stops tick-blindness. Metric: exit criteria ticked per 10 cycles (c1–30: 0; target ≥ 4 by
+  c40).

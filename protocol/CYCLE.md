@@ -43,7 +43,9 @@ If it is too big for one session, split it in `BACKLOG.md` and take the first sl
 Size check (X-008): a slice that changes physics will meet a red-team pass and its fixes in the
 same cycle — leave room for them, or split before building.
 **Plan (Gate 2).** Launch the `architect` with a brief: cycle number, current Era and its open
-exit criteria, the top 3–5 backlog items with ids, human answers, anything unfinished, and your
+exit criteria — **for each unticked one, whether code that exists might already meet it**
+(X-011, cycle-30 retrospective: tick-blindness left 3 met-in-code criteria unticked for 30
+cycles; metric: criteria ticked per 10 cycles) — the top 3–5 backlog items with ids, human answers, anything unfinished, and your
 proposed unit if you have one. It returns a `UNIT / SLICE / DESIGN / TESTS FIRST / RISKS /
 RED-TEAM / ADR / OUT OF SCOPE` plan. Its plan wins over your preference; if you disagree on a
 fact, show it the fact once and let it decide.
