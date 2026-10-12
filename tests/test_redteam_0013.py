@@ -67,7 +67,8 @@ def gov(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _spec(**fields) -> AgentSpec:
-    base = dict(id="pm-a", name="pm-a", role="pm", pod=1, provider="scripted",
+    # The name is the desk PM's: a key must wear its spec's name (ADR-032 (n)).
+    base = dict(id="pm-a", name="pm-1", role="pm", pod=1, provider="scripted",
                 script="moving-average-pm", charter="Run the desk.")
     return AgentSpec(**(base | fields))
 

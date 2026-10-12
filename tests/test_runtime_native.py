@@ -75,7 +75,8 @@ def gov(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _spec(**fields) -> AgentSpec:
-    base = dict(id="pm-a", name="pm-a", role="pm", pod=1, provider="scripted",
+    # The name is the desk PM's: a key must wear its spec's name (ADR-032 (n)).
+    base = dict(id="pm-a", name="pm-1", role="pm", pod=1, provider="scripted",
                 script="moving-average-pm", charter="Run the desk.")
     return AgentSpec(**(base | fields))
 
@@ -283,7 +284,8 @@ async def test_physics_refusals_reach_the_mind_as_tool_errors(
 ) -> None:
     _, analyst_key = agent_factory("analyst-1", "analyst", 1)
     scripts(buy=_calls("place_order"))
-    rec = await wake(_spec(id="an-a", role="analyst", script="buy"), fund_client(analyst_key),
+    rec = await wake(_spec(id="an-a", name="analyst-1", role="analyst", script="buy"),
+                     fund_client(analyst_key),
                      workflow_input={})
     assert rec.ended == "done"
     assert rec.transcript[3].is_error and "403" in rec.transcript[3].content
@@ -306,7 +308,7 @@ async def test_a_tool_bug_is_counted_apart_from_a_refusal(
             return await real.request(method, path, **kwargs)
 
     scripts(two=_calls("get_clock", "place_order"))
-    rec = await wake(_spec(id="an-a", role="analyst", script="two"),
+    rec = await wake(_spec(id="an-a", name="analyst-1", role="analyst", script="two"),
                      Buggy(base_url="http://unused", api_key=analyst_key), workflow_input={})
     assert (rec.ended, rec.tool_calls, rec.tool_failures) == ("done", 2, 1)
     clock, order = (m for m in rec.transcript if m.role == "tool")
@@ -558,7 +560,7 @@ def _month_through_the_runtime(world: int) -> tuple[list[tuple], list]:
         finally:
             s.close()
     app.dependency_overrides[get_session] = _session
-    spec = _spec(pod=pod_id)
+    spec = _spec(pod=pod_id, name="pm-runtime")
     runs = []
 
     async def month() -> None:

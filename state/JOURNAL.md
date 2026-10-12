@@ -1008,3 +1008,26 @@ work found a single-mind blind spot.** One PM alone never reads a list of one, s
 shape went unnoticed through R-2 and R-3b-1.
 Next: R-3b-2b. Provision App agents from specs (bind the spec's name), `fund-runtime backtest`,
 and the run label `minds: scripted` in physics' run record (physics → red-team).
+
+## Cycle 0026 — R-3b-2b-1: minds are provisioned from their specs, and a key must wear its spec's name (2026-10-12)
+Era: I — The Desk
+Exit criterion served: EC1 (M1: the PM + Analyst month with minds made from specs, not
+hand-registered). Size check (X-008): R-3b-2b is split. **R-3b-2b-1** (this cycle, no physics
+change): `runtime.provision` registers one App agent per spec over HTTP, with a registrar key the
+caller holds (physics decides whether that key may register). The App agent's name is the spec's
+name, and `charter_ref` is `spec:<id>`. The wake and the conductor refuse a key whose `/me` name is
+not the spec's. **R-3b-2c**: `fund-runtime backtest` + the `minds:` label in physics' run record
+(physics → red-team).
+Step 0: `?? setup/` is the Human's P-0003 installer (STATE says so). It was left untouched.
+Decision (prime rule, tie-breaker "safer seal"): the `runtime` identity does **not** gain
+`REGISTER_AGENTS`. The clock key stays the narrowest key in the world. The registrar is a key
+the operator hands in. Today that is the seed admin. In Era II it may be a workflow's.
+Hypothesis: If `provision(specs, registrar, connect)` (a) checks every spec before it registers
+any (unique ids and names, wake gate open, `wake_policy` not `never`), (b) registers each one
+through `POST /agents/register`, (c) accepts the answer only if it is the agent asked for, and
+(d) raises naming what was already registered if a step fails, and if wake/conductor compare
+`/me`'s name too, then: the R-3b-2a two-pod month runs with minds provisioned through HTTP, its
+ledger records the registrar as the actor of every `agent_registered`, a spec whose name is
+taken refuses with the earlier ones named, a key with the right role and pod but another name
+cannot wake, and nothing is registered under HALT or cap refusal. Expected ~15 new tests.
+Xfails stay at 6. Old tests that hand in a key under another name are findings of the new law.

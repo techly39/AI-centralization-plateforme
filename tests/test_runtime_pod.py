@@ -31,7 +31,7 @@ from sqlalchemy import select
 
 from app.clock import LiveClock, set_clock
 from app.db.base import get_session
-from app.db.models import AgentRole, Event, Message as Msg, Order
+from app.db.models import Agent, AgentRole, Event, Message as Msg, Order
 from app.ledger.events import EVENT_ORDER_FILLED
 from app.main import create_app
 from app.marketdata import SyntheticProvider, set_provider
@@ -40,8 +40,9 @@ from app.registry.service import get_or_create_system_agent, register_agent, see
 from app.run_clock import start_backtest
 from mcp_server import FundClient
 from runtime import governance
-from runtime.lockstep import Mind, run_backtest
+from runtime.lockstep import run_backtest
 from runtime.providers import CompletionRequest, Message, ToolCall
+from runtime.provision import provision
 from runtime.scripted import ma_signal_analyst, signal_pm
 from runtime.spec import AgentSpec
 from tests.support import world_key
@@ -158,8 +159,8 @@ def test_the_analyst_sends_nothing_after_a_failed_read() -> None:
 
 # --- the month ------------------------------------------------------------------------
 
-def _spec(id: str, role: str, pod: int, script: str) -> AgentSpec:
-    return AgentSpec(id=id, name=id, role=role, pod=pod, provider="scripted", script=script,
+def _spec(id: str, name: str, role: str, pod: int, script: str) -> AgentSpec:
+    return AgentSpec(id=id, name=name, role=role, pod=pod, provider="scripted", script=script,
                      charter="Work the desk.")
 
 
@@ -176,14 +177,13 @@ def _pod_month(world: int) -> dict:
             pod = create_pod(s, name=f"desk-{n}")
             fund_pod(s, pod_id=pod.id, delta=CAPITAL, actor=system, reason="pod capital")
             pods.append(pod.id)
-        _, keys["a-analyst-1"] = register_agent(s, name="an-1", role=AgentRole.analyst,
-                                                pod_id=pods[0])
-        _, keys["b-pm-1"] = register_agent(s, name="pm-1", role=AgentRole.pm, pod_id=pods[0])
-        _, keys["c-pm-2"] = register_agent(s, name="pm-2", role=AgentRole.pm, pod_id=pods[1])
+        # The operator's seed admin is the registrar; the minds are made from their
+        # specs over HTTP (R-3b-2b-1, ADR-032 (n)).
+        _, keys["registrar"] = register_agent(s, name="management", role=AgentRole.management)
         s.commit()
-    specs = [_spec("a-analyst-1", "analyst", pods[0], "ma-signal-analyst"),
-             _spec("b-pm-1", "pm", pods[0], "signal-pm"),
-             _spec("c-pm-2", "pm", pods[1], "signal-pm")]
+    specs = [_spec("a-analyst-1", "an-1", "analyst", pods[0], "ma-signal-analyst"),
+             _spec("b-pm-1", "pm-1", "pm", pods[0], "signal-pm"),
+             _spec("c-pm-2", "pm-2", "pm", pods[1], "signal-pm")]
 
     app = create_app()
 
@@ -198,14 +198,18 @@ def _pod_month(world: int) -> dict:
 
     async def month() -> None:
         transport = httpx.ASGITransport(app=app)
-        clients = {k: FundClient(base_url="http://fund.test", api_key=v, transport=transport)
-                   for k, v in [*keys.items(), ("clock", clock_key)]}
+
+        def connect(key: str) -> FundClient:
+            return FundClient(base_url="http://fund.test", api_key=key, transport=transport)
+
+        clients = {k: connect(v) for k, v in [*keys.items(), ("clock", clock_key)]}
+        minds = []
         try:
-            runs.append(await run_backtest(
-                [Mind(spec, clients[spec.id]) for spec in specs], clients["clock"],
-                steps=DAYS, workflow_input={"universe": UNIVERSE}))
+            minds = await provision(specs, clients["registrar"], connect)
+            runs.append(await run_backtest(minds, clients["clock"], steps=DAYS,
+                                           workflow_input={"universe": UNIVERSE}))
         finally:
-            for c in clients.values():
+            for c in [*clients.values(), *(m.client for m in minds)]:
                 await c.aclose()
 
     began = time.monotonic()
@@ -222,8 +226,9 @@ def _pod_month(world: int) -> dict:
                     for m in s.execute(select(Msg)).scalars()}
         analyst_id = next(e[4]["agent_id"] for e in ledger
                           if e[3] == "agent_registered" and e[4].get("name") == "an-1")
+        charters = {a.name: a.charter_ref for a in s.execute(select(Agent)).scalars()}
     return {"run": run, "ledger": ledger, "orders": orders, "messages": messages,
-            "pods": pods, "analyst": analyst_id, "seconds": seconds}
+            "pods": pods, "analyst": analyst_id, "seconds": seconds, "charters": charters}
 
 
 @pytest.fixture(scope="module")
@@ -259,6 +264,20 @@ def test_the_pod_lives_a_month_through_the_conductor(months) -> None:
     sent = [v for v in m["messages"].values() if v[0] == m["analyst"]]
     assert len(sent) == DAYS and {v[1] for v in sent} == {f"pod:{m['pods'][0]}"}
     assert m["seconds"] < BUDGET_SECONDS
+
+
+def test_the_minds_were_made_from_their_specs_by_the_registrar(months) -> None:
+    m = months["a"]
+    registered = {e[4]["name"]: (e[2], e[4]["role"], e[4]["pod_id"])
+                  for e in m["ledger"] if e[3] == "agent_registered"}
+    (registrar,) = [e[4]["agent_id"] for e in m["ledger"]
+                    if e[3] == "agent_registered" and e[4]["name"] == "management"]
+    pod_1, pod_2 = m["pods"]
+    assert {k: v for k, v in registered.items() if k not in {"management", "runtime"}} == {
+        "an-1": (registrar, "analyst", pod_1), "pm-1": (registrar, "pm", pod_1),
+        "pm-2": (registrar, "pm", pod_2)}
+    assert {k: m["charters"][k] for k in ("an-1", "pm-1", "pm-2")} == {
+        "an-1": "spec:a-analyst-1", "pm-1": "spec:b-pm-1", "pm-2": "spec:c-pm-2"}
 
 
 def test_every_order_rests_on_its_analysts_signal_of_that_day(months) -> None:

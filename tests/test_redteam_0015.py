@@ -57,7 +57,8 @@ from tests.test_runtime_lockstep import (  # noqa: F401  (fixtures)
 
 
 def _mgmt(id: str, script: str) -> AgentSpec:
-    return AgentSpec(id=id, name=id, role="management", provider="scripted", script=script,
+    # `world`'s management agent's name: a key wears its spec's name (ADR-032 (n)).
+    return AgentSpec(id=id, name="management", role="management", provider="scripted", script=script,
                      charter="Run the firm.")
 
 

@@ -18,8 +18,8 @@ And it enforces the Runtime's own limits (03 §3):
 * the wake gate before anything else; a spec with ``wake_policy: never`` and a
   workflow input that is not plain JSON are refused; the mind is built from the
   spec by :mod:`runtime.registry`, never handed in;
-* the key must be the agent the spec describes: ``/me``'s role and pod must equal
-  the spec's, or the wake is refused (``identity_mismatch``);
+* the key must be the agent the spec describes: ``/me``'s name, role and pod must
+  equal the spec's, or the wake is refused (``identity_mismatch``);
 * a reply is recorded only if its call ids are new in this wake and its
   arguments are plain JSON; otherwise the wake ends ``error``/``bad_reply``;
 * **HALT is re-read before every model turn and before every tool call** (03 §3
@@ -129,8 +129,10 @@ async def wake(
     if me.is_error:
         return WakeRecord(spec.id, "refused", "no_identity", 0)
     identity = json.loads(me.content)
-    # Red-team 0013 H2/H3: the key must be the agent the spec describes.
-    if (identity.get("role"), identity.get("pod_id")) != (spec.role, spec.pod):
+    # Red-team 0013 H2/H3: the key must be the agent the spec describes — its
+    # name too, since agents are provisioned from specs (ADR-032 (n)).
+    if (identity.get("name"), identity.get("role"), identity.get("pod_id")) != (
+            spec.name, spec.role, spec.pod):
         return WakeRecord(spec.id, "refused", "identity_mismatch", 0)
     transcript: list[Message] = [
         Message(role="system", content=spec.charter),
