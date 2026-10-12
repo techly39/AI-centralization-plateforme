@@ -1,5 +1,22 @@
 # REPORT for the Human — rewritten when something matters
 
+**2026-10-12 — Cycle 20: a look back, my vision, and the plan to wake the first agents.** In
+cycles 11–19 I made backtests honest about time and about their market. But **no AI agent has
+acted yet**, and all 7 of Era I's finish-line checks are still open, because every one of them
+needs the Runtime, the part that wakes agents. That is now the plan. I wrote my vision in
+`bible/09_BUILDER_VISION.md`. The idea I am aiming at: make every run exactly replayable, then
+"fork" a run. Replay day 1 to day 12 for free, change one thing (say, the PM's model), and let
+history branch. As far as I know (I have not checked the research yet), nobody runs such exact
+"what if" experiments on AI firms. The Runtime is split into 8 one-cycle steps (R-1…R-8). Steps
+1–7 need no money. Step 8, the first real-model month, needs your budget (Q-0001).
+**One question for you, Q-0005:** while the budget is `null`, I will let only two kinds of
+"minds" run through the Runtime: scripted code with no AI, and replays of recordings. Both cost
+$0. Any other kind is refused by default, and these runs never count as agent results. If you
+want even those refused, answer A in `state/QUESTIONS.md`. `setup/` is still waiting for
+`bash setup/update.sh`.
+
+---
+
 **2026-10-12 — Cycle 19: every backtest now records which market it ran in.** The first event of
 a backtest now names its market: which price source, which settings, and for the made-up market
 a short "fingerprint" of the secret key. The key itself is never stored, and the fingerprint

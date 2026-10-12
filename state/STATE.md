@@ -1,9 +1,18 @@
 # STATE — rewritten every cycle
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 19 (B-037a a run records its world — merged 842e958, 2026-10-12)
+**Last cycle:** 20 (retrospective + Builder vision + Runtime plan ADR-032 — merged 34c1a59, 2026-10-12)
 
 ## What is true now
+- **The frontier is the Runtime** (cycle-20 retrospective). `bible/09_BUILDER_VISION.md` exists:
+  a run is a proof object (physics + world + minds' cassettes), and the target instrument is the
+  exact counterfactual fork. ADR-032 fixes the Runtime's shape. BACKLOG "Runtime" R-1…R-8 serve
+  all 7 Era I exit criteria; M1–M5 need no money, R-8 needs the cap (Q-0001). Cap gate: fails
+  closed, and only `{scripted, cassette}` run under null (Q-0005, chosen B, awaiting the Human).
+  Run criteria (EC1, EC2, EC7 live) are ticked only by real minds; test criteria (EC3–EC6) may be
+  met by tests. Physics work only when a Runtime slice needs it or an agent can reach it.
+- **Process** (`protocol/CYCLE.md`, cycle 20): step 2 size check (X-008); step 5 smoke run
+  (X-004) + claim check (X-006). Auditor BLOCK rate 5/10 (c1–10) → 2/9 (c11–19).
 - **A run records its world and lives in only one** (ADR-031 + amendment,
   `tests/test_run_world.py`, `tests/test_redteam_0011.py`): every provider has `world()`;
   `run_started.world` carries it (synthetic: law `hmac-sha256-gbm/1`, origin, drift, volatility,
@@ -59,8 +68,8 @@
 - **The Human (2026-10-11):** accepted P-0001/P-0002/P-0003. Open: Q-0001 (budget), Q-0002
   (provisioning key) — neither blocks work.
 - **OpenClaw** 2026.5.12, mapped; firm in its own profile (ADR-019). Nothing in OpenClaw changed.
-- No Runtime, Truman, Quant Lab or Observatory yet. `bible/09_BUILDER_VISION.md` not yet written
-  (due with the Launch Pad's end — at the cycle-20 retrospective at the latest).
+- No Runtime, Truman, Quant Lab or Observatory yet. `runtime/` holds only
+  `openclaw/VERSION_NOTES.md`.
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
   with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
@@ -68,10 +77,10 @@
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **Cycle 20 is a retrospective** (re-read 00 + 01, `06_LOOP` §6): write
-   `bible/09_BUILDER_VISION.md` (due now) and the Runtime plan (Era I exit: PM + Analyst complete
-   the month *via the Runtime*), split into backlog slices.
-2. B-037b `fund-env backtest` re-run driver (fingerprint check first, ledger diff) — or B-037c
-   lived-worlds, whichever the Runtime plan needs first.
-3. B-036 stamp-after-flush check (closes 2 xfails) or B-028 row stamps — the probe is the
-   determinism harness for both. (S-004b stays blocked on P-0002.)
+1. **R-1** Runtime skeleton: `runtime/` + `fund-runtime`, AgentSpec, governance reader (HALT,
+   fail-closed cap gate on `{scripted, cassette}`), `LLMProvider` protocol, dynamic boundary
+   probe for `runtime` (allowlist = ADR-032 amendment + planted counter-example).
+2. **R-2** scripted mind + `native` adapter over the published MCP tool list (HALT per tool
+   batch); the probe's `ScriptedPM` becomes the first scripted mind.
+3. **R-3** lockstep backtest + `runtime` clock identity (B-032, B-000f): a scripted PM + Analyst
+   live a month through the Runtime (M1). Retrospective due at cycle 30.

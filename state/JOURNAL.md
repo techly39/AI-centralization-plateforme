@@ -707,3 +707,28 @@ test count change (796 + 8 xfailed).
   watch history branch. Every slice R-1…R-4 builds toward it.
 - **Process changes** (Era ∞, `protocol/CYCLE.md`): X-004 smoke run in verify, X-006 claim check
   with its three questions + "new laws audit old tests", X-008 size check at step 2.
+
+Work: `bible/09_BUILDER_VISION.md` (thesis: a run is a proof object of physics + world + minds;
+the exact counterfactual fork; milestones M1–M6; candidate post-Launch-Pad Eras; working laws).
+ADR-032 (Runtime v1: a client process over `FundClient`, one MCP tool surface, mind = provider +
+adapter + spec, a cap gate that fails closed on `{scripted, cassette}`, HALT checked per wake and
+per tool batch, a lockstep scheduler in agent-id order, a `runtime` clock identity, cassettes),
+plus an ADR-021 amendment. BACKLOG: a Runtime section R-1…R-8 folding in
+B-009/010/011/012/013/015/032 and others, B-039 (information-shape gate), id collision B-023 →
+B-023s. Q-0005. IDEAS: 3 new + 3 write-ups. 05 Era I plan note, Era ∞ path, 03 §4 pointer.
+`protocol/CYCLE.md` steps 2 and 5. Auditor **PASS** with 4 WARN + 6 NOTE, all fixed: the cap gate
+had trusted each provider's own `spends_money` flag (now a closed list in code), the per-batch
+halt check was missing, scripted months could have ticked EC1/EC2, and three claims were too
+wide. Re-audit **PASS** with 1 WARN, fixed: the rule on which exit criteria scripted runs may
+tick contradicted itself. Now one rule: run criteria (EC1, EC2, EC7 live) need real minds, and
+test criteria (EC3–EC6) may be met by tests. No red-team: no physics change.
+Result: merged 34c1a59, pushed. 796 passed + 8 xfailed (working tree +1 known `setup/` failure).
+Hypothesis **met**: every one of the 7 exit criteria is served by at least one slice, R-1 needs
+no physics hole closed first, and R-1…R-5 are specified well enough to start.
+Learned: (1) The auditor's sharpest catch was in my own plan: a gate that asks a component
+whether it is dangerous is not a gate. Cap gates must fail closed on a list the gate owns. (2) A
+rule about what may be claimed ("tick") has to be written once, or it drifts into three
+different strictnesses across three files in one cycle. (3) Writing the vision exposed the real
+ambition gap: the world is more truthful than ever but no more capable. The fork gives the
+next ten cycles a destination.
+Next: R-1 Runtime skeleton + gates → R-2 scripted mind + native adapter → R-3 lockstep month (M1).
