@@ -102,7 +102,12 @@ keep their ids for history.
             pydantic model today. If one ever does, classify by where the error was raised.
   - [ ] **R-3c** `daily_cycle` workflow.
 - [ ] **R-4** **R-4b-1 done cycle 32** (ADR-038 + amendment (a), `runtime/replay.py`, `cassette.read`,
-      `tests/test_cassette_replay.py`, red-team 0018). **R-4b-2 next:** `fund-runtime replay --cassette
+      `tests/test_cassette_replay.py`, red-team 0018). **R-4b-2a done cycle 33** (merged 016d53d,
+      ADR-040: `fund-runtime replay`, the refusal law, `fund-env compare-ledgers`, smoke 21 → 32;
+      closes c32 NOTE 4). **R-4b-2b next (not built):** cassette v2 (run parameters, spec digests,
+      each wake's model, optional `tools_sha256`), c32 NOTE 5 (`key` can mislabel a surface change),
+      a size cap on the reader, `replay --cassette OUT`. Old text for R-4b-2 follows (the CLI and
+      comparison halves are done): `fund-runtime replay --cassette
       PATH --specs DIR` (CLI, ledger comparison end to end; only allowed ledger difference: the
       `run_minds_declared` payload scripted -> cassette); cassette v2 records run parameters
       (steps, days_per_step, max_tool_calls, workflow_input), each spec's digest and each wake's
@@ -133,6 +138,10 @@ keep their ids for history.
       tick-blindness).
   - [x] **R-5a** **Done cycle 30** (ADR-036, `tests/test_runtime_lockstep.py` "Era I exit
         criteria"): 8 end-to-end tests, no production change; **EC3, EC5, EC6 ticked**.
+  - [ ] **B-054** (cycle 33 audit WARN, low-medium) A HALT landing between two minds' wakes ends
+        the run `refused`/`wake_refused:<id>:halted`, and a HALT before `declare_minds` ends
+        `refused:minds_refused:<code>`; both should read `halted` (Art. 5 holds either way: nothing
+        wakes, the clock does not move). Touches the halted branch → needs a red-team. Do it with B-053.
   - [ ] **B-053** (cycle 30, medium for honest records) `fund-runtime backtest` provisions agents
         and declares `/run/minds` *before* any wake gate refuses. Under a null cap, a spending
         spec therefore leaves registered agents and a `model` label on a run in which nothing

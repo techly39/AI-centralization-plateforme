@@ -352,3 +352,12 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   cassette holds and the replay never compares (the calendar), not sentences I wrote. Add to X-006:
   for every artifact the run writes, list each field and name where a replay/reader compares it, or
   why not. Metric: holes the red-team finds per cycle that this list would have named. — status: new
+- [cycle 33] **A mutation per new test, listed in the journal** — c32 and c33 both had an auditor
+  BLOCK for a test whose setup made its assertion unfalsifiable. Add to X-006/step 5: for every new
+  test, name the one-line change to production code that turns it red; run it for the ones where
+  the answer is not obvious. Metric: auditor BLOCKs of the "cannot fail" kind per cycle (c32: 1, c33: 1;
+  target 0). — status: new
+- [cycle 33] **A golden "what ended the run" table** — the `refused`/`halted`/`diverged` labels are
+  decided in three places (lockstep, `_conduct`, the cassette outcome). One table in the ADR + one
+  parametrized test over every end the conductor can produce would have found B-054 and the c32
+  NOTE 4 together. — status: new

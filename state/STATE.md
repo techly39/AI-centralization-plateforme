@@ -1,9 +1,8 @@
 # STATE — rewritten every cycle (budget: ≤ 120 lines, X-013)
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 32 (R-4b-1: a replay drives the minds from a cassette — merged a1f72a2, 2026-10-13)
-**Cycle 33 was interrupted** by a usage limit (429) after its architect plan, before any commit:
-branch `cycle/0033-replay-cli` is empty and the plan was lost. Resume it at step 2 (X-012).
+**Last cycle:** 33 (R-4b-2a: replay CLI, refusal law, `compare-ledgers` — merged 016d53d, 2026-10-13;
+it resumed the branch a usage limit had emptied, X-012 case 3, and the recovery worked)
 
 This file was compacted on 2026-10-13 (Human-directed loop repair). The detailed per-capability
 notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) and in the ADRs.
@@ -12,17 +11,24 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - [x] EC3 look-ahead refused at the agent level · [x] EC5 HALT stops within one tick ·
   [x] EC6 null cap refuses every spending mind (holds only under Q-0005 answer B).
 - [ ] EC1 1-month pod backtest via the Runtime (real minds, R-8) · [ ] EC2 cassette replay =
-  identical ledger (test half met in code by R-4b-1; ticked at R-8) · [ ] EC4 metering (R-6) ·
-  [ ] EC7 OpenClaw conformance (R-7/R-8).
-- Tests: **1555 passed + 6 xfailed**; smoke 21/21.
+  identical ledger (met end to end for scripted minds by R-4b-2a; ticked at R-8) · [ ] EC4
+  metering (R-6) · [ ] EC7 OpenClaw conformance (R-7/R-8).
+- Tests: **1609 passed + 6 xfailed**; smoke 32/32 (a real two-server record → replay → compare).
 
-## What is true now — the Runtime (`runtime/`, ADR-032 + amendments a–p, ADR-033, -037, -038)
+## What is true now — the Runtime (`runtime/`, ADR-032 + amendments a–p, ADR-033, -037, -038, -040)
+- **Replay CLI + ledger comparison** (R-4b-2a, ADR-040, `tests/test_replay_cli.py`,
+  `tests/test_ledger_compare.py`): `fund-runtime replay --cassette PATH --specs DIR` (steps from the
+  recording; input/days/budget flags must match, a mismatch is `diverged`; exit 0 = every wake matched,
+  **not** an identical ledger). `fund-env compare-ledgers RECORDED REPLAYED` (`app/ledger/compare.py`,
+  read-only, raw rows, one allowed difference: the `run_minds_declared` payload → `{"minds":["cassette"]}`)
+  is the only check of the ledger. A setup refusal in a replay ends `refused`; a retired mind `diverged`.
+  Known: HALT between wakes labels `refused` (B-054).
 - **Replay** (R-4b-1, ADR-038, `runtime/replay.py`, `tests/test_cassette_replay.py`,
   `tests/test_redteam_0018.py`): `cassette.read` accepts only the canonical v1 document;
   `Recording.load` → `Tape`s; `run_backtest(replay=)` ends at the first wake that leaves the
   recording (`diverged:<id>:<step>:<seq>:<kind>` or `diverged:clock:…`). The scripted 31-day
-  month replays into a fresh DB with the same ledger, same transcripts, zero usage. In process
-  only. Not done: CLI, cassette v2, smoke step, hash links, size cap. Label `cassette` (Q-0006).
+  month replays into a fresh DB with the same ledger, same transcripts, zero usage.
+  Not done (R-4b-2b): cassette v2, hash links, size cap. Label `cassette` (Q-0006).
 - **Cassettes** (R-4a, ADR-037, `tests/test_cassette.py`): `fund-runtime backtest --cassette PATH`
   writes a redacted, 0600, exclusive `*.cassette.json`; every `WakeRecord` has `exchanges`
   (seq, request_sha256, usage). Gitignored.
@@ -77,10 +83,12 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **Cycle 33 = R-4b-2** (resume the empty branch at step 2): `fund-runtime replay --cassette PATH
-   --specs DIR` (end-to-end ledger comparison; only allowed difference: the `run_minds_declared`
-   payload), cassette v2 (run parameters, spec digests, each wake's model), a cassette step in
-   the smoke run, a replay setup error that does not read as `diverged` (audit c32 NOTE 4).
-   Claim-check question (X-006): what does the artifact hold that the reader never compares?
-2. **B-053**: a pre-gate before provisioning in `fund-runtime backtest` (red-team).
-3. R-6 metering v1 (EC4). R-3c `daily_cycle`. Tick-check (X-011): EC2 stays open until R-8.
+1. **Cycle 34 = R-6 metering v1, first slice** (EC4, the one unmet criterion reachable at a null
+   cap; the architect splits it): system-reported cost per agent on a fake provisioner; system cost
+   overrides self-report (`Usage.cost_usd` is only self-reported today). Tick-check (X-011).
+2. **B-053 + B-054** together (red-team): pre-gate before provisioning; HALT reads `halted` between
+   wakes and before `declare_minds`.
+3. **R-4b-2b**: cassette v2, c32 NOTE 5, reader size cap, `replay --cassette OUT`. Then R-3c
+   `daily_cycle`. EC2 stays open until R-8. Cycle 40 is the retrospective (re-read Constitution + Genesis).
+   X-006 additions to keep: "what does the artifact hold that the reader never compares?" and (new,
+   IDEAS c33) "name the one-line production change that turns each new test red".
