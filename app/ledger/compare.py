@@ -12,8 +12,17 @@ and type must still be equal. Derived tables are not compared: they rebuild from
 (``fund-env rebuild-state``). A difference anywhere else is a finding, never a reason to widen
 this law.
 
+"Raw text" means the values SQLite returns, compared with Python's ``==`` (a column's affinity
+decides text vs number); the one allowed row is judged on its parsed JSON, so a hand-made
+replay database could spell ``{"minds": ["cassette"]}`` differently than physics does. Physics
+refuses a second declaration (``app.run_clock``), so two declarations cannot occur in a real
+database.
+
 Read-only: the files are opened ``mode=ro`` and a missing path is an error, never a new
-database. The Runtime does not import this module: it stays ledger-blind (ADR-022, ADR-040).
+database. That holds for the rollback-journal databases the App makes (no ``journal_mode``
+pragma anywhere in ``app/``); a WAL-mode file would get ``-shm``/``-wal`` files beside it even
+read-only (audit c33). The Runtime does not import this module: it stays ledger-blind
+(ADR-022, ADR-040).
 """
 
 from __future__ import annotations
@@ -91,7 +100,7 @@ def _is_the_allowed_difference(recorded: Row, replayed: Row) -> bool:
         return False
     try:
         was, now = json.loads(recorded[4]), json.loads(replayed[4])
-    except ValueError:
+    except (ValueError, TypeError):  # not JSON text (a NULL or an integer in the column)
         return False
     return now == REPLAYED_DECLARATION and _is_a_declaration(was)
 

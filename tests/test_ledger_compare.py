@@ -79,6 +79,10 @@ CASES = {
         _swap(_ledger(["scripted"]), 2, payload=_payload(minds=["wizard"])), _ledger(["cassette"]), 3),
     "recorded payload has an extra key": (
         _swap(_ledger(["scripted"]), 2, payload=_payload(minds=["scripted"], x=1)), _ledger(["cassette"]), 3),
+    "recorded payload is NULL": (
+        _swap(_ledger(["scripted"]), 2, payload=None), _ledger(["cassette"]), 3),
+    "recorded payload is an integer": (
+        _swap(_ledger(["scripted"]), 2, payload=7), _ledger(["cassette"]), 3),
     "recorded payload is not json": (
         _swap(_ledger(["scripted"]), 2, payload="not json"), _ledger(["cassette"]), 3),
     "no declaration in the replay": (_ledger(DECLARED), _ledger(), 3),

@@ -29,7 +29,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db.models import AgentRole, Event
+from app.db.models import Agent, AgentRole, Event
 from app.ledger.compare import compare, ledger_rows
 from app.marketdata import SyntheticProvider, set_provider
 from app.registry.pods import create_pod, fund_pod
@@ -131,8 +131,9 @@ def test_replay_cli_replays_the_recorded_run(tmp_path, input_file, monkeypatch, 
     wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
     assert len(wakes) == 2 * STEPS
     assert all(e["usage"] == Usage().model_dump(mode="json") for w in wakes for e in w["exchanges"])
-    assert re.findall(r"fk_[A-Za-z0-9_-]{20,}", capsys.readouterr().out + err) == []
-    assert fresh.registrar not in err and fresh.clock not in err
+    printed = json.dumps(out) + err  # `Desk.run` already read stdout: check what it parsed
+    assert re.findall(r"fk_[A-Za-z0-9_-]{20,}", printed) == []
+    assert fresh.registrar not in printed and fresh.clock not in printed
     # Same transcripts as the recorded run's.
     assert [w["transcript"] for st in out["run"]["steps"] for w in st["wakes"]] == [
         w["transcript"] for st in rec_out["run"]["steps"] for w in st["wakes"]]
@@ -148,9 +149,12 @@ def test_replay_cli_declares_cassette_before_any_firm_act(tmp_path, input_file, 
     events = fresh.events()
     (declared,) = [e for e in events if e[3] == "run_minds_declared"]
     assert declared[4] == {"minds": ["cassette"]}
-    first_firm = min(e[0] for e in events if e[3] in {"agent_registered", "order_placed", "message_sent"}
-                     and e[0] > declared[0])
-    assert declared[0] < first_firm
+    # The first event of any agent that is not physics' own or the Runtime's, over ALL events
+    # (as the smoke run's `minds_check` reads it): none may precede the declaration.
+    with fresh.Sessions() as s:
+        roles = {a.id: a.role.value for a in s.execute(select(Agent)).scalars()}
+    firm = [e[0] for e in events if e[2] is not None and roles[e[2]] not in {"system", "runtime"}]
+    assert firm and min(firm) > declared[0], (declared[0], min(firm))
 
 
 def test_replay_cli_in_another_world_exits_1_diverged(tmp_path, input_file, monkeypatch, capsys) -> None:
@@ -214,7 +218,20 @@ def _specs_dir(tmp_path: Path, *ids: str, **fields) -> Path:
     return directory
 
 
-CASES = ["missing", "pretty", "refused_run", "diverged_run", "halted_run", "extra_spec",
+def test_the_usage_cases_start_from_a_command_that_passes(tmp_path, monkeypatch, capsys) -> None:
+    """Control for the cases below: a good cassette, the desk specs and good keys get past every
+    usage check and reach the server (here a stub that answers 500: the run is refused, exit 1).
+    Without this, a bad fixture would make every case below pass by failing at the cassette."""
+    monkeypatch.setenv(cli.REGISTRAR_KEY_ENV, "fk_registrar-key-0000")
+    monkeypatch.setenv(cli.CLOCK_KEY_ENV, "fk_clock-key-0000")
+    transport = Recorder()
+    code = cli.main(["replay", "--cassette", str(_good_cassette(tmp_path)), "--specs", str(DESK)],
+                    transport=transport)
+    capsys.readouterr()
+    assert code == 1 and transport.requests > 0
+
+
+CASES = ["missing","pretty", "refused_run", "diverged_run", "halted_run", "extra_spec",
          "missing_spec", "model_spec", "no_registrar_key", "equal_keys", "remote_server",
          "zero_days", "huge_tool_budget", "bad_input", "no_specs"]
 

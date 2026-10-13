@@ -181,7 +181,7 @@ def backtest_check() -> bool:
             fine = (r.returncode == 0 and result["equal"] is True and result["allowed"] == 1
                     and result["first_difference"] is None)
             detail = result["detail"]
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError):
             fine, detail = False, (r.stdout + r.stderr).strip()[-300:]
         return ok & step("fund-env compare-ledgers: the replay's ledger is the recorded one's "
                          "but for the declaration", fine, detail)
@@ -256,12 +256,15 @@ def desk_run(tmpdir: Path, name: str, command: list[str], verify, kind: str) -> 
         run_env = {**env, "FUND_RUNTIME__SERVER_URL": base,
                    "FUND_RUNTIME__REGISTRAR_KEY": keys.get("seed-admin", ""),
                    "FUND_RUNTIME__CLOCK_KEY": keys.get("seed-runtime", "")}
-        r = subprocess.run(
-            ["uv", "run", "fund-runtime", *command, "--specs", "specs/desk-month",
-             "--input", "specs/desk-month/input.json"],
-            cwd=REPO, env=run_env, capture_output=True, text=True, timeout=300,
-        )
-        fine, detail = verify(r, keys)
+        try:
+            r = subprocess.run(
+                ["uv", "run", "fund-runtime", *command, "--specs", "specs/desk-month",
+                 "--input", "specs/desk-month/input.json"],
+                cwd=REPO, env=run_env, capture_output=True, text=True, timeout=300,
+            )
+            fine, detail = verify(r, keys)
+        except subprocess.TimeoutExpired:
+            fine, detail = False, "timed out after 300 s"
         ok = step(f"fund-runtime {command[0]}: specs/desk-month", fine, detail)
     finally:
         clean = stop(server)
