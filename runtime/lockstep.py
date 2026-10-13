@@ -189,7 +189,9 @@ async def run_backtest(
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
                                 max_tool_calls=budget, tape=tape)
             wakes.append(record)
-            if record.ended == "halted":
+            if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
+                # B-054: a HALT that lands between two wakes refuses the next one at the gate;
+                # the run is halted, not refused (Art. 5). The refused wake stays in the record.
                 stop = ("halted", "halted")
             elif record.ended == "refused":
                 if record.reason == "no_identity" and await _key_dead(mind.client):

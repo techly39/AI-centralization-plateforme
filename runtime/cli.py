@@ -14,6 +14,10 @@ lives ``N`` steps of a backtest run with the minds ``DIR``'s specs describe
 operator opened it (``fund-env start-backtest``), seeded the Runtime's clock
 identity and made the pods. In order:
 
+0. the law is read once: under HALT the run ends ``halted``; a spec that could
+   never wake under it (:func:`runtime.provision.vet`, no network) ends the run
+   ``refused`` before physics is told anything (B-053). A HALT met at any later
+   stage also ends it ``halted``, never ``refused`` (B-054);
 1. the specs, the workflow input (a JSON object, default ``{}``) and the two keys
    are read. Keys come **from the environment only**, never argv (``ps`` shows
    argv to every user): ``FUND_RUNTIME__REGISTRAR_KEY`` registers the minds'
@@ -84,7 +88,7 @@ from runtime.lockstep import (
     run_backtest,
 )
 from runtime.native import DEFAULT_MAX_TOOL_CALLS
-from runtime.provision import ProvisionError, provision
+from runtime.provision import ProvisionError, provision, vet
 from runtime.registry import ProviderRefused, check_spec
 from runtime.replay import Recording, RecordingError, as_cassette
 from runtime.spec import AgentSpec, SpecError, load_specs
@@ -246,17 +250,31 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
     def refused(reason: str, registered: tuple[str, ...] | list[str] = ()) -> dict[str, Any]:
         return {"ended": "refused", "reason": reason, "registered": list(registered), "run": None}
 
+    def halted(registered: tuple[str, ...] | list[str] = ()) -> dict[str, Any]:
+        return {"ended": "halted", "reason": "halted", "registered": list(registered), "run": None}
+
+    # B-053: specs that could never wake tell physics nothing (no declaration, no
+    # agent); one read of the law decides. B-054: a HALT at any stage reads ``halted``.
+    law = read_governance()
+    if law.halted:
+        return halted()
+    if (problem := vet(specs, law)) is not None:
+        return refused(f"provision:{problem}")
     registrar, clock = connect(registrar_key), connect(clock_key)
     minds: list[Mind] = []
     try:
         # Both before anything is registered: physics takes the declaration only
         # while no firm agent has acted (ADR-032 (p)).
         problem = await check_clock(clock) or await declare_minds(clock, specs)
+        if problem == "minds_refused:423":
+            return halted()
         if problem is not None:
             return refused(problem)
         try:
             minds = await provision(specs, registrar, connect)
         except ProvisionError as exc:
+            if _is_halt(exc.reason):
+                return halted(exc.registered)
             return refused(f"provision:{exc.reason}", exc.registered)
         record = await run_backtest(minds, clock, **run)
         return {"ended": record.ended, "reason": record.reason,
@@ -264,6 +282,16 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
     finally:
         for c in [registrar, clock, *(m.client for m in minds)]:
             await c.aclose()
+
+
+def _is_halt(reason: str) -> bool:
+    """True only for the reasons :func:`provision` gives when HALT stopped it: its own
+    re-read, the gate's ``halted`` under its own read, or physics' 423 (only
+    ``app.registry.halt`` answers 423). Spec ids hold no ``:`` (``runtime.spec``)."""
+    parts = reason.split(":")
+    return (reason == "halted"
+            or (len(parts) == 3 and parts[0] == "wake_refused" and parts[2] == "halted")
+            or (len(parts) == 3 and parts[0] == "register_failed" and parts[2] == "423"))
 
 
 def _key(name: str) -> str:

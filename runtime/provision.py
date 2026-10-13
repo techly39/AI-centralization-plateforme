@@ -46,7 +46,7 @@ from collections.abc import Callable, Sequence
 
 from mcp_server.client import FundAPIError, FundClient
 from runtime.gate import decide_batch, decide_wake_under
-from runtime.governance import read_governance
+from runtime.governance import Governance, read_governance
 from runtime.lockstep import Mind
 from runtime.registry import ProviderRefused, check_spec
 from runtime.spec import AgentSpec
@@ -89,23 +89,9 @@ async def provision(
     ``connect(api_key)`` builds the client a mind will act through.
     """
     ordered = sorted(specs, key=lambda s: s.id)
-    if len({s.id for s in ordered}) != len(ordered):
-        raise ProvisionError("duplicate_spec_id")
-    if len({name_key(s.name) for s in ordered}) != len(ordered):
-        raise ProvisionError("duplicate_name")
-    law = read_governance()  # one read: every spec is judged under the same law
-    for spec in ordered:
-        if name_key(spec.name) in RESERVED_NAMES:
-            raise ProvisionError(f"name_reserved:{spec.id}")
-        if spec.wake_policy == "never":
-            raise ProvisionError(f"wake_policy_never:{spec.id}")
-        decision = decide_wake_under(spec.provider, spec.adapter, law)
-        if not decision.allowed:
-            raise ProvisionError(f"wake_refused:{spec.id}:{decision.reason}")
-        try:
-            check_spec(spec)
-        except ProviderRefused as exc:
-            raise ProvisionError(f"provider_refused:{spec.id}:{exc.reason}") from exc
+    # one read: every spec is judged under the same law
+    if (problem := vet(ordered, read_governance())) is not None:
+        raise ProvisionError(problem)
     try:
         directory = await registrar.get("/agents")
     except FundAPIError as exc:
@@ -152,6 +138,32 @@ async def provision(
             await mind.client.aclose()
         raise
     return minds
+
+
+def vet(specs: Sequence[AgentSpec], law: Governance) -> str | None:
+    """Why ``specs`` cannot be provisioned under ``law``, or ``None``: every check
+    :func:`provision` makes before it reads the directory, with no network call
+    (B-053). ``fund-runtime backtest`` asks first, so a run whose minds could never
+    wake tells physics nothing: no ``/run/minds`` declaration, no agent. The reason
+    is the one :func:`provision` would raise."""
+    ordered = sorted(specs, key=lambda s: s.id)
+    if len({s.id for s in ordered}) != len(ordered):
+        return "duplicate_spec_id"
+    if len({name_key(s.name) for s in ordered}) != len(ordered):
+        return "duplicate_name"
+    for spec in ordered:
+        if name_key(spec.name) in RESERVED_NAMES:
+            return f"name_reserved:{spec.id}"
+        if spec.wake_policy == "never":
+            return f"wake_policy_never:{spec.id}"
+        decision = decide_wake_under(spec.provider, spec.adapter, law)
+        if not decision.allowed:
+            return f"wake_refused:{spec.id}:{decision.reason}"
+        try:
+            check_spec(spec)
+        except ProviderRefused as exc:
+            return f"provider_refused:{spec.id}:{exc.reason}"
+    return None
 
 
 def _is_the_agent(made: object, spec: AgentSpec) -> bool:

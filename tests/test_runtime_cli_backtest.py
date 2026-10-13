@@ -364,8 +364,10 @@ def test_a_server_off_this_machine_is_refused(SessionFactory, keys, specs, capsy
     assert (code, out) == (2, None) and "this machine" in err and _made(SessionFactory) == {}
 
 
-def test_a_server_that_is_not_there_is_a_refusal_not_a_crash(keys, specs, capsys):
-    """No transport: a real connection to a loopback port nothing listens on."""
+def test_a_server_that_is_not_there_is_a_refusal_not_a_crash(keys, specs, woke, capsys):
+    """No transport: a real connection to a loopback port nothing listens on.
+    (``woke`` installs the specs' scripts: since B-053 they are vetted before the
+    clock is asked, so specs naming no script would be refused first.)"""
     import socket
     with socket.socket() as s:  # a port that was free a moment ago
         s.bind(("127.0.0.1", 0))
@@ -397,10 +399,61 @@ def test_the_shipped_desk_month_is_a_pod_of_two_scripted_minds():
 # --- provisioning refusals -----------------------------------------------------------------
 
 def test_halt_provisions_nothing(SessionFactory, keys, specs, woke, gov, capsys):
+    """B-054: was ``refused``/``provision:wake_refused:a-pm:halted``; a HALT run is ``halted``.
+    Nothing is declared either (B-053)."""
+    from app.ledger.events import EVENT_RUN_MINDS_DECLARED
     (gov / "HALT").write_text("")
     code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "2"], capsys)
-    assert code == 1 and out["reason"].startswith("provision:wake_refused:a-pm:")
-    assert out["registered"] == [] and _made(SessionFactory) == {} and woke == []
+    assert code == 1 and out == {"ended": "halted", "reason": "halted", "registered": [],
+                                 "run": None}
+    assert _made(SessionFactory) == {} and woke == [] and _advances(SessionFactory) == 0
+    with SessionFactory() as s:
+        assert s.scalar(select(Event).where(Event.type == EVENT_RUN_MINDS_DECLARED)) is None
+
+
+class HaltsAt(httpx.AsyncBaseTransport):
+    """The App over ASGI, and the Human writes HALT (both files: the Runtime's and
+    physics') ``when`` (``before`` | ``after``) the first request to ``path``."""
+
+    def __init__(self, app, path: str, when: str, files: tuple[Path, ...]) -> None:
+        self.inner, self.path, self.when, self.files = httpx.ASGITransport(app=app), path, when, files
+
+    def _halt(self) -> None:
+        for f in self.files:
+            f.write_text("")
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        hit = request.url.path == self.path and not self.files[0].exists()
+        if hit and self.when == "before":
+            self._halt()
+        resp = await self.inner.handle_async_request(request)
+        if hit and self.when == "after":
+            self._halt()
+        return resp
+
+
+def run_halting_at(SessionFactory, argv, capsys, path: str, when: str,
+                   files: tuple[Path, ...]) -> tuple[int, dict | None]:
+    app = _app(SessionFactory)
+    with TestClient(app):
+        code = cli.main(["backtest", *argv], transport=HaltsAt(app, path, when, files))
+    out, _ = capsys.readouterr()
+    return code, (json.loads(out) if out.strip() else None)
+
+
+@pytest.mark.parametrize("path, registered", [
+    ("/run/minds", []),              # after the declaration, before provision reads the law
+    ("/agents/register", ["a-pm"]),  # after the first registration (provision's re-read)
+])
+def test_halt_during_provisioning_ends_halted_and_names_what_exists(
+        SessionFactory, keys, specs, woke, gov, halt_file, capsys, path, registered):
+    """B-054: was ``refused``/``provision:wake_refused:…:halted`` or ``provision:halted``."""
+    code, out = run_halting_at(SessionFactory, ["--specs", str(specs), "--steps", "2"], capsys,
+                               path, "after", (gov / "HALT", halt_file))
+    assert code == 1 and out == {"ended": "halted", "reason": "halted",
+                                 "registered": registered, "run": None}
+    assert len(_made(SessionFactory)) == len(registered) and woke == []
+    assert _advances(SessionFactory) == 0
 
 
 def test_a_taken_name_provisions_nothing(SessionFactory, keys, tmp_path, woke, capsys):

@@ -139,6 +139,29 @@ def test_a_spec_that_could_never_wake_registers_nothing(SessionFactory, world, w
     assert _made(SessionFactory) == {}
 
 
+@pytest.mark.parametrize("specs, reason", [
+    ([_spec("a-pm", "ok"), _spec("x-pm", "x", provider="metered", script=None)],
+     "wake_refused:x-pm:cap_null"),
+    ([_spec("a-pm", "ok"), _spec("x-pm", "x", wake_policy="never")], "wake_policy_never:x-pm"),
+    ([_spec("a-pm", "ok"), _spec("x-pm", "x", model="some-model")],
+     "provider_refused:x-pm:contradiction"),
+    ([_spec("a-pm", "ok"), _spec("x-pm", "x", script="no-such-script")],
+     "provider_refused:x-pm:unknown_script"),
+    ([_spec("a-pm", "one"), _spec("a-pm", "two")], "duplicate_spec_id"),
+    ([_spec("a-pm", "same"), _spec("b-pm", "same")], "duplicate_name"),
+    ([_spec("a-pm", "Runtime")], "name_reserved:a-pm"),
+    ([_spec("a-pm", "ok"), _spec("b-pm", "fine")], None),
+])
+def test_vet_is_provisions_own_judgement(SessionFactory, world, woke, gov, specs, reason):
+    """B-053: ``vet`` (no client, so no network) says what ``provision`` raises, under one law."""
+    from runtime.governance import read_governance
+    from runtime.provision import vet
+    assert vet(specs, read_governance()) == reason
+    if reason is not None:
+        err, _, _ = _provision(SessionFactory, specs, world["admin"])
+        assert err.reason == reason and _made(SessionFactory) == {}
+
+
 def test_under_halt_nothing_is_registered(SessionFactory, world, woke, gov):
     (gov / "HALT").write_text("")
     err, _, _ = _provision(SessionFactory, [_spec("a-pm", "ok")], world["admin"])
