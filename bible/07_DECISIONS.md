@@ -1415,3 +1415,48 @@ lost. How should the loop treat a session the API cut off?
 - Tests: a scratch check of the staged file against the real cycle-32 (merged) and cycle-33
   (limit) logs plus synthetic max-turns, 529, plain-text cases: 14 checks. Not in `tests/`: the
   file is the Human's and has no pytest suite.
+
+## ADR-040 — `fund-runtime replay`, the refusal law, `fund-env compare-ledgers` (R-4b-2a; amends ADR-038) — accepted
+Question: R-4b-1 replayed only in process, a replay's setup refusal read as `diverged:…:ended`, and
+nothing compared a replay's ledger with the recording's. What is the operator path, and who checks
+the ledger?
+1. **Who compares the ledgers?** Physics' operator command `fund-env compare-ledgers RECORDED REPLAYED`
+   (`app/ledger/compare.py`), read-only (`mode=ro`; a missing path is exit 2, never a new database).
+   The Runtime stays ledger-blind (ADR-022, ADR-033): it imports no ledger code and the `runtime`
+   role gained no permission. Prime rule: keeps the seal.
+2. **A setup refusal in a replay is a refusal.** A replay ends the way a live run would at every wake
+   a live run would stop: `wake_refused:<id>:<reason>` for every refusal except a retirement
+   (`no_identity` + a 401 key), which a live run absorbs and a replay cannot (the recording woke
+   every mind): that is `diverged:…:ended`. HALT is still first. Closes audit c32 NOTE 4.
+   Accepted: an in-world act that makes the recorded identity differ (a mind moved or renamed)
+   ends `refused:identity_mismatch`, not `diverged`; the run still exits 1, never `completed`.
+3. **Parameters of a v1 replay.** Steps come from the recording (`replay` has no `--steps`); input,
+   days-per-step and max-tool-calls from flags. A wrong input ends `diverged:…:0:world` at turn 0, wrong
+   days `diverged:clock:…:calendar_landed`, a budget through H2 (ADR-038 (a)). Recording them is
+   cassette v2 (R-4b-2b). A spec with a `model` is a usage error (v1 replays scripted runs only).
+4. **Strict comparison.** Equal length and every row equal as raw text (id, ts, actor, type,
+   `payload_json`), with exactly one allowed difference: the single `run_minds_declared` row, whose
+   replayed payload must be exactly `{"minds":["cassette"]}` and whose recorded payload must be a valid kind
+   list; its id, ts, actor and type stay equal. Stricter than EC2's "except ids/wall-clock": a
+   difference there is a finding, never a reason to widen the law. Derived tables rebuild from the
+   ledger and are not compared.
+- **Over-claim guard.** `fund-runtime replay` exit 0 means every wake matched its tape and the
+  calendar matched; it is **not** proof of an identical ledger. Only `compare-ledgers` against the
+  *original* database says that, and the cassette carries no ledger digest: keep the recorded database.
+- **X-006 answer: what the recording holds that the replay never compares.** Never compared: the
+  recorded replies (taken from the tape, not hashed), usage and cost (zero by design), `redactions`,
+  each wake's `reason` and `tool_failures`, trailing tool results after the last turn of a
+  `tool_budget` wake, the outcome's `registered` and `reason`, spec fields in no request (budget, wake
+  policy; in v1 the model), and the ledger itself (only `compare-ledgers`). Compared: request hashes
+  (prefix transcript, tools, model: identity and input too), each wake's `ended` and `tool_calls`,
+  the calendar, the step count, the spec ids, and that no mind was retired.
+- **Found while building:** the smoke run records a 5-day desk month on one real server and replays it
+  on a second fresh database; `compare-ledgers` finds the two files equal but for the declaration,
+  raw text, ids and timestamps included. No ledger nondeterminism outside the minds was found
+  (the plan's risk); the in-memory tests compare payloads re-serialised with sorted keys, the smoke run
+  compares the databases' own text.
+- Not done (R-4b-2b): cassette v2 (run parameters, spec digests, each wake's model, `tools_sha256`),
+  NOTE 5 (`key` can mislabel a surface change), a size cap on the reader, `replay --cassette OUT`.
+- Tests: `tests/test_replay_cli.py` (21), `tests/test_ledger_compare.py` (25),
+  `tests/test_cassette_replay.py` +5 (refusal law; mutation: the old conductor turns all five red).
+  Suite 1555 → 1606 passed + 6 xfailed; smoke 21 → 32 steps, all PASS.
