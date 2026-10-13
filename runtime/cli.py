@@ -47,7 +47,7 @@ serves, set up exactly as the recorded run's was: the same specs' minds, as ``ca
 answering from the tape. No ``--steps``: the recording holds the step count. ``--input`` and
 ``--days-per-step`` must be the recorded run's (cassette v1 does not store them; a mismatch ends
 the run ``diverged``). Same keys, same order, same output as ``backtest``. Exit 0 only if the run
-``completed``; 1 if it was refused, ``halted`` or ``diverged``; 2 if the command is wrong (the
+``completed``; 1 if it was refused or ended early (``halted``, ``diverged``, ``error``); 2 if the command is wrong (the
 cassette is not a completed run, the specs are not its minds, a spec carries a model, and every
 ``backtest`` usage error). **Exit 0 is not proof of an identical ledger**: compare the new
 database with the recorded one, ``fund-env compare-ledgers RECORDED REPLAYED``.
