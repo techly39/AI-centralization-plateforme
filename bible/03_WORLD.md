@@ -21,6 +21,8 @@ firm app/                      (git: origin = AI-centralization-plateforme)
   quant/                       Quant Lab — new (Era III, minimal pieces earlier)
   ui/                          Observatory — Era II (TRD Phase 4)
   experiments/                 experiment specs (YAML) + result folders
+  acceptance/                  one executable definition of done per mission (ADR-042)
+  setup/                       HUMAN-RUN installer + staged protected files (ADR-042)
   scripts/                     operator tools — exist
   tests/                       pytest, one suite for the whole repo
   TRD_ai_fund_environment.md   detailed spec for physics (still authoritative for app/)

@@ -109,7 +109,8 @@ Deliverables:
    Built and tested against a fake provider if no provisioning credential exists.
 8. Verify the "chat restricted to central pod" report with two pods.
 
-Exit criteria *(plan: ADR-032 — every criterion below is served by at least one backlog slice R-1…R-8. The first two
+Exit criteria *(from cycle 37 served by missions in `state/missions.json`, ADR-042; before that the
+plan was ADR-032 — every criterion below is served by at least one backlog slice R-1…R-8. The first two
 criteria and the live half of the last one are ticked only by real minds, at R-8. The other four are
 test criteria and may be met by tests using scripted or fake providers)*:
 - [ ] One pod (PM + Analyst) completes a 1-month backtest via the Runtime in < 10 min

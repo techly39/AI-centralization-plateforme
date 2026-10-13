@@ -1,4 +1,8 @@
-# BACKLOG — ordered. Each item serves an exit criterion of the current Era.
+# BACKLOG — legacy slice backlog (cycles 1–36). Raw material, not a work queue.
+
+> **Since cycle 37 (ADR-042) the work queue is `state/missions.json`** (standard:
+> `protocol/MISSIONS.md`). Planning sessions re-cut the open items below into missions and mark each
+> item that became one with its mission id. Do not take an item from here as a unit of work.
 
 ## The Runtime — Era I exit (ADR-032; cycle-20 retrospective: this is the frontier)
 One slice per cycle, in order. Each names the exit criterion (EC1–EC7, `05_ERAS.md` Era I, in

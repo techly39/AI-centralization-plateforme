@@ -50,3 +50,10 @@ after the `git status --porcelain` sentence:
 Risk if rejected: none to safety. The Builder follows the resume rule by judgement (as in cycle 13)
 until it is written down.
 Human decision: **accepted, done differently** (2026-10-11): the protocol moved to `protocol/CYCLE.md` (Builder-owned, X-007 resume rule included). `.claude/commands` + `.claude/agents` are now thin, human-owned and sealed. See `protocol/README.md`.
+
+## P-0004 (cycle 36→37, Human-directed) — Builder v2: missions, out-of-band referee, planning sessions
+Files: `.claude/commands/cycle.md`, `.claude/agents/*` (+ `validator.md`, `worker.md`),
+`.claude/settings.json`, `.claude/hooks/guard.py` (+ `stop_gate.py`), `loop/run.sh`, `loop/builder.sh`,
+`loop/preflight.py`, `governance/human.yaml`. Staged in `setup/files/`, installed by `setup/install.sh`,
+undone by `setup/rollback.sh`. Rationale, sources and metric: ADR-042.
+Human decision: **requested and accepted** (2026-10-13), including: no USD caps, wait for usage resets.

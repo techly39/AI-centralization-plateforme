@@ -1,125 +1,105 @@
-# CYCLE PROTOCOL — Builder-owned
+# CYCLE PROTOCOL — one Builder session (Builder-owned)
 
-This is **your** protocol. Improve it whenever a better process would raise your success rate
-(an Era ∞ cycle: hypothesis + metric). `.claude/commands/cycle.md` only points here and holds
-the three human-owned gates (0 stop checks, 5 verify, 7 merge) plus the `loop_status.json` rule.
-If this file ever conflicts with those gates, the gates win — record the conflict in
-`state/PROPOSALS.md`.
+`.claude/commands/cycle.md` (human-owned) holds the gates; this file is how you meet them. If they
+conflict, the gates win — record the conflict in `state/PROPOSALS.md`. Architecture: ADR-042.
 
-**The team (ADR-035).** The Human assigns models in `governance/human.yaml` (`builder.team`):
-judgment on opus, execution on sonnet. You are the **lead**: you orient, build, test and record.
-The **architect** plans (step 2), the **auditor** reviews (step 5), the **red-team** attacks
-(step 5). Every other subagent you start (`Explore`, `general-purpose`) is a **helper** on the
-helpers' model. Launch the three named roles with no `model` override. Spend their time well:
-give each a precise brief so it does not re-discover what you already know.
+A **session** (still numbered as a cycle) has one mode, given by the runner in `$ARGUMENTS`:
+- `build` — move the active mission forward; finish it if you can. This file.
+- `plan` — groom the future: `protocol/PLAN.md`.
+- `diagnosis` — the last sessions failed: find the root cause, write `state/BLOCKED.md`, fix it only
+  if the fix is small and safe. No mission work.
+No mode given (interactive `/cycle`) → `build` if a mission is `active` or `ready`, else `plan`.
 
-**Context hygiene.** Everything you read stays in your context for every later turn and is paid
-for again each turn. Never read these whole — `tail` the end or `grep` what you need:
-`state/JOURNAL.md`, `bible/07_DECISIONS.md`, `state/REPORT.md`, `state/IDEAS.md`,
-`state/SURVEY.md`, `state/METRICS.md`. Run tests with `-q` and show only the tail
-(`uv run pytest -q 2>&1 | tail -15`). For a wide search across many files, send a helper and
-take back only its conclusion.
+**The team** (models in `governance/human.yaml` → `builder.team`; launch with no `model` override):
+`architect` plans a mission once · `validator` runs the checks and reports evidence · `red-team`
+attacks physics once per mission that touches it · `auditor` reviews the mission once before merge ·
+`worker` takes a well-specified side task (only if `builder.parallel_workers` > 0, each in its own
+worktree) · any other subagent is a helper. Give each a precise brief; never re-pay for discovery.
 
+**Context hygiene.** Everything you read is paid again on every later turn. Never read whole:
+`state/JOURNAL.md`, `bible/07_DECISIONS.md`, `state/IDEAS.md`, `state/BACKLOG.md`, `state/SURVEY.md`
+— `grep`/`tail`. Tests: `uv run pytest -p no:warnings -o addopts="" -q 2>&1 | tail -15`. Wide
+searches → a helper subagent; take back only its conclusion.
 
-**0. Gate — stop checks.** If `governance/HALT` exists: write `state/loop_status.json`
-`{"result":"blocked","reason":"HALT"}` and stop. If `git status --porcelain` is not empty,
-investigate: commit legitimate leftover state, otherwise record and stop as `blocked`.
-**Resume, don't restart (X-007, P-0003):** run `git branch --no-merged main`. A `cycle/NNNN-*`
-branch whose number is greater than `loop_status.cycle` is an interrupted cycle: take that number,
-check its journal entry (write the hypothesis if missing, saying it was written late), and resume
-it — no new unit until it is merged, failed, or recorded as abandoned with its reason. Where to
-resume (X-012, cycle 33: a usage limit cut a cycle after its plan, before any commit):
-- `git log main..<branch>` shows build commits → resume at step 5;
-- it shows only the `plan` commit, or `state/plans/NNNN.md` exists → resume at step 4 with that
-  plan (Gate 2 is already met; do not re-launch the architect);
-- it shows nothing and there is no plan file → the cycle died before its plan was saved:
-  `git switch` to the branch and start at step 2 for that same number (the previous STATE
-  "Next 3 moves" still holds).
-A session cut off by a usage limit is logged `result=limit` in the runner's cycle log; it is not
-a failure, and resuming is the whole recovery.
+## 0. Gate 0 — stop checks and resume
+- `governance/HALT` exists → write `state/loop_status.json` `{"cycle": N, "result": "blocked",
+  "reason": "HALT"}` and stop.
+- Cycle number N = `state/loop_status.json` `cycle` + 1.
+- Dirty tree: on the active mission's branch it is the previous session's unfinished work (cut by a
+  limit or the hang guard) — read it, commit it as `M-NNN: recovered work in progress`, continue.
+  Anywhere else: investigate; commit legitimate leftover state, otherwise end `blocked`.
 
-**1. Orient.** Read `state/STATE.md`, last 3 entries of `state/JOURNAL.md` (tail, not the
-whole file), top of `state/BACKLOG.md`, `state/QUESTIONS.md` (look for human answers), and the
-current Era in `bible/05_ERAS.md`. Cycle number = last cycle in `state/loop_status.json` + 1.
-If the cycle number is a multiple of 10: re-read `bible/00_CONSTITUTION.md` and
-`bible/01_GENESIS.md` and do the retrospective (`bible/06_LOOP.md` §6) as part of this cycle.
+## 1. Orient (cheap)
+Read `state/PROGRESS.md` (the last session's handoff), the active or first `ready` mission in
+`state/missions.json`, its plan `state/missions/M-NNN.md` if it exists, and `git log --oneline -15`.
+`state/STATE.md` only if PROGRESS points you there. That is all: the mission plan holds the rest.
 
-**2. Choose ONE unit of work** using the priority list in `bible/06_LOOP.md` §2.
-While Era ½ (Survey) is open, the unit is survey/cleanup work only — no features.
-After the Launch Pad, choose from your own roadmap (`bible/09_BUILDER_VISION.md`).
-Before touching OpenClaw, read `bible/08_OPENCLAW.md`.
-If it is too big for one session, split it in `BACKLOG.md` and take the first slice.
-Size check (X-008): a slice that changes physics will meet a red-team pass and its fixes in the
-same cycle — leave room for them, or split before building.
-**Plan (Gate 2).** Launch the `architect` with a brief: cycle number, current Era and its open
-exit criteria — **for each unticked one, whether code that exists might already meet it**
-(X-011, cycle-30 retrospective: tick-blindness left 3 met-in-code criteria unticked for 30
-cycles; metric: criteria ticked per 10 cycles) — the top 3–5 backlog items with ids, human answers, anything unfinished, and your
-proposed unit if you have one. It returns a `UNIT / SLICE / DESIGN / TESTS FIRST / RISKS /
-RED-TEAM / ADR / OUT OF SCOPE` plan. Its plan wins over your preference; if you disagree on a
-fact, show it the fact once and let it decide.
+## 2. Start a mission (only when none is `active`)
+1. Take the first `ready` mission whose `depends_on` are `done`. Set it `active`, create
+   `mission/M-NNN-<slug>` from `main`.
+2. **Gate 2 — plan.** Launch the `architect` with the mission entry, the standard
+   (`protocol/MISSIONS.md`) and anything PROGRESS says. Save its plan verbatim to
+   `state/missions/M-NNN.md`. Commit `M-NNN: plan`.
+3. **Acceptance first.** Write `acceptance/M-NNN.py` from the plan, run it, see it **fail** for the
+   right reason, commit `M-NNN: acceptance (fails before the work)`. Push the branch.
+If the architect says the mission is not ready (too big, wrong, blocked), fix `missions.json` as it
+advises (split by capability, reorder, drop with reason), commit on `main`, and end `planned`.
 
-**3. Hypothesis + save the plan (X-012).** As soon as the architect returns — before anything
-else — `git switch -c cycle/NNNN-<slug>`, write the architect's plan verbatim to
-`state/plans/NNNN.md`, and append to `state/JOURNAL.md`:
-`## Cycle NNNN — <title> (<ISO date>)` / `Era:` / `Exit criterion served:` / `Plan:` (the
-architect's `UNIT` and `SLICE` lines, and `see state/plans/NNNN.md`) / `Hypothesis:`.
-Commit both: `cycle NNNN: plan — <unit>`. A plan costs an opus call; an interruption must never
-lose it.
+## 3. Build
+- Work through the plan's milestones in order. Each milestone ends with the suite green and a commit
+  `M-NNN: <what> — <why>`; push the branch after each one. Tests first where the plan names them.
+- Follow the TRD inside `app/`; never edit a test just to make it pass (if a test is wrong, say why
+  in the commit). A new law that breaks old tests: each break is a finding for the ADR, not a test
+  to "fix".
+- Decide open questions with the prime rule; real decisions get an ADR in `bible/07_DECISIONS.md`.
+- Deviating from the plan is allowed; write the deviation and its reason in `state/missions/M-NNN.md`.
+- Keep `state/PROGRESS.md` true at every milestone (§5): a session can be cut at any moment.
 
-**4. Build** on the cycle branch, following the plan: its tests first, its
-design, nothing from `OUT OF SCOPE`. If reality forces a deviation, write it and its reason in
-the journal as you go.
-Small commits: `cycle NNNN: <what> — <why>`. Follow the TRD inside `app/`.
-Commit the build before step 5 begins (X-009, cycle 22): an interrupted cycle then resumes from a
-commit, not from an uncommitted tree.
-Answer any open question with the prime rule; log it in `bible/07_DECISIONS.md`
-(and `state/QUESTIONS.md` if the Human should see it).
+## 4. Finish a mission (Gate 5, then Gate 7)
+When the acceptance check passes and the plan's milestones are done:
+1. `uv run python scripts/smoke_run.py` exits 0 (if the mission touched anything beyond docs/state).
+2. Launch the `validator` (brief: mission id, acceptance path, branch). It runs the acceptance check,
+   the full suite and the demo line, and returns PASS/FAIL with evidence. FAIL → fix, re-validate.
+3. If the mission touched physics (`app/registry`, `app/oms`, `app/marketdata`, metering, Runtime
+   halt/budget code) or the plan says `RED-TEAM: yes`: launch the `red-team` with the diff range and
+   the new laws. Commit its test file **as written, before any fix**. Triage by
+   `protocol/MISSIONS.md` §6. The validator and red-team may run in parallel.
+4. Launch the `auditor` on `git diff main...HEAD` with: the plan, the validator's evidence, the
+   red-team result, every deviation, and the claim list (every "never / all / only / covers"
+   sentence the diff adds, with the counter-example that tests it). Fix every BLOCK. A re-audit is
+   scoped to the fix commits.
+5. Merge: `git switch main && git merge --no-ff mission/M-NNN-<slug>`, run the suite on `main`,
+   set the mission `done`, then record (§6) and push: `git push origin main mission/M-NNN-<slug>`.
+6. If time and budget remain, end the session anyway: the runner verifies the merge out of band and
+   chooses the next session's mode. Result `merged`.
 
-**5. Gate — verify.**
-- `uv run pytest` → all green. Never edit a test just to make it pass; if a test is
-  wrong, say why in the commit message.
-- Boundary + determinism tests pass (once they exist).
-- Run check (X-004): if the diff touches anything but docs/state, `uv run python
-  scripts/smoke_run.py` exits 0 — tests green is not "the fund starts".
-- Claim check (X-006), before the auditor: list every "covers / finds / never / all / only /
-  0 found" sentence the diff adds (code, ADR, journal) and plant a counter-example for each, or
-  narrow the sentence. Ask: what in this diff can an unprotected file or env var change? Is
-  every check inside the lock that protects the write it guards? Which old tests did a new law
-  break — and is each one a finding (log it in the ADR), not a test to "fix"?
-- Launch the `auditor` subagent on `git diff main...HEAD`. Brief it with: the plan (unit,
-  invariants, risks), the claim-check list and what you did about each, test and smoke results,
-  and any deviation from the plan. Fix every `BLOCK` finding. A re-audit after fixes is scoped:
-  give it the previous findings and the fix commits, and ask it to verify those fixes and check
-  the fix diff — not to re-review the whole change from scratch.
-  If the plan says `RED-TEAM: yes`, or the change touches `app/registry`, `app/oms`,
-  `app/marketdata`, metering or the Runtime's halt/budget code, also launch `red-team`, briefed
-  with the diff range, the new laws and the invariants they must hold.
-- Commit the red-team's test file as it wrote it, before any fix (X-010, re-audit c28 NOTE 5).
-  Then every changed hole or guard is a diff in history, not just a sentence in a commit
-  message.
+## 5. End a session without finishing (`progress`)
+Commit everything on the mission branch and push it. Rewrite `state/PROGRESS.md`:
 
-**6. Experiment** (only if this unit is an experiment): spec in
-`experiments/<id>/spec.yaml`, results in `experiments/<id>/`, conclusion appended to
-`state/FINDINGS.md` with evidence (run_id, event ids, numbers). Respect every cap.
+```
+Cycle: NNNN · Mission: M-NNN (<title>) · Branch: mission/M-NNN-<slug>
+Done so far: <milestones done, one line each>
+Next: <the exact next step>
+Watch out: <anything that cost you time; dead ends>
+Acceptance: <passes | fails: why>
+```
+≤ 40 lines. Result `progress`.
 
-**7. Gate — merge.** Only if step 5 passed: `git switch main && git merge --no-ff
-cycle/NNNN-<slug>`, run `uv run pytest` again on `main`, then `git push origin main
-cycle/NNNN-<slug>`. Never force. If step 5 failed: stay off `main`, keep the branch,
-result = `failed`.
+## 6. Record (every session, small)
+- `state/JOURNAL.md`: `## Cycle NNNN — <mode> — <mission or plan> (<ISO date>)` then 3–8 lines:
+  what you did, the result, what you learned, next. (Constitution Art. 7.2.)
+- `state/PROGRESS.md` as in §5 (also after a merge: say what is next).
+- On a merged mission only: `state/SHOWCASE.md` (one entry: what's new + the demo line), `state/STATE.md`
+  (≤ 120 lines, a map not a history), `state/REPORT.md` if the Human must know or decide something.
+- An idea → one line in `state/IDEAS.md`. Never hand-write metrics: the runner measures
+  (`$FIRM_HOME/metrics.jsonl`).
+- Last: `state/loop_status.json` = `{"cycle": N, "mode": "build", "mission": "M-NNN",
+  "result": "merged|progress|planned|failed|blocked", "branch": "...", "ts": "<ISO>"}`. Commit state on
+  the branch you are on (`main` after a merge).
 
-**8. Record** (on `main`, one commit `cycle NNNN: state`):
-- finish the journal entry: `Work:` / `Result:` / `Learned:` / `Next:`;
-- rewrite `state/STATE.md` (current Era, cycle, what's true now, next 3 moves). **Budget: at
-  most 120 lines** (X-013, cycle 33: it had grown to 283 lines, read in full every cycle). It is a
-  map, not a history: one or two lines per capability, each pointing at its ADR and tests. Detail
-  belongs in the ADR (`bible/07_DECISIONS.md`) and the journal. When a new fact does not fit,
-  fold an older bullet into a one-line summary — never delete a fact the ADRs do not hold;
-- reorder `state/BACKLOG.md`, add discoveries;
-- append any idea this cycle gave you to `state/IDEAS.md` (retrospective cycles: write up the top 3);
-- update `state/REPORT.md` if the Human should know something;
-- append a row to `state/METRICS.md`;
-- write `state/loop_status.json`:
-  `{"cycle": N, "result": "merged|failed|blocked", "branch": "...", "ts": "<ISO>"}`.
+End with three lines: what you did, the result, what's next.
 
-End with a 3-line summary: what you did, the result, what's next.
+## Headless notes
+Bash runs in the OS sandbox (repo + temp writable, network: GitHub and PyPI only, localhost
+allowed); protected paths are write-denied by the OS. `git push origin …` runs outside the sandbox
+and works only as a bare command (no `cd … &&`). Prefer `uv run --project "<repo>" …` over `cd`.

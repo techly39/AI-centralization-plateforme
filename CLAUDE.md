@@ -15,18 +15,23 @@ stack, firm design, roadmap, your own tools and process. Eras III–VI are only 
 The only limits are the Constitution and the protected files. Everything else is yours.
 (`bible/01_GENESIS.md` §6)
 
-## Your first run: clean and understand
+The Survey (Era ½) closed at cycle 9 (`state/SURVEY.md`). Cycles 1–36 used the slice process;
+from cycle 37 the Builder works in missions (below).
 
-Cycle 1 is not a feature. It is **Era ½ — the Survey** (`bible/05_ERAS.md`): read
-everything, run everything, inventory the toolchain and OpenClaw (back it up, change
-nothing), commit the uncommitted Phase 2 work, clean junk, correct the Bible where it is
-wrong, write `state/SURVEY.md`. Build only once you understand what you're working with.
+## How work is organised (Builder v2, ADR-042)
+
+The unit of work is a **mission**: a capability of the world someone can run and inspect, with an
+executable acceptance check (`acceptance/M-NNN.py`) written before the code. Standard:
+`protocol/MISSIONS.md`. Queue: `state/missions.json`. A session ("cycle") is `plan` (groom the
+future: `protocol/PLAN.md`) or `build` (move the active mission: `protocol/CYCLE.md`); the runner
+chooses. Old slice plans (`state/BACKLOG.md`, R-*, `state/plans/`) are raw material, not instructions.
 
 ## Read order (every session)
 
 1. This file (auto-loaded).
-2. `state/STATE.md` → where the world is now and the next moves.
-3. `state/JOURNAL.md` (last 3 entries), `state/BACKLOG.md` (top), `state/QUESTIONS.md` (human answers).
+2. `state/PROGRESS.md` → the last session's handoff; then the active mission in `state/missions.json`
+   and its plan `state/missions/M-NNN.md`. Plan sessions: `protocol/PLAN.md` says what to read.
+3. `state/STATE.md` (the map of what exists) and `state/QUESTIONS.md` (human answers) when needed.
 4. The Bible book relevant to today's work:
 
 | Book | Read when |
@@ -60,7 +65,8 @@ wrong, write `state/SURVEY.md`. Build only once you understand what you're worki
 7. **Agents may scheme inside the sim — that's data.** Breaking physics is your bug.
    Reaching outside is an incident. (Art. 8)
 8. **Honest measurement.** Never weaken a test, never hide a trial, never fake a result. (Art. 9)
-9. **One unit of work per cycle, `main` always green**, append-only history, no force-push.
+9. **One mission at a time, done means its acceptance check passes, `main` always green**,
+   unfinished work on its mission branch, append-only history, no force-push.
    **OpenClaw agents are set up to the `08_OPENCLAW.md` standard** — no agent wakes without
    passing conformance; never touch the Human's non-`firm-` agents.
 10. **Never wait for the Human when the prime rule can answer.** Answer with the future,
@@ -75,19 +81,24 @@ wrong, write `state/SURVEY.md`. Build only once you understand what you're worki
 
 ## Running a cycle
 
-Headless: the Human runs `loop/builder.sh start` → a bounded batch of `claude -p "/cycle"` runs
-(per-cycle / per-run / per-day USD caps in `governance/human.yaml`), then it stops.
-Interactive: type `/cycle`. The protocol is `.claude/commands/cycle.md` → `protocol/CYCLE.md`.
+Headless: the Human runs `loop/builder.sh start` → a bounded batch of `claude -p "/cycle <mode>"`
+sessions (mode chosen by the runner; limits in `governance/human.yaml`), then it stops. After each
+session the runner itself re-runs the suite on `main` and the mission's acceptance check, and logs
+metrics to `$FIRM_HOME/metrics.jsonl` — never hand-write metrics. A Stop hook refuses a `merged`
+claim whose acceptance check fails. Interactive: `/cycle` (or `/cycle plan`). Protocol:
+`.claude/commands/cycle.md` → `protocol/CYCLE.md` / `protocol/PLAN.md`.
 
-**The Builder team** (ADR-035; models set only in `governance/human.yaml` → `builder.team`):
+**The Builder team** (ADR-035, ADR-042; models set only in `governance/human.yaml` → `builder.team`):
 
 | Role | Default | Does |
 |---|---|---|
-| lead (you) | sonnet | orient, build, test, record |
-| lead on hard cycles | opus | diagnosis, every 10th (retrospective), the cycle after a failure |
-| `architect` | opus | plans each unit before code is written (Gate 2) |
-| `auditor` | opus | reviews every diff before merge (Gate 5) |
-| `red-team` | opus | attacks physics after risky changes |
+| lead (you) | sonnet | build sessions: orient, build, test, record |
+| lead_hard | opus | plan sessions, diagnosis, the session after a failure |
+| `architect` | opus | plans each mission once, before its code (Gate 2) |
+| `validator` | sonnet | runs acceptance + suite + smoke + demo, reports evidence (Gate 5) |
+| `red-team` | opus | attacks physics once per mission that touches it |
+| `auditor` | opus | reviews each mission once before merge, with the validator's evidence (Gate 5) |
+| `worker` | sonnet | side tasks in their own worktree, only if `builder.parallel_workers` > 0 |
 | helpers | sonnet | any other subagent: search, exploration |
 
 Launch the named roles without a `model` override, and brief them precisely.

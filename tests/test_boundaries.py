@@ -82,7 +82,9 @@ class Layer:
     app_exempt_files: frozenset[str] = field(default_factory=frozenset)
 
 
-_NOT_PHYSICS = frozenset({"runtime", "ui", "mcp_server", "scripts", "tests", "legacy"})
+#: Never imported by any layer (ADR-042): mission acceptance checks and the human-run installer.
+_NEVER_IMPORTED = frozenset({"acceptance", "setup"})
+_NOT_PHYSICS = frozenset({"runtime", "ui", "mcp_server", "scripts", "tests", "legacy"}) | _NEVER_IMPORTED
 
 LAYERS = (
     # Physics. Also never speaks MCP itself: the MCP layer wraps it from outside.
@@ -93,13 +95,13 @@ LAYERS = (
     Layer("truman", "truman", _NOT_PHYSICS | {"app", "mcp"} | LLM_SDKS),
     # One agent's doorway: an HTTP client of the App.
     Layer("mcp_server", "mcp_server",
-          frozenset({"app", "runtime", "ui", "scripts", "tests", "legacy"}) | LLM_SDKS,
+          frozenset({"app", "runtime", "ui", "scripts", "tests", "legacy"}) | _NEVER_IMPORTED | LLM_SDKS,
           app_allowlist=MCP_SERVER_MAY_IMPORT_FROM_APP),
     # Wakes agents; may call LLMs (through metered keys); reaches the App over HTTP/MCP.
-    Layer("runtime", "runtime", frozenset({"app", "ui", "scripts", "tests", "legacy"})),
-    Layer("ui", "ui", frozenset({"app", "runtime", "scripts", "tests", "legacy"}) | LLM_SDKS),
+    Layer("runtime", "runtime", frozenset({"app", "ui", "scripts", "tests", "legacy"}) | _NEVER_IMPORTED),
+    Layer("ui", "ui", frozenset({"app", "runtime", "scripts", "tests", "legacy"}) | _NEVER_IMPORTED | LLM_SDKS),
     # Operator tools: clients, except the named in-process probes.
-    Layer("scripts", "scripts", frozenset({"app", "runtime", "tests", "legacy"}) | LLM_SDKS,
+    Layer("scripts", "scripts", frozenset({"app", "runtime", "tests", "legacy"}) | _NEVER_IMPORTED | LLM_SDKS,
           app_exempt_files=IN_PROCESS_SCRIPTS),
 )
 
@@ -108,6 +110,9 @@ NOT_LAYERS = {
     "tests": "the suite may import every layer",
     "legacy": "frozen pre-Bible POC (cycle 6: keep); nothing may import it",
     "loop": "human-owned runner (Art. 6)",
+    "acceptance": "mission acceptance checks (ADR-042): like the suite, may drive every layer; "
+                  "nothing may import them",
+    "setup": "human-run installer: staged copies of protected files (Art. 6, ADR-042)",
 }
 
 #: Loose ``.py`` files at the repo root. ``test_api.py`` awaits `git rm` (S-004b, P-0002).

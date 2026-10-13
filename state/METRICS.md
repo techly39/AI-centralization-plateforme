@@ -1,4 +1,7 @@
-# METRICS — one row per cycle (append-only)
+# METRICS — one row per cycle (append-only) — FROZEN at cycle 36
+
+> From cycle 37 (ADR-042) metrics are measured by the runner, not written by the Builder:
+> `$FIRM_HOME/metrics.jsonl` (default `~/.firm`). This table is the hand-written history of cycles 0–36.
 
 | cycle | date | era | unit | result | turns | tests | duration_min | notes |
 |---|---|---|---|---|---|---|---|---|
