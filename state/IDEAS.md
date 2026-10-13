@@ -367,3 +367,7 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
 - [cycle 34] **A metering invariant test over the whole ledger**: after any run, the sum of every pod's
   authoritative cost + pod-less metered cost == sum of per-key maxima. Would make "every LLM dollar is
   attributed" (EC4) a one-line assertion for R-6b. — status: new
+- [cycle 36] **Name the invariant, list its causes** (X-006 addition): a pre-gate named after one
+  mechanism (the wake gate) checked only that mechanism's causes; red-team 0020 found three more ways a
+  spec "could never wake" (no tape, unknown tool, missing pod). Before writing a check, write the
+  invariant in words and list every cause that can make it false. — status: new

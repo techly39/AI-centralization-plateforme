@@ -1,8 +1,9 @@
 # STATE — rewritten every cycle (budget: ≤ 120 lines, X-013)
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 34 (R-6a: system-reported cost ledger, physics half of metering — merged 240b607,
-2026-10-13; ADR-041; ticks nothing, EC4 waits for R-6b)
+**Last cycle:** 36 (B-053 + B-054: vet before physics is told, HALT reads `halted` at every stage —
+merged 5eb1d6d, 2026-10-13; ADR-032/040 amendment; red-team 0020; ticks nothing). Cycle 35 was
+blocked on budget. Cycle 34: R-6a metering physics half (ADR-041).
 
 This file was compacted on 2026-10-13 (Human-directed loop repair). The detailed per-capability
 notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) and in the ADRs.
@@ -13,7 +14,8 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - [ ] EC1 1-month pod backtest via the Runtime (real minds, R-8) · [ ] EC2 cassette replay =
   identical ledger (met end to end for scripted minds by R-4b-2a; ticked at R-8) · [ ] EC4
   metering (R-6) · [ ] EC7 OpenClaw conformance (R-7/R-8).
-- Tests: **1755 passed + 6 xfailed**; smoke 32/32 (a real two-server record → replay → compare).
+- Tests: **1846 passed + 9 xfailed** (+3 = red-team 0020 open lows: B-055 ×2, B-056); smoke 32/32
+  (a real two-server record → replay → compare).
 
 ## What is true now — the Runtime (`runtime/`, ADR-032 + amendments a–p, ADR-033, -037, -038, -040)
 - **Replay CLI + ledger comparison** (R-4b-2a, ADR-040, `tests/test_replay_cli.py`,
@@ -22,7 +24,11 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   **not** an identical ledger). `fund-env compare-ledgers RECORDED REPLAYED` (`app/ledger/compare.py`,
   read-only, raw rows, one allowed difference: the `run_minds_declared` payload → `{"minds":["cassette"]}`)
   is the only check of the ledger. A setup refusal in a replay ends `refused`; a retired mind `diverged`.
-  Known: HALT between wakes labels `refused` (B-054).
+- **Pre-gate + HALT label** (B-053/B-054, c36, ADR-032/040 amendment, `tests/test_redteam_0020.py`):
+  `_conduct` reads the law once; `runtime.provision.vet` (network-free, `provision`'s own checks) and a
+  cassette-outside-replay check refuse before `/run/minds` is declared. HALT at the law read, the
+  declaration, provisioning (`cli._is_halt`, exact reasons), between wakes, or the advance (423) → `halted`.
+  Known gap B-055: directory/pod/tool refusals still come after the declaration (zero-cost labels only).
 - **Replay** (R-4b-1, ADR-038, `runtime/replay.py`, `tests/test_cassette_replay.py`,
   `tests/test_redteam_0018.py`): `cassette.read` accepts only the canonical v1 document;
   `Recording.load` → `Tape`s; `run_backtest(replay=)` ends at the first wake that leaves the
@@ -89,8 +95,8 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **B-053 + B-054** together (red-team), *before* R-6b edits the gate: pre-gate before
-   provisioning; HALT reads `halted` between wakes and before `declare_minds`.
+1. **B-056** (physics 500 on register into a missing pod; small, `app/registry`, red-team) — or fold it
+   into R-6b's red-team if budget is tight. B-055 (reads before the declaration) can wait.
 2. **R-6b** (EC4, ADR-041 §8): the gate lets a `metered` provider wake under a numeric cap;
    `provision` mints one key per agent (limit ≤ `MAX_METERED_USD_MICROS`, total ≤ cap, fail closed);
    a `FakeMeteredProvider` charges `FakeProvisioner`; `sync_costs` runs after the last step only;
