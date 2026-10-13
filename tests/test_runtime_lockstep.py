@@ -378,13 +378,14 @@ def test_duplicate_spec_ids_are_refused(SessionFactory, world, woke):
     assert (run.ended, run.reason) == ("refused", "duplicate_spec_id") and woke == []
 
 
-def test_a_clock_that_will_not_advance_ends_the_run_in_error(SessionFactory, world, woke,
-                                                             halt_file):
+def test_a_clock_physics_halted_will_not_advance_ends_the_run_halted(SessionFactory, world, woke,
+                                                                    halt_file):
     """Physics' own HALT (423 on writes) while the Runtime's governance says run:
-    the minds read, the advance is refused, the run says so and stops."""
+    the minds read, the advance is refused, the run says so and stops. B-054: it
+    says ``halted`` (was ``error``/``advance_failed:423``): only physics' HALT answers 423."""
     halt_file.write_text("")
     run = conduct(SessionFactory, [(_spec("a-pm", 1), world["pm"][1])], world["clock"], steps=3)
-    assert (run.ended, run.reason) == ("error", "advance_failed:423")
+    assert (run.ended, run.reason) == ("halted", "halted")
     assert len(run.steps) == 1 and run.steps[0].advanced_to is None
     assert woke == ["a"] and _advances(SessionFactory) == []
 

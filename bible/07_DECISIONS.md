@@ -1540,3 +1540,24 @@ tick) is not built. **This cycle ticks nothing**: no mind spends and the gate is
   and tick (R-6b); B-000k firm-level costs; B-000n self-report rate law (self-report spam is still
   unbounded, but cannot move a metered agent's ranking); B-022 secret scan (before any real key).
 - Tests: `tests/test_metering.py` (physics), `tests/test_metering_metrics.py`, `tests/test_runtime_metering.py`.
+
+## ADR-032/ADR-040 amendment (cycle 36, B-053 + B-054) — accepted
+- **Vetted before physics is told (B-053).** `fund-runtime backtest`/`replay` read the law once in
+  `_conduct`, before any client is used, and run `runtime.provision.vet(specs, law)`: the network-free
+  checks `provision` makes (duplicate id/name, reserved name, `wake_policy: never`, the wake gate,
+  `check_spec`), with the same reason strings. A refusal there ends the run `refused`/`provision:<reason>`
+  with no `/run/minds` declaration and no agent. `provision` delegates to `vet` and keeps its own read.
+  **Known gap:** `name_taken` and `directory_unreadable` need the directory, so they still come after
+  the declaration; they can only leave a zero-cost label (every spec that reaches them passed the gate).
+- **HALT reads `halted` (B-054).** Corrects the cycle-33 claim. A run HALT stops ends
+  `{"ended": "halted", "reason": "halted"}` when HALT is: present at the law read; met by the
+  declaration (`minds_refused:423`); met in `provision` (`halted`, `wake_refused:<id>:halted`,
+  `register_failed:<id>:423` — exactly these, `cli._is_halt`; `registered` still names what exists);
+  met at the gate between two wakes (the refused wake stays in the step's record); or met by the advance
+  (`423`, was `error`/`advance_failed:423`: physics' halt check runs before the handler, so the clock did
+  not move). Only `app.registry.halt` answers 423 (grep, cycle 36). Every non-halt refusal keeps its label.
+- Old tests changed (findings): `test_halt_provisions_nothing` (the B-054 label; now stronger: no
+  declaration, no advance); `test_a_clock_that_will_not_advance_ends_the_run_in_error` → `…_ends_the_run_halted`
+  (same invariants, new label); `test_a_server_that_is_not_there_is_a_refusal_not_a_crash` gained the `woke`
+  fixture (its specs named uninstalled scripts, hidden while the clock check ran first).
+- Tests: `test_run_minds.py`, `test_runtime_cli_backtest.py`, `test_runtime_lockstep.py`, `test_runtime_provision.py`.
