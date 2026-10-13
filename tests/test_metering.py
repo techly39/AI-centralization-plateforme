@@ -85,6 +85,7 @@ def test_firm_roles_may_not_meter(client, db, two_agents, who):
 def test_management_may_not_meter(client, db, admin_key, two_agents):
     assert meter(client, admin_key, two_agents["a"]).status_code == 403
     assert events_of(db, EVENT_COST_METERED) == []
+    assert len(events_of(db, EVENT_PERMISSION_DENIED)) == 1
 
 
 def test_only_runtime_and_system_hold_the_right():

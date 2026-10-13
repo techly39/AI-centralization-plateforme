@@ -302,7 +302,17 @@ def _cost_metrics(session: Session, pod_id: int, metered: dict[int, AgentMetered
                 )
             ).scalar_one()
         )
-        authoritative = (self_reported - theirs) + metered_usd
+        # Summed directly, never as ``self_reported - theirs``: past ~2e13 dollars of
+        # self-report spam a float subtraction loses cents, and a metered agent's
+        # reports could then move its colleagues' share (audit c34 WARN 1).
+        unmetered = float(
+            session.execute(
+                select(func.coalesce(func.sum(Cost.usd_cost), 0.0)).where(
+                    Cost.pod_id == pod_id, Cost.agent_id.not_in(list(in_pod))
+                )
+            ).scalar_one()
+        )
+        authoritative = unmetered + metered_usd
         gap = theirs - metered_usd
     return CostMetrics(
         total_usd_cost=round_money(authoritative),

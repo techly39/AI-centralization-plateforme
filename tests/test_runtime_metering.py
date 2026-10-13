@@ -5,8 +5,9 @@ Claims under test:
 * the fake provisioner refuses a charge past a key's limit and an unknown key,
   is deterministic, and holds no secret;
 * ``sync_costs`` posts each key's cumulative total to the agent the key was
-  made for, so physics' metered dollars equal the provisioner's charges to the
-  micro-dollar (EC4's assertion, on the physics half: no mind spends yet);
+  made for, so the ledger fold's metered micro-dollars equal the provisioner's
+  charges exactly (EC4's assertion, on the physics half: no mind spends yet;
+  the published metrics are dollars rounded to cents);
 * syncing twice writes nothing new; only changed keys are posted again;
 * a HALT stops the sync (``halted``), and the next sync catches up exactly;
 * a wrong key (a PM's) raises; a refused key is reported and the rest go on.
@@ -167,6 +168,12 @@ def test_sync_stops_on_halt_and_catches_up_after(SessionFactory, world, halt_fil
     halt_file.unlink()
     caught = run_sync(SessionFactory, world["runtime"], p)
     assert caught.posted == 3 and caught.halted is False
+    s = SessionFactory()
+    try:
+        got = metered_by_agent(s)
+    finally:
+        s.close()
+    assert sum(m.usd_micros for m in got.values()) == sum(u.usd_micros_total for u in p.usage())
 
 
 def test_sync_with_a_pm_key_raises(SessionFactory, world):

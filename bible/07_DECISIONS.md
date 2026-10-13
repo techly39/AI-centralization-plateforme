@@ -1494,9 +1494,15 @@ tick) is not built. **This cycle ticks nothing**: no mind spends and the gate is
    self-reported `Cost` rows leave the authoritative `total_usd_cost` and stay as the cross-check
    (`self_reported_usd_cost`, `self_report_gap_usd`). An unmetered agent keeps its self-report. A pod
    with no metering gets exactly the old numbers, with the new fields `null` / 0. `cost_adjusted_pnl`
-   and the leaderboard rank on the authoritative total. Metered dollars go to the pod in the key's
-   latest event, i.e. the agent's pod when it was posted (agents do not change pods today; a move
-   would need a split by delta). A metered agent with no pod (management) appears in no pod's cost:
+   and the leaderboard rank on the authoritative total. An agent's metered dollars (all its keys) go to
+   one pod: the pod in the latest event of the last key in first-seen order, i.e. the agent's pod when
+   it was posted (agents do not change pods today; a move would need a split by delta). The
+   unmetered part is summed from the rows directly, not as a difference of float sums (audit c34 WARN 1).
+   The published figures are dollars rounded to cents; exactness to the micro-dollar holds in the
+   ledger fold (`metered_by_agent`) only (audit c34 WARN 2). The reader's `conflicts` and `malformed`
+   counts are computed but exposed nowhere yet: a forged row is dropped silently (audit c34 WARN 3,
+   backlog); `SyncReport.refused` is not persisted either, and a 422 for a label that fails the
+   pattern would leave dollars unattributed — R-6b must fail loudly on it. A metered agent with no pod (management) appears in no pod's cost:
    B-000k.
 5. **Ledger only.** `cost_metered {agent_id, pod_id, key_ref, usd_micros_total}`; no table, no
    migration, no reducer: nothing to rebuild, so `rebuild_state` cannot disagree. `key_ref` is an
