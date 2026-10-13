@@ -1,8 +1,8 @@
 # STATE — rewritten every cycle (budget: ≤ 120 lines, X-013)
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 33 (R-4b-2a: replay CLI, refusal law, `compare-ledgers` — merged 016d53d, 2026-10-13;
-it resumed the branch a usage limit had emptied, X-012 case 3, and the recovery worked)
+**Last cycle:** 34 (R-6a: system-reported cost ledger, physics half of metering — merged 240b607,
+2026-10-13; ADR-041; ticks nothing, EC4 waits for R-6b)
 
 This file was compacted on 2026-10-13 (Human-directed loop repair). The detailed per-capability
 notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) and in the ADRs.
@@ -13,7 +13,7 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - [ ] EC1 1-month pod backtest via the Runtime (real minds, R-8) · [ ] EC2 cassette replay =
   identical ledger (met end to end for scripted minds by R-4b-2a; ticked at R-8) · [ ] EC4
   metering (R-6) · [ ] EC7 OpenClaw conformance (R-7/R-8).
-- Tests: **1609 passed + 6 xfailed**; smoke 32/32 (a real two-server record → replay → compare).
+- Tests: **1755 passed + 6 xfailed**; smoke 32/32 (a real two-server record → replay → compare).
 
 ## What is true now — the Runtime (`runtime/`, ADR-032 + amendments a–p, ADR-033, -037, -038, -040)
 - **Replay CLI + ledger comparison** (R-4b-2a, ADR-040, `tests/test_replay_cli.py`,
@@ -51,7 +51,13 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   `{native}` wake under any cap until R-6. `fund-runtime status` prints the law.
 - Boundary law: runtime imports no `app` module beyond `{app, app.config, app.limits}`.
 
-## What is true now — physics (`app/`, TRD Phases 0–2 + ADR-022…031, -034)
+## What is true now — physics (`app/`, TRD Phases 0–2 + ADR-022…031, -034, -041)
+- **Metering v1, physics half** (R-6a, ADR-041, `tests/test_metering*.py`, `test_runtime_metering.py`,
+  `test_redteam_0019.py`): `POST /metering/usage` (right `REPORT_METERED_COST`: runtime + system only),
+  cumulative µ$ per key, one key = first agent, `cost_metered` event (ledger only, `key_ref` withheld).
+  A metered agent's cost replaces its self-report in pod metrics/leaderboard (per agent;
+  `self_report_gap_usd`). `runtime/metering.py`: `FakeProvisioner`, `sync_costs`. The gate is untouched:
+  nothing spends yet. Not shown anywhere: reader `conflicts`/`malformed` counts; pod-less agents (B-000k).
 - Withheld from agents: `run_started.world`, `run_minds_declared.minds` (ADR-034). Ticker
   universe still probeable by 200/404 (B-052).
 - A run records its world and lives in only one (ADR-031); a keyed synthetic market makes a
@@ -83,11 +89,13 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next 3 moves
-1. **Cycle 34 = R-6 metering v1, first slice** (EC4, the one unmet criterion reachable at a null
-   cap; the architect splits it): system-reported cost per agent on a fake provisioner; system cost
-   overrides self-report (`Usage.cost_usd` is only self-reported today). Tick-check (X-011).
-2. **B-053 + B-054** together (red-team): pre-gate before provisioning; HALT reads `halted` between
-   wakes and before `declare_minds`.
+1. **B-053 + B-054** together (red-team), *before* R-6b edits the gate: pre-gate before
+   provisioning; HALT reads `halted` between wakes and before `declare_minds`.
+2. **R-6b** (EC4, ADR-041 §8): the gate lets a `metered` provider wake under a numeric cap;
+   `provision` mints one key per agent (limit ≤ `MAX_METERED_USD_MICROS`, total ≤ cap, fail closed);
+   a `FakeMeteredProvider` charges `FakeProvisioner`; `sync_costs` runs after the last step only;
+   `compare-ledgers` handles the trailing `cost_metered` block by type (own ADR); a loud failure on a
+   422 label; the end-to-end EC4 test and the tick. Tick-check (X-011).
 3. **R-4b-2b**: cassette v2, c32 NOTE 5, reader size cap, `replay --cassette OUT`. Then R-3c
    `daily_cycle`. EC2 stays open until R-8. Cycle 40 is the retrospective (re-read Constitution + Genesis).
    X-006 additions to keep: "what does the artifact hold that the reader never compares?" and (new,

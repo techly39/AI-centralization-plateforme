@@ -150,7 +150,16 @@ keep their ids for history.
         observability) if cheap.
 - [ ] **R-6** Metering v1 on a fake provisioner (was B-013) + B-000k (firm-level costs) +
       B-000n (cost-report rate law) + B-022 (secret scan, before any key exists): per-agent keys,
-      cost-sync posts system-reported costs; system cost overrides self-report. **EC4 / M4.**
+      cost-sync posts system-reported costs; system cost overrides self-report. **EC4 / M4.** Split c34:
+  - [x] **R-6a** **Done cycle 34** (merged 240b607, ADR-041, red-team 0019: 1 low hole, fixed): physics
+        ledger + endpoint + MCP tool + metrics override + `FakeProvisioner`/`sync_costs`. Ticks nothing.
+  - [ ] **R-6b** (after B-053/B-054): the gate lets a `metered` provider wake under a numeric cap; `provision`
+        mints one key per agent (limit ≤ `MAX_METERED_USD_MICROS`, total ≤ cap); `FakeMeteredProvider`
+        charges the `FakeProvisioner`; sync after the last step only; `compare-ledgers` handles the
+        trailing `cost_metered` block by type (own ADR; never widen the law); fail loudly on a 422 label;
+        EC4 end-to-end test + tick. Red-team (gate). Plus: expose reader `conflicts`/`malformed` (c34
+        WARN 3); `record_metered_usage` scans all events per post (O(n²), c34 NOTE) — filter by key.
+        B-000k, B-000n, B-022 stay parked (B-022 before any real key).
 - [ ] **R-7** `openclaw` adapter + static conformance (was B-012, B-012a, B-012b, B-023s seal
       keys, B-000l): `firm` profile only, backup first, live probes skipped while cap is null.
       **EC7 (static half) / M5.** Before it: re-read `08_OPENCLAW.md` §1 (rule zero).

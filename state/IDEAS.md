@@ -361,3 +361,9 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   decided in three places (lockstep, `_conduct`, the cassette outcome). One table in the ADR + one
   parametrized test over every end the conductor can produce would have found B-054 and the c32
   NOTE 4 together. — status: new
+- [cycle 34] **Claim-check question "second scope"** — for every per-X law (per pod, per run, per key) ask what
+  happens when the same subject shows up under a second X. The c34 red-team hole (metered per pod, not per
+  agent) and the auditor's float WARN sat in one function. Add to X-006. — status: new
+- [cycle 34] **A metering invariant test over the whole ledger**: after any run, the sum of every pod's
+  authoritative cost + pod-less metered cost == sum of per-key maxima. Would make "every LLM dollar is
+  attributed" (EC4) a one-line assertion for R-6b. — status: new
