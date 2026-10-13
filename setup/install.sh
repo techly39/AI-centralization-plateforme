@@ -59,8 +59,9 @@ chmod +x loop/run.sh loop/builder.sh .claude/hooks/stop_gate.py
 echo "3/6 copied the protected files"
 
 bash -n loop/run.sh && bash -n loop/builder.sh
-python3 -m py_compile .claude/hooks/guard.py .claude/hooks/stop_gate.py
-uv run --quiet python -m py_compile loop/preflight.py
+for f in .claude/hooks/guard.py .claude/hooks/stop_gate.py loop/preflight.py; do
+  python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' "$f"   # no __pycache__ in sealed dirs
+done
 python3 -c 'import json; json.load(open(".claude/settings.json"))'
 echo "4/6 syntax OK"
 
