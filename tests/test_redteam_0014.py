@@ -203,14 +203,17 @@ def test_held_every_route_but_me_clock_halt_refuses_the_runtime_key(client, worl
     runtime key other than /me, /clock, /halt, /clock/advance, /run/minds, /health
     is a participant act. The first assert proves the sweep covers every route.
     ``POST /run/minds`` joined in cycle 28 (ADR-032 (p)): the conductor's word on
-    what drives the run, under ``CONTROL_CLOCK``, no new permission."""
+    what drives the run, under ``CONTROL_CLOCK``, no new permission.
+    ``POST /metering/usage`` joined in cycle 34 (ADR-041): the one new right,
+    ``REPORT_METERED_COST`` — a finding of the new law, not a test to loosen."""
     import re
 
     paths = client.app.openapi()["paths"]
     published = {(m.upper(), re.sub(r"\{[^}]+\}", "{}", p)) for p, ops in paths.items()
                  for m in ops}
     allowed = {("GET", "/me"), ("GET", "/clock"), ("GET", "/halt"),
-               ("POST", "/clock/advance"), ("POST", "/run/minds"), ("GET", "/health")}
+               ("POST", "/clock/advance"), ("POST", "/run/minds"), ("GET", "/health"),
+               ("POST", "/metering/usage")}
     swept = {(m, _template(p)) for m, p, _ in _EVERY_ROUTE}
     assert published - allowed <= swept, published - allowed - swept
     for method, path, body in _EVERY_ROUTE:

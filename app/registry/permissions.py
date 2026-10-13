@@ -30,6 +30,7 @@ class Action(str, enum.Enum):
     READ_HALT = "read_halt"                # is the world halted? (GET /halt)
     READ_CLOCK = "read_clock"              # the fund's now (GET /clock) — ADR-026
     CONTROL_CLOCK = "control_clock"        # advance a backtest clock — ADR-027
+    REPORT_METERED_COST = "report_metered_cost"  # system-reported cost of an agent — ADR-041
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -91,8 +92,16 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
     # even the universal inbox / cost / task reports, so no ledger row it writes
     # can pass for agent activity. The world's time is not a firm agent's lever
     # (Art. 10), so management lost CONTROL_CLOCK — a TRD §6 deviation, in the ADR.
+    # It also posts the *metered* cost of other agents (ADR-041): a metering row
+    # is physics' attestation about an agent, never activity of the runtime
+    # itself, and no firm role holds the right.
     AgentRole.runtime: frozenset(
-        {Action.READ_HALT, Action.READ_CLOCK, Action.CONTROL_CLOCK}
+        {
+            Action.READ_HALT,
+            Action.READ_CLOCK,
+            Action.CONTROL_CLOCK,
+            Action.REPORT_METERED_COST,
+        }
     ),
     # 'system' is the internal/bootstrap identity and may do anything.
     AgentRole.system: frozenset(Action),

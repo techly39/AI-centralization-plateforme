@@ -24,6 +24,7 @@ from app.api import (
     halt,
     marketdata,
     messages,
+    metering,
     metrics,
     orders,
     reporting,
@@ -123,6 +124,7 @@ def create_app() -> FastAPI:
     app.include_router(orders.router)
     app.include_router(messages.router)
     app.include_router(reporting.router)
+    app.include_router(metering.router)
     app.include_router(metrics.router)
 
     logger.info("app created (env database_url={})", settings.database_url)

@@ -43,6 +43,11 @@ EVENT_COST_REPORTED = "cost_reported"     # payload: {cost_id, tokens_in, tokens
 EVENT_TASK_STARTED = "task_started"       # payload: {task_id, subject}
 EVENT_TASK_ENDED = "task_ended"           # payload: {task_id, subject, seconds, outcome}
 
+# System-reported cost (ADR-041): the Runtime's provisioner says what a key has
+# cost in total so far. Cumulative integer micro-dollars; audit only (the
+# metrics fold these events, there is no table).
+EVENT_COST_METERED = "cost_metered"       # payload: {agent_id, pod_id, key_ref, usd_micros_total}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}
@@ -65,6 +70,7 @@ WITHHELD = "withheld"
 AGENT_WITHHELD_FIELDS: dict[str, frozenset[str]] = {
     EVENT_RUN_STARTED: frozenset({"world"}),
     EVENT_RUN_MINDS_DECLARED: frozenset({"minds"}),
+    EVENT_COST_METERED: frozenset({"key_ref"}),
 }
 
 

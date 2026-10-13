@@ -39,6 +39,7 @@ from app.db.models import Cost, Order, OrderSide, OrderStatus, Pod, Task
 from app.ledger.events import ledger_now
 from app.marketdata import MarketDataProvider, get_provider
 from app.metrics.equity import DailyCloseCache, build_equity_curve
+from app.metrics.metering import AgentMetered, metered_by_agent
 from app.metrics.performance import (
     annualise,
     compound,
@@ -86,10 +87,21 @@ class PerformanceMetrics:
 
 @dataclass(slots=True)
 class CostMetrics:
+    #: The authoritative figure the pods are ranked on (ADR-041): for a metered
+    #: agent its system-reported cost, for an unmetered one its self-reports.
     total_usd_cost: float
     tokens_in: int
     tokens_out: int
     reports: int
+    #: Every self-reported ``Cost`` row of the pod, as before metering existed.
+    self_reported_usd_cost: float
+    #: Metered agents' system-reported cost; ``None`` if no agent of the pod is
+    #: metered (unmeasured, not free), ``0.0`` if metered at nothing.
+    metered_usd_cost: float | None
+    metered_agents: int
+    #: Metered agents' self-reports minus their metered cost: how far they were
+    #: wrong about themselves. ``None`` if no agent is metered.
+    self_report_gap_usd: float | None
 
 
 @dataclass(slots=True)
@@ -136,6 +148,7 @@ def compute_pod_metrics(
     provider: MarketDataProvider | None = None,
     closes: DailyCloseCache | None = None,
     now: datetime | None = None,
+    metered: dict[int, AgentMetered] | None = None,
 ) -> PodMetrics:
     """Everything the TRD asks for about one pod, valued at the ledger's now.
 
@@ -183,7 +196,9 @@ def compute_pod_metrics(
         pricing_errors=sorted(set(curve.pricing_errors) | set(portfolio.pricing_errors)),
     )
 
-    cost = _cost_metrics(session, pod_id)
+    cost = _cost_metrics(
+        session, pod_id, metered if metered is not None else metered_by_agent(session)
+    )
     activity = _activity_metrics(session, pod_id)
 
     return PodMetrics(
@@ -214,8 +229,11 @@ def compute_leaderboard(
         now = ledger_now(session)
     closes = DailyCloseCache(provider)
     pod_ids = session.execute(select(Pod.id).order_by(Pod.id)).scalars().all()
+    metered = metered_by_agent(session)   # one fold for the whole ranking
     rows = [
-        compute_pod_metrics(session, pod_id=pid, provider=provider, closes=closes, now=now)
+        compute_pod_metrics(
+            session, pod_id=pid, provider=provider, closes=closes, now=now, metered=metered
+        )
         for pid in pod_ids
     ]
     return sorted(rows, key=lambda m: m.cost_adjusted_pnl, reverse=True)
@@ -253,7 +271,7 @@ def _trade_stats(session: Session, pod_id: int) -> tuple[float, float, int, int]
     return realized, fees, wins, closed
 
 
-def _cost_metrics(session: Session, pod_id: int) -> CostMetrics:
+def _cost_metrics(session: Session, pod_id: int, metered: dict[int, AgentMetered]) -> CostMetrics:
     # TOTAL, not SUM: SQLite's integer SUM raises on int64 overflow, which made
     # one agent's absurd report a permanent 500 for management (red-team 0001).
     # TOTAL is a float and never raises. It stays exact below 2**53 tokens —
@@ -267,11 +285,48 @@ def _cost_metrics(session: Session, pod_id: int) -> CostMetrics:
             func.count(Cost.id),
         ).where(Cost.pod_id == pod_id)
     ).one()
+    self_reported = float(row[0])
+
+    # An agent with any metered row is metered (ADR-041): its self-reports leave
+    # the authoritative total and stay as the cross-check. Per agent, not per pod.
+    in_pod = {aid: m for aid, m in metered.items() if m.pod_id == pod_id}
+    metered_usd: float | None = None
+    gap: float | None = None
+    authoritative = self_reported
+    if metered:
+        # "Metered" is decided over the whole fold, not per pod: a metered agent's
+        # self-reports leave *every* pod's total, whichever pod its dollars land
+        # on (red-team 0019 rt0019-1). The unmetered part is summed directly,
+        # never as ``self_reported - theirs``: past ~2e13 dollars of self-report
+        # spam a float subtraction loses cents (audit c34 WARN 1).
+        unmetered = float(
+            session.execute(
+                select(func.coalesce(func.sum(Cost.usd_cost), 0.0)).where(
+                    Cost.pod_id == pod_id, Cost.agent_id.not_in(list(metered))
+                )
+            ).scalar_one()
+        )
+        landed = sum(m.usd_micros for m in in_pod.values()) / 1_000_000
+        authoritative = unmetered + landed
+        if in_pod:
+            metered_usd = landed
+            theirs = float(
+                session.execute(
+                    select(func.coalesce(func.sum(Cost.usd_cost), 0.0)).where(
+                        Cost.pod_id == pod_id, Cost.agent_id.in_(list(in_pod))
+                    )
+                ).scalar_one()
+            )
+            gap = theirs - metered_usd
     return CostMetrics(
-        total_usd_cost=round_money(float(row[0])),
+        total_usd_cost=round_money(authoritative),
         tokens_in=int(row[1]),
         tokens_out=int(row[2]),
         reports=int(row[3]),
+        self_reported_usd_cost=round_money(self_reported),
+        metered_usd_cost=None if metered_usd is None else round_money(metered_usd),
+        metered_agents=len(in_pod),
+        self_report_gap_usd=None if gap is None else round_money(gap),
     )
 
 

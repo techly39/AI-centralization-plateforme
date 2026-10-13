@@ -45,6 +45,15 @@ MAX_JSON_DEPTH = 32
 #: Deepest ledger payload: a free JSON field plus the event's own wrapping.
 MAX_LEDGER_DEPTH = MAX_JSON_DEPTH + 4
 
+#: Most micro-dollars one metered key may total ($1M; far below 2**53, so
+#: sums of many keys stay exact). A key's total is system-reported and
+#: cumulative (ADR-041).
+MAX_METERED_USD_MICROS = 10**12
+
+#: A metering ``key_ref``: an opaque lower-case label for a provisioned key. It
+#: is never a key and never a hash of one, and agents never read it (ADR-041).
+KEY_REF_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
+
 #: Longest single step of a backtest clock (``POST /clock/advance``), in days.
 #: A year per step covers any honest schedule; the bound keeps one call from
 #: skipping a run past everything the pods were meant to live through (ADR-027).

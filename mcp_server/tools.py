@@ -32,6 +32,9 @@ from pydantic import Field
 from app.limits import (
     MAX_ADVANCE_DAYS,
     MAX_ADVANCE_MINUTES,
+    KEY_REF_PATTERN,
+    MAX_ID,
+    MAX_METERED_USD_MICROS,
     MAX_ORDER_QTY,
     MAX_PRICE,
     MAX_TOKENS_PER_REPORT,
@@ -516,6 +519,24 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         checked on arrival; the answer lists the ones that filled or were rejected.
         """
         return await call("POST", "/clock/advance", body={"days": days, "minutes": minutes})
+
+    @api_tool(server, method="POST", path="/metering/usage")
+    async def report_metered_usage(
+        agent_id: Annotated[int, Field(description="The agent the key was minted for.", ge=1, le=MAX_ID, strict=True)],
+        key_ref: Annotated[str, Field(description="The key's opaque label (lower-case letters, digits, - _; at most 64).", pattern=KEY_REF_PATTERN)],
+        usd_micros_total: Annotated[int, Field(description="What the key has cost in total so far, in micro-dollars (cumulative, not a delta).", ge=0, le=MAX_METERED_USD_MICROS, strict=True)],
+    ) -> Any:
+        """Post a provisioned key's cumulative cost for an agent. The Runtime's identity only (no firm agent).
+
+        System-reported cost replaces the agent's self-report in the metrics. A
+        key belongs to the first agent it names; a total never goes down;
+        re-posting the same total changes nothing.
+        """
+        return await call(
+            "POST",
+            "/metering/usage",
+            body={"agent_id": agent_id, "key_ref": key_ref, "usd_micros_total": usd_micros_total},
+        )
 
     @api_tool(server, method="POST", path="/run/minds")
     async def declare_run_minds(

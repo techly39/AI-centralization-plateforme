@@ -34,6 +34,7 @@ def _row(metrics: PodMetrics) -> LeaderboardRowOut:
         total_value=metrics.capital.total_value,
         pnl=metrics.performance.pnl,
         total_usd_cost=metrics.cost.total_usd_cost,
+        metered_usd_cost=metrics.cost.metered_usd_cost,
         cost_adjusted_pnl=metrics.cost_adjusted_pnl,
         total_return=metrics.performance.total_return,
         sharpe_daily=metrics.performance.sharpe_daily,

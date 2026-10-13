@@ -87,9 +87,12 @@ def test_only_physics_holds_control_clock():
     assert holders == {AgentRole.runtime, AgentRole.system}
 
 
-def test_the_runtime_role_is_halt_and_clock_only():
+def test_the_runtime_role_is_halt_clock_and_metering_only():
+    """Cycle 34 (ADR-041): REPORT_METERED_COST joined — physics' attestation of
+    another agent's cost, never a participant act. Nothing else may."""
     granted = {a for a in Action if has_permission(AgentRole.runtime, a)}
-    assert granted == {Action.READ_HALT, Action.READ_CLOCK, Action.CONTROL_CLOCK}
+    assert granted == {Action.READ_HALT, Action.READ_CLOCK, Action.CONTROL_CLOCK,
+                       Action.REPORT_METERED_COST}
 
 
 def test_physics_roles_are_exactly_system_and_runtime():

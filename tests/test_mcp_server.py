@@ -306,6 +306,20 @@ async def test_permissions_are_the_apis_not_the_tools(
 
 
 @pytest.mark.anyio
+async def test_report_metered_usage_tool_is_403_for_a_pm_and_works_for_the_runtime(
+    mcp_client_factory, desk, runtime_key
+):
+    _, pm_id, pm_key = desk
+    args = {"agent_id": pm_id, "key_ref": "k1", "usd_micros_total": 1000}
+    async with mcp_client_factory(pm_key) as conn:
+        message = await call_expecting_error(build_server(conn), "report_metered_usage", **args)
+        assert "403" in message
+    async with mcp_client_factory(runtime_key) as conn:
+        done = await call(build_server(conn), "report_metered_usage", **args)
+        assert done["recorded"] is True and done["agent_id"] == pm_id
+
+
+@pytest.mark.anyio
 async def test_a_rejected_order_is_a_result_not_a_tool_failure(
     mcp_client_factory, admin_key, make_pod, fund_pod_cash
 ):
