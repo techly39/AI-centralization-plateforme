@@ -8,8 +8,8 @@ Blocks (exit code 2, reason on stderr — Claude Code feeds it back to the model
   * outbound HTTP writes (POST/PUT/PATCH/DELETE or data upload) to non-local hosts;
   * everything except reads while governance/HALT exists.
 
-This is a seatbelt, not a vault: the real enforcement is git history plus the hash
-check in loop/preflight.py, whose reference hashes live outside the repo.
+This is a seatbelt, not a vault: the real enforcement is the OS sandbox (loop sessions, ADR-042),
+git history, and the hash check in loop/preflight.py, whose reference hashes live outside the repo.
 Stdlib only, so it runs with the system python3.
 """
 from __future__ import annotations
@@ -34,14 +34,19 @@ PROTECTED = (
 READ_ONLY_VERBS = {
     "cat", "head", "tail", "less", "more", "grep", "rg", "wc", "ls", "diff",
     "sha256sum", "shasum", "file", "stat", "test", "[", "echo", "cd", "pwd",
+    "cut", "sort", "uniq", "tr", "nl", "jq",
 }
 # P-0001 (accepted 2026-10-11): match protected PATH tokens, not bare words, so prose in a
 # commit message or `state/loop_status.json` is not mistaken for a protected file.
 PROTECTED_TOKEN = re.compile(
     r"(^|[\s'\"/=:(])(bible/0[01]_|governance(/|\b(?!\s))|loop/|\.claude/settings\.json|\.claude/(hooks|commands|agents)|\.firm(/|\b))"
 )
-READ_ONLY_GIT = {"diff", "log", "show", "status", "blame", "ls-files"}
+READ_ONLY_GIT = {"diff", "log", "show", "status", "blame", "ls-files", "rev-parse", "ls-tree", "cat-file", "grep"}
 WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+# ADR-042: quoted text is data, not shell syntax — a `|` or `>` inside a grep pattern or a message is
+# not a pipe or a redirect. Redirects to /dev/null and between descriptors write nothing.
+QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+HARMLESS_REDIRECT = re.compile(r"\d?>>?\s*/dev/null|\d?>&\d")
 
 DANGEROUS = [
     (r"\bgit\s+push\b[^\n;&|]*(\s-f\b|--force)", "force-push is forbidden (Art. 3.3)"),
@@ -96,9 +101,12 @@ def block(reason: str) -> None:
 
 
 def bash_is_read_only(cmd: str) -> bool:
-    if re.search(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-i|\bmv\b|\bcp\b|\brm\b|\bchmod\b|\btruncate\b|\bln\b|\btouch\b)", cmd):
+    bare = HARMLESS_REDIRECT.sub(" ", QUOTED.sub("''", cmd))
+    if re.search(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-i|\bmv\b|\bcp\b|\brm\b|\bchmod\b|\btruncate\b|\bln\b|\btouch\b)", bare):
         return False
-    for segment in re.split(r"&&|\|\||;|\|", cmd):
+    if re.search(r"\$\(|`", bare):          # command substitution runs arbitrary commands
+        return False
+    for segment in re.split(r"&&|\|\||;|\|", bare):
         words = segment.strip().split()
         if not words:
             continue
@@ -116,7 +124,7 @@ def check_bash(cmd: str, root: Path, halted: bool) -> None:
         if re.search(pattern, cmd):
             block(reason)
     if halted and not bash_is_read_only(cmd):
-        block("governance/HALT exists — only reads allowed; write state and end the cycle (Art. 5)")
+        block("governance/HALT exists — only reads allowed; write state and end the session (Art. 5)")
     scan = re.sub(r"""(-m|--message)\s+("[^"]*"|'[^']*')""", " ", cmd)  # commit prose is not a path
     mentions = bool(PROTECTED_TOKEN.search(scan))
     if mentions and not bash_is_read_only(cmd):

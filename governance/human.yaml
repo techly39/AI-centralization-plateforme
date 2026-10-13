@@ -10,30 +10,54 @@ firm:
   max_spawn_depth: 2             # worker → sub-worker → stop
 
 builder:
-  # The Builder team — the ONLY place models are chosen. Judgment goes to opus, execution to
-  # sonnet. model: opus | sonnet | haiku | fable (aliases follow the newest release) or a
-  # full claude-* id. effort: low | medium | high | xhigh | max.
+  # Builder v2 (ADR-042): the unit of work is a MISSION (protocol/MISSIONS.md); a "cycle" is one
+  # session of `claude -p "/cycle <mode>"`, mode = plan | build | diagnosis, chosen by the runner.
+  #
+  # The Builder team — the ONLY place models are chosen. model: opus | sonnet | haiku | fable
+  # (aliases follow the newest release) or a full claude-* id. effort: low | medium | high | xhigh | max.
   team:
-    lead:      {model: sonnet, effort: high}   # main session: orient, build, test, record
-    lead_hard: {model: opus,   effort: high}   # lead for diagnosis, retrospective (every 10th) and the cycle after a failure
-    architect: {model: opus,   effort: high}   # plans each unit before code is written (Gate 2)
-    auditor:   {model: opus,   effort: high}   # reviews every diff before merge (Gate 5)
-    red-team:  {model: opus,   effort: high}   # attacks physics after risky changes
+    lead:      {model: sonnet, effort: high}   # build sessions
+    lead_hard: {model: opus,   effort: high}   # plan sessions, diagnosis, the session after a failure
+    architect: {model: opus,   effort: high}   # plans each mission once, before its code (Gate 2)
+    auditor:   {model: opus,   effort: high}   # reviews each mission once, before merge (Gate 5)
+    red-team:  {model: opus,   effort: high}   # attacks physics, once per mission that touches it
+    validator: {model: sonnet, effort: high}   # runs acceptance + suite + demo, reports evidence (Gate 5)
+    worker:    {model: sonnet, effort: high}   # side tasks in their own worktree (parallel_workers > 0)
     helpers:   {model: sonnet}                 # every other subagent: search, exploration, chores
 
-  # One command (loop/builder.sh start) runs this many cycles, then stops.
+  # One `loop/builder.sh start` runs this many sessions, then stops.
   cycles_per_run: 4
-  # Dollar guard rails (list-price USD as reported by Claude Code). A cycle only starts if its
-  # whole max_usd_per_cycle still fits under the run and day caps, so no cap is ever overshot.
-  # Measured on all-opus cycles: $1.2–4.8, $6–7.6 with a red-team pass.
-  max_usd_per_cycle: 8           # a cycle is cut off at this spend (room for a red-team pass)
-  max_usd_per_run: 30            # the most one `loop/builder.sh start` can spend
-  max_usd_per_day: 35            # the most all of today's runs together can spend
   max_cycles_per_day: 8
-  max_turns_per_cycle: 150
-  max_consecutive_failures: 3    # then one diagnosis cycle, then the loop stops for you
-  cycle_sleep_seconds: 60        # pause between cycles inside one run
+  # Planning: a plan session runs when no mission is ready, and after every N accepted missions.
+  plan_every_missions: 3
+  # Parallel workers in git worktrees (phase 3 of ADR-042). 0 = the lead works alone.
+  parallel_workers: 0
+
+  # Money: null = no cap. On a subscription the usage limit is the real stop (Human, 2026-10-13).
+  # Set a number to bring a cap back (list-price USD as reported by Claude Code).
+  max_usd_per_cycle: null        # per session
+  max_usd_per_run: null
+  max_usd_per_day: null
+  max_turns_per_cycle: null      # per session
+  # Hang guard, not a budget: a session still running after this many hours is stopped.
+  max_session_hours: 8
+  # Usage limit hit: wait for the reset (if it is less than max_wait_hours away), then continue.
+  wait_for_usage_reset: true
+  max_wait_hours: 6
+  # Out-of-band checks by the runner (minutes): an acceptance check that runs longer fails.
+  acceptance_timeout_minutes: 20
+
+  max_consecutive_failures: 3    # then one diagnosis session, then the loop stops for you
+  cycle_sleep_seconds: 60        # pause between sessions inside one run
   git_remote: origin
+
+  # The OS sandbox around the Builder's shell commands (Claude Code sandboxing, ADR-042).
+  # Writes: the repo and temp dirs (+ allow_write); protected files are write-denied by the OS.
+  # Network: only these hosts. `git push origin` runs outside the sandbox (guard: origin only).
+  sandbox:
+    enabled: true
+    allowed_domains: [github.com, "*.github.com", "*.githubusercontent.com", pypi.org, files.pythonhosted.org]
+    allow_write: ["~/.cache/uv", "~/.local/share/uv"]
 
 approvals:
   era_gates: false               # true = Builder stops and waits at each Era boundary

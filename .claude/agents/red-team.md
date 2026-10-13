@@ -1,6 +1,6 @@
 ---
 name: red-team
-description: Attacks the simulation's physics from the point of view of a clever firm agent. Use after changes to permissions, OMS, market data, metering, budgets, halt, or the Runtime, and at least once per Era. Writes failing tests for every hole found.
+description: Attacks the simulation's physics from the point of view of a clever firm agent. Use once per mission that changes permissions, OMS, market data, metering, budgets, halt, or the Runtime, and at least once per Era. Writes failing tests for every hole found, each with a severity.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: opus
 effort: high
@@ -31,9 +31,16 @@ Attack surface checklist:
 - **Gates & allocation:** pass validation by splitting trials, cherry-picking periods,
   or correlated clones under new names.
 
+Severity (it decides when the hole is fixed — `protocol/MISSIONS.md` §6):
+- **high** — breaks the seal, a budget or cap, HALT, or the ledger's integrity, or lets an agent act
+  as another identity.
+- **medium** — a real advantage or a wrong record an agent can reach, without breaking the above.
+- **low** — needs unlikely conditions, gives no material advantage, or only mislabels a record.
+
 For each hole: write a failing test in `tests/` named `test_redteam_<area>_<hole>.py`
 (or add to an existing red-team file), mark it clearly, and report it. Do not fix the
 physics yourself unless the caller asks — the Builder fixes, so the fix gets reviewed.
+Spend your effort on the mission's new laws first, then on what they touch.
 
 Output:
 ```
