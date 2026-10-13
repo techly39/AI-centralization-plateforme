@@ -10,7 +10,9 @@ Usage (from the repo root, via `uv run python loop/preflight.py ...`):
                      repeated failure)
   --post N LOG  after a run: N = last cycle number before the run, LOG = its output file.
                 Records cost and models used. Counts the run only if state/loop_status.json
-                advanced; a usage/rate-limit stop exits 30 and is not counted (the runner stops).
+                advanced. A session cut off by a usage/rate limit or an overloaded API exits 30:
+                its cost is logged (result=limit, it counts toward the dollar caps), but it is
+                not a cycle and not a failure — the next run resumes the interrupted cycle.
   --cost LOG    print the USD cost of one run, read from its output file
   --apply-team  write builder.team models/efforts into the .claude/agents/ frontmatter
                 (loop/seal.sh runs this before sealing)
@@ -189,7 +191,9 @@ def check() -> None:
     today = dt.date.today().isoformat()
     ran_today = 0
     if CYCLES_LOG.exists():
-        ran_today = sum(1 for line in CYCLES_LOG.read_text().splitlines() if line.startswith(today))
+        # A session cut off by a usage limit is not a cycle: it costs dollars, not a cycle slot.
+        ran_today = sum(1 for line in CYCLES_LOG.read_text().splitlines()
+                        if line.startswith(today) and " result=limit " not in line)
     if ran_today >= int(cfg.get("max_cycles_per_day", 24)):
         stop(f"daily cycle limit reached ({ran_today}).", 20)
     # A cycle starts only if its whole budget still fits under today's cap: the day never overshoots.
@@ -210,9 +214,12 @@ def check() -> None:
 
 
 LIMIT_MARKERS = re.compile(
-    r"usage limit|rate.?limit|limit reached|limit will reset|resets at|429|overloaded|quota",
+    r"usage limit|session limit|rate.?limit|limit reached|limit will reset|resets at|resets \d|429|"
+    r"overloaded|quota",
     re.IGNORECASE,
 )
+# HTTP statuses that mean "the API would not serve us right now", not "the cycle went wrong".
+LIMIT_STATUSES = {429, 529}
 
 
 def spent_today() -> float:
@@ -238,6 +245,27 @@ def result_json(log_text: str) -> dict:
         if isinstance(d, dict):
             return d
     return {}
+
+
+def limit_hit(log_text: str) -> str | None:
+    """Why the session was cut off by the API (usage/rate limit, overload), or None.
+
+    Read from the structured result first (api_error_status / api_error), then from the result
+    text of an errored session, then — only if the log holds no result object at all — from the
+    raw log. Spending money before the limit hit does not make it a failure (cycle 33: $1.01,
+    architect done, then `usage_limit_reached`).
+    """
+    d = result_json(log_text)
+    if d:
+        status = d.get("api_error_status")
+        error = str(d.get("api_error") or "")
+        if status in LIMIT_STATUSES or re.search(r"limit|overloaded|quota", error, re.IGNORECASE):
+            return f"{status or ''} {error} — {d.get('result', '')}".strip()
+        if d.get("is_error") and LIMIT_MARKERS.search(str(d.get("result") or "")):
+            return str(d.get("result"))
+        return None
+    m = LIMIT_MARKERS.search(log_text)
+    return m.group(0) if m else None
 
 
 def run_cost(log_text: str) -> float:
@@ -276,7 +304,8 @@ def last_cycle() -> int:
 def post(before: int, logfile: str | None) -> None:
     """Classify the run that just ended. Exit codes:
          0  a real cycle ran (merged / failed / blocked) — counted toward the daily caps
-         30 no cycle ran because of a usage/rate limit — not counted, the runner stops
+         30 the session was cut off by a usage/rate limit — its cost is logged (result=limit),
+            the failure counter is untouched, the runner stops
     A run that did not advance state/loop_status.json is NEVER counted as merged.
     """
     FIRM_HOME.mkdir(parents=True, exist_ok=True)
@@ -284,21 +313,26 @@ def post(before: int, logfile: str | None) -> None:
     after = last_cycle()
     log_text = read_log(logfile)
     cost = run_cost(log_text)
+    used = models_used(log_text)
+    models = ",".join(f"{m}:{c:.2f}" for m, c in sorted(used.items())) or "none"
 
     if after > before:
         try:
             result = json.loads(status_file.read_text()).get("result", "failed")
         except (OSError, json.JSONDecodeError):
             result = "failed"
-    elif LIMIT_MARKERS.search(log_text) and cost == 0:
-        print("POST: no cycle ran — usage/rate limit hit. Not counted.")
-        sys.exit(30)
     else:
+        why = limit_hit(log_text)
+        if why is not None:
+            with CYCLES_LOG.open("a") as fh:
+                fh.write(f"{dt.date.today().isoformat()} cycle={before + 1} result=limit cost={cost:.4f} "
+                         f"models={models}\n")
+            print(f"POST: the session was cut off by the API ({why}). Cost ${cost:.2f} logged; "
+                  "not a cycle, not a failure — the next run resumes it.")
+            sys.exit(30)
         result = "failed"
         print("POST: the run did not advance state/loop_status.json — counted as failed.")
 
-    used = models_used(log_text)
-    models = ",".join(f"{m}:{c:.2f}" for m, c in sorted(used.items())) or "none"
     warn = ""
     # Gate 5's auditor runs on its own model; a merge with no usage of that model means the
     # review was skipped or downgraded. Flag it for the Human (it cannot be hidden from this log).
