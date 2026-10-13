@@ -158,84 +158,133 @@ def stop(server: subprocess.Popen) -> bool:
 
 
 def backtest_check() -> bool:
-    """The desk month's first days through the operator's commands (R-3b-2c-1): a
-    synthetic backtest database, ``fund-env serve`` on it, and ``fund-runtime
-    backtest`` provisioning ``specs/desk-month`` and conducting the run."""
+    """The desk month's first days through the operator's commands (R-3b-2c-1), then the same run
+    replayed from its cassette (R-4b-2a, ADR-040): a synthetic backtest database, ``fund-env serve``
+    on it, ``fund-runtime backtest --cassette`` provisioning ``specs/desk-month`` and conducting the
+    run; then a second fresh database in the same world, ``fund-runtime replay`` of the cassette,
+    and ``fund-env compare-ledgers`` of the two files."""
     with tempfile.TemporaryDirectory(prefix="fund-smoke-bt-") as tmp:
         tmpdir = Path(tmp)
-        port = free_port()
-        base = f"http://127.0.0.1:{port}"
+        cassette = tmpdir / "desk.cassette.json"
+        ok = desk_run(tmpdir, "backtest", ["backtest", "--steps", "5", "--cassette", str(cassette)],
+                      verify_backtest, "scripted")
+        ok &= step("fund-runtime backtest --cassette wrote the record",
+                   cassette.is_file() and cassette.stat().st_mode & 0o777 == 0o600)
+        if not ok:
+            return False
+        ok &= desk_run(tmpdir, "replay", ["replay", "--cassette", str(cassette)],
+                       verify_replay, "cassette")
         env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
-        env["FUND_DATABASE_URL"] = f"sqlite:///{tmpdir / 'backtest.db'}"
-        env["FUND_MARKETDATA__PROVIDER"] = "synthetic"
-        # One fixed world (cycle 28): a fresh random key drew, now and then, five days in
-        # which the analyst never said long, and the step failed on the world's luck.
-        # This key opens nothing; it only names a throwaway synthetic market.
-        env["FUND_MARKETDATA__SYNTHETIC_KEY"] = SMOKE_WORLD_KEY
-        keys = {}
-        for args in (["init-db"], ["start-backtest", "--start", "2024-01-02T14:30:00Z"],
-                     ["seed-admin", "--name", "smoke-mgmt"], ["seed-runtime"],
-                     ["create-pod", "--name", "desk-1", "--allocation", "1000000"]):
-            r = run_cli(env, *args)
-            key = re.search(r"\bfk_\S+", r.stdout)
-            if key:
-                keys[args[0]] = key.group(0)
-            if not step(f"backtest db: fund-env {args[0]}", r.returncode == 0,
-                        "" if r.returncode == 0 else (r.stdout + r.stderr).strip()[-300:]):
-                return False
-        server_log = (tmpdir / "serve.log").open("w")
-        server = subprocess.Popen(
-            ["uv", "run", "fund-env", "serve", "--port", str(port)],
-            cwd=REPO, env=env, stdout=server_log, stderr=subprocess.STDOUT,
-        )
+        r = run_cli(env, "compare-ledgers", str(tmpdir / "backtest.db"), str(tmpdir / "replay.db"))
         try:
-            if not step("backtest db: fund-env serve answers /health", wait_for_health(base)):
-                print((tmpdir / "serve.log").read_text()[-2000:])
-                return False
-            run_env = {**env, "FUND_RUNTIME__SERVER_URL": base,
-                       "FUND_RUNTIME__REGISTRAR_KEY": keys.get("seed-admin", ""),
-                       "FUND_RUNTIME__CLOCK_KEY": keys.get("seed-runtime", "")}
+            result = json.loads(r.stdout)
+            fine = (r.returncode == 0 and result["equal"] is True and result["allowed"] == 1
+                    and result["first_difference"] is None)
+            detail = result["detail"]
+        except (ValueError, KeyError, TypeError):
+            fine, detail = False, (r.stdout + r.stderr).strip()[-300:]
+        return ok & step("fund-env compare-ledgers: the replay's ledger is the recorded one's "
+                         "but for the declaration", fine, detail)
+
+
+def verify_backtest(r: subprocess.CompletedProcess[str], keys: dict[str, str]) -> tuple[bool, str]:
+    try:
+        out = json.loads(r.stdout)
+        wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
+        # An order the PM placed and physics accepted (its tool result is no error).
+        filled = [m for w in wakes if w["spec_id"] == "b-pm" for m in w["transcript"]
+                  if m["role"] == "tool" and m["tool_call_id"].startswith("order:")
+                  and not m["is_error"]]
+        fine = (r.returncode == 0 and out["ended"] == "completed"
+                and out["registered"] == ["a-analyst", "b-pm"] and len(wakes) == 10
+                and all(w["ended"] == "done" and w["tool_failures"] == 0 for w in wakes)
+                and bool(filled)
+                and not any(k in r.stdout + r.stderr for k in keys.values()))
+        return fine, (f"{out['ended']}, {len(out['run']['steps'])} steps, {len(wakes)} wakes,"
+                      f" {len(filled)} orders accepted")
+    except (ValueError, KeyError, TypeError):
+        return False, (r.stdout + r.stderr).strip()[-300:]
+
+
+def verify_replay(r: subprocess.CompletedProcess[str], keys: dict[str, str]) -> tuple[bool, str]:
+    try:
+        out = json.loads(r.stdout)
+        wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
+        free = all(e["usage"] == {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
+                   for w in wakes for e in w["exchanges"])
+        fine = (r.returncode == 0 and out["ended"] == "completed" and out["run"]["minds"] == "cassette"
+                and len(wakes) == 10 and free and bool(wakes)
+                and not any(k in r.stdout + r.stderr for k in keys.values()))
+        return fine, f"{out['ended']}, {len(wakes)} wakes, zero usage: {free}"
+    except (ValueError, KeyError, TypeError):
+        return False, (r.stdout + r.stderr).strip()[-300:]
+
+
+def desk_run(tmpdir: Path, name: str, command: list[str], verify, kind: str) -> bool:
+    """A fresh synthetic backtest database ``NAME.db`` in ``tmpdir`` (the same world every time),
+    ``fund-env serve`` on it, ``fund-runtime COMMAND`` on ``specs/desk-month``, the server stopped.
+    ``verify(result, keys)`` judges the run; the ledger must declare minds ``kind``."""
+    port = free_port()
+    base = f"http://127.0.0.1:{port}"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
+    env["FUND_DATABASE_URL"] = f"sqlite:///{tmpdir / (name + '.db')}"
+    env["FUND_MARKETDATA__PROVIDER"] = "synthetic"
+    # One fixed world (cycle 28): a fresh random key drew, now and then, five days in
+    # which the analyst never said long, and the step failed on the world's luck.
+    # This key opens nothing; it only names a throwaway synthetic market.
+    env["FUND_MARKETDATA__SYNTHETIC_KEY"] = SMOKE_WORLD_KEY
+    keys = {}
+    for args in (["init-db"], ["start-backtest", "--start", "2024-01-02T14:30:00Z"],
+                 ["seed-admin", "--name", "smoke-mgmt"], ["seed-runtime"],
+                 ["create-pod", "--name", "desk-1", "--allocation", "1000000"]):
+        r = run_cli(env, *args)
+        key = re.search(r"\bfk_\S+", r.stdout)
+        if key:
+            keys[args[0]] = key.group(0)
+        if not step(f"{name} db: fund-env {args[0]}", r.returncode == 0,
+                    "" if r.returncode == 0 else (r.stdout + r.stderr).strip()[-300:]):
+            return False
+    server_log = (tmpdir / f"{name}-serve.log").open("w")
+    server = subprocess.Popen(
+        ["uv", "run", "fund-env", "serve", "--port", str(port)],
+        cwd=REPO, env=env, stdout=server_log, stderr=subprocess.STDOUT,
+    )
+    try:
+        if not step(f"{name} db: fund-env serve answers /health", wait_for_health(base)):
+            print((tmpdir / f"{name}-serve.log").read_text()[-2000:])
+            return False
+        run_env = {**env, "FUND_RUNTIME__SERVER_URL": base,
+                   "FUND_RUNTIME__REGISTRAR_KEY": keys.get("seed-admin", ""),
+                   "FUND_RUNTIME__CLOCK_KEY": keys.get("seed-runtime", "")}
+        try:
             r = subprocess.run(
-                ["uv", "run", "fund-runtime", "backtest", "--specs", "specs/desk-month",
-                 "--input", "specs/desk-month/input.json", "--steps", "5"],
+                ["uv", "run", "fund-runtime", *command, "--specs", "specs/desk-month",
+                 "--input", "specs/desk-month/input.json"],
                 cwd=REPO, env=run_env, capture_output=True, text=True, timeout=300,
             )
-            try:
-                out = json.loads(r.stdout)
-                wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
-                # An order the PM placed and physics accepted (its tool result is no error).
-                filled = [m for w in wakes if w["spec_id"] == "b-pm" for m in w["transcript"]
-                          if m["role"] == "tool" and m["tool_call_id"].startswith("order:")
-                          and not m["is_error"]]
-                fine = (r.returncode == 0 and out["ended"] == "completed"
-                        and out["registered"] == ["a-analyst", "b-pm"] and len(wakes) == 10
-                        and all(w["ended"] == "done" and w["tool_failures"] == 0 for w in wakes)
-                        and bool(filled)
-                        and not any(k in r.stdout + r.stderr for k in keys.values()))
-                detail = (f"{out['ended']}, {len(out['run']['steps'])} steps, {len(wakes)} wakes,"
-                          f" {len(filled)} orders accepted")
-            except (ValueError, KeyError, TypeError):
-                fine, detail = False, (r.stdout + r.stderr).strip()[-300:]
-            ok = step("fund-runtime backtest: specs/desk-month lives 5 days", fine, detail)
-            ok &= minds_check(tmpdir / "backtest.db")
-        finally:
-            clean = stop(server)
-            server_log.close()
-        return ok & step("backtest server stopped cleanly on SIGINT", clean)
+            fine, detail = verify(r, keys)
+        except subprocess.TimeoutExpired:
+            fine, detail = False, "timed out after 300 s"
+        ok = step(f"fund-runtime {command[0]}: specs/desk-month", fine, detail)
+    finally:
+        clean = stop(server)
+        server_log.close()
+    ok &= step(f"{name} server stopped cleanly on SIGINT", clean)
+    return ok & minds_check(tmpdir / f"{name}.db", kind)
 
 
-def minds_check(db: Path) -> bool:
-    """Physics' own record of the run (ADR-032 (p)): one declaration, ``scripted``,
-    written before any firm agent's event. Read from the file, as a reader would."""
+def minds_check(db: Path, kind: str) -> bool:
+    """Physics' own record of the run (ADR-032 (p)): one declaration, ``kind``, written before
+    any firm agent's event. Read from the file, as a reader would."""
     with sqlite3.connect(db) as con:
         rows = con.execute("SELECT id, payload_json FROM events "
                            "WHERE type = 'run_minds_declared'").fetchall()
         first_firm = con.execute(
             "SELECT min(e.id) FROM events e JOIN agents a ON a.id = e.actor_agent_id "
             "WHERE a.role NOT IN ('system', 'runtime')").fetchone()[0]
-    fine = (len(rows) == 1 and json.loads(rows[0][1]) == {"minds": ["scripted"]}
+    fine = (len(rows) == 1 and json.loads(rows[0][1]) == {"minds": [kind]}
             and first_firm is not None and rows[0][0] < first_firm)
-    return step("backtest db: the ledger declares minds: scripted, before any firm act", fine,
+    return step(f"{db.stem} db: the ledger declares minds: {kind}, before any firm act", fine,
                 f"{rows}, first firm event {first_firm}")
 
 
