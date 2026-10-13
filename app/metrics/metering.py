@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Agent, Event
 from app.ledger.events import EVENT_COST_METERED, append_event
-from app.limits import MAX_METERED_USD_MICROS
+from app.limits import MAX_ID, MAX_METERED_USD_MICROS
 from app.registry.permissions import PHYSICS_ROLES
 
 #: Held by the endpoint across the check, the append *and* the commit, so two
@@ -90,9 +90,9 @@ def _valid(payload: object) -> tuple[int, int | None, str, int] | None:
         return None
     agent_id, pod_id = payload.get("agent_id"), payload.get("pod_id")
     key_ref, total = payload.get("key_ref"), payload.get("usd_micros_total")
-    if type(agent_id) is not int or not isinstance(key_ref, str):
+    if type(agent_id) is not int or not 1 <= agent_id <= MAX_ID or not isinstance(key_ref, str):
         return None
-    if pod_id is not None and type(pod_id) is not int:
+    if pod_id is not None and (type(pod_id) is not int or not 1 <= pod_id <= MAX_ID):
         return None
     if type(total) is not int or not 0 <= total <= MAX_METERED_USD_MICROS:
         return None

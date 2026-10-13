@@ -1520,6 +1520,16 @@ tick) is not built. **This cycle ticks nothing**: no mind spends and the gate is
    `compare-ledgers` (ids strict, ADR-040) would reject. Answer: sync only after the last step, so the
    rows form a trailing block that R-6b's comparison handles by type, by its own ADR. The comparison
    is never widened to make a difference pass.
+- **Red-team 0019** (`tests/test_redteam_0019.py`, 83 tests): 1 hole (low, reachable only by a row forged
+  into the ledger or a future pod-move law): "metered" was decided per pod, so an agent whose metered
+  row named another pod kept its self-reports in its own. Fixed: "metered" is decided over the whole
+  fold; its self-reports leave every pod's total, its dollars land on the event's pod. Defence in
+  depth: the reader also requires `agent_id`/`pod_id` in 1..`MAX_ID`. Held: every firm-role post,
+  rebind and lowering; the runtime key on 11 participant routes; `key_ref` anchor/unicode/coercion
+  tricks; 12-thread races on one key (file-backed SQLite); HALT; self-report masking; forged rows;
+  10 000 keys at the cap; `key_ref` in every agent read; MCP bounds. Noted, not filed: a post already
+  past the halt check can still write once (every endpoint has this gap); R-6b must cap a key's
+  limit at `MAX_METERED_USD_MICROS`.
 - **Old tests this law broke (findings, not tests to loosen):** `test_redteam_0014` (the runtime key
   answers only /me, /clock, /halt, /clock/advance, /run/minds, /health — now also
   `POST /metering/usage`) and `test_runtime_identity` (the runtime role was exactly

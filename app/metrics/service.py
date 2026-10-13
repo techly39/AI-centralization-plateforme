@@ -293,27 +293,31 @@ def _cost_metrics(session: Session, pod_id: int, metered: dict[int, AgentMetered
     metered_usd: float | None = None
     gap: float | None = None
     authoritative = self_reported
-    if in_pod:
-        metered_usd = sum(m.usd_micros for m in in_pod.values()) / 1_000_000
-        theirs = float(
-            session.execute(
-                select(func.coalesce(func.sum(Cost.usd_cost), 0.0)).where(
-                    Cost.pod_id == pod_id, Cost.agent_id.in_(list(in_pod))
-                )
-            ).scalar_one()
-        )
-        # Summed directly, never as ``self_reported - theirs``: past ~2e13 dollars of
-        # self-report spam a float subtraction loses cents, and a metered agent's
-        # reports could then move its colleagues' share (audit c34 WARN 1).
+    if metered:
+        # "Metered" is decided over the whole fold, not per pod: a metered agent's
+        # self-reports leave *every* pod's total, whichever pod its dollars land
+        # on (red-team 0019 rt0019-1). The unmetered part is summed directly,
+        # never as ``self_reported - theirs``: past ~2e13 dollars of self-report
+        # spam a float subtraction loses cents (audit c34 WARN 1).
         unmetered = float(
             session.execute(
                 select(func.coalesce(func.sum(Cost.usd_cost), 0.0)).where(
-                    Cost.pod_id == pod_id, Cost.agent_id.not_in(list(in_pod))
+                    Cost.pod_id == pod_id, Cost.agent_id.not_in(list(metered))
                 )
             ).scalar_one()
         )
-        authoritative = unmetered + metered_usd
-        gap = theirs - metered_usd
+        landed = sum(m.usd_micros for m in in_pod.values()) / 1_000_000
+        authoritative = unmetered + landed
+        if in_pod:
+            metered_usd = landed
+            theirs = float(
+                session.execute(
+                    select(func.coalesce(func.sum(Cost.usd_cost), 0.0)).where(
+                        Cost.pod_id == pod_id, Cost.agent_id.in_(list(in_pod))
+                    )
+                ).scalar_one()
+            )
+            gap = theirs - metered_usd
     return CostMetrics(
         total_usd_cost=round_money(authoritative),
         tokens_in=int(row[1]),
