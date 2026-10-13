@@ -1412,3 +1412,11 @@ Next: R-4b-2 (`fund-runtime replay` CLI, cassette v2 recording run parameters/sp
 - **STATE.md budget (X-013, step 8):** ≤ 120 lines, a map not a history. Compacted from 283 to 86
   lines; the old text is `git show 5bffbfa:state/STATE.md`; the ADRs and journal entries it cited hold
   the per-capability detail. If a cycle misses a fact, recover it from that commit.
+
+## Cycle 0033 — R-4b-2a the replay CLI, the refusal law, a ledger comparison (2026-10-13)
+Era: I — The Desk
+Exit criterion served: EC2 (replay at $0, test half; ticks nothing, ADR-032 leaves EC2 to R-8).
+X-011 check (architect): EC1 not met (real minds, R-8, Q-0001); EC2 met end to end for scripted minds after this cycle, unticked until R-8; EC4 not met (R-6); EC7 not met (R-7).
+Resumed: the empty branch `cycle/0033-replay-cli` (usage-limit cut-off, X-012 case 3), fast-forwarded to main 64789e6; same number, step 2.
+Plan: UNIT: `fund-runtime replay --cassette PATH --specs DIR`, the replay refusal law (audit c32 NOTE 4), a read-only ledger comparison (`fund-env compare-ledgers`), and a record-then-replay step in the smoke run (R-4b-2a). SLICE: cassette v1 only; cassette v2, NOTE 5, a size cap and `replay --cassette OUT` go to a new backlog item R-4b-2b. RED-TEAM: no (escalate if the halted branch, decide_batch, the budget clamp, check_clock, declare_minds, app/registry or app/run_clock are edited). See state/plans/0033.md.
+Hypothesis: a cassette of a scripted month, replayed through the operator command into a fresh database, ends `completed` at $0, and `fund-env compare-ledgers` finds the two ledgers equal row for row (raw text) except the one `run_minds_declared` payload; a changed world, input or calendar ends `diverged` with exit 1 and an unequal ledger; a setup refusal in a replay ends `refused`, not `diverged`. Metric: exit codes, `allowed == 1`, `first_difference`.
