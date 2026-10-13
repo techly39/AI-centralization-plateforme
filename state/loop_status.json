@@ -1,1 +1,1 @@
-{"cycle": 34, "result": "merged", "branch": "cycle/0034-metering-physics", "ts": "2026-10-13T14:30:00Z"}
+{"cycle": 35, "result": "blocked", "reason": "budget: about $2.28 of the $8 session cap left; architect + auditor (+ red-team for B-053/B-054) cannot fit, so no unit was started", "branch": "main", "ts": "2026-10-13T14:45:00Z"}
