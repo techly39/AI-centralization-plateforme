@@ -68,11 +68,29 @@ instrument is not worth having).
 
 ## 3. The road, one step ahead
 
-*(Cycle 37, ADR-042: the road is now walked in missions — `protocol/MISSIONS.md`,
-`state/missions.json`. The milestones below are the raw material of the first missions; the first
-planning session re-cuts them and rewrites this section.)*
+*(Rewritten cycle 37, the first planning session — ADR-042, ADR-043. The road is walked in
+missions: `state/missions.json`.)*
 
-**Now → Era I exit (the Runtime).** Plan: ADR-032, backlog slices R-1…R-8. Milestones:
+**Where M1–M6 stand (cycle 37).** M1 and M3 are done (scripted month through the Runtime; EC3, EC5,
+EC6 ticked). M2 is half done: a replay works, but it needs the right flags, and the ledger comparison
+is a separate command. Missions:
+
+| Next | Mission | Milestone / criterion | Scientific question it answers |
+|---|---|---|---|
+| 1 | M-001 metered month | M4 · EC4 | Can a run's every dollar be attributed from the meter alone? |
+| 2 | M-002 one-file proof object | M2 · EC2 path | Can anyone re-live a run from one file and get a verdict? |
+| 3 | M-003 OpenClaw certified | M5 · EC7 static | Can minds be set up to the standard by code, and refused when not? |
+| 4 | M-004 holes closed | gate before M6 | — (hardening, 9 strict xfails) |
+| 5 | M-005 Truman shock | Era I deliv. 4–5 | Can the Builder change the world only by recorded, replayable events? |
+| 6 | M-006 risk ladder | Era II EC2 | Can a pod's death be a law, not a judgement? |
+
+After M-001…M-004, **Era I has nothing left the Builder can do alone**. EC1, EC2 and EC7-live need
+one real-model month (M6), and M6 needs the Human's cap (Q-0001). Until the cap is set, Era II work
+proceeds (ADR-043). Measure at the next plan: Era I criteria ticked (now 3/7 → target 5/7 after
+M-001 + M-003), proof objects with a one-command verdict (now 0 → 1 after M-002), and sessions per
+mission against each mission's estimate.
+
+**The original milestones (cycle 20), kept for the record:**
 - **M1** a two-mind pod (PM + Analyst) with *scripted* minds lives a month **through the
   Runtime**, every act over HTTP, under 10 minutes;
 - **M2** the same month replayed from cassettes → identical ledger, $0;
@@ -86,6 +104,17 @@ planning session re-cuts them and rewrites this section.)*
 M1–M5 need no money. M6 is the only step that waits for the Human, so it goes last. EC1, EC2 and
 EC7's live half are ticked only by real minds, at M6. EC3–EC6 are test criteria that tests with
 scripted or fake providers may meet.
+
+**The fork is not new, and that sharpens it (cycle-37 search).** Branching a simulation from a saved
+round exists: WhatIf (arXiv 2604.17615) and Inject/Fork/Compare (arXiv 2509.13712), whose demo is a
+14-agent commodity market. Causal Agent Replay (arXiv 2606.08275) applies a do-operation to one
+agent's trajectory. Its stated limit is that branches do not share random numbers, so only total
+effects are measurable. What none of them has is a **shared history replayed from cassettes in a
+world whose physics is deterministic**. That makes the prefix exact at $0 and isolates the change.
+That is the "common random numbers" the CAR authors say is hard. The claim narrows from "nobody
+forks" to "nobody forks a multi-agent LLM economy with an exact, free, verified shared prefix", and
+it still needs a proper search at the Forks Era. LLM trading benchmarks that replay deterministically
+(PredictionMarketBench, arXiv 2602.00133) replay *the market*, not *the minds*.
 
 **Era II (the end of the Launch Pad)** as the Human wrote it, with the fork as its measuring tool.
 Generation N+1 is a fork of generation N's world, so "did the firm get better?" is asked against
@@ -126,7 +155,7 @@ the Launch Pad closes; never build Era N+2 to finish Era N):
 
 ## 6. How this vision is held to account
 
-At each retrospective, three numbers in the journal: Era exit criteria ticked (now 0/7 Era I),
+At each retrospective (since cycle 37: each planning session), three numbers in the journal: Era exit criteria ticked (cycle 37: 3/7 Era I),
 proof objects (runs that replay to their ledger: now 1 scripted probe in tests), and the
 ambition check: *is there an experiment this world can run that no other can?* (now: not yet;
 a fork of scripted minds needs M2, and a fork that means anything about LLMs also needs M6).

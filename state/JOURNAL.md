@@ -1460,3 +1460,18 @@ Work:
 Result: merged 5eb1d6d, pushed. Hypothesis **met**: a refused spec under a null cap declares nothing and makes no agent; HALT at all five stages ends `halted` with nothing woken after it and no advance; non-halt refusals keep their labels (409 and `bad_input` counter-examples). Auditor PASS, 0 BLOCK (WARN 1: no test for `register_failed:*:423` → the red-team's held test covers it, mutation-confirmed by the re-audit; NOTEs 7/8 ADR text fixed; NOTE 1 not taken, trust assumption written). Red-team 0020: 4 holes, none breaks an invariant: cassette spec in a backtest (medium, fixed, test committed before the fix per X-010); unknown tool and missing pod pass `vet` (low → B-055); physics 500 on register into a missing pod (low → B-056). Scoped re-audit PASS.
 Learned: (1) "Could never wake" has more causes than the gate: a provider that needs a tape it does not have, a tool that does not exist, a pod that does not exist. A pre-gate named after the gate checked only the gate's causes. Name the invariant ("every spec can wake"), then list its causes. (2) A deviation written only in a commit message and the ADR is not in the journal; Gate 2 wants it in the journal, written as it happens. (3) Running auditor and red-team in parallel saved a round trip; the red-team's held tests then answered the auditor's coverage WARN.
 Next: B-056 (or with R-6b's red-team), R-6b, R-4b-2b. Cycle 40 = retrospective.
+
+## Cycle 0037 — plan — re-foundation: the first mission queue (2026-10-13)
+Look back: no v2 metrics yet (`$FIRM_HOME/metrics.jsonl` absent; regression: 0 done missions). Era I 3/7
+(EC3, EC5, EC6); no criterion newly met by code (X-011: EC4 needs R-6b, EC7 has no adapter, EC1/EC2 need
+real minds).
+World: scripted pods live and replay a month; physics is honest about time, money and halt. What became
+boring: one more seal slice. Frontier: a spending mind (metered), a run as a one-file proof, minds as real
+OpenClaw agents, and the world's first scripted event (a shock), which turns the firm's risk law into
+something the world can test.
+Outward: 3 searches (sources in IDEAS c37). Forking sims exist (WhatIf, Inject/Fork/Compare). Causal Agent
+Replay lacks common random numbers; cassette-replayed prefixes are exactly that. Vision §3 narrowed.
+Decided: 6 ready missions M-001…M-006 (ADR-043); Era II starts while EC1/EC2/EC7-live wait on Q-0001;
+fork + correlated-minds experiment parked; AlphaForge-style "minds write code" rejected. No process change:
+no baseline to judge it against (ADR-043 §5). Result: planned.
+Next: build → M-001 (architect, acceptance red first).

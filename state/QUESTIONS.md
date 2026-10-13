@@ -5,6 +5,10 @@ Context: `firm.monthly_llm_usd_cap` is null (ADR-003). Era I's milestone (B-015)
 Options: A wait / B build everything against a fake provider + cassettes until the cap is set.
 Chosen: B. Everything up to B-014 needs no live LLM spend.
 Reversible: yes.
+Update (cycle 37): after missions M-001…M-004, this cap is the **only** thing between Era I and its
+exit. The remaining three criteria (the real-model month, its replay, and OpenClaw's live probes) need
+real minds. A small cap is enough for one month of a two-mind pod on a cheap model (estimate at R-8).
+Until then the Builder works on Era II (ADR-043).
 Human answer:
 
 ## Q-0002 (cycle 0) — OpenRouter provisioning credential

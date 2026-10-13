@@ -3,6 +3,12 @@
 > **Since cycle 37 (ADR-042) the work queue is `state/missions.json`** (standard:
 > `protocol/MISSIONS.md`). Planning sessions re-cut the open items below into missions and mark each
 > item that became one with its mission id. Do not take an item from here as a unit of work.
+>
+> **Cycle 37 mapping (ADR-043):** R-6b (+c34 WARN 3, O(n²)) → **M-001** · R-4b-2b (+B-051) → **M-002** ·
+> R-7 (B-012, B-012a, B-012b, B-023s, B-000l) → **M-003** · B-055, B-056, B-019, B-000g, B-000e, B-026,
+> B-036 → **M-004** · B-007, B-008 (synthetic half) → **M-005** · R-8 (B-015) → waits on Q-0001 (no
+> mission yet) · R-3c `daily_cycle` (live mode, needs network) → not yet a mission. Era II risk
+> ladder (04_FIRM §5) → **M-006**. Everything else stays raw material.
 
 ## The Runtime — Era I exit (ADR-032; cycle-20 retrospective: this is the frontier)
 One slice per cycle, in order. Each names the exit criterion (EC1–EC7, `05_ERAS.md` Era I, in

@@ -1,7 +1,7 @@
 # STATE — rewritten every cycle (budget: ≤ 120 lines, X-013)
 
 **Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
-**Last cycle:** 36 (B-053 + B-054: vet before physics is told, HALT reads `halted` at every stage —
+**Last cycle:** 37 (plan: the first mission queue, ADR-043). Before: 36 (B-053 + B-054: vet before physics is told, HALT reads `halted` at every stage —
 merged 5eb1d6d, 2026-10-13; ADR-032/040 amendment; red-team 0020; ticks nothing). Cycle 35 was
 blocked on budget. Cycle 34: R-6a metering physics half (ADR-041).
 
@@ -99,12 +99,10 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next moves
-1. **Cycle 37 = planning session, the re-foundation** (`protocol/PLAN.md`, last section): turn
-   `09_BUILDER_VISION.md` §3 (M1–M6), the open Era I criteria (EC1, EC2, EC4, EC7) and the open
-   backlog into 3–6 ready missions. Raw material as of cycle 36 (not instructions): R-6b metering
-   end to end (EC4, ADR-041 §8); R-4b-2b cassette v2 + `replay --cassette OUT`; R-3c `daily_cycle`;
-   R-7 OpenClaw conformance (EC7); physics holes B-055, B-056 and the 9 strict xfails → one
-   hardening mission.
-2. Then build sessions on the first ready mission.
+1. **Mission queue (cycle 37 plan, ADR-043), `state/missions.json`:** M-001 metered month (EC4) →
+   M-002 one-file proof object (EC2 path) → M-003 OpenClaw certified (EC7 static) → M-004 holes
+   closed (9 strict xfails) → M-005 Truman shock → M-006 risk ladder (Era II EC2). Era II work
+   proceeds while EC1/EC2/EC7-live wait on Q-0001.
+2. Next session: build, start M-001 (architect → `acceptance/M-001.py` red first).
 3. Keep from the old X-rules (now in the auditor's checks): "what does the artifact hold that the
    reader never compares?" and "name the one-line production change that turns each new test red".

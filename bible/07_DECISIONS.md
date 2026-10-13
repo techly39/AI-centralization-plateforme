@@ -1627,3 +1627,35 @@ recorded (a negative result is a result, Art. 9.2).
 `worker.md`, `.claude/settings.json` (Stop hook), `.claude/hooks/guard.py` (quoted text is data, not shell
 syntax; `>/dev/null` is not a write; `$(…)` is never read-only) + new `stop_gate.py`, `loop/run.sh`,
 `loop/builder.sh`, `loop/preflight.py`, `governance/human.yaml`. Recorded as P-0004.
+
+## ADR-043 — The first mission queue; Era II work starts while Era I's real-mind criteria wait on the cap — accepted (cycle 37, plan)
+**Context.** The re-foundation planning session (cycle 37, `protocol/PLAN.md`) turned the vision
+milestones M1–M6, the open Era I criteria and the open backlog into missions. Era I has 3 of 7 exit
+criteria ticked. Of the other four, EC4 and EC7's static half can be met with fake providers and no
+money. EC1, EC2 and EC7's live half are ticked only by real minds, which need `monthly_llm_usd_cap`
+(Q-0001, unanswered since cycle 0). Once EC4 and EC7-static are met, Era I has nothing left that the
+Builder can do alone.
+
+**Decision.**
+1. The queue is M-001 metered month (EC4) → M-002 self-contained proof object (EC2 path) → M-003
+   OpenClaw certified (EC7 static) → M-004 hardening (9 strict xfails) → M-005 Truman shock (Era I
+   deliverables 4–5) → M-006 risk ladder (Era II EC2). Raw material is mapped in `state/BACKLOG.md`.
+2. **Era II work may begin before Era I closes**, while Era I's open criteria wait only on the Human.
+   Era II is N+1, so the prime rule's "never build Era N+2 to finish Era N" is not breached. CLAUDE.md
+   rule 10 ("never wait for the Human") rules out idling. Missions that unblock Era I always go ahead
+   of Era II missions in the queue.
+3. The fork instrument (`09_BUILDER_VISION.md` §2) is **parked, not adopted**. It belongs to an Era
+   after the Launch Pad (N+2). M-002 (one-file proof object) is the prerequisite it shares with Era I.
+   The fork will be considered when Era II's generations need it ("generation N+1 is a fork of N").
+4. Truman v1 is built on the keyed synthetic market, not a real-history pack. Fetching history needs
+   network that the Builder's sandbox does not have.
+5. No process change at this plan (`protocol/PLAN.md` §6). The runner has logged zero v2 sessions
+   (`$FIRM_HOME/metrics.jsonl` does not exist yet). Changing the process before its baseline is
+   measured would confound ADR-042's own evaluation. The first process hypothesis is due at the next
+   plan, against measured v2 sessions.
+
+**Alternatives rejected.** Waiting for Q-0001 before Era II (idles the loop). Adopting the fork now
+(N+2, and without real minds it measures scripted code). A hardening-first queue (MISSIONS §5: at
+most 1 in 5; none of the 9 holes is high).
+
+**Reversible.** Yes: the queue is re-cut at every plan.

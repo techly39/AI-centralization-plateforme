@@ -371,3 +371,25 @@ what it unlocks, why it's never been seen) and adopt, park, or reject them.
   mechanism (the wake gate) checked only that mechanism's causes; red-team 0020 found three more ways a
   spec "could never wake" (no tape, unknown tool, missing pod). Before writing a check, write the
   invariant in words and list every cause that can make it false. — status: new
+
+### Cycle 37 — first planning session (re-foundation)
+Sources (outward look, 3 searches): WhatIf, arXiv 2604.17615 (fork a social sim from a saved round,
+parent pointer, copied prefix); Inject/Fork/Compare, arXiv 2509.13712 (fork vocabulary, 14-agent
+commodity market); Causal Agent Replay, arXiv 2606.08275 (do-operation on one agent step, re-run
+forward; its limit: no common random numbers across branches); Counterfactual Rollout Replay (forkable
+envs as process rewards, 2026-09); PredictionMarketBench, arXiv 2602.00133 (deterministic market
+replay, not mind replay); AlphaForgeBench, arXiv 2602.18481 (LLM trading results vary run to run; they
+make the LLM write factors to get determinism); Ross, So, De Simone, Pozniak, Lo (2026-09: more capable
+LLM traders act more alike → a "non-diversifiable risk floor").
+- [cycle 37] **Fork with common random numbers** — our cassette prefix is exactly the shared randomness
+  CAR says is missing; a fork measures a *direct* effect, not a total one. Decision: **park** (N+2, ADR-043;
+  M-002 is the shared prerequisite). — status: parked
+- [cycle 37] **Correlated minds experiment** — several pods on the same model vs. mixed models, under the
+  same Truman crash (M-005): does the firm's joint drawdown rise with model capability (Lo et al.'s
+  risk floor), measured on one world? Needs real minds (Q-0001) + M-005 + M-006. Decision: **park** until
+  a cap exists; it is the best first experiment for Era II. — status: parked
+- [cycle 37] **Determinism by construction (AlphaForge)** — have minds emit strategies as code instead
+  of orders. Decision: **reject** for now: the ADR-028 Era III constraint already says strategy code
+  never runs in the App; the firm studies minds acting, not factor quality. — status: rejected
+- [cycle 37] **Real-history Truman pack via a Human-run fetch** (`fund-env truman fetch`, the one network
+  step outside the sandbox). After M-005. — status: new
