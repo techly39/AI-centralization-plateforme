@@ -138,22 +138,25 @@ keep their ids for history.
       tick-blindness).
   - [x] **R-5a** **Done cycle 30** (ADR-036, `tests/test_runtime_lockstep.py` "Era I exit
         criteria"): 8 end-to-end tests, no production change; **EC3, EC5, EC6 ticked**.
-  - [ ] **B-054** (cycle 33 audit WARN, low-medium) A HALT landing between two minds' wakes ends
-        the run `refused`/`wake_refused:<id>:halted`, and a HALT before `declare_minds` ends
-        `refused:minds_refused:<code>`; both should read `halted` (Art. 5 holds either way: nothing
-        wakes, the clock does not move). Touches the halted branch → needs a red-team. Do it with B-053.
-  - [ ] **B-053** (cycle 30, medium for honest records) `fund-runtime backtest` provisions agents
-        and declares `/run/minds` *before* any wake gate refuses. Under a null cap, a spending
-        spec therefore leaves registered agents and a `model` label on a run in which nothing
-        woke. Fix: a pre-gate in `runtime/cli.py::_conduct` using `decide_wake_under` (one law
-        read) before provisioning. This is Runtime gate code, so it needs a red-team. B-023 (halt
-        observability) if cheap.
+  - [x] **B-053 + B-054** **Done cycle 36** (ADR-032/040 amendment, red-team 0020): `vet` before
+        physics is told; HALT reads `halted` at every stage (law read, declaration, provision, between
+        wakes, advance); a cassette spec outside a replay is refused up front.
+  - [ ] **B-055** (red-team 0020, low; records only) Specs that pass `vet` but are refused after the
+        `/run/minds` declaration: `name_taken`, `directory_unreadable`/`directory_malformed`, a pod that
+        does not exist (`register_failed:<id>:error`), a `tools` list naming an unpublished tool
+        (`unknown_tool` at the first wake). All leave only a zero-cost label. Fix: `_conduct` reads
+        `/agents` + pods and the published tool list (reads only) and checks them before `declare_minds`.
+        2 strict xfails in `tests/test_redteam_0020.py`.
+- [ ] **B-056** (red-team 0020, low, **physics bug**) `POST /agents/register` with a `pod_id` that names
+      no pod → 500 (unhandled FK IntegrityError). Any registrar, incl. a management mind's `register_agent`
+      tool, can trigger it. Fix: `app.registry.service.register_agent` checks the pod → 404/409. Strict xfail
+      `test_hole_registering_into_a_missing_pod_is_a_500_not_a_refusal`. Before R-8 (minds that register).
 - [ ] **R-6** Metering v1 on a fake provisioner (was B-013) + B-000k (firm-level costs) +
       B-000n (cost-report rate law) + B-022 (secret scan, before any key exists): per-agent keys,
       cost-sync posts system-reported costs; system cost overrides self-report. **EC4 / M4.** Split c34:
   - [x] **R-6a** **Done cycle 34** (merged 240b607, ADR-041, red-team 0019: 1 low hole, fixed): physics
         ledger + endpoint + MCP tool + metrics override + `FakeProvisioner`/`sync_costs`. Ticks nothing.
-  - [ ] **R-6b** (after B-053/B-054): the gate lets a `metered` provider wake under a numeric cap; `provision`
+  - [ ] **R-6b** (B-053/B-054 done c36): the gate lets a `metered` provider wake under a numeric cap; `provision`
         mints one key per agent (limit ≤ `MAX_METERED_USD_MICROS`, total ≤ cap); `FakeMeteredProvider`
         charges the `FakeProvisioner`; sync after the last step only; `compare-ledgers` handles the
         trailing `cost_metered` block by type (own ADR; never widen the law); fail loudly on a 422 label;
