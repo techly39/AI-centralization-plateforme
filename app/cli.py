@@ -17,8 +17,11 @@ Kept dependency-free (argparse) so it works the moment the package installs.
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import json
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from alembic import command
 from alembic.config import Config as AlembicConfig
@@ -26,6 +29,7 @@ from alembic.config import Config as AlembicConfig
 from app.config import REPO_ROOT, get_settings
 from app.db.base import session_scope
 from app.db.models import AgentRole
+from app.ledger.compare import LedgerFileError, compare, ledger_rows
 from app.ledger.rebuild import rebuild_state
 from app.logging_setup import setup_logging
 from app.registry.pods import create_pod, fund_pod
@@ -41,7 +45,7 @@ from app.run_clock import RunClockError, install_run_clock, start_backtest
 
 #: Commands that do not run on the database's clock: ``init-db`` may find no
 #: schema yet, ``start-backtest`` creates the clock, ``serve`` installs it itself.
-_NO_RUN_CLOCK = frozenset({"init-db", "start-backtest", "serve"})
+_NO_RUN_CLOCK = frozenset({"init-db", "start-backtest", "serve", "compare-ledgers"})
 
 
 def _alembic_config() -> AlembicConfig:
@@ -194,6 +198,18 @@ def cmd_start_backtest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_compare_ledgers(args: argparse.Namespace) -> int:
+    """Exit 0 if the ledgers are equal but for the one allowed difference, 1 if they differ,
+    2 if a path is not a readable fund database. Read-only, touches no configured database."""
+    try:
+        result = compare(ledger_rows(args.recorded), ledger_rows(args.replayed))
+    except LedgerFileError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(dataclasses.asdict(result), sort_keys=True))
+    return 0 if result.equal else 1
+
+
 def cmd_rebuild_state(_: argparse.Namespace) -> int:
     with session_scope() as session:
         state = rebuild_state(session)
@@ -266,6 +282,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="simulated start, ISO-8601 with timezone (e.g. 2024-01-02T14:30:00Z)",
     )
     p_bt.set_defaults(func=cmd_start_backtest)
+
+    p_cmp = sub.add_parser(
+        "compare-ledgers",
+        help="read-only: is REPLAYED's ledger RECORDED's but for the run_minds_declared payload?",
+    )
+    p_cmp.add_argument("recorded", type=Path, help="the recorded run's database file")
+    p_cmp.add_argument("replayed", type=Path, help="the replay's database file")
+    p_cmp.set_defaults(func=cmd_compare_ledgers)
 
     p_rebuild = sub.add_parser("rebuild-state", help="rebuild derived tables from events")
     p_rebuild.set_defaults(func=cmd_rebuild_state)

@@ -575,3 +575,31 @@ def test_cassette_minds_with_no_recording_refuse_to_wake_and_nothing_moves(repla
     run = _pod_month(11, cassettes=True)["run"]
     assert (run.ended, run.reason) == ("refused", "wake_refused:a-analyst-1:unavailable")
     assert len(run.steps) == 1 and run.steps[0].advanced_to is None
+
+
+# --- the refusal law (ADR-040 (2), audit c32 NOTE 4) ------------------------------------------
+
+@pytest.mark.parametrize("why", ["contradiction", "unknown_tool", "identity_mismatch", "bad_input",
+                                 "no_identity"])
+def test_a_setup_refusal_in_a_replay_is_a_refusal_not_a_divergence(replays, monkeypatch, why) -> None:
+    """A replay ends the way a live run would at every wake a live run would stop: a refusal
+    that is not a retirement is ``wake_refused``, never ``diverged:...:ended``. The retirement
+    test above stays the counter-example (a dead key IS a divergence in a replay)."""
+    from runtime import lockstep
+    real, n = lockstep.wake, []
+
+    async def first_wake_is_refused(spec, *a, **kw):
+        n.append(1)
+        if len(n) == 1:
+            return WakeRecord(spec.id, "refused", why, 0)
+        return await real(spec, *a, **kw)
+
+    async def alive(client):
+        return False
+    monkeypatch.setattr(lockstep, "wake", first_wake_is_refused)
+    monkeypatch.setattr(lockstep, "_key_dead", alive)
+    out = _pod_month(11, replay=replays["rec"])
+    run = out["run"]
+    assert (run.ended, run.reason) == ("refused", f"wake_refused:a-analyst-1:{why}")
+    assert run.steps[-1].advanced_to is None
+    assert _count_events(out["ledger"], "clock_advanced") == 0

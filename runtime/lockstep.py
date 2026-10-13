@@ -191,20 +191,24 @@ async def run_backtest(
             wakes.append(record)
             if record.ended == "halted":
                 stop = ("halted", "halted")
-            elif replay is not None and (record.ended, record.reason) != ("refused", "halted") and (
-                    where := replay.divergence(step, record)):
-                # Only HALT is not a divergence. Any other refusal (a retired mind included) is:
-                # a recorded run woke every mind, so a mind that does not wake left the recording.
-                stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
             elif record.ended == "refused":
                 if record.reason == "no_identity" and await _key_dead(mind.client):
                     # Red-team 0015 H1: the agent was deactivated by an act inside the
                     # world (e.g. management firing it). That is data, not a reason for
                     # the world's time to stop: the mind is retired and the run goes on.
-                    retired.append(mind.spec.id)
-                    retired_at.append(step)
-                    continue
-                stop = ("refused", f"wake_refused:{mind.spec.id}:{record.reason}")
+                    # A replay cannot go on: a recorded run woke every mind, so a mind
+                    # that no longer wakes left the recording (ADR-038 (a), ADR-040 (2)).
+                    if replay is not None:
+                        where = replay.divergence(step, record) or "0:ended"
+                        stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
+                    else:
+                        retired.append(mind.spec.id)
+                        retired_at.append(step)
+                        continue
+                else:  # any other refusal ends a replay as it ends a live run (ADR-040 (2))
+                    stop = ("refused", f"wake_refused:{mind.spec.id}:{record.reason}")
+            elif replay is not None and (where := replay.divergence(step, record)):
+                stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
             if stop:
                 break
         if stop is None and not decide_batch().allowed:
