@@ -1394,3 +1394,24 @@ to real minds, R-8). Plan by the architect; red-team: see the cycle-32 entry in 
   in cassette v2. The forged-reply limit stands: replies are not hashed, so a cassette with
   consistent forged hashes encodes any policy, within the agent key's permissions.
 - Suite 1485 → 1554 passed + 6 xfailed; smoke 21/21.
+
+## ADR-039 — A usage-limit cut-off is not a failed cycle   (Human-directed loop repair, 2026-10-13) — accepted
+Question: cycle 33 spent $1.01, got its plan, then hit `429 usage_limit_reached`. The runner
+called it `failed` (a limit counted only at cost 0), raised the failure counter, and the plan was
+lost. How should the loop treat a session the API cut off?
+- **Classification (`loop/preflight.py`, Human-installed):** read the final result object:
+  `api_error_status ∈ {429, 529}` or an `api_error` naming a limit/overload/quota → a limit; an
+  errored result whose text names a limit → a limit; no result object at all → the old text
+  markers. Anything else that did not advance `loop_status.json` is still a failure (a max-turns
+  or max-budget stop is a real signal that the unit was too big).
+- **Accounting:** a limit is logged `result=limit cost=…`. Its dollars count toward the day's cap
+  (honest measurement of spend), it does not use a daily cycle slot, it does not touch the failure
+  counter, and the runner stops (it never retries on its own).
+- **Recovery is resuming:** `protocol/CYCLE.md` X-012 saves the architect's plan in a commit
+  before the build, and the resume rule distinguishes an empty branch (re-plan, same number),
+  a plan-only branch (build) and a built branch (verify).
+- Rejected: auto-retry after the reset time (a cap must end the run, `builder` rules); counting
+  limits as failures with a higher threshold (it would still promote the next lead to opus).
+- Tests: a scratch check of the staged file against the real cycle-32 (merged) and cycle-33
+  (limit) logs plus synthetic max-turns, 529, plain-text cases: 14 checks. Not in `tests/`: the
+  file is the Human's and has no pytest suite.

@@ -1393,3 +1393,22 @@ Result: see the state commit. Auditor round 1: PASS, 0 BLOCK, 1 WARN (a FIFO han
 Scoped re-audit: BLOCK 1 (my own fix made the H2 test pass for the wrong reason; isolated with `_uncalendared`, mutation red without the clamp), WARN 1 (negative `tool_calls`), NOTEs 1/3 (calendar validated, two reasons `calendar_at`/`calendar_landed`): all fixed; merged a1f72a2 without a third audit (the fix diff was a test, two validations and a reason string).
 Learned: (1) Red-team earned its place again: 3 of 6 holes were things my claim check could not see because they were absent fields, not wrong sentences (what the cassette does NOT compare). New claim-check question for X-006: "what does the recording hold that the replay never compares?" (2) Fixing a hole can make an older test vacuous (three held tests started ending on the calendar check, not on what they claimed): isolate the claim, say so in the test. (3) A shell hook and a parser that reject harmless commands cost about 10 turns this cycle.
 Next: R-4b-2 (`fund-runtime replay` CLI, cassette v2 recording run parameters/spec digest/model, a cassette step in the smoke run), then B-053 and R-6.
+
+## Human intervention — 2026-10-13 (between cycles 32 and 33): loop repair
+- **What happened to cycle 33.** The run's 4th session (lead sonnet, 9 turns, $1.01) created
+  `cycle/0033-replay-cli`, got its architect plan, then hit `429 usage_limit_reached` ("session
+  limit · resets 4:20am"). No journal entry, no commit, the plan was lost. `preflight --post`
+  treated a limit as a limit only when the cost was 0, so it logged `result=failed` and raised the
+  failure counter to 1 (the next cycle would have run on opus for no reason).
+- **Runner fix** (`loop/preflight.py`, installed by the Human's `setup/update.sh`, ADR-039): the
+  cut-off is read from the structured result (`api_error_status` 429/529, `api_error`), then the
+  errored result's text. Such a session is logged `result=limit` with its cost: it counts toward
+  the dollar caps, not as a failure, not as a daily cycle slot; the runner stops. The cycle-33
+  record was corrected by an appended note in the cycle log, and the counter reset 1 → 0.
+- **Protocol fix (X-012, `protocol/CYCLE.md` steps 0 and 3):** the branch is created and the
+  architect's full plan committed (`state/plans/NNNN.md`) before the build. The resume rule now
+  has three cases: build commits → step 5; plan only → step 4; empty branch → step 2, same number.
+  **Cycle 33 is the third case: resume `cycle/0033-replay-cli` at step 2.**
+- **STATE.md budget (X-013, step 8):** ≤ 120 lines, a map not a history. Compacted from 283 to 86
+  lines; the old text is `git show 5bffbfa:state/STATE.md`; the ADRs and journal entries it cited hold
+  the per-capability detail. If a cycle misses a fact, recover it from that commit.

@@ -27,7 +27,16 @@ investigate: commit legitimate leftover state, otherwise record and stop as `blo
 **Resume, don't restart (X-007, P-0003):** run `git branch --no-merged main`. A `cycle/NNNN-*`
 branch whose number is greater than `loop_status.cycle` is an interrupted cycle: take that number,
 check its journal entry (write the hypothesis if missing, saying it was written late), and resume
-it at step 5 — no new unit until it is merged, failed, or recorded as abandoned with its reason.
+it — no new unit until it is merged, failed, or recorded as abandoned with its reason. Where to
+resume (X-012, cycle 33: a usage limit cut a cycle after its plan, before any commit):
+- `git log main..<branch>` shows build commits → resume at step 5;
+- it shows only the `plan` commit, or `state/plans/NNNN.md` exists → resume at step 4 with that
+  plan (Gate 2 is already met; do not re-launch the architect);
+- it shows nothing and there is no plan file → the cycle died before its plan was saved:
+  `git switch` to the branch and start at step 2 for that same number (the previous STATE
+  "Next 3 moves" still holds).
+A session cut off by a usage limit is logged `result=limit` in the runner's cycle log; it is not
+a failure, and resuming is the whole recovery.
 
 **1. Orient.** Read `state/STATE.md`, last 3 entries of `state/JOURNAL.md` (tail, not the
 whole file), top of `state/BACKLOG.md`, `state/QUESTIONS.md` (look for human answers), and the
@@ -50,11 +59,15 @@ proposed unit if you have one. It returns a `UNIT / SLICE / DESIGN / TESTS FIRST
 RED-TEAM / ADR / OUT OF SCOPE` plan. Its plan wins over your preference; if you disagree on a
 fact, show it the fact once and let it decide.
 
-**3. Hypothesis.** Append to `state/JOURNAL.md`:
+**3. Hypothesis + save the plan (X-012).** As soon as the architect returns — before anything
+else — `git switch -c cycle/NNNN-<slug>`, write the architect's plan verbatim to
+`state/plans/NNNN.md`, and append to `state/JOURNAL.md`:
 `## Cycle NNNN — <title> (<ISO date>)` / `Era:` / `Exit criterion served:` / `Plan:` (the
-architect's `UNIT` and `SLICE` lines) / `Hypothesis:`.
+architect's `UNIT` and `SLICE` lines, and `see state/plans/NNNN.md`) / `Hypothesis:`.
+Commit both: `cycle NNNN: plan — <unit>`. A plan costs an opus call; an interruption must never
+lose it.
 
-**4. Build** on `git switch -c cycle/NNNN-<slug>`, following the plan: its tests first, its
+**4. Build** on the cycle branch, following the plan: its tests first, its
 design, nothing from `OUT OF SCOPE`. If reality forces a deviation, write it and its reason in
 the journal as you go.
 Small commits: `cycle NNNN: <what> — <why>`. Follow the TRD inside `app/`.
@@ -97,7 +110,11 @@ result = `failed`.
 
 **8. Record** (on `main`, one commit `cycle NNNN: state`):
 - finish the journal entry: `Work:` / `Result:` / `Learned:` / `Next:`;
-- rewrite `state/STATE.md` (current Era, cycle, what's true now, next 3 moves);
+- rewrite `state/STATE.md` (current Era, cycle, what's true now, next 3 moves). **Budget: at
+  most 120 lines** (X-013, cycle 33: it had grown to 283 lines, read in full every cycle). It is a
+  map, not a history: one or two lines per capability, each pointing at its ADR and tests. Detail
+  belongs in the ADR (`bible/07_DECISIONS.md`) and the journal. When a new fact does not fit,
+  fold an older bullet into a one-line summary — never delete a fact the ADRs do not hold;
 - reorder `state/BACKLOG.md`, add discoveries;
 - append any idea this cycle gave you to `state/IDEAS.md` (retrospective cycles: write up the top 3);
 - update `state/REPORT.md` if the Human should know something;
