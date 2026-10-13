@@ -260,6 +260,11 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
         return halted()
     if (problem := vet(specs, law)) is not None:
         return refused(f"provision:{problem}")
+    if run.get("replay") is None:
+        # Red-team 0020: outside a replay a cassette mind has no tape and could never wake.
+        for spec in sorted(specs, key=lambda s: s.id):
+            if spec.provider == "cassette":
+                return refused(f"provision:cassette_without_recording:{spec.id}")
     registrar, clock = connect(registrar_key), connect(clock_key)
     minds: list[Mind] = []
     try:

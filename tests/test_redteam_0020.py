@@ -84,13 +84,11 @@ def desk_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 # HOLES
 # =========================================================================================
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HOLE medium (B-053): a `provider: cassette` spec passes `vet` under `fund-runtime "
-    "backtest` (zero-cost, check_spec needs no tape), so physics records a `cassette` "
-    "declaration and registers every agent; then every wake is refused `unavailable` (no "
-    "tape outside replay). A spec that could never wake told physics a provenance claim "
-    "(`cassette`) that no wake ever backed. Fix: `_conduct` (or `vet` with a `replay` flag) "
-    "refuses a cassette spec when no Recording is given, before `check_clock`."))
+# FIXED in cycle 36 (was HOLE medium, B-053): a `provider: cassette` spec passed `vet` under
+# `fund-runtime backtest` (zero-cost, check_spec needs no tape), so physics recorded a
+# `cassette` declaration and registered every agent; then every wake was refused `unavailable`
+# (no tape outside replay). Fix: `_conduct` refuses a cassette spec when no Recording is given,
+# before `check_clock`.
 def test_hole_cassette_spec_in_a_backtest_declares_and_registers_then_never_wakes(
         SessionFactory, keys, woke, tmp_path, capsys):
     specs = _write_specs(tmp_path / "specs", _spec("a-pm", "desk-1-pm", 1),
@@ -98,6 +96,7 @@ def test_hole_cassette_spec_in_a_backtest_declares_and_registers_then_never_wake
                           "provider": "cassette", "charter": "Replay."})
     code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
     assert code == 1 and out["ended"] == "refused"
+    assert out["reason"] == "provision:cassette_without_recording:x-pm"
     # Expected after the fix: nothing told to physics.
     assert _events(SessionFactory, EVENT_RUN_MINDS_DECLARED) == 0
     assert _made(SessionFactory) == {}
