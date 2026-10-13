@@ -1443,3 +1443,13 @@ Work:
 Result: merged 240b607, pushed. Hypothesis **met**; EC4 not ticked (no spending path until R-6b). Auditor: PASS, 0 BLOCK, 3 WARN (float subtraction of two sums lost cents under spam → sum unmetered rows directly; "to the micro-dollar" overclaim → narrowed to the ledger fold; conflict/malformed counts shown nowhere → ADR + backlog) + NOTEs. Red-team 0019: 1 low hole (metered decided per pod, not over the whole fold), test committed before the fix (X-010), fixed; 82 held guards. Not re-audited: the fixes were one query, a range check and ADR text.
 Learned: (1) The red-team again found an *absent-field* shape: the law was right per pod and wrong across pods; the claim check should ask "what happens when the same agent appears in a second scope?". (2) The auditor's WARN 1 and the red-team's hole were the same function — read the whole function after a fix, not just the line. (3) Shell guard: a compound command with `;`/`&&` after an `uv run` needs approval; run one command per call (cost ~6 turns).
 Next: B-053 + B-054 (pre-gate, HALT label; red-team, before R-6b edits the gate), then R-6b (gate lets `metered` wake under a numeric cap, per-agent keys with limit ≤ `MAX_METERED_USD_MICROS`, sync after the last step, EC4 test + tick), R-4b-2b. Cycle 40 = retrospective.
+
+## Cycle 0035 — blocked on budget (2026-10-13)
+(No unit started: about $2.28 of the $8 session cap was left, too little for architect + auditor + red-team. Entry written in cycle 36.)
+
+## Cycle 0036 — B-053 + B-054: vet before physics is told, HALT always reads `halted` (2026-10-13)
+Era: I — The Desk
+Exit criterion served: EC4 groundwork (honest run records before R-6b edits the gate); ticks nothing.
+X-011 check (architect): EC1, EC2, EC4, EC7 unchanged — none met by this unit.
+Plan: UNIT: Fix the run records for B-053 + B-054 together. B-053: a run whose specs could never wake must not reach physics (no `/run/minds` declaration, no agents). B-054: every way HALT can stop a run must end it `halted`, never `refused`. SLICE: whole. Deferred: B-023 (halt observability), and the known gap that a `name_taken` refusal still happens after the declaration. RED-TEAM: yes. See state/plans/0036.md.
+Hypothesis: with a network-free `vet(specs, law)` run in `_conduct` before `check_clock`/`declare_minds`, a spec the gate refuses under a null cap leaves zero declarations and zero agents; HALT before the run, at the declaration (423), mid-provisioning, or between two minds' wakes ends the run `halted` with no wake after the HALT and no advance; every non-halt refusal keeps its label byte for byte. Metric: declaration/agent counts, `ended`/`reason` labels, the unchanged old refusal tests.
