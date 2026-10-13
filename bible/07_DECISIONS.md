@@ -1469,3 +1469,58 @@ the ledger?
 - Tests: `tests/test_replay_cli.py` (21), `tests/test_ledger_compare.py` (25),
   `tests/test_cassette_replay.py` +5 (refusal law; mutation: the old conductor turns all five red).
   Suite 1555 → 1606 passed + 6 xfailed; smoke 21 → 32 steps, all PASS.
+
+## ADR-041 — Metering v1, the physics half: a system-reported cost ledger (R-6a; amends ADR-033 and 03_WORLD §4) — accepted
+Context: until now the only cost physics held was what an agent *said* it spent (`POST /costs`). EC4
+asks for every LLM dollar attributed to an agent by a system-reported cost. R-6a builds the law and the
+fake provider; R-6b (gate lets a metered provider wake, per-agent keys, sync inside a run, the EC4
+tick) is not built. **This cycle ticks nothing**: no mind spends and the gate is unchanged.
+1. **Who posts.** The `runtime` role, through a new narrow right `REPORT_METERED_COST` (held by
+   `runtime` and, through `frozenset(Action)`, `system`; by no firm role, management included). Not
+   `system`: the Runtime process holds both keys anyway, so a separate identity buys no seal, and
+   `system` would hand the sync job every right (prime rule: safer seal). A stolen runtime key could
+   forge costs — the same operator-level trust as the clock (ADR-033). The metered agent is named in
+   the body (the caller is never the subject); the endpoint refuses a physics identity as subject
+   (422) and an unknown id (404).
+2. **Cumulative, in integer micro-dollars** (`MAX_METERED_USD_MICROS` = 10^12, strict ints: `true` and
+   `1.0` are 422). A re-post of a key's total writes nothing (`recorded:false`); a lower total is 409;
+   a sync cut by HALT catches up exactly. The reader counts each key once at its maximum total, so
+   a duplicate or out-of-order event cannot double-count.
+3. **One key, one agent.** The key's first well-formed `cost_metered` event binds it. A later post
+   naming another agent is 409. An event forged straight into the ledger naming another agent is
+   ignored by the reader and counted (`MeteredLedger.conflicts`); one that is not a well-formed row is
+   ignored and counted (`malformed`). An agent may hold several keys; they sum.
+4. **What "overrides" means.** Per agent, not per pod: an agent with any metered row is metered; its
+   self-reported `Cost` rows leave the authoritative `total_usd_cost` and stay as the cross-check
+   (`self_reported_usd_cost`, `self_report_gap_usd`). An unmetered agent keeps its self-report. A pod
+   with no metering gets exactly the old numbers, with the new fields `null` / 0. `cost_adjusted_pnl`
+   and the leaderboard rank on the authoritative total. Metered dollars go to the pod in the key's
+   latest event, i.e. the agent's pod when it was posted (agents do not change pods today; a move
+   would need a split by delta). A metered agent with no pod (management) appears in no pod's cost:
+   B-000k.
+5. **Ledger only.** `cost_metered {agent_id, pod_id, key_ref, usd_micros_total}`; no table, no
+   migration, no reducer: nothing to rebuild, so `rebuild_state` cannot disagree. `key_ref` is an
+   opaque label (`^[a-z0-9][a-z0-9_-]{0,63}$`), never a key or a hash of one, and agents read it as
+   `withheld` (`AGENT_WITHHELD_FIELDS`). HALT refuses the post (423, the existing middleware).
+6. **Concurrency.** The endpoint holds `METER_LOCK` across the check, the append and the commit: one
+   process. Two servers on one file are the B-036 class; the reader's first-binding and maximum rules
+   keep that race from rebinding a key or double-counting.
+7. **Runtime half** (`runtime/metering.py`, imports only `mcp_server.client`): `FakeProvisioner`
+   (deterministic `fake-0001…`, per-key limit, no secret, no network) and `sync_costs`, which posts
+   every key's total in `key_ref` order. 423 stops it (`halted`), 401/403 raises, 404/409/422 are
+   recorded per key and the rest go on.
+8. **Decided now for R-6b: metering rows in a replayed ledger.** A metered run's ledger will hold
+   `cost_metered` rows a $0 replay cannot produce, and a sync between steps would shift ids, which
+   `compare-ledgers` (ids strict, ADR-040) would reject. Answer: sync only after the last step, so the
+   rows form a trailing block that R-6b's comparison handles by type, by its own ADR. The comparison
+   is never widened to make a difference pass.
+- **Old tests this law broke (findings, not tests to loosen):** `test_redteam_0014` (the runtime key
+  answers only /me, /clock, /halt, /clock/advance, /run/minds, /health — now also
+  `POST /metering/usage`) and `test_runtime_identity` (the runtime role was exactly
+  READ_HALT/READ_CLOCK/CONTROL_CLOCK — now plus REPORT_METERED_COST). Both edits add the one new right
+  and name it; every other route still refuses the runtime key.
+- **Not done:** the gate letting a metered provider wake, per-agent key creation in `provision`, a limit
+  from `budget_usd` with the total under the cap, sync inside a run, a sync CLI, EC4's end-to-end test
+  and tick (R-6b); B-000k firm-level costs; B-000n self-report rate law (self-report spam is still
+  unbounded, but cannot move a metered agent's ranking); B-022 secret scan (before any real key).
+- Tests: `tests/test_metering.py` (physics), `tests/test_metering_metrics.py`, `tests/test_runtime_metering.py`.

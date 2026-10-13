@@ -10,7 +10,14 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import Path
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    model_validator,
+)
 
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
 from app.finite import json_problem
@@ -18,8 +25,10 @@ from app.ledger.events import agent_payload
 from app.limits import (
     MAX_ADVANCE_DAYS,
     MAX_ADVANCE_MINUTES,
+    KEY_REF_PATTERN,
     MAX_ID,
     MAX_JSON_DEPTH,
+    MAX_METERED_USD_MICROS,
     MAX_ORDER_QTY,
     MAX_PRICE,
     MAX_TOKENS_PER_REPORT,
@@ -372,6 +381,28 @@ class CostReportRequest(BaseModel):
     )
 
 
+class MeteredUsageIn(BaseModel):
+    """Body of ``POST /metering/usage``: a key's cumulative cost, as the provisioner reports it.
+
+    The total is a strict integer of micro-dollars (``true`` and ``1.0`` are
+    refused) and is cumulative: re-posting it changes nothing (ADR-041).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    agent_id: Annotated[StrictInt, Field(ge=1, le=MAX_ID)]
+    key_ref: str = Field(pattern=KEY_REF_PATTERN)
+    usd_micros_total: Annotated[StrictInt, Field(ge=0, le=MAX_METERED_USD_MICROS)]
+
+
+class MeteredUsageOut(BaseModel):
+    agent_id: int
+    key_ref: str
+    usd_micros_total: int
+    recorded: bool = Field(description="False when this total was already on the ledger.")
+    event_id: int | None
+
+
 class CostOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -469,11 +500,22 @@ class PerformanceOut(BaseModel):
 class CostSummaryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    total_usd_cost: float
+    total_usd_cost: float = Field(
+        description="The authoritative cost: system-reported for a metered agent, "
+        "self-reported for an unmetered one (ADR-041)."
+    )
     tokens_in: int
     tokens_out: int
     reports: int = Field(
         description="How many cost reports arrived. Zero means unmeasured, not free."
+    )
+    self_reported_usd_cost: float = Field(description="Every self-reported cost row of the pod.")
+    metered_usd_cost: float | None = Field(
+        description="System-reported cost of the pod's metered agents; null if none is metered."
+    )
+    metered_agents: int
+    self_report_gap_usd: float | None = Field(
+        description="Metered agents' self-reports minus their metered cost; null if none is metered."
     )
 
 
@@ -526,6 +568,7 @@ class LeaderboardRowOut(BaseModel):
     total_value: float
     pnl: float
     total_usd_cost: float
+    metered_usd_cost: float | None
     cost_adjusted_pnl: float
     total_return: float | None
     sharpe_daily: float | None

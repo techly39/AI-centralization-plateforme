@@ -123,8 +123,9 @@ Target:
    Q-0005: the gate fails closed. Only the zero-cost `scripted` and `cassette` providers,
    named in code, may run under null, and their runs are labelled and never count as agent runs.)*
 2. A **cost-sync job** (in Runtime) pulls per-key usage and posts it to the App as the
-   `system` agent. System-reported cost is authoritative; self-reports stay as a
-   cross-check (the gap between them is itself a finding).
+   `runtime` identity (right `REPORT_METERED_COST`, not `system`; ADR-041). System-reported
+   cost is authoritative per agent; self-reports stay as a cross-check (the gap between them
+   is itself a finding: `self_report_gap_usd`).
 3. **Era III+, if needed:** a local OpenAI-compatible **meter proxy** (prefer an existing
    one such as LiteLLM proxy over writing one) for model routing, caching, and
    recording cassettes centrally.
