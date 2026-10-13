@@ -1,0 +1,72 @@
+# HUMAN-ONLY (Constitution Art. 6). The Builder reads this file; it never writes it.
+# After editing, run: loop/seal.sh   (it also applies builder.team to the agent files)
+
+firm:
+  # Hard monthly cap on LLM spend for ALL firm agents together (USD).
+  # null = the firm's agents do not run. The Runtime refuses to provision keys or wake agents.
+  monthly_llm_usd_cap: null
+  max_concurrent_agents: 12      # agents awake at the same time
+  max_agents_total: 200          # alive agents, all pods, all scales
+  max_spawn_depth: 2             # worker → sub-worker → stop
+
+builder:
+  # Builder v2 (ADR-042): the unit of work is a MISSION (protocol/MISSIONS.md); a "cycle" is one
+  # session of `claude -p "/cycle <mode>"`, mode = plan | build | diagnosis, chosen by the runner.
+  #
+  # The Builder team — the ONLY place models are chosen. model: opus | sonnet | haiku | fable
+  # (aliases follow the newest release) or a full claude-* id. effort: low | medium | high | xhigh | max.
+  team:
+    lead:      {model: sonnet, effort: high}   # build sessions
+    lead_hard: {model: opus,   effort: high}   # plan sessions, diagnosis, the session after a failure
+    architect: {model: opus,   effort: high}   # plans each mission once, before its code (Gate 2)
+    auditor:   {model: opus,   effort: high}   # reviews each mission once, before merge (Gate 5)
+    red-team:  {model: opus,   effort: high}   # attacks physics, once per mission that touches it
+    validator: {model: sonnet, effort: high}   # runs acceptance + suite + demo, reports evidence (Gate 5)
+    worker:    {model: sonnet, effort: high}   # side tasks in their own worktree (parallel_workers > 0)
+    helpers:   {model: sonnet}                 # every other subagent: search, exploration, chores
+
+  # One `loop/builder.sh start` runs this many sessions, then stops.
+  cycles_per_run: 4
+  max_cycles_per_day: 8
+  # Planning: a plan session runs when no mission is ready, and after every N accepted missions.
+  plan_every_missions: 3
+  # Parallel workers in git worktrees (phase 3 of ADR-042). 0 = the lead works alone.
+  parallel_workers: 0
+
+  # Money: null = no cap. On a subscription the usage limit is the real stop (Human, 2026-10-13).
+  # Set a number to bring a cap back (list-price USD as reported by Claude Code).
+  max_usd_per_cycle: null        # per session
+  max_usd_per_run: null
+  max_usd_per_day: null
+  max_turns_per_cycle: null      # per session
+  # Hang guard, not a budget: a session still running after this many hours is stopped.
+  max_session_hours: 8
+  # Usage limit hit: wait for the reset (if it is less than max_wait_hours away), then continue.
+  wait_for_usage_reset: true
+  max_wait_hours: 6
+  # Out-of-band checks by the runner (minutes): an acceptance check that runs longer fails.
+  acceptance_timeout_minutes: 20
+
+  max_consecutive_failures: 3    # then one diagnosis session, then the loop stops for you
+  cycle_sleep_seconds: 60        # pause between sessions inside one run
+  git_remote: origin
+
+  # The OS sandbox around the Builder's shell commands (Claude Code sandboxing, ADR-042).
+  # Writes: the repo and temp dirs (+ allow_write); protected files are write-denied by the OS.
+  # Network: only these hosts. `git push origin` runs outside the sandbox (guard: origin only).
+  sandbox:
+    enabled: true
+    allowed_domains: [github.com, "*.github.com", "*.githubusercontent.com", pypi.org, files.pythonhosted.org]
+    allow_write: ["~/.cache/uv", "~/.local/share/uv"]
+
+approvals:
+  era_gates: false               # true = Builder stops and waits at each Era boundary
+  pitch_requires_human: true     # Era III: you approve pitches until you set this false
+
+network:
+  # The only hosts firm agents may reach (through the App / metered keys).
+  firm_egress_allowlist:
+    - openrouter.ai
+    - api.anthropic.com
+    - query1.finance.yahoo.com
+    - query2.finance.yahoo.com

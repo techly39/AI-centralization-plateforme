@@ -68,6 +68,10 @@ instrument is not worth having).
 
 ## 3. The road, one step ahead
 
+*(Cycle 37, ADR-042: the road is now walked in missions — `protocol/MISSIONS.md`,
+`state/missions.json`. The milestones below are the raw material of the first missions; the first
+planning session re-cuts them and rewrites this section.)*
+
 **Now → Era I exit (the Runtime).** Plan: ADR-032, backlog slices R-1…R-8. Milestones:
 - **M1** a two-mind pod (PM + Analyst) with *scripted* minds lives a month **through the
   Runtime**, every act over HTTP, under 10 minutes;

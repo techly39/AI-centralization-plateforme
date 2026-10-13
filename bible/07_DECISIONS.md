@@ -1570,3 +1570,60 @@ tick) is not built. **This cycle ticks nothing**: no mind spends and the gate is
   fixture (its specs named uninstalled scripts, hidden while the clock check ran first).
 - Tests: `test_run_minds.py`, `test_runtime_cli_backtest.py`, `test_runtime_lockstep.py`, `test_runtime_provision.py`,
   `test_redteam_0020.py` (1 hole fixed, 3 open as strict xfail: B-055 ×2, B-056 physics 500 on a missing pod).
+
+---
+
+## ADR-042 — Builder v2: missions, acceptance checks run by the runner, planning sessions — accepted (Human-directed, 2026-10-13)
+**Context.** Cycles 1–36: unit = one slice that fits one session, with architect + auditor (+ red-team)
+on every slice and ~8 state files updated per cycle. Measured (cycles 31–36, list price): ~$28.6 for
+~1,580 product lines, 0 Era exit criteria ticked, ~1 demonstrable capability; per cycle the lead made
+~200 model calls at ~130k context, three opus reviewers started cold, ~1/3 of lines written were
+state/docs, and red-team lows became the next units of work. The Human (a scientist, not shipping a
+product) asked for a builder that delivers concrete features per run.
+
+**Sources weighed** (the Human's research + the Builder's): Anthropic, "Effective harnesses for
+long-running agents" (Nov 2025: feature list with pass/fail test steps, progress file, git, one
+end-to-end feature at a time); Anthropic, "Harness design for long-running application development"
+(Mar 2026: planner kept, sprints and per-sprint evaluation removed for newer models, one final
+evaluator, evaluators earn their cost only at the edge of model ability); Anthropic, "Building a C
+compiler with parallel Claudes" (Feb 2026: tests steer agents; parallelism pays only on independent
+tasks); arXiv 2607.25152 (self-evaluated loops report progress in 100% of cycles while 56% change
+nothing; an in-transcript judge accepts 44% of regressions; out-of-band, world-grounded checks close
+the gap); Claude Code docs (subagents before agent teams — ~7× tokens; Stop hooks; OS sandbox; CLAUDE.md
+< 200 lines); Cursor (flat coordination makes agents risk-averse — small, safe changes).
+Rejected from the research: splitting one feature into per-layer subagents (no evidence; the layers
+share `permissions.py`, the ledger and the MCP server); agent teams and named swarms (cost, experimental);
+cloud projects (the seal, fund.db and OpenClaw are local); `/goal` as the done-judge (it is an
+in-transcript judge). Parallel workers: deferred to a measured phase (`builder.parallel_workers: 0`).
+
+**Decision.**
+1. The unit of work is a **mission** (`protocol/MISSIONS.md`): a capability someone can run, 1–4
+   sessions, with an executable acceptance check committed before the code and failing at that commit.
+2. Sessions are `plan` (`protocol/PLAN.md`: measure, look outward, ideate, write 3–6 ready missions, one
+   Era ∞ hypothesis) or `build` (`protocol/CYCLE.md`); the runner chooses (no ready mission, every
+   `plan_every_missions` accepted missions, or a mission at twice its estimate → plan).
+3. Architect once per mission; validator (runs checks, reports evidence); red-team once per mission
+   touching physics, with severities (high fixed now, medium in the mission or next, low → one hardening
+   mission, ≤ 1 in 5); auditor once per mission, judging the acceptance check too.
+4. **The referee is outside the Builder:** after every session `loop/preflight.py --post` re-runs the
+   suite on `main` and the mission's acceptance check in its own worktree, checks red-first, records
+   acceptance edits, logs `$FIRM_HOME/metrics.jsonl`; a claimed merge it cannot reproduce is `failed`
+   (`false_done`). A Stop hook refuses a `merged`/`progress` claim the repo does not support.
+5. Paperwork per session: journal (3–8 lines), `PROGRESS.md`, `loop_status.json`; per mission: SHOWCASE,
+   STATE, ADR only for real decisions. `METRICS.md` frozen.
+6. Human decisions (2026-10-13): no USD caps (the subscription's usage limit is the stop), the runner
+   waits for usage resets ≤ 6 h, an 8 h hang guard; Bash in the OS sandbox (writes: repo + temp; network:
+   GitHub, PyPI); lead sonnet for build, opus for plan.
+
+**Rollout (one variable at a time, Anthropic's method):** phase 1 = this ADR. Phase 2 = A/B the build
+lead's model (sonnet vs opus) on accepted missions per dollar. Phase 3 = `parallel_workers` 1–2 on
+independent tasks. **Metric:** accepted missions per $100 (runner-verified); secondary: false-done rate,
+main-red events, review share of tokens, docs/product ratio. **Rollback:** if after two runs it does not
+beat the cycle 31–36 baseline, or main goes red, `setup/rollback.sh` restores v1 and the result is
+recorded (a negative result is a result, Art. 9.2).
+
+**Protected files** changed by the Human through `setup/install.sh` (staged in `setup/files/`):
+`.claude/commands/cycle.md`, `.claude/agents/{architect,auditor,red-team}.md` + new `validator.md`,
+`worker.md`, `.claude/settings.json` (Stop hook), `.claude/hooks/guard.py` (quoted text is data, not shell
+syntax; `>/dev/null` is not a write; `$(…)` is never read-only) + new `stop_gate.py`, `loop/run.sh`,
+`loop/builder.sh`, `loop/preflight.py`, `governance/human.yaml`. Recorded as P-0004.

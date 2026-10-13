@@ -78,14 +78,18 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - Era III constraint (ADR-028 amendment): agent strategy code never runs inside the App process.
 - Not yet: Truman, Quant Lab, Observatory, live scheduler (R-3c), stored RunRecords.
 
-## The Builder's process
-- Protocol in `protocol/CYCLE.md` (Builder-owned); `.claude/` and `loop/` sealed. Team (ADR-035):
-  lead sonnet, lead_hard opus (diagnosis, every 10th, after a failure), architect / auditor /
-  red-team opus. $8/cycle, $30/run, $35/day, 8 cycles/day.
-- 2026-10-13 loop repair (Human-directed): the runner now logs a usage-limit cut-off as
-  `result=limit` (counts dollars, not a failure, not a cycle slot); the architect's plan is saved
-  and committed before the build (X-012); STATE.md has a line budget (X-013).
-- Retrospective c21–30: direction right, pace slow; drift = tick-blindness → X-011 (step 2).
+## The Builder's process — Builder v2 since cycle 37 (ADR-042, Human-directed 2026-10-13)
+- Unit = **mission** (`protocol/MISSIONS.md`, queue `state/missions.json`): a capability with an
+  executable acceptance check (`acceptance/M-NNN.py`) written first and failing first. Sessions are
+  `plan` (`protocol/PLAN.md`) or `build` (`protocol/CYCLE.md`), chosen by the runner. Handoff:
+  `state/PROGRESS.md`; what's new: `state/SHOWCASE.md`.
+- Team: lead sonnet (build), lead_hard opus (plan, diagnosis, after a failure); architect once per
+  mission, validator (runs checks), red-team once per physics mission, auditor once per mission.
+- The runner is the referee: re-runs the suite on `main` and the acceptance check after every
+  session, checks red-first, logs `$FIRM_HOME/metrics.jsonl`. A Stop hook refuses a false `merged`.
+- No USD caps (Human: the subscription limit is the stop); 4 sessions/run, 8/day; waits for usage
+  resets ≤ 6 h; 8 h hang guard; Bash in the OS sandbox (GitHub + PyPI only).
+- Before v2: cycles 1–36 in slices (`state/BACKLOG.md`, `state/METRICS.md`, retrospectives c10/20/30).
 - Human: accepted P-0001/2/3. Open: Q-0001 (budget, blocks R-8 only), Q-0002, Q-0005, Q-0006.
 - OpenClaw 2026.5.12 mapped; firm in its own profile (ADR-019); nothing in OpenClaw changed.
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
@@ -94,15 +98,13 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   `cd "<repo>" && git add … && git commit …` works. `git push origin main <branch>` only as a bare
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
-## Next 3 moves
-1. **B-056** (physics 500 on register into a missing pod; small, `app/registry`, red-team) — or fold it
-   into R-6b's red-team if budget is tight. B-055 (reads before the declaration) can wait.
-2. **R-6b** (EC4, ADR-041 §8): the gate lets a `metered` provider wake under a numeric cap;
-   `provision` mints one key per agent (limit ≤ `MAX_METERED_USD_MICROS`, total ≤ cap, fail closed);
-   a `FakeMeteredProvider` charges `FakeProvisioner`; `sync_costs` runs after the last step only;
-   `compare-ledgers` handles the trailing `cost_metered` block by type (own ADR); a loud failure on a
-   422 label; the end-to-end EC4 test and the tick. Tick-check (X-011).
-3. **R-4b-2b**: cassette v2, c32 NOTE 5, reader size cap, `replay --cassette OUT`. Then R-3c
-   `daily_cycle`. EC2 stays open until R-8. Cycle 40 is the retrospective (re-read Constitution + Genesis).
-   X-006 additions to keep: "what does the artifact hold that the reader never compares?" and (new,
-   IDEAS c33) "name the one-line production change that turns each new test red".
+## Next moves
+1. **Cycle 37 = planning session, the re-foundation** (`protocol/PLAN.md`, last section): turn
+   `09_BUILDER_VISION.md` §3 (M1–M6), the open Era I criteria (EC1, EC2, EC4, EC7) and the open
+   backlog into 3–6 ready missions. Raw material as of cycle 36 (not instructions): R-6b metering
+   end to end (EC4, ADR-041 §8); R-4b-2b cassette v2 + `replay --cassette OUT`; R-3c `daily_cycle`;
+   R-7 OpenClaw conformance (EC7); physics holes B-055, B-056 and the 9 strict xfails → one
+   hardening mission.
+2. Then build sessions on the first ready mission.
+3. Keep from the old X-rules (now in the auditor's checks): "what does the artifact hold that the
+   reader never compares?" and "name the one-line production change that turns each new test red".

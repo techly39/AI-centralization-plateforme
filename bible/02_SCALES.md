@@ -47,11 +47,13 @@ S0 is the experimenter.
   `state/STATE.md`, `state/JOURNAL.md`, `state/BACKLOG.md`, git history.
 - **Strengths:** writing and refactoring code, tests, reading docs, careful local reasoning.
 - **Weaknesses to design around:**
-  - finite context → small cycles, state files, never rely on "remembering";
-  - drift over many cycles → re-read Genesis every 10 cycles, retrospectives;
-  - temptation to make tests pass rather than make code right → the `auditor` subagent
-    reviews every diff; Constitution Art. 9;
-  - over-building → one unit of work per cycle, Era exit criteria as the compass.
+  - finite context → state files and a short handoff (`state/PROGRESS.md`), never rely on
+    "remembering";
+  - drift over many sessions → planning sessions with the runner's numbers, Genesis re-read;
+  - judging its own progress too kindly → "done" is an acceptance check run by the runner, out of
+    band; the `validator` runs, the `auditor` reviews; Constitution Art. 9 (ADR-042);
+  - over-building and under-building → one mission at a time, each a capability someone can run,
+    sized 1–4 sessions (`protocol/MISSIONS.md`); Era exit criteria as the compass.
 
 ### S2 — Physics (the App)
 - **Objective:** none. Physics has no goal; it enforces laws and records everything.
@@ -126,8 +128,9 @@ Standing questions:
 - **Horizon:** how many sim-days can an agent keep a coherent thesis? Where does memory fail?
 - **Coordination:** at what team size does communication cost exceed its benefit?
 - **Adapter effect:** same agent spec under `openclaw` vs `native` — does the host matter?
-- **Builder scale:** which kinds of tasks does the Builder finish in one cycle, which
-  fail, and why? (Measured in `state/METRICS.md`.) What should be delegated to its
-  subagents? What process change raised its success rate?
+- **Builder scale:** which kinds of missions does the Builder finish within estimate, which
+  fail, and why? (Measured by the runner: `$FIRM_HOME/metrics.jsonl`; cycles 0–36 in
+  `state/METRICS.md`.) What should be delegated to its subagents? What process change raised
+  accepted missions per dollar?
 - **Model exam:** a fixed battery of Truman scenarios with known correct behaviour, run
   against any new model before it is allowed in the firm.
