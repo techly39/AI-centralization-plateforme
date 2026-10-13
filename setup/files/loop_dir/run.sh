@@ -92,7 +92,11 @@ while [ "$i" -le "$sessions" ]; do
   claude "${args[@]}" > "$log" 2>&1 &
   pid=$!
   # Hang guard: a session still running after max_session_hours is stopped (counted by --post).
-  ( sleep "$(awk -v h="${hang_hours:-8}" 'BEGIN { printf "%d", h * 3600 }')"; kill -TERM "$pid" 2>/dev/null ) &
+  # The watcher kills its own sleep when stopped (no orphan holding the log open, no stale pid).
+  hang_s="$(awk -v h="${hang_hours:-8}" 'BEGIN { printf "%d", h * 3600 }')"
+  ( sleep "$hang_s" & s=$!
+    trap 'kill "$s" 2>/dev/null; exit 0' TERM
+    wait "$s" && kill -TERM "$pid" 2>/dev/null ) >/dev/null 2>&1 &
   guard=$!
   wait "$pid"; code=$?
   kill "$guard" 2>/dev/null; wait "$guard" 2>/dev/null
