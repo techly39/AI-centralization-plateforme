@@ -44,7 +44,15 @@ from app.run_clock import (
 )
 from runtime import lockstep
 from runtime.spec import AgentSpec
-from tests.test_runtime_cli_backtest import _made, _run, keys, specs  # noqa: F401 - fixtures
+from tests.test_runtime_cli_backtest import (  # noqa: F401 - fixtures
+    _made,
+    _run,
+    _write_specs,
+    keys,
+    run_halting_at,
+    specs,
+)
+from tests.test_runtime_cli_backtest import _spec as _cli_spec
 from tests.test_runtime_lockstep import (  # noqa: F401 - fixtures
     _app,
     gov,
@@ -239,6 +247,39 @@ def test_a_run_whose_firm_agent_acted_is_refused_before_any_agent_is_made(
     code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
     assert code == 1 and out["reason"] == "minds_refused:409" and out["registered"] == []
     assert set(_made(SessionFactory)) == {"early-bird"} and woke == []
+
+
+# --- B-053: a run whose minds could never wake tells physics nothing ---------------------
+# (The counter-example, specs that can wake still declare first, is
+# ``test_the_command_declares_before_it_registers`` above, unchanged.)
+
+@pytest.mark.parametrize("bad, reason", [
+    ({"provider": "metered", "script": None}, "wake_refused:x-pm:cap_null"),
+    ({"wake_policy": "never"}, "wake_policy_never:x-pm"),
+    ({"model": "some-model"}, "provider_refused:x-pm:contradiction"),
+    ({"script": "no-such-script"}, "provider_refused:x-pm:unknown_script"),
+    ({"adapter": "openclaw"}, "wake_refused:x-pm:cap_null"),
+], ids=["spending", "never", "contradiction", "unknown-script", "openclaw"])
+def test_a_spec_that_could_never_wake_declares_nothing(SessionFactory, keys, woke, gov, tmp_path,
+                                                       capsys, bad, reason):
+    specs = _write_specs(tmp_path / "specs", _cli_spec("a-pm", "desk-1-pm", 1),
+                         _cli_spec("x-pm", "x", 2) | bad)
+    code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
+    assert code == 1 and out == {"ended": "refused", "reason": f"provision:{reason}",
+                                 "registered": [], "run": None}
+    assert _declarations(SessionFactory) == [] and _made(SessionFactory) == {} and woke == []
+
+
+# --- B-054: a HALT at the declaration reads ``halted`` -----------------------------------
+
+def test_halt_landing_before_the_declaration_ends_halted(SessionFactory, keys, specs, woke, gov,
+                                                         halt_file, capsys):
+    """The Human halts while the declaration is in flight: physics answers 423."""
+    code, out = run_halting_at(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys,
+                               "/run/minds", "before", (gov / "HALT", halt_file))
+    assert code == 1 and out == {"ended": "halted", "reason": "halted", "registered": [],
+                                 "run": None}
+    assert _declarations(SessionFactory) == [] and _made(SessionFactory) == {} and woke == []
 
 
 # --- the copies agree -----------------------------------------------------------------------

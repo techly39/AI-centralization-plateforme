@@ -189,7 +189,9 @@ async def run_backtest(
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
                                 max_tool_calls=budget, tape=tape)
             wakes.append(record)
-            if record.ended == "halted":
+            if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
+                # B-054: a HALT that lands between two wakes refuses the next one at the gate;
+                # the run is halted, not refused (Art. 5). The refused wake stays in the record.
                 stop = ("halted", "halted")
             elif record.ended == "refused":
                 if record.reason == "no_identity" and await _key_dead(mind.client):
@@ -219,6 +221,11 @@ async def run_backtest(
         try:
             moved = await clock.post("/clock/advance", {"days": days_per_step})
         except FundAPIError as exc:
+            if exc.status_code == 423:
+                # B-054: a HALT after the last gate read. Physics refuses before the
+                # handler runs (``app.registry.halt``), so the clock did not move.
+                done.append(StepRecord(step, at, tuple(wakes), None))
+                return end("halted")
             # Red-team 0015 H3: physics may have committed the advance and failed
             # after it (the sweep, the connection). Ask physics where the clock is,
             # so the record says what the ledger says; if physics cannot say either,

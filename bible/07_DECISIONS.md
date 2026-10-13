@@ -1540,3 +1540,33 @@ tick) is not built. **This cycle ticks nothing**: no mind spends and the gate is
   and tick (R-6b); B-000k firm-level costs; B-000n self-report rate law (self-report spam is still
   unbounded, but cannot move a metered agent's ranking); B-022 secret scan (before any real key).
 - Tests: `tests/test_metering.py` (physics), `tests/test_metering_metrics.py`, `tests/test_runtime_metering.py`.
+
+## ADR-032/ADR-040 amendment (cycle 36, B-053 + B-054) — accepted
+- **Vetted before physics is told (B-053).** `fund-runtime backtest`/`replay` read the law once in
+  `_conduct`, before any client is used, and run `runtime.provision.vet(specs, law)`: the network-free
+  checks `provision` makes (duplicate id/name, reserved name, `wake_policy: never`, the wake gate,
+  `check_spec`), with the same reason strings. A refusal there ends the run `refused`/`provision:<reason>`
+  with no `/run/minds` declaration and no agent. `provision` delegates to `vet` and keeps its own read.
+  Outside a replay, `_conduct` also refuses a `provider: cassette` spec
+  (`provision:cassette_without_recording:<id>`): it has no tape and could never wake (red-team 0020, medium).
+  **Known gaps (B-055):** `name_taken`, `directory_unreadable` and `directory_malformed` need the directory,
+  a spec in a pod that does not exist fails only at registration, and a `tools` list naming an unpublished
+  tool is refused only at the first wake (`unknown_tool`; the published list is read over the network).
+  Each still comes after the declaration, and each can only leave a zero-cost label, because every spec
+  that reaches it passed the gate (red-team 0020: no spec that passes `vet` is ever declared `model`).
+- **HALT reads `halted` (B-054).** Corrects the cycle-33 claim. A run HALT stops ends
+  `{"ended": "halted", "reason": "halted"}` when HALT is: present at the law read; met by the
+  declaration (`minds_refused:423`); met in `provision` (`halted`, `wake_refused:<id>:halted`,
+  `register_failed:<id>:423` — exactly these, `cli._is_halt`; `registered` still names what exists);
+  met at the gate between two wakes (the refused wake stays in the step's record); or met by the advance
+  (`423`, was `error`/`advance_failed:423`: physics' halt check runs before the handler, so the clock did
+  not move; the record trusts the loopback server to be this App, as every other answer does). Only
+  `app.registry.halt` answers 423 (grep, cycle 36; red-team 0020 confirmed). Every non-halt refusal keeps
+  its label. A spec that is both refused by `vet` and run against a bad clock now ends `provision:<reason>`
+  instead of `not_backtest`/`clock_identity`: each label is unchanged, only which check runs first.
+- Old tests changed (findings): `test_halt_provisions_nothing` (the B-054 label; now stronger: no
+  declaration, no advance); `test_a_clock_that_will_not_advance_ends_the_run_in_error` → `test_a_clock_physics_halted_will_not_advance_ends_the_run_halted`
+  (same invariants, new label); `test_a_server_that_is_not_there_is_a_refusal_not_a_crash` gained the `woke`
+  fixture (its specs named uninstalled scripts, hidden while the clock check ran first).
+- Tests: `test_run_minds.py`, `test_runtime_cli_backtest.py`, `test_runtime_lockstep.py`, `test_runtime_provision.py`,
+  `test_redteam_0020.py` (1 hole fixed, 3 open as strict xfail: B-055 ×2, B-056 physics 500 on a missing pod).
