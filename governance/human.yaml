@@ -4,7 +4,7 @@
 firm:
   # Hard monthly cap on LLM spend for ALL firm agents together (USD).
   # null = the firm's agents do not run. The Runtime refuses to provision keys or wake agents.
-  monthly_llm_usd_cap: null
+  monthly_llm_usd_cap: 50
   max_concurrent_agents: 12      # agents awake at the same time
   max_agents_total: 200          # alive agents, all pods, all scales
   max_spawn_depth: 2             # worker → sub-worker → stop
