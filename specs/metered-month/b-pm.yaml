@@ -1,0 +1,12 @@
+# M-001 (metered month): the PM of pod 1 on the fake METERED provider. It never reports its
+# own cost, so the meter is the only record of what it spent.
+id: b-pm
+name: desk-1-pm
+role: pm
+pod: 1
+provider: fake-metered
+script: signal-pm
+budget_usd: 20
+charter: >-
+  Trade your pod's book on today's signal from your analyst, and cite it in every order.
+  Without a signal for today, hold.

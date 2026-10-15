@@ -53,7 +53,15 @@ from typing import Any
 from pydantic import BaseModel
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime.gate import ZERO_COST_ADAPTERS, ZERO_COST_PROVIDERS, decide_batch
+from runtime.gate import (
+    METERED_ADAPTERS,
+    METERED_PROVIDERS,
+    ZERO_COST_ADAPTERS,
+    ZERO_COST_PROVIDERS,
+    decide_batch,
+)
+from runtime.governance import read_governance
+from runtime.metering import Meter, usd_to_micros_floor
 from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
 from runtime.replay import Recording
 from runtime.spec import AgentSpec
@@ -65,10 +73,12 @@ MAX_DAYS_PER_STEP = 366
 
 @dataclass(frozen=True)
 class Mind:
-    """A spec and the client that acts as its App agent."""
+    """A spec and the client that acts as its App agent. A metered mind also holds its own
+    key at the provisioner (``meter``, ADR-044); a zero-cost mind holds none."""
 
     spec: AgentSpec
     client: FundClient
+    meter: Meter | None = None
 
 
 @dataclass(frozen=True)
@@ -154,6 +164,13 @@ async def run_backtest(
         if who["id"] in agents:
             return RunRecord("refused", f"duplicate_agent:{mind.spec.id}", label)
         agents.add(who["id"])
+        if mind.meter is not None and not _key_is(mind.meter, who["id"]):
+            # ADR-044: a key is its own agent's. A handed-in meter for another agent would
+            # bill one mind's dollars to another.
+            return RunRecord("refused", f"meter_mismatch:{mind.spec.id}", label)
+    meters = [m.meter for m in ordered if m.meter is not None]
+    if len({id(m.provisioner) for m in meters}) > 1:
+        return RunRecord("refused", "meter_mismatch:provisioner", label)
 
     done: list[StepRecord] = []
     retired: list[str] = []
@@ -166,6 +183,10 @@ async def run_backtest(
     for step in range(steps):
         if not decide_batch().allowed:
             return end("halted")
+        if meters and not _limits_fit(meters):
+            # The conductor's own check, so a caller who hands in minds cannot go around
+            # ``vet``; a cap lowered mid-run (or made null) is met here, at the next step.
+            return end("refused", "metered_over_cap")
         try:
             at = _now_of(await clock.get("/clock"))
         except FundAPIError as exc:
@@ -186,8 +207,13 @@ async def run_backtest(
             # place, whatever budget the replay was given (never above the caller's own).
             budget = (min(tape.tool_calls, max_tool_calls)
                       if tape is not None and tape.ended == "tool_budget" else max_tool_calls)
+            if meters and not _limits_fit(meters):
+                # Red-team 0021: a cap lowered during this step binds the next wake, not the
+                # next step. (A mind's own later turns are still billed within its key.)
+                stop = ("refused", "metered_over_cap")
+                break
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
-                                max_tool_calls=budget, tape=tape)
+                                max_tool_calls=budget, tape=tape, meter=mind.meter)
             wakes.append(record)
             if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
                 # B-054: a HALT that lands between two wakes refuses the next one at the gate;
@@ -259,9 +285,26 @@ async def check_clock(clock: FundClient) -> str | None:
     return None
 
 
+def _key_is(meter: Meter, agent_id: int) -> bool:
+    """Is this key the one minted for App agent ``agent_id``?"""
+    try:
+        return meter.provisioner.agent_of(meter.key_ref) == agent_id
+    except KeyError:
+        return False
+
+
+def _limits_fit(meters: Sequence[Meter]) -> bool:
+    """Do the keys' limits, together, fit the cap as the law reads now? A ``null`` cap is the
+    wake gate's to refuse (``cap_null``), so it is not this check's concern."""
+    cap = read_governance().monthly_llm_usd_cap
+    if cap is None:
+        return True
+    return sum(m.provisioner.limit(m.key_ref) for m in meters) <= usd_to_micros_floor(cap)
+
+
 #: Physics' kind for each zero-cost provider (``app.run_clock.MIND_KINDS``; a test
 #: pins the copy). Any other mind is a model answering now: ``model``.
-_KIND = {"scripted": "scripted", "cassette": "cassette"}
+_KIND = {"scripted": "scripted", "cassette": "cassette", "fake-metered": "scripted"}
 
 
 def mind_kinds(specs: Sequence[AgentSpec]) -> list[str]:
@@ -270,7 +313,9 @@ def mind_kinds(specs: Sequence[AgentSpec]) -> list[str]:
     zero-cost (the gate's own sets): ``scripted`` through ``openclaw`` runs
     OpenClaw's model (audit c28 WARN 1). Anything else is declared ``model``."""
     def kind(s: AgentSpec) -> str:
-        if s.provider in ZERO_COST_PROVIDERS and s.adapter in ZERO_COST_ADAPTERS:
+        # A fake metered mind is code from a closed table: physics hears ``scripted`` (ADR-044).
+        if ((s.provider in ZERO_COST_PROVIDERS and s.adapter in ZERO_COST_ADAPTERS)
+                or (s.provider in METERED_PROVIDERS and s.adapter in METERED_ADAPTERS)):
             return _KIND.get(s.provider, "model")
         return "model"
     return sorted({kind(s) for s in specs})

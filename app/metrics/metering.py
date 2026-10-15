@@ -24,10 +24,10 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Agent, Event
+from app.db.models import Agent, Cost, Event
 from app.ledger.events import EVENT_COST_METERED, append_event
 from app.limits import MAX_ID, MAX_METERED_USD_MICROS
 from app.registry.permissions import PHYSICS_ROLES
@@ -188,3 +188,38 @@ def record_metered_usage(
             "usd_micros_total": usd_micros_total,
         },
     )
+
+
+@dataclass(slots=True)
+class MeteredAgentRow:
+    agent_id: int
+    pod_id: int | None
+    usd_micros: int
+    #: What the agent said it spent (``costs`` rows), shown beside the meter, never added to it.
+    self_reported_usd: float
+
+
+@dataclass(slots=True)
+class MeteredSummary:
+    agents: list[MeteredAgentRow]
+    #: Σ of every key's maximum total; ``None`` when nothing is metered (unmeasured, not free).
+    total_usd_micros: int | None
+    conflicts: int
+    malformed: int
+
+
+def metered_summary(session: Session) -> MeteredSummary:
+    """Each metered agent's metered cost and own self-report, with what the reader ignored.
+    A pure fold of the ledger (plus the self-report table): a rebuild cannot disagree."""
+    metered = metered_by_agent(session)
+    reported: dict[int, float] = {}
+    if metered:
+        rows = session.execute(
+            select(Cost.agent_id, func.coalesce(func.sum(Cost.usd_cost), 0.0))
+            .where(Cost.agent_id.in_(list(metered))).group_by(Cost.agent_id)
+        ).all()
+        reported = {agent_id: float(total) for agent_id, total in rows}
+    agents = [MeteredAgentRow(aid, m.pod_id, m.usd_micros, reported.get(aid, 0.0))
+              for aid, m in sorted(metered.items())]
+    total = sum(a.usd_micros for a in agents) if agents else None
+    return MeteredSummary(agents, total, metered.conflicts, metered.malformed)

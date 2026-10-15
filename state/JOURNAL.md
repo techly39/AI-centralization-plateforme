@@ -1475,3 +1475,11 @@ Decided: 6 ready missions M-001…M-006 (ADR-043); Era II starts while EC1/EC2/E
 fork + correlated-minds experiment parked; AlphaForge-style "minds write code" rejected. No process change:
 no baseline to judge it against (ADR-043 §5). Result: planned.
 Next: build → M-001 (architect, acceptance red first).
+
+## Human intervention — 2026-10-15 (during M-001)
+- Q-0002 answered: the Human created an OpenRouter **provisioning** key. It lives only in the
+  gitignored repo-root `.env` (mode 600) as `FUND_OPENROUTER_PROVISIONING_KEY`. Never print it,
+  never commit it, never copy it into a tracked file. No code reads it yet.
+- With Q-0001 answered (cap $50/month) the key is usable in principle. A real `metered` provider
+  still needs its own ADR (M-001 plan §"Which name"); per-key limits sum to ≤ the cap.
+- B-022 (secret-scan test) now matters: a real key exists on this machine.

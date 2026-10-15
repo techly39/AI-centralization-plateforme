@@ -403,6 +403,25 @@ class MeteredUsageOut(BaseModel):
     event_id: int | None
 
 
+class MeteredAgentOut(BaseModel):
+    """One metered agent. There is no ``key_ref`` here, ever."""
+
+    agent_id: int
+    pod_id: int | None
+    metered_usd_micros: int
+    metered_usd: float
+    self_reported_usd: float = Field(description="What the agent said it spent; never counted.")
+    self_report_gap_usd: float = Field(description="Self-reported minus metered (negative: under-reported).")
+
+
+class MeteredAgentsOut(BaseModel):
+    agents: list[MeteredAgentOut]
+    total_usd_micros: int | None = Field(
+        description="Σ of every key's maximum total; null if nothing is metered (not zero).")
+    conflicts: int = Field(description="Ledger rows ignored: a key named another agent.")
+    malformed: int = Field(description="Ledger rows ignored: not a well-formed metering row.")
+
+
 class CostOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

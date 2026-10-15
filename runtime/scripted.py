@@ -261,9 +261,27 @@ def _order(ticker: str, side: str, qty: float, why: str) -> ToolCall:
     })
 
 
+def self_reporting(script: Script, usd_per_wake: float) -> Script:
+    """``script``, then one ``report_cost`` call of ``usd_per_wake`` when it has nothing left
+    to do: a mind that tells the fund what it cost, in a number the meter neither needs nor
+    believes (M-001, ADR-044). The inner script's own calls are passed through untouched."""
+    def run(request: CompletionRequest) -> CompletionResponse:
+        if any(c.id == "self-report" for m in request.messages for c in m.tool_calls):
+            return CompletionResponse(content="Done for today.")
+        reply = script(request)
+        if reply.tool_calls:
+            return reply
+        return CompletionResponse(content="Reporting what today cost.", tool_calls=[
+            ToolCall(id="self-report", name="report_cost", arguments={
+                "tokens_in": 1000, "tokens_out": 100, "usd_cost": usd_per_wake,
+                "task_label": "wake"})])
+    return run
+
+
 #: The closed table: script name → policy. A spec names one of these keys.
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
     "ma-signal-analyst": ma_signal_analyst,
     "signal-pm": signal_pm,
+    "ma-signal-analyst-underreports": self_reporting(ma_signal_analyst, 0.01),
 })

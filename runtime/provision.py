@@ -17,7 +17,9 @@ conductor, so nothing bound the spec to the agent beyond role and pod.
     (:func:`name_key`, physics' fold);
   - no name is reserved;
   - the wake gate is open under one read of the law (HALT or a cap refusal
-    provisions nothing);
+    provisions nothing); a metered spec is judged as if its key existed, and the
+    budgets of all metered specs, in whole micro-dollars, must fit the cap together
+    (ADR-044);
   - ``wake_policy`` is not ``never``;
   - a mind can be built from the spec;
   - no name is already taken in the directory the registrar reads (red-team 0016 H2/H3).
@@ -34,6 +36,9 @@ conductor, so nothing bound the spec to the agent beyond role and pod.
   error names the same (H1b). Those agents are in the run's database, which is
   spoiled (ADR-027: a run is a database).
 
+A metered spec gets one key at the provisioner, minted right after its agent is registered and
+bound to that agent's id, with a spending limit of its budget. A zero-cost mind gets none.
+
 Keys are never written anywhere: each lives only in the client ``connect`` builds
 from it. The caller closes the clients of a successful call; a failed call closes
 the ones it made.
@@ -45,9 +50,15 @@ import unicodedata
 from collections.abc import Callable, Sequence
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime.gate import decide_batch, decide_wake_under
+from runtime.gate import METERED_PROVIDERS, decide_batch, decide_wake_under
 from runtime.governance import Governance, read_governance
 from runtime.lockstep import Mind
+from runtime.metering import (
+    MAX_METERED_USD_MICROS,
+    FakeProvisioner,
+    Meter,
+    usd_to_micros_floor,
+)
 from runtime.registry import ProviderRefused, check_spec
 from runtime.spec import AgentSpec
 
@@ -83,10 +94,13 @@ async def provision(
     specs: Sequence[AgentSpec],
     registrar: FundClient,
     connect: Callable[[str], FundClient],
+    *,
+    provisioner: FakeProvisioner | None = None,
 ) -> list[Mind]:
     """Register one App agent per spec through ``registrar``; return the minds in id order.
 
-    ``connect(api_key)`` builds the client a mind will act through.
+    ``connect(api_key)`` builds the client a mind will act through. ``provisioner`` is where the
+    metered specs' keys are minted; a metered spec without one is refused.
     """
     ordered = sorted(specs, key=lambda s: s.id)
     # one read: every spec is judged under the same law
@@ -98,6 +112,8 @@ async def provision(
         raise ProvisionError(f"directory_unreadable:{exc.status_code}") from exc
     if not isinstance(directory, list):
         raise ProvisionError("directory_malformed")
+    if provisioner is None and any(s.provider in METERED_PROVIDERS for s in ordered):
+        raise ProvisionError("no_provisioner")
     taken = {name_key(a["name"]) for a in directory
              if isinstance(a, dict) and type(a.get("name")) is str}
     for spec in ordered:
@@ -132,7 +148,15 @@ async def provision(
                 client = connect(made["api_key"])
             except Exception as exc:  # noqa: BLE001 - the caller's connect failed
                 raise ProvisionError(f"connect_failed:{spec.id}", [*done, spec.id]) from exc
-            minds.append(Mind(spec, client))
+            meter = None
+            if spec.provider in METERED_PROVIDERS:
+                try:
+                    meter = Meter(provisioner, provisioner.create_key(
+                        made["id"], usd_to_micros_floor(spec.budget_usd)))
+                except Exception as exc:  # noqa: BLE001 - the agent exists, its key does not
+                    await client.aclose()
+                    raise ProvisionError(f"key_failed:{spec.id}", [*done, spec.id]) from exc
+            minds.append(Mind(spec, client, meter))
     except BaseException:
         for mind in minds:  # no client outlives a failed provisioning
             await mind.client.aclose()
@@ -147,6 +171,7 @@ def vet(specs: Sequence[AgentSpec], law: Governance) -> str | None:
     wake tells physics nothing: no ``/run/minds`` declaration, no agent. The reason
     is the one :func:`provision` would raise."""
     ordered = sorted(specs, key=lambda s: s.id)
+    limits: dict[str, int] = {}   # metered spec id -> its key's limit, micro-dollars
     if len({s.id for s in ordered}) != len(ordered):
         return "duplicate_spec_id"
     if len({name_key(s.name) for s in ordered}) != len(ordered):
@@ -156,13 +181,21 @@ def vet(specs: Sequence[AgentSpec], law: Governance) -> str | None:
             return f"name_reserved:{spec.id}"
         if spec.wake_policy == "never":
             return f"wake_policy_never:{spec.id}"
-        decision = decide_wake_under(spec.provider, spec.adapter, law)
+        # A metered spec is judged as if its key existed: provision mints it.
+        decision = decide_wake_under(spec.provider, spec.adapter, law,
+                                     metered=spec.provider in METERED_PROVIDERS)
         if not decision.allowed:
             return f"wake_refused:{spec.id}:{decision.reason}"
         try:
             check_spec(spec)
         except ProviderRefused as exc:
             return f"provider_refused:{spec.id}:{exc.reason}"
+        if decision.reason == "metered":
+            limits[spec.id] = usd_to_micros_floor(spec.budget_usd)
+            if limits[spec.id] > MAX_METERED_USD_MICROS:
+                return f"budget_too_large:{spec.id}"
+    if limits and sum(limits.values()) > usd_to_micros_floor(law.monthly_llm_usd_cap):
+        return "budget_over_cap"
     return None
 
 

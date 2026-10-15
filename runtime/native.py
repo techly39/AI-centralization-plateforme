@@ -54,6 +54,7 @@ from mcp_server.client import FundClient
 from mcp_server.tools import build_server
 from runtime.gate import decide_batch, decide_wake
 from runtime.cassette import request_sha256
+from runtime.metering import Meter
 from runtime.providers import (
     CompletionRequest,
     CompletionResponse,
@@ -122,20 +123,22 @@ async def wake(
     workflow_input: dict[str, Any],
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
     tape: Tape | None = None,
+    meter: Meter | None = None,
 ) -> WakeRecord:
     """Wake the mind ``spec`` describes once, acting as ``client``'s agent. ``tape`` is the
-    recording a ``cassette`` mind replays (R-4b); the registry builds the mind from it."""
+    recording a ``cassette`` mind replays (R-4b); the registry builds the mind from it.
+    ``meter`` is the mind's own key at the provisioner, for a ``fake-metered`` mind (ADR-044)."""
     if type(max_tool_calls) is not int or max_tool_calls < 0:
         raise ValueError("max_tool_calls is a non-negative int")
     if spec.adapter != "native":
         return WakeRecord(spec.id, "refused", "wrong_adapter", 0)
     if spec.wake_policy == "never":  # red-team 0013 H8: a spec kept on file stays asleep
         return WakeRecord(spec.id, "refused", "wake_policy_never", 0)
-    decision = decide_wake(spec.provider, spec.adapter)
+    decision = decide_wake(spec.provider, spec.adapter, metered=meter is not None)
     if not decision.allowed:
         return WakeRecord(spec.id, "refused", decision.reason, 0)
     try:
-        provider = build_provider(spec, tape)
+        provider = build_provider(spec, tape, meter)
     except ProviderRefused as exc:
         return WakeRecord(spec.id, "refused", exc.reason, 0)
 

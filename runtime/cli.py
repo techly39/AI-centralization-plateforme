@@ -73,11 +73,11 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from mcp_server.client import FundClient
+from mcp_server.client import FundAPIError, FundClient
 from runtime import cassette
 from runtime.cassette import CassetteError, redact  # noqa: F401 - ``cli.redact`` is public
-from runtime.gate import decide_wake_under
-from runtime.governance import read_governance
+from runtime.gate import METERED_PROVIDERS, decide_wake_under
+from runtime.governance import Governance, read_governance
 from runtime.lockstep import (
     MAX_DAYS_PER_STEP,
     MAX_STEPS,
@@ -87,6 +87,7 @@ from runtime.lockstep import (
     record_json,
     run_backtest,
 )
+from runtime.metering import FakeProvisioner, sync_costs, usd_to_micros_floor
 from runtime.native import DEFAULT_MAX_TOOL_CALLS
 from runtime.provision import ProvisionError, provision, vet
 from runtime.registry import ProviderRefused, check_spec
@@ -150,7 +151,9 @@ def main(argv: list[str] | None = None, *,
     law = read_governance()  # one read for one report
     wakes = []
     for spec in specs:
-        d = decide_wake_under(spec.provider, spec.adapter, law)
+        # As ``vet`` asks: a metered spec is judged as if provisioning had given it its key.
+        d = decide_wake_under(spec.provider, spec.adapter, law,
+                              metered=spec.provider in METERED_PROVIDERS)
         wakes.append({"id": spec.id, "provider": spec.provider, "adapter": spec.adapter,
                       "allowed": d.allowed, "reason": d.reason})
     print(json.dumps({
@@ -217,6 +220,9 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         if not specs:
             raise _Usage(f"no specs in {args.specs}: a run needs minds")
         workflow_input, registrar_key, clock_key, server = _shared(args, args.steps)
+        if args.cassette is not None and any(s.provider in METERED_PROVIDERS for s in specs):
+            # No law yet says how to replay the trailing cost block (ADR-044 §6).
+            raise _Usage("a metered run's cassette is not defined yet: run without --cassette")
         if args.cassette is not None:
             try:
                 cassette.check_path(args.cassette)
@@ -231,6 +237,11 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
                                max_tool_calls=args.max_tool_calls))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
     code = 0 if out["ended"] == "completed" else 1
+    if (lost := _unattributed(out.get("metering"))):
+        # Spent, and not posted to the ledger: the run is not clean (ADR-044 §5).
+        print(f"fund-runtime: {lost} metered micro-dollars not attributed: "
+              f"{json.dumps(out['metering']['sync'], sort_keys=True)}", file=sys.stderr)
+        code = 1
     if args.cassette is not None:  # every run that began is written, refused ones too (Art. 9)
         try:
             redactions = cassette.write(args.cassette, out)
@@ -275,18 +286,71 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             return halted()
         if problem is not None:
             return refused(problem)
+        # Where the metered minds' keys live: the fake provisioner, in this process (ADR-044).
+        provisioner = (FakeProvisioner() if any(s.provider in METERED_PROVIDERS for s in specs)
+                       else None)
         try:
-            minds = await provision(specs, registrar, connect)
+            minds = await provision(specs, registrar, connect, provisioner=provisioner)
         except ProvisionError as exc:
+            # Nothing has woken, so no key has spent anything: there is nothing to sync.
             if _is_halt(exc.reason):
                 return halted(exc.registered)
             return refused(f"provision:{exc.reason}", exc.registered)
-        record = await run_backtest(minds, clock, **run)
-        return {"ended": record.ended, "reason": record.reason,
-                "registered": [m.spec.id for m in minds], "run": record_json(record)}
+        metering = None
+        try:
+            record = await run_backtest(minds, clock, **run)
+        finally:
+            if provisioner is not None:
+                # Once, after the run ends, whatever the end — a crash or SystemExit too
+                # (red-team 0021): the meter's totals reach the ledger.
+                metering = await _sync_metering(provisioner, minds, clock, law)
+        out = {"ended": record.ended, "reason": record.reason,
+               "registered": [m.spec.id for m in minds], "run": record_json(record)}
+        if metering is not None:
+            out["metering"] = metering
+        return out
     finally:
         for c in [registrar, clock, *(m.client for m in minds)]:
             await c.aclose()
+
+
+async def _sync_metering(provisioner: FakeProvisioner, minds: list[Mind], clock: FundClient,
+                         law: Governance) -> dict[str, Any]:
+    """Post every key's total to physics as the Runtime's identity (ADR-041) and report what the
+    keys cost: who, how much, and whether each dollar reached the ledger. A sync that fails
+    is data in the outcome, not an exception: the caller exits non-zero on it."""
+    error = None
+    try:
+        report = await sync_costs(provisioner, clock)
+        sync = {"posted": report.posted, "unchanged": report.unchanged, "halted": report.halted,
+                "refused": [list(r) for r in report.refused], "error": None}
+    except FundAPIError as exc:  # 401/403: the wrong key; every post would fail the same way
+        error = f"sync_failed:{exc.status_code}"
+        sync = {"posted": 0, "unchanged": 0, "halted": False, "refused": [], "error": error}
+    usage = {u.key_ref: u for u in provisioner.usage()}
+    keys = [{"spec_id": m.spec.id, "agent_id": usage[m.meter.key_ref].agent_id,
+             "key_ref": m.meter.key_ref,
+             "limit_usd_micros": provisioner.limit(m.meter.key_ref),
+             "spent_usd_micros": usage[m.meter.key_ref].usd_micros_total,
+             "charges": provisioner.charges(m.meter.key_ref)}
+            for m in minds if m.meter is not None]
+    return {"cap_usd_micros": (None if law.monthly_llm_usd_cap is None
+                               else usd_to_micros_floor(law.monthly_llm_usd_cap)),
+            "keys": keys,
+            "total_usd_micros": sum(k["spent_usd_micros"] for k in keys),
+            "sync": sync}
+
+
+def _unattributed(metering: dict[str, Any] | None) -> int:
+    """Micro-dollars spent that physics did not take: all of them if the sync was stopped
+    (HALT) or failed, otherwise those of the keys it refused."""
+    if metering is None:
+        return 0
+    sync = metering["sync"]
+    if sync["halted"] or sync["error"] is not None:
+        return metering["total_usd_micros"]
+    refused = {r[0] for r in sync["refused"]}
+    return sum(k["spent_usd_micros"] for k in metering["keys"] if k["key_ref"] in refused)
 
 
 def _is_halt(reason: str) -> bool:

@@ -1659,3 +1659,74 @@ Builder can do alone.
 most 1 in 5; none of the 9 holes is high).
 
 **Reversible.** Yes: the queue is re-cut at every plan.
+
+
+## ADR-044 — Metering v1, the Runtime half: a fake metered provider, keys under the cap, one sync (M-001; amends ADR-032 (4)(p) and ADR-041 §7–8) — accepted (cycle 38)
+
+**Context.** ADR-041 built the physics half of metering: a cumulative `cost_metered` ledger the
+metrics read instead of an agent's self-report. Nothing in the Runtime produced it. The gate still
+answered `no_metered_key` to every spending provider under a numeric cap, so no run could show that
+each dollar is charged by the system to the mind that spent it (Era I EC4, vision M4).
+
+**Decision.**
+1. **Which name is metered.** `fake-metered` only (`runtime.gate.METERED_PROVIDERS`): a script from
+   the closed table, billed per model turn to its own key at a fake provisioner. No model, no
+   network. A real provider is a new name by its own ADR, with the Human's cap (Q-0001).
+2. **The gate** opens it only when the cap is a number, the adapter is `native`, and the Runtime says
+   it holds the mind's key (`metered is True`, exact). Order: halted → zero_cost → cap_null →
+   metered → `no_metered_key`. The gate is told; it never asks the provider.
+3. **A numeric cap exists only inside a process that rebinds `runtime.governance.HUMAN_YAML`** (the
+   existing test seam). No flag, env variable or config reaches it; the Builder never sets the cap (it was `null` when
+   this was written; the Human answered Q-0001, $50/month, on 2026-10-15 while M-001 was built); HALT
+   stays the real HALT. The acceptance check proves the real law refuses the same specs.
+4. **Limits.** key limit = floor(`budget_usd` × 10⁶) micro-dollars, in 1..10¹². `vet` refuses
+   `budget_over_cap` when Σ limits > floor(cap × 10⁶); the conductor re-checks every step
+   before every wake (`metered_over_cap`), so minds handed in around `vet`, or a cap lowered mid-run, are met. Enforced
+   per run: **monthly accounting across runs must exist before any real key** (a gate for R-8, with B-022).
+5. **One key per metered agent**, minted right after registration and bound to that agent's id; the
+   conductor refuses a key that is not its agent's (`meter_mismatch`). A charge past the limit raises
+   before anything is returned: nothing is ever spent past a limit, the wake ends `error`.
+6. **One sync**, after the run ends, whatever the end (`sync_costs`). A refused, halted or failed
+   post exits 1 and names the unattributed micro-dollars on stderr. **Compare-ledgers is unchanged
+   (one allowed difference)**; a metered run's `--cassette` is refused (exit 2). The mission that
+   replays a metered run owns a second, named verdict: recorded ledger = replay + a trailing block of
+   k ≥ 1 well-formed `cost_metered` rows by the runtime, reported apart, never folded into `equal`.
+7. **Physics hears `scripted`** for these minds (`run_minds_declared`): code from a closed table.
+8. **A read** `GET /metering/agents` (READ_CROSS_POD, no new Action; the Runtime identity does not
+   read): per metered agent the meter, the agent's own self-report and the gap; `total_usd_micros` is
+   `null` when nothing is metered; forged rows are counted, never believed; no `key_ref`. Tool
+   `get_metered_costs`. Closes audit c34 WARN 3.
+9. **The fake price** is $3 / $15 per million tokens on ceil(chars/4) of the request's and reply's
+   canonical JSON. Deterministic: same world + specs → same charges to the micro-dollar (guarded by
+   `tests/test_runtime_metered_determinism.py`: two fresh databases, identical usage and ledger). A month of the 2-mind pod measured ≈ $5.2 of a $40 budget; it
+   grows with the published tool list (adding one MCP tool moved it by ~$0.05), so the acceptance
+   asserts relations, not dollar constants.
+
+**Old tests this law broke (findings, restated not loosened).**
+`test_every_registered_name_is_on_the_gates_list_and_says_so` (registered names = ZERO_COST ∪
+METERED, `spends_money` ⇔ metered); `test_the_adapter_takes_no_provider_object` (+`meter`, a key
+handle checked as exactly a `Meter`); a spy's `build()` signature in test_runtime_lockstep; the
+red-team 0014 route sweep (+ the new read, refused to the Runtime key).
+
+**Alternatives rejected.** A `law=` parameter on the CLI (an injectable cap is what Art. 4 forbids);
+metering through OpenClaw (it has its own key and model); posting after every step (many rows, no
+gain: totals are cumulative); fixing the O(n²) scan in `record_metered_usage` (one sync per run —
+stays in BACKLOG).
+
+**Red-team 0021 (5 holes).** Fixed in this mission: *high* — a cap lowered during a step bound only
+the next step (now Σ limits ≤ cap is checked before every wake); *low* — the sync is in a `finally`,
+so a crash or `SystemExit` out of a wake still posts the dollars. **Accepted, written, and routed to
+the hardening mission M-004 (Art. 9: a hole accepted is written, never hidden):** *medium* — until
+the single sync, physics knows no agent is metered, so a leaderboard read **during** the run ranks
+metered minds on their self-reports; "a self-report can no longer move a metered agent's cost or
+rank" is true of the finished run only (the fix, posting every key at 0 after provisioning, makes
+the cost rows no longer a trailing block — the compare-ledgers law of §6 must be written with it);
+*medium* — a rival can drain a metered mind's key by stuffing its inbox with long messages, since
+the fake bills every character (needs a per-sender message quota, a law change); *low* — a sync
+that fails part-way reports `posted: 0` and counts every key as unattributed (exit 1 is right).
+Tests: `tests/test_redteam_0021.py` (3 strict xfails).
+
+**Not done.** A real provisioner; persistence of the fake's state (a HALT before the sync leaves the
+dollars unposted — reported, exit 1, no catch-up); B-000k, B-000n, B-022.
+
+**Reversible.** Yes: one name in the gate's list, one class in the registry's table.
