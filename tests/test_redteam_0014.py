@@ -189,6 +189,7 @@ _EVERY_ROUTE = [
     ("POST", "/tasks/end", {"task_id": 1, "status": "done"}),
     ("GET", "/metrics/pod/1", None),
     ("GET", "/metrics/leaderboard", None),
+    ("GET", "/metering/agents", None),   # M-001 (ADR-044): the Runtime writes the meter, never reads it
 ]
 
 

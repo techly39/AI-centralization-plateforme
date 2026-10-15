@@ -11,7 +11,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import MeteredUsageIn, MeteredUsageOut
+from app.api.schemas import (
+    MeteredAgentOut,
+    MeteredAgentsOut,
+    MeteredUsageIn,
+    MeteredUsageOut,
+)
 from app.db.base import get_session
 from app.db.models import Agent
 from app.metrics.metering import (
@@ -20,12 +25,39 @@ from app.metrics.metering import (
     NotAFirmAgent,
     UnknownMeteredAgent,
     UsageDecreased,
+    metered_summary,
     record_metered_usage,
 )
+from app.oms.money import round_money
 from app.registry.auth import require
 from app.registry.permissions import Action
 
 router = APIRouter(prefix="/metering", tags=["metering"])
+
+
+@router.get("/agents", response_model=MeteredAgentsOut)
+def read_metered_agents(
+    _: Agent = Depends(require(Action.READ_CROSS_POD)),
+    session: Session = Depends(get_session),
+) -> MeteredAgentsOut:
+    """What each metered agent cost, by the meter, beside what it said it spent (ADR-044)."""
+    summary = metered_summary(session)
+    return MeteredAgentsOut(
+        agents=[
+            MeteredAgentOut(
+                agent_id=a.agent_id,
+                pod_id=a.pod_id,
+                metered_usd_micros=a.usd_micros,
+                metered_usd=round_money(a.usd_micros / 1_000_000),
+                self_reported_usd=round_money(a.self_reported_usd),
+                self_report_gap_usd=round_money(a.self_reported_usd - a.usd_micros / 1_000_000),
+            )
+            for a in summary.agents
+        ],
+        total_usd_micros=summary.total_usd_micros,
+        conflicts=summary.conflicts,
+        malformed=summary.malformed,
+    )
 
 
 @router.post("/usage", response_model=MeteredUsageOut)
