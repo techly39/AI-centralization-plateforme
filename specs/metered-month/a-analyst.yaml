@@ -1,0 +1,13 @@
+# M-001 (metered month): the Analyst of pod 1 on the fake METERED provider. Its script reports
+# a cost of $0.01 a wake about itself, which the system's meter neither believes nor needs.
+# A code mind with a spending key from a fake provisioner — never a firm agent (ADR-044).
+id: a-analyst
+name: desk-1-analyst
+role: analyst
+pod: 1
+provider: fake-metered
+script: ma-signal-analyst-underreports
+budget_usd: 20
+charter: >-
+  Read the bars of your universe every day and tell your pod's PM, in one signal message
+  dated today, which names are long and which are flat.
