@@ -60,7 +60,8 @@ from runtime.gate import (
     ZERO_COST_PROVIDERS,
     decide_batch,
 )
-from runtime.metering import Meter
+from runtime.governance import read_governance
+from runtime.metering import Meter, usd_to_micros_floor
 from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
 from runtime.replay import Recording
 from runtime.spec import AgentSpec
@@ -163,6 +164,13 @@ async def run_backtest(
         if who["id"] in agents:
             return RunRecord("refused", f"duplicate_agent:{mind.spec.id}", label)
         agents.add(who["id"])
+        if mind.meter is not None and not _key_is(mind.meter, who["id"]):
+            # ADR-044: a key is its own agent's. A handed-in meter for another agent would
+            # bill one mind's dollars to another.
+            return RunRecord("refused", f"meter_mismatch:{mind.spec.id}", label)
+    meters = [m.meter for m in ordered if m.meter is not None]
+    if len({id(m.provisioner) for m in meters}) > 1:
+        return RunRecord("refused", "meter_mismatch:provisioner", label)
 
     done: list[StepRecord] = []
     retired: list[str] = []
@@ -175,6 +183,10 @@ async def run_backtest(
     for step in range(steps):
         if not decide_batch().allowed:
             return end("halted")
+        if meters and not _limits_fit(meters):
+            # The conductor's own check, so a caller who hands in minds cannot go around
+            # ``vet``; a cap lowered mid-run (or made null) is met here, at the next step.
+            return end("refused", "metered_over_cap")
         try:
             at = _now_of(await clock.get("/clock"))
         except FundAPIError as exc:
@@ -266,6 +278,23 @@ async def check_clock(clock: FundClient) -> str | None:
     if not isinstance(now, dict) or now.get("mode") != "backtest":
         return "not_backtest"
     return None
+
+
+def _key_is(meter: Meter, agent_id: int) -> bool:
+    """Is this key the one minted for App agent ``agent_id``?"""
+    try:
+        return meter.provisioner.agent_of(meter.key_ref) == agent_id
+    except KeyError:
+        return False
+
+
+def _limits_fit(meters: Sequence[Meter]) -> bool:
+    """Do the keys' limits, together, fit the cap as the law reads now? A ``null`` cap is the
+    wake gate's to refuse (``cap_null``), so it is not this check's concern."""
+    cap = read_governance().monthly_llm_usd_cap
+    if cap is None:
+        return True
+    return sum(m.provisioner.limit(m.key_ref) for m in meters) <= usd_to_micros_floor(cap)
 
 
 #: Physics' kind for each zero-cost provider (``app.run_clock.MIND_KINDS``; a test
