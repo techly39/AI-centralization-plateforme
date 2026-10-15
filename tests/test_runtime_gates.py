@@ -54,11 +54,13 @@ def test_reader_paths_are_the_constitutions() -> None:
     assert governance.HUMAN_YAML == root / "governance" / "human.yaml"
 
 
-def test_the_real_human_yaml_reads_as_cap_null() -> None:
-    """Today's law, read through the real file (not a fixture)."""
+def test_the_real_human_yaml_reads_as_the_humans_answer() -> None:
+    """Today's law, read through the real file (not a fixture). Q-0001 was answered on
+    2026-10-15: "$50/month" (it read ``null`` until then). A tripwire, not a fixture: the cap
+    changes only when the Human changes it, and this line changes with it."""
     g = governance.read_governance()
-    assert g.monthly_llm_usd_cap is None
-    assert g.cap_problem is None  # null is a valid answer, not a parse failure
+    assert g.monthly_llm_usd_cap == 50.0
+    assert g.cap_problem is None  # a number is a valid answer, not a parse failure
 
 
 def test_a_numeric_cap_is_read(gov: Path) -> None:
