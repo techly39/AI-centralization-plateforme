@@ -1676,7 +1676,8 @@ each dollar is charged by the system to the mind that spent it (Era I EC4, visio
    it holds the mind's key (`metered is True`, exact). Order: halted → zero_cost → cap_null →
    metered → `no_metered_key`. The gate is told; it never asks the provider.
 3. **A numeric cap exists only inside a process that rebinds `runtime.governance.HUMAN_YAML`** (the
-   existing test seam). No flag, env variable or config reaches it; the real cap stays `null`; HALT
+   existing test seam). No flag, env variable or config reaches it; the Builder never sets the cap (it was `null` when
+   this was written; the Human answered Q-0001, $50/month, on 2026-10-15 while M-001 was built); HALT
    stays the real HALT. The acceptance check proves the real law refuses the same specs.
 4. **Limits.** key limit = floor(`budget_usd` × 10⁶) micro-dollars, in 1..10¹². `vet` refuses
    `budget_over_cap` when Σ limits > floor(cap × 10⁶); the conductor re-checks every step
@@ -1696,8 +1697,8 @@ each dollar is charged by the system to the mind that spent it (Era I EC4, visio
    `null` when nothing is metered; forged rows are counted, never believed; no `key_ref`. Tool
    `get_metered_costs`. Closes audit c34 WARN 3.
 9. **The fake price** is $3 / $15 per million tokens on ceil(chars/4) of the request's and reply's
-   canonical JSON. Deterministic: same world + specs → same charges to the micro-dollar (checked: two
-   acceptance runs, the same total). A month of the 2-mind pod measured ≈ $5.2 of a $40 budget; it
+   canonical JSON. Deterministic: same world + specs → same charges to the micro-dollar (guarded by
+   `tests/test_runtime_metered_determinism.py`: two fresh databases, identical usage and ledger). A month of the 2-mind pod measured ≈ $5.2 of a $40 budget; it
    grows with the published tool list (adding one MCP tool moved it by ~$0.05), so the acceptance
    asserts relations, not dollar constants.
 

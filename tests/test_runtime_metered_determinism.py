@@ -3,7 +3,7 @@
 Charges depend on the length of every request, which carries every tool result the App returned:
 one varying field (a wall-clock stamp, a random id) would change the meter between two runs of the
 same world. Two fresh databases, the same keyed synthetic market, the same fake-metered PM: the
-provisioner's usage and the ledger must be identical, and ``app.ledger.compare`` must agree.
+provisioner's usage and the whole ledger (ids, stamps, payloads) must be identical.
 """
 
 from __future__ import annotations

@@ -22,7 +22,8 @@ after the last step `sync_costs` posts each key's cumulative total as the Runtim
 ## Decisions and why (ADR-044)
 
 - **A numeric cap only by rebinding the law file in-process.** The CLI can never be handed a cap, so
-  the Human's `null` cannot be routed around; the acceptance runs the same specs under the real law
+  the Human's cap (it was `null` when this was written, $50 once Q-0001 was answered) cannot be
+  routed around; the acceptance runs the same specs under the real law
   and checks the refusal leaves the ledger untouched.
 - **`fake-metered` is one closed name** (a no-network class), told to physics as `scripted`.
 - **Limits are checked three times**: `vet` (Σ budgets ≤ cap, and each ≤ the physics maximum),
