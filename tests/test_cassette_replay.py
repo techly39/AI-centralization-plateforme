@@ -3,7 +3,7 @@
 Claims under test:
 
 * **the reader** — ``cassette.read`` is the inverse of ``write`` and accepts only the canonical
-  v1 document: no repeated key (two minted keys redact to one), no NaN, no extra key, no other
+  v2 document (M-002: version 1 is refused by name): no repeated key (two minted keys redact to one), no NaN, no extra key, no other
   version or hash format, no non-ASCII, no pretty-printing, no symlink or directory, no
   nesting deep enough to exhaust the parser;
 * **the recording** — only a completed run replays, and only if its wakes are consistent;
@@ -53,6 +53,7 @@ from runtime.replay import (
     as_cassette,
 )
 from runtime.spec import AgentSpec
+from tests.cassette_parts import PARTS
 from tests.test_runtime_native import _calls, _spec, anyio_backend, fund_client, gov, scripts  # noqa: F401
 from tests.test_runtime_pod import DAYS, _pod_month
 
@@ -69,10 +70,10 @@ def test_read_inverts_write(tmp_path: Path) -> None:
     path = tmp_path / "a.cassette.json"
     outcome = {"run": {"ended": "completed", "steps": []},
                "key": "fk_" + "A" * 43, "n": 1, "t": "café"}
-    redactions = cassette.write(path, outcome)
-    got, counted = cassette.read(path)
-    assert counted == redactions == 1
-    assert got == {**outcome, "key": "fk_<redacted>"}
+    redactions = cassette.write(path, outcome, **PARTS)
+    got = cassette.read(path)
+    assert got.redactions == redactions == 1
+    assert got.outcome == {**outcome, "key": "fk_<redacted>"}
 
 
 def _raw(tmp_path: Path, text: str | bytes) -> Path:
@@ -82,21 +83,25 @@ def _raw(tmp_path: Path, text: str | bytes) -> Path:
 
 
 def _doc(**over) -> str:
-    base = {"cassette_version": 1, "hash_format": cassette.HASH_FORMAT,
-            "outcome": {"run": None}, "redactions": 0}
+    spec = PARTS["specs"][0]
+    base = {"cassette_version": 2, "hash_format": cassette.HASH_FORMAT, "ledger": None,
+            "outcome": {"run": None}, "parameters": PARTS["parameters"], "redactions": 0,
+            "specs": [{"sha256": cassette.spec_sha256(spec), "spec": spec}], "world": None}
     base.update(over)
     return json.dumps({k: v for k, v in base.items() if v is not ...}, sort_keys=True,
                       separators=(",", ":"))
 
 
 def test_read_accepts_the_hand_built_canonical_document(tmp_path: Path) -> None:
-    assert cassette.read(_raw(tmp_path, _doc())) == ({"run": None}, 0)  # the builder is right
+    got = cassette.read(_raw(tmp_path, _doc()))  # the builder is right
+    assert (got.outcome, got.redactions) == ({"run": None}, 0)
 
 
-def test_read_refuses_what_is_not_a_canonical_v1_cassette(tmp_path: Path) -> None:
+def test_read_refuses_what_is_not_a_canonical_v2_cassette(tmp_path: Path) -> None:
     good = _doc()
     bad = {
-        "version 2": _doc(cassette_version=2),
+        "version 1": _doc(cassette_version=1),
+        "version 3": _doc(cassette_version=3),
         "version true": _doc(cassette_version=True),
         "other hash format": _doc(hash_format="sha256/other/1"),
         "extra key": _doc(extra=1),
@@ -112,7 +117,7 @@ def test_read_refuses_what_is_not_a_canonical_v1_cassette(tmp_path: Path) -> Non
         "trailing text": good + "\n",
         "not json": "cassette",
         "top level a list": "[]",
-        "too deep": '{"cassette_version":1,"hash_format":"' + cassette.HASH_FORMAT
+        "too deep": '{"cassette_version":2,"hash_format":"' + cassette.HASH_FORMAT
                     + '","outcome":' + "[" * 100_000 + "]" * 100_000 + ',"redactions":0}',
     }
     for label, text in bad.items():
@@ -120,26 +125,27 @@ def test_read_refuses_what_is_not_a_canonical_v1_cassette(tmp_path: Path) -> Non
             cassette.read(_raw(tmp_path, text))
         assert label  # the failing case is named by the parametrised-in-spirit loop below
     # Counter-check: each refusal above is for its stated reason, not for a typo in the builder.
-    assert cassette.read(_raw(tmp_path, good))[1] == 0
+    assert cassette.read(_raw(tmp_path, good)).redactions == 0
 
 
 def test_read_refuses_a_repeated_key_and_two_minted_keys_that_redact_to_one(
         tmp_path: Path) -> None:
-    dup = '{"cassette_version":1,"hash_format":"%s","outcome":{"a":1,"a":2},"redactions":0}' % (
+    dup = '{"cassette_version":2,"hash_format":"%s","outcome":{"a":1,"a":2},"redactions":0}' % (
         cassette.HASH_FORMAT)
     with pytest.raises(CassetteError, match="twice"):
         cassette.read(_raw(tmp_path, dup))
     # Counter-example: two different minted keys as object keys are two keys when written, one
-    # after redaction. write() cannot tell; the reader must refuse the file it produced.
+    # after redaction. Since v2 the writer refuses it (nothing is left behind), so the reader
+    # never meets the file it would have had to refuse.
     path = tmp_path / "keys.cassette.json"
-    cassette.write(path, {"run": {"fk_" + "A" * 43: 1, "fk_" + "B" * 43: 2}})
     with pytest.raises(CassetteError, match="twice"):
-        cassette.read(path)
+        cassette.write(path, {"run": {"fk_" + "A" * 43: 1, "fk_" + "B" * 43: 2}}, **PARTS)
+    assert not path.exists()
 
 
 def test_read_refuses_a_symlink_a_directory_and_a_missing_file(tmp_path: Path) -> None:
     real = tmp_path / "real.cassette.json"
-    cassette.write(real, _outcome())
+    cassette.write(real, _outcome(), **PARTS)
     link = tmp_path / "link.cassette.json"
     link.symlink_to(real)
     with pytest.raises(CassetteError):
@@ -169,7 +175,7 @@ def _wake_json(spec_id: str = "pm", *, ended="done", calls=0, usage=True, sha=SH
                   Message(role="user", content='{"me":{"id":1}}'),
                   Message(role="assistant", content=content)]
     return {"spec_id": spec_id, "ended": ended, "reason": ended, "tool_calls": calls,
-            "tool_failures": 0, "transcript": [m.model_dump(mode="json") for m in transcript],
+            "tool_failures": 0, "model": None, "tools_sha256": SHA, "transcript": [m.model_dump(mode="json") for m in transcript],
             "exchanges": [{"seq": 0, "request_sha256": sha,
                            "usage": {"input_tokens": 1, "output_tokens": 2, "cost_usd": 0.5}
                            if usage else None}]}
@@ -381,12 +387,13 @@ def test_the_replay_module_has_no_reach() -> None:
 
 # --- where a replay leaves its recording -----------------------------------------------
 
-def _replayed(*, sha: str, before: str, ended="done", calls=0, extra=()) -> WakeRecord:
+def _replayed(*, sha: str, before: str, ended="done", calls=0, extra=(), model=None,
+              tools=SHA) -> WakeRecord:
     """A replayed one-turn wake whose request hashed to ``sha`` with ``before`` as its user text."""
     transcript = (Message(role="system", content="Work."), Message(role="user", content=before),
                   Message(role="assistant", content="hold"))
     return WakeRecord("pm", ended, ended, calls, transcript, 0,
-                      (Exchange(0, sha, Usage()), *extra))
+                      (Exchange(0, sha, Usage()), *extra), model, tools)
 
 
 def _recorded(user: str, ended="done", calls=0) -> Recording:
@@ -417,6 +424,35 @@ def test_divergence_kinds_come_from_the_records() -> None:
     assert same.divergence(0, _replayed(sha=SHA, before="today", calls=2)) == "1:ended"
 
 
+def test_note5_changed_tools_with_redacted_key_in_prefix_reads_surface() -> None:
+    """c32 NOTE 5: a changed tool surface is a surface change even when a key was redacted."""
+    keyed = _recorded("key fk_<redacted> here")
+    live = "key fk_" + "Z" * 43 + " here"
+    other = "b" * 64
+    assert keyed.divergence(0, _replayed(sha=other, before=live, tools="c" * 64)) == "0:surface"
+    assert keyed.divergence(0, _replayed(sha=other, before=live, model="m")) == "0:surface"
+
+
+def test_note5_same_tools_with_redacted_key_reads_key() -> None:
+    """Counter-example: with the surface unchanged, the redacted key is what differs."""
+    keyed = _recorded("key fk_<redacted> here")
+    live = "key fk_" + "Z" * 43 + " here"
+    assert keyed.divergence(0, _replayed(sha="b" * 64, before=live)) == "0:key"
+
+
+def test_wake_without_tools_sha256_is_a_recording_error() -> None:
+    for missing in ("tools_sha256", "model"):
+        w = _wake_json()
+        del w[missing]
+        with pytest.raises(RecordingError, match="malformed"):
+            Recording.from_outcome(_outcome_of(w))
+    for bad in ("short", 7, None):
+        w = _wake_json()
+        w["tools_sha256"] = bad
+        with pytest.raises(RecordingError, match="tools"):
+            Recording.from_outcome(_outcome_of(w))
+
+
 # --- the month -------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -433,7 +469,7 @@ def replays(tmp_path_factory):
         try:
             recorded = _pod_month(11)
             path = d / "month.cassette.json"
-            cassette.write(path, {"run": record_json(recorded["run"])})
+            cassette.write(path, {"run": record_json(recorded["run"])}, **PARTS)
             rec = Recording.load(path)
             yield {"recorded": recorded, "rec": rec, "dir": d,
                    "same": _pod_month(11, replay=rec), "path": path}
@@ -461,8 +497,8 @@ def test_a_replayed_month_leaves_the_recorded_ledger(replays) -> None:
 
 def test_a_replayed_month_writes_the_recorded_cassette_bytes_but_for_the_label(replays) -> None:
     """The record of the replay equals the recorded one except where the minds' provider shows."""
-    a = json.loads(cassette.dumps({"run": record_json(replays["recorded"]["run"])})[0])
-    b = json.loads(cassette.dumps({"run": record_json(replays["same"]["run"])})[0])
+    a = json.loads(cassette.dumps({"run": record_json(replays["recorded"]["run"])}, **PARTS)[0])
+    b = json.loads(cassette.dumps({"run": record_json(replays["same"]["run"])}, **PARTS)[0])
     assert a["outcome"]["run"].pop("minds") == "scripted"
     assert b["outcome"]["run"].pop("minds") == "cassette"
     assert a == b

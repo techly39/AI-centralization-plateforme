@@ -33,7 +33,7 @@ from app.db.models import Agent, AgentRole, Event
 from app.ledger.events import EVENT_CLOCK_ADVANCED
 from app.registry.pods import create_pod
 from app.registry.service import register_agent, seed_runtime_agent
-from runtime import cli
+from runtime import cassette, cli
 from runtime.providers import CompletionResponse, ToolCall
 from tests.test_runtime_lockstep import (  # noqa: F401 - fixtures
     _app,
@@ -194,8 +194,16 @@ def test_cassette_flag_writes_the_record_that_was_printed(
                                            "--cassette", str(path)], capsys)
     assert code == 0 and out["ended"] == "completed"
     doc = json.loads(path.read_text())
-    assert (doc["cassette_version"], doc["redactions"]) == (1, 0)
+    assert (doc["cassette_version"], doc["redactions"]) == (2, 0)
     assert doc["outcome"] == out  # the file holds what was printed
+    # M-002: the file also holds what the replay needs, so one file is enough.
+    assert doc["parameters"] == {"days_per_step": 1, "max_tool_calls": 64, "steps": 2,
+                                 "workflow_input": {}}
+    assert [e["spec"]["id"] for e in doc["specs"]] == ["a-pm", "b-pm"]
+    assert all(e["sha256"] == cassette.spec_sha256(e["spec"]) for e in doc["specs"])
+    assert (doc["world"], doc["ledger"]) == (None, None)  # an operator-hosted App: unverifiable
+    assert all(w["tools_sha256"] and "model" in w
+               for st in out["run"]["steps"] for w in st["wakes"])
     wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
     assert all(len(w["exchanges"]) == sum(m["role"] == "assistant" for m in w["transcript"])
                for w in wakes)

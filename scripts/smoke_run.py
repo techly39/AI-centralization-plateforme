@@ -258,8 +258,10 @@ def desk_run(tmpdir: Path, name: str, command: list[str], verify, kind: str) -> 
                    "FUND_RUNTIME__CLOCK_KEY": keys.get("seed-runtime", "")}
         try:
             r = subprocess.run(
-                ["uv", "run", "fund-runtime", *command, "--specs", "specs/desk-month",
-                 "--input", "specs/desk-month/input.json"],
+                # A replay takes only its cassette (M-002): specs and input are in the file.
+                ["uv", "run", "fund-runtime", *command,
+                 *(["--specs", "specs/desk-month", "--input", "specs/desk-month/input.json"]
+                   if command[0] == "backtest" else [])],
                 cwd=REPO, env=run_env, capture_output=True, text=True, timeout=300,
             )
             fine, detail = verify(r, keys)

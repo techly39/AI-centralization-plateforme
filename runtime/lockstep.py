@@ -104,6 +104,10 @@ class RunRecord:
     retired: tuple[str, ...] = ()
     #: The step each of ``retired`` was retired at, in the same order (audit c24 NOTE 5).
     retired_at: tuple[int, ...] = ()
+    #: ``(spec id, App agent id)`` per mind, in spec-id order: who is who in the ledger's
+    #: ``actor_agent_id`` (``replay --verify`` names the wake an event belongs to). Empty for a
+    #: run refused before its minds were read.
+    agents: tuple[tuple[str, int], ...] = ()
 
 
 async def run_backtest(
@@ -151,6 +155,7 @@ async def run_backtest(
     # Red-team 0015 H2: one App agent is one mind. Every key is read before step 0;
     # a key that is not its spec's agent, or an agent handed in twice, refuses the run.
     agents: set[int] = set()
+    who_is: list[tuple[str, int]] = []
     for mind in ordered:
         try:
             who = await mind.client.get("/me")
@@ -164,6 +169,7 @@ async def run_backtest(
         if who["id"] in agents:
             return RunRecord("refused", f"duplicate_agent:{mind.spec.id}", label)
         agents.add(who["id"])
+        who_is.append((mind.spec.id, who["id"]))
         if mind.meter is not None and not _key_is(mind.meter, who["id"]):
             # ADR-044: a key is its own agent's. A handed-in meter for another agent would
             # bill one mind's dollars to another.
@@ -178,7 +184,7 @@ async def run_backtest(
 
     def end(ended: str, reason: str | None = None) -> RunRecord:
         return RunRecord(ended, reason or ended, label, tuple(done), tuple(retired),
-                         tuple(retired_at))
+                         tuple(retired_at), tuple(who_is))
 
     for step in range(steps):
         if not decide_batch().allowed:

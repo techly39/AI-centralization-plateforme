@@ -53,7 +53,7 @@ from pydantic import ValidationError
 from mcp_server.client import FundClient
 from mcp_server.tools import build_server
 from runtime.gate import decide_batch, decide_wake
-from runtime.cassette import request_sha256
+from runtime.cassette import request_sha256, tools_sha256
 from runtime.metering import Meter
 from runtime.providers import (
     CompletionRequest,
@@ -102,6 +102,12 @@ class WakeRecord:
     tool_failures: int = 0
     #: One per model turn asked, in order (R-4a). Empty for a wake refused before any turn.
     exchanges: tuple[Exchange, ...] = ()
+    #: The model the wake asked (``spec.model``); ``None``: a scripted mind, or the wake was
+    #: refused before any turn (cassette v2, M-002).
+    model: str | None = None
+    #: ``cassette.tools_sha256`` of the tools every request of the wake carried; ``None`` only
+    #: for a wake refused before its tools were listed.
+    tools_sha256: str | None = None
 
 
 async def published_tools(client: FundClient) -> list[ToolSpec]:
@@ -150,6 +156,7 @@ async def wake(
             return WakeRecord(spec.id, "refused", "unknown_tool", 0)
         tools = [t for t in tools if t.name in spec.tools]
     visible = frozenset(t.name for t in tools)
+    tools_digest = tools_sha256(tools)
 
     if type(workflow_input) is not dict or not _is_json(workflow_input):
         return WakeRecord(spec.id, "refused", "bad_input", 0)  # red-team 0013 H7
@@ -176,7 +183,7 @@ async def wake(
 
     def end(ended: str, reason: str | None = None) -> WakeRecord:
         return WakeRecord(spec.id, ended, reason or ended, made, tuple(transcript),
-                          len(failures), tuple(exchanges))
+                          len(failures), tuple(exchanges), spec.model, tools_digest)
 
     while True:
         if not decide_batch().allowed:  # no thinking after HALT: R-6's think costs money

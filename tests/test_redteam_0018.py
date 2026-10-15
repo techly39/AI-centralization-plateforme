@@ -31,6 +31,7 @@ from runtime.lockstep import record_json
 from runtime.native import Exchange, WakeRecord
 from runtime.providers import CompletionRequest, CompletionResponse, Message, ToolCall
 from runtime.registry import ProviderRefused, build_provider
+from tests.cassette_parts import PARTS
 from runtime.replay import (
     CassetteProvider,
     Recording,
@@ -72,7 +73,7 @@ def rt_scripts(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _record_to_recording(run, path: Path) -> Recording:
-    cassette.write(path, {"run": record_json(run)})
+    cassette.write(path, {"run": record_json(run)}, **PARTS)
     return Recording.load(path)
 
 
@@ -282,8 +283,12 @@ def test_hole_an_exchange_seq_that_is_not_an_int_is_refused(seq):
 # =====================================================================================
 
 def _doc(outcome_text: str) -> str:
-    return ('{"cassette_version":1,"hash_format":"%s","outcome":%s,"redactions":0}'
-            % (cassette.HASH_FORMAT, outcome_text))
+    """A hand-built canonical v2 document around ``outcome_text`` (M-002: v1 is refused)."""
+    spec = PARTS["specs"][0]
+    return ('{"cassette_version":2,"hash_format":"%s","ledger":null,"outcome":%s,'
+            '"parameters":{"days_per_step":1,"max_tool_calls":64,"steps":1,"workflow_input":{}},'
+            '"redactions":0,"specs":[{"sha256":"%s","spec":{"id":"a-analyst"}}],"world":null}'
+            % (cassette.HASH_FORMAT, outcome_text, cassette.spec_sha256(spec)))
 
 
 def _raw(tmp_path: Path, text: str) -> Path:
@@ -310,7 +315,7 @@ def test_held_the_reader_refuses_non_canonical_bodies(tmp_path, label, outcome_t
 def test_held_a_lone_surrogate_is_canonical_but_harmless(tmp_path):
     """``\\ud800`` round-trips through ``ensure_ascii`` unchanged, so the reader accepts it; the
     request hash and the writer both serialise it with ``ensure_ascii=True``."""
-    got, _ = cassette.read(_raw(tmp_path, _doc('{"n":"\\ud800"}')))
+    got = cassette.read(_raw(tmp_path, _doc('{"n":"\\ud800"}'))).outcome
     assert got == {"n": "\ud800"}
     assert len(cassette.request_sha256(CompletionRequest(
         messages=[Message(role="user", content=got["n"])]))) == 64
@@ -318,7 +323,7 @@ def test_held_a_lone_surrogate_is_canonical_but_harmless(tmp_path):
 
 def test_held_a_symlink_swapped_in_and_a_device_are_refused(tmp_path):
     real = tmp_path / "real.cassette.json"
-    cassette.write(real, {"run": None})
+    cassette.write(real, {"run": None}, **PARTS)
     link = tmp_path / "l.cassette.json"
     link.symlink_to(real)
     with pytest.raises(CassetteError):

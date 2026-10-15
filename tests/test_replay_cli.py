@@ -3,13 +3,15 @@
 Claims under test:
 
 * the command refuses itself (exit 2, nothing contacted) for a cassette that is not a completed
-  run, specs that are not the recording's minds, a spec that carries a model, and every usage
-  error ``backtest`` has; it takes no ``--steps`` (the recording holds the count);
+  run (or is version 1), specs in the cassette that are not the recording's minds, a spec that
+  carries a model, and every usage error ``backtest`` has; it takes no ``--steps`` and (M-002)
+  no ``--specs``, ``--input``, ``--days-per-step`` or ``--max-tool-calls``: the cassette holds
+  the count, the specs and the run's parameters;
 * a recorded scripted run, replayed into a fresh database of the same world, ends ``completed``
   at zero usage, declares ``cassette`` before any firm act, and leaves a ledger that
   ``compare-ledgers`` finds equal to the recorded one but for the declaration;
-* the replay is not blind to what the v1 cassette does not store: another world, another
-  workflow input, another days-per-step each end ``diverged`` (exit 1) with an unequal ledger.
+* the replay is not blind to a tampered cassette or another world: another world, another
+  workflow input, another days-per-step in the cassette each end ``diverged`` (exit 1).
 
 Two databases in one test: each is built like the operator's (start-backtest, admin, runtime,
 a pod) and held in memory; ledgers are written to files in raw text for ``compare``.
@@ -37,6 +39,8 @@ from app.registry.service import get_or_create_system_agent, register_agent, see
 from app.run_clock import start_backtest
 from runtime import cassette, cli
 from runtime.providers import Usage
+from runtime.spec import AgentSpec
+from tests.cassette_parts import PARTS
 from tests.support import world_key
 from tests.test_cassette_replay import _outcome_of, _wake_json
 from tests.test_phase3_probe import CAPITAL, START, SYMBOLS, _fresh_database
@@ -113,11 +117,22 @@ def _record(tmp_path: Path, input_file: Path, monkeypatch, capsys, world: int = 
     return desk, out, path
 
 
-def _replay(desk: Desk, path: Path, input_file: Path | None, monkeypatch, capsys, *extra: str):
-    argv = ["replay", "--cassette", str(path), "--specs", str(DESK), *extra]
-    if input_file is not None:
-        argv += ["--input", str(input_file)]
-    return desk.run(argv, monkeypatch, capsys)
+def _replay(desk: Desk, path: Path, monkeypatch, capsys, *extra: str):
+    """``fund-runtime replay`` from the cassette alone (M-002): no other input exists."""
+    return desk.run(["replay", "--cassette", str(path), *extra], monkeypatch, capsys)
+
+
+def _forge(dest: Path, doc: dict) -> Path:
+    """A canonical-looking file for ``doc``, written without the writer's checks."""
+    dest.write_text(json.dumps(doc, sort_keys=True, separators=(",", ":")), encoding="ascii")
+    return dest
+
+
+def _tampered(path: Path, dest: Path, **parameters) -> Path:
+    """``path``'s cassette with some run parameters changed (specs and tapes untouched)."""
+    doc = json.loads(path.read_text(encoding="ascii"))
+    doc["parameters"].update(parameters)
+    return _forge(dest, doc)
 
 
 # --- a replay -------------------------------------------------------------------------------
@@ -125,7 +140,7 @@ def _replay(desk: Desk, path: Path, input_file: Path | None, monkeypatch, capsys
 def test_replay_cli_replays_the_recorded_run(tmp_path, input_file, monkeypatch, capsys) -> None:
     recorded, rec_out, path = _record(tmp_path, input_file, monkeypatch, capsys)
     fresh = Desk(11)
-    code, out, err = _replay(fresh, path, input_file, monkeypatch, capsys)
+    code, out, err = _replay(fresh, path, monkeypatch, capsys)
     assert code == 0 and (out["ended"], out["reason"]) == ("completed", "completed"), (out, err)
     assert out["run"]["minds"] == "cassette" and len(out["run"]["steps"]) == STEPS
     wakes = [w for st in out["run"]["steps"] for w in st["wakes"]]
@@ -145,7 +160,7 @@ def test_replay_cli_replays_the_recorded_run(tmp_path, input_file, monkeypatch, 
 def test_replay_cli_declares_cassette_before_any_firm_act(tmp_path, input_file, monkeypatch, capsys) -> None:
     _, _, path = _record(tmp_path, input_file, monkeypatch, capsys)
     fresh = Desk(11)
-    assert _replay(fresh, path, input_file, monkeypatch, capsys)[0] == 0
+    assert _replay(fresh, path, monkeypatch, capsys)[0] == 0
     events = fresh.events()
     (declared,) = [e for e in events if e[3] == "run_minds_declared"]
     assert declared[4] == {"minds": ["cassette"]}
@@ -160,33 +175,49 @@ def test_replay_cli_declares_cassette_before_any_firm_act(tmp_path, input_file, 
 def test_replay_cli_in_another_world_exits_1_diverged(tmp_path, input_file, monkeypatch, capsys) -> None:
     recorded, _, path = _record(tmp_path, input_file, monkeypatch, capsys, world=11)
     other = Desk(12)
-    code, out, _ = _replay(other, path, input_file, monkeypatch, capsys)
+    code, out, _ = _replay(other, path, monkeypatch, capsys)
     assert code == 1 and out["ended"] == "diverged" and out["reason"].endswith(":world"), out["reason"]
     result = compare(ledger_rows(recorded.to_file(tmp_path / "a.db")),
                      ledger_rows(other.to_file(tmp_path / "b.db")))
     assert result.equal is False and result.first_difference is not None
 
 
-def test_replay_cli_with_another_input_diverges_at_turn_0(tmp_path, input_file, monkeypatch, capsys) -> None:
-    """Counter-example to "v1 does not store the input, so it is not checked"."""
+def test_replay_takes_specs_and_parameters_from_the_cassette(
+        tmp_path, input_file, monkeypatch, capsys) -> None:
+    """One file is enough: the recorded parameters and specs are in it, and the replay used them."""
     _, _, path = _record(tmp_path, input_file, monkeypatch, capsys)
-    other_input = tmp_path / "other.json"
-    other_input.write_text(json.dumps({"universe": ["SYNA"]}))
-    code, out, _ = _replay(Desk(11), path, other_input, monkeypatch, capsys)
+    doc = json.loads(path.read_text(encoding="ascii"))
+    assert doc["parameters"] == {"days_per_step": 1, "max_tool_calls": 64, "steps": STEPS,
+                                 "workflow_input": json.loads(input_file.read_text())}
+    assert [e["spec"]["id"] for e in doc["specs"]] == ["a-analyst", "b-pm"]
+    monkeypatch.chdir(tmp_path)  # nowhere near specs/
+    code, out, err = _replay(Desk(11), path, monkeypatch, capsys)
+    assert code == 0 and out["ended"] == "completed", (out, err)
+
+
+def test_tampered_input_diverges_world_at_turn_0(tmp_path, input_file, monkeypatch, capsys) -> None:
+    """The old flag-mismatch test, restated as cassette tampering: the minds see another input."""
+    _, _, path = _record(tmp_path, input_file, monkeypatch, capsys)
+    other = _tampered(path, tmp_path / "other.cassette.json", workflow_input={"universe": ["SYNA"]})
+    code, out, _ = _replay(Desk(11), other, monkeypatch, capsys)
     assert code == 1 and out["reason"] == "diverged:a-analyst:0:0:world", out["reason"]
 
 
-def test_replay_cli_with_another_days_per_step_diverges_on_the_calendar(
+def test_tampered_days_per_step_diverges_calendar(
         tmp_path, input_file, monkeypatch, capsys) -> None:
     _, _, path = _record(tmp_path, input_file, monkeypatch, capsys)
-    code, out, _ = _replay(Desk(11), path, input_file, monkeypatch, capsys, "--days-per-step", "2")
+    other = _tampered(path, tmp_path / "other.cassette.json", days_per_step=2)
+    code, out, _ = _replay(Desk(11), other, monkeypatch, capsys)
     assert code == 1 and out["reason"] == "diverged:clock:0:0:calendar_landed", out["reason"]
 
 
-def test_replay_takes_no_steps_flag(tmp_path, monkeypatch, capsys) -> None:
+@pytest.mark.parametrize("flag, value", [
+    ("--steps", "5"), ("--specs", str(DESK)), ("--input", "input.json"),
+    ("--days-per-step", "2"), ("--max-tool-calls", "8")])
+def test_removed_flags_are_usage_errors(flag, value, tmp_path, monkeypatch, capsys) -> None:
+    """The cassette holds the count, the specs and every parameter: no flag can contradict it."""
     with pytest.raises(SystemExit) as exit_:
-        cli.main(["replay", "--cassette", str(tmp_path / "x.cassette.json"), "--specs", str(DESK),
-                  "--steps", "5"])
+        cli.main(["replay", "--cassette", str(tmp_path / "x.cassette.json"), flag, value])
     assert exit_.value.code == 2
 
 
@@ -201,21 +232,21 @@ class Recorder(httpx.AsyncBaseTransport):
         return httpx.Response(500)
 
 
-def _good_cassette(tmp_path: Path, **over) -> Path:
-    outcome = _outcome_of(_wake_json("a-analyst"), _wake_json("b-pm"), **over)
-    outcome["run"]["steps"][0]["advanced_to"] = "2024-01-03T14:30:00Z"
-    path = tmp_path / "good.cassette.json"
-    cassette.write(path, outcome)
+def _desk_specs(*ids: str, **fields) -> list[dict]:
+    """The desk's spec bodies as a cassette carries them (``AgentSpec.model_dump(mode="json")``)."""
+    return [AgentSpec.model_validate(yaml.safe_load((DESK / f"{id}.yaml").read_text()) | fields)
+            .model_dump(mode="json") for id in ids]
+
+
+def _good_cassette(tmp_path: Path, name: str = "good", *, outcome: dict | None = None,
+                   specs: list[dict] | None = None, **over) -> Path:
+    if outcome is None:
+        outcome = _outcome_of(_wake_json("a-analyst"), _wake_json("b-pm"), **over)
+        outcome["run"]["steps"][0]["advanced_to"] = "2024-01-03T14:30:00Z"
+    path = tmp_path / f"{name}.cassette.json"
+    cassette.write(path, outcome, parameters=PARTS["parameters"],
+                   specs=specs if specs is not None else _desk_specs("a-analyst", "b-pm"))
     return path
-
-
-def _specs_dir(tmp_path: Path, *ids: str, **fields) -> Path:
-    directory = tmp_path / "specs"
-    directory.mkdir()
-    for id in ids:
-        spec = yaml.safe_load((DESK / f"{id}.yaml").read_text()) | fields
-        (directory / f"{id}.yaml").write_text(yaml.safe_dump(spec))
-    return directory
 
 
 def test_the_usage_cases_start_from_a_command_that_passes(tmp_path, monkeypatch, capsys) -> None:
@@ -225,65 +256,69 @@ def test_the_usage_cases_start_from_a_command_that_passes(tmp_path, monkeypatch,
     monkeypatch.setenv(cli.REGISTRAR_KEY_ENV, "fk_registrar-key-0000")
     monkeypatch.setenv(cli.CLOCK_KEY_ENV, "fk_clock-key-0000")
     transport = Recorder()
-    code = cli.main(["replay", "--cassette", str(_good_cassette(tmp_path)), "--specs", str(DESK)],
-                    transport=transport)
+    code = cli.main(["replay", "--cassette", str(_good_cassette(tmp_path))], transport=transport)
     capsys.readouterr()
     assert code == 1 and transport.requests > 0
 
 
-CASES = ["missing","pretty", "refused_run", "diverged_run", "halted_run", "extra_spec",
+CASES = ["missing", "pretty", "refused_run", "diverged_run", "halted_run", "extra_spec",
          "missing_spec", "model_spec", "no_registrar_key", "equal_keys", "remote_server",
-         "zero_days", "huge_tool_budget", "bad_input", "no_specs"]
+         "zero_days", "huge_tool_budget", "bad_input", "no_specs", "v1", "spec_edited",
+         "steps_disagree"]
 
 
 @pytest.mark.parametrize("case", CASES)
 def test_replay_usage_errors_exit_2_and_contact_nothing(case, tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setenv(cli.REGISTRAR_KEY_ENV, "fk_registrar-key-0000")
     monkeypatch.setenv(cli.CLOCK_KEY_ENV, "fk_clock-key-0000")
-    cass, specs, extra = _good_cassette(tmp_path), DESK, []
+    cass, extra = _good_cassette(tmp_path), []
+    doc = json.loads(cass.read_text())
+    both = ("a-analyst", "b-pm")
     if case == "missing":
         cass = tmp_path / "missing.cassette.json"
     elif case == "pretty":
         pretty = tmp_path / "pretty.cassette.json"
-        pretty.write_text(json.dumps(json.loads(cass.read_text()), indent=2))
+        pretty.write_text(json.dumps(doc, indent=2))
         cass = pretty
     elif case == "refused_run":
         path = tmp_path / "refused.cassette.json"
-        cassette.write(path, {"ended": "refused", "reason": "provision:x", "registered": [], "run": None})
+        cassette.write(path, {"ended": "refused", "reason": "provision:x", "registered": [], "run": None},
+                       parameters=PARTS["parameters"], specs=_desk_specs(*both))
         cass = path
     elif case in {"diverged_run", "halted_run"}:
-        path = tmp_path / "ended.cassette.json"
-        cassette.write(path, _outcome_of(_wake_json("a-analyst"), _wake_json("b-pm"),
-                                         ended=case.split("_")[0]))
-        cass = path
+        cass = _good_cassette(tmp_path, "ended", outcome=_outcome_of(
+            _wake_json("a-analyst"), _wake_json("b-pm"), ended=case.split("_")[0]))
     elif case == "extra_spec":
-        specs = _specs_dir(tmp_path, "a-analyst", "b-pm")
-        (specs / "c-pm.yaml").write_text((specs / "b-pm.yaml").read_text().replace("b-pm", "c-pm")
-                                         .replace("desk-1-pm", "desk-1-pm-2"))
+        third = _desk_specs("b-pm")[0] | {"id": "c-pm", "name": "desk-1-pm-2"}
+        cass = _good_cassette(tmp_path, "extra", specs=[*_desk_specs(*both), third])
     elif case == "missing_spec":
-        specs = _specs_dir(tmp_path, "a-analyst")
+        cass = _good_cassette(tmp_path, "missing-spec", specs=_desk_specs("a-analyst"))
     elif case == "model_spec":
-        specs = _specs_dir(tmp_path, "a-analyst", "b-pm", model="some-model")
+        cass = _good_cassette(tmp_path, "model", specs=_desk_specs(*both, model="some-model"))
     elif case == "no_registrar_key":
         monkeypatch.delenv(cli.REGISTRAR_KEY_ENV)
     elif case == "equal_keys":
         monkeypatch.setenv(cli.CLOCK_KEY_ENV, "fk_registrar-key-0000")
     elif case == "remote_server":
         extra = ["--server", "http://example.com:8000"]
-    elif case == "zero_days":
-        extra = ["--days-per-step", "0"]
-    elif case == "huge_tool_budget":
-        extra = [f"--max-tool-calls", str(cli.MAX_TOOL_CALLS + 1)]
-    elif case == "bad_input":
-        bad = tmp_path / "bad.json"
-        bad.write_text("[1]")
-        extra = ["--input", str(bad)]
+    elif case in {"zero_days", "huge_tool_budget", "bad_input"}:
+        field, value = {"zero_days": ("days_per_step", 0),
+                        "huge_tool_budget": ("max_tool_calls", cli.MAX_TOOL_CALLS + 1),
+                        "bad_input": ("workflow_input", [1])}[case]
+        cass = _tampered(cass, tmp_path / "bad.cassette.json", **{field: value})
     elif case == "no_specs":
-        specs = tmp_path / "empty"
-        specs.mkdir()
+        cass = _good_cassette(tmp_path, "empty", specs=[])
+    elif case == "v1":
+        cass = _forge(tmp_path / "v1.cassette.json", {
+            "cassette_version": 1, "hash_format": cassette.HASH_FORMAT, "outcome": doc["outcome"],
+            "redactions": 0})
+    elif case == "spec_edited":  # a spec changed without its digest
+        doc["specs"][0]["spec"]["charter"] = "Do something else."
+        cass = _forge(tmp_path / "edited.cassette.json", doc)
+    elif case == "steps_disagree":  # the parameters contradict the recording
+        cass = _tampered(cass, tmp_path / "steps.cassette.json", steps=7)
     transport = Recorder()
-    code = cli.main(["replay", "--cassette", str(cass), "--specs", str(specs), *extra],
-                    transport=transport)
+    code = cli.main(["replay", "--cassette", str(cass), *extra], transport=transport)
     out, err = capsys.readouterr()
     assert code == 2 and out == "" and err.startswith("fund-runtime:"), (case, err)
     assert transport.requests == 0

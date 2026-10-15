@@ -43,18 +43,18 @@ cannot be written). With ``--cassette PATH`` the same outcome is also written, r
 new ``*.cassette.json`` file (:mod:`runtime.cassette`) whatever the run's end; a write that
 fails exits 1 after the outcome was printed.
 
-    fund-runtime replay --cassette PATH --specs DIR [--days-per-step D] [--input FILE]
-                        [--max-tool-calls K] [--server URL]
+    fund-runtime replay --cassette PATH [--server URL]
 
 replays the run ``PATH`` recorded (ADR-040) into the fresh backtest database the App at ``URL``
-serves, set up exactly as the recorded run's was: the same specs' minds, as ``cassette`` minds,
-answering from the tape. No ``--steps``: the recording holds the step count. ``--input`` and
-``--days-per-step`` must be the recorded run's (cassette v1 does not store them; a mismatch ends
-the run ``diverged``). Same keys, same order, same output as ``backtest``. Exit 0 only if the run
-``completed``; 1 if it was refused or ended early (``halted``, ``diverged``, ``error``); 2 if the command is wrong (the
-cassette is not a completed run, the specs are not its minds, a spec carries a model, and every
-``backtest`` usage error). **Exit 0 is not proof of an identical ledger**: compare the new
-database with the recorded one, ``fund-env compare-ledgers RECORDED REPLAYED``.
+serves, set up exactly as the recorded run's was: the specs' minds (as the cassette carries them,
+as ``cassette`` minds) answering from the tape. The cassette (v2, ADR-045) holds everything the
+replay needs: the step count, days per step, tool-call budget and workflow input of the recorded
+run, and its specs; no other flag exists. Same keys, same order, same output as ``backtest``. Exit 0
+only if the run ``completed``; 1 if it was refused or ended early (``halted``, ``diverged``,
+``error``); 2 if the command is wrong (the cassette is unreadable, is version 1 or not a completed
+run, a spec carries a model, and every ``backtest`` usage error). **Exit 0 is not proof of an
+identical ledger**: compare the new database with the recorded one, ``fund-env compare-ledgers
+RECORDED REPLAYED``.
 
 The server must be on this machine (``127.0.0.1`` or ``::1``), and no proxy from
 the environment is used (``FundClient``): agent keys never leave it.
@@ -92,7 +92,7 @@ from runtime.native import DEFAULT_MAX_TOOL_CALLS
 from runtime.provision import ProvisionError, provision, vet
 from runtime.registry import ProviderRefused, check_spec
 from runtime.replay import Recording, RecordingError, as_cassette
-from runtime.spec import AgentSpec, SpecError, load_specs
+from runtime.spec import AgentSpec, SpecError, load_specs, specs_from_cassette
 
 REGISTRAR_KEY_ENV = "FUND_RUNTIME__REGISTRAR_KEY"
 CLOCK_KEY_ENV = "FUND_RUNTIME__CLOCK_KEY"
@@ -129,12 +129,6 @@ def main(argv: list[str] | None = None, *,
     rp = sub.add_parser("replay", help="replay a recorded run's minds from its cassette (no model, $0)")
     rp.add_argument("--cassette", type=Path, required=True, metavar="PATH",
                     help=f"the recorded run's {cassette.SUFFIX} (a completed run of scripted minds)")
-    rp.add_argument("--specs", type=Path, required=True,
-                    help="the same specs the run was recorded with (their ids must match)")
-    rp.add_argument("--days-per-step", type=int, default=1)
-    rp.add_argument("--input", type=Path, help="workflow input: the one the run was recorded with")
-    rp.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS,
-                    help="tool-call budget per wake")
     rp.add_argument("--server", default=os.environ.get(SERVER_ENV) or DEFAULT_SERVER,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
     args = parser.parse_args(argv)
@@ -176,40 +170,47 @@ def _shared(args: argparse.Namespace, steps: int | None = None) -> tuple[dict[st
         if value is not None and not low <= value <= top:
             raise _Usage(f"{flag} is in [{low}, {top}]")
     workflow_input = _read_input(args.input)
+    return (workflow_input, *_keys(args))
+
+
+def _keys(args: argparse.Namespace) -> tuple[str, str, str]:
+    """``(registrar_key, clock_key, server)``: from the environment, never the command line."""
     registrar_key, clock_key = (_key(REGISTRAR_KEY_ENV), _key(CLOCK_KEY_ENV))
     if registrar_key == clock_key:
         raise _Usage("the registrar key and the clock key are one key: the clock "
                      "identity registers nobody")
-    return workflow_input, registrar_key, clock_key, _loopback(args.server)
+    return registrar_key, clock_key, _loopback(args.server)
 
 
 def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None) -> int:
-    """``fund-runtime replay`` (ADR-040): the recorded run's minds, as cassette minds, in a fresh
-    database. Exit 0 only for ``completed``: **that is not proof of an identical ledger**."""
+    """``fund-runtime replay`` (ADR-040, ADR-045): the recorded run's minds, as cassette minds, in a
+    fresh database; the specs and the run's parameters come from the cassette alone. Exit 0 only
+    for ``completed``: **that is not proof of an identical ledger** (``--verify`` is)."""
     try:
-        specs = load_specs(args.specs)
-        if not specs:
-            raise _Usage(f"no specs in {args.specs}: a run needs minds")
         try:
-            rec = Recording.load(args.cassette)
+            cas = cassette.read(args.cassette)
+            rec = Recording.from_outcome(cas.outcome)
+            specs = specs_from_cassette(cas.specs)
         except (CassetteError, RecordingError) as exc:
             raise _Usage(f"{args.cassette}: {exc}") from exc
-        if len({s.id for s in specs}) != len(specs) or {s.id for s in specs} != rec.spec_ids:
-            raise _Usage("the specs are not the recording's minds: their ids differ")
+        if {s.id for s in specs} != rec.spec_ids:
+            raise _Usage("the cassette's specs are not the recording's minds: their ids differ")
+        if cas.parameters["steps"] != rec.steps:
+            raise _Usage("the cassette's parameters disagree with its recording (steps)")
         try:
             specs = [as_cassette(s) for s in specs]
             for spec in specs:
                 check_spec(spec)
         except (ProviderRefused, ValueError) as exc:  # a cassette v1 cannot replay a model-bearing run
             raise _Usage(f"the specs cannot replay as cassette minds: {exc}") from exc
-        workflow_input, registrar_key, clock_key, server = _shared(args)
+        registrar_key, clock_key, server = _keys(args)
     except (SpecError, _Usage) as exc:
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
     out = asyncio.run(_conduct(specs, server, registrar_key, clock_key, transport,
-                               steps=rec.steps, days_per_step=args.days_per_step,
-                               workflow_input=workflow_input,
-                               max_tool_calls=args.max_tool_calls, replay=rec))
+                               steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
+                               workflow_input=cas.parameters["workflow_input"],
+                               max_tool_calls=cas.parameters["max_tool_calls"], replay=rec))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
     return 0 if out["ended"] == "completed" else 1
 
@@ -244,7 +245,12 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         code = 1
     if args.cassette is not None:  # every run that began is written, refused ones too (Art. 9)
         try:
-            redactions = cassette.write(args.cassette, out)
+            redactions = cassette.write(
+                args.cassette, out,
+                parameters={"steps": args.steps, "days_per_step": args.days_per_step,
+                            "max_tool_calls": args.max_tool_calls,
+                            "workflow_input": workflow_input},
+                specs=[spec.model_dump(mode="json") for spec in specs])
         except CassetteError as exc:
             print(f"fund-runtime: {exc}", file=sys.stderr)
             return 1

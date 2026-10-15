@@ -336,7 +336,7 @@ def test_held_halt_between_two_minds_mid_replay_ends_halted(tmp_path, monkeypatc
             (gov_dir / "HALT").write_text("")
         return record
     monkeypatch.setattr(lockstep, "wake", wake)
-    code, out, _ = _replay(fresh, path, input_file, monkeypatch, capsys)
+    code, out, _ = _replay(fresh, path, monkeypatch, capsys)
     assert code == 1 and (out["ended"], out["reason"]) == ("halted", "halted")
     assert len(out["run"]["steps"]) == 2 and out["run"]["steps"][1]["advanced_to"] is None
     with fresh.Sessions() as s:
@@ -349,11 +349,13 @@ def test_held_a_tape_cannot_fake_a_halt(tmp_path, monkeypatch, capsys, desk_env)
     ends as the mind really does, so the run diverges; it never reads ``halted``."""
     from tests.test_replay_cli import Desk, _record, _replay
     input_file = desk_env
-    _, out, _ = _record(tmp_path, input_file, monkeypatch, capsys)
+    _, out, path = _record(tmp_path, input_file, monkeypatch, capsys)
+    recorded = json.loads(path.read_text(encoding="ascii"))
     out["run"]["steps"][0]["wakes"][0]["ended"] = "halted"
     out["run"]["steps"][0]["wakes"][0]["reason"] = "halted"
     forged = tmp_path / "forged.cassette.json"
-    cassette.write(forged, out)
-    code, replayed, _ = _replay(Desk(11), forged, input_file, monkeypatch, capsys)
+    cassette.write(forged, out, parameters=recorded["parameters"],
+                   specs=[e["spec"] for e in recorded["specs"]])
+    code, replayed, _ = _replay(Desk(11), forged, monkeypatch, capsys)
     assert code == 1 and replayed["ended"] == "diverged"
     assert replayed["reason"].startswith("diverged:") and replayed["reason"].endswith(":ended")
