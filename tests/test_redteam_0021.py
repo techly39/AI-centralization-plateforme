@@ -92,14 +92,7 @@ class FailsNthMeteringPost(httpx.AsyncBaseTransport):
 
 # --- (d) a cap lowered mid-step: the rest of the step still spends ------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HOLE high (cap, Art. 4): the conductor checks Σ limits ≤ cap only at the top of a step "
-    "(`_limits_fit` in `run_backtest`), and the wake gate checks only `null`. When the Human "
-    "lowers a numeric cap to $0 during a step, every remaining wake of that step still wakes "
-    "and is charged up to its key's full limit; a `null` cap would have stopped the very next "
-    "wake. A cap of $0 is obeyed later than `null`. Fix: in `run_backtest`'s per-mind loop, "
-    "before each `wake`, `if meters and not _limits_fit(meters): stop = ('refused', "
-    "'metered_over_cap'); break` (and, for a mind's own later turns, check it per turn)."))
+# FIXED in M-001 (ADR-044): `run_backtest` checks Σ limits ≤ cap before every wake (high).
 def test_hole_a_cap_lowered_to_zero_mid_step_still_lets_the_next_mind_spend(
         SessionFactory, world, woke, gov, monkeypatch) -> None:
     def lowers(request):
@@ -196,13 +189,7 @@ def test_hole_a_rival_drains_a_metered_minds_key_by_stuffing_its_inbox(
 
 # --- (e) the sync is not in a ``finally``: a mind that ends the process loses the dollars ---
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HOLE low (sync law 'once, after the run ends, whatever the end'): the sync runs only if "
-    "`run_backtest` returns. A BaseException out of a wake (`native.wake` lets SystemExit "
-    "escape by design; KeyboardInterrupt alike) skips it: the key's dollars never reach the "
-    "ledger and, with SystemExit(0), the process exits 0. Needs code in the closed script "
-    "table or an operator's Ctrl-C, so low. Fix: in `_conduct`, run `_sync_metering` in a "
-    "`finally` around `run_backtest` (and print the outcome before re-raising)."))
+# FIXED in M-001 (ADR-044): `_conduct` syncs in a `finally` around `run_backtest`.
 def test_hole_a_systemexit_in_a_metered_wake_skips_the_sync(
         SessionFactory, keys, woke, gov, tmp_path, capsys, monkeypatch) -> None:
     def leaves(request):

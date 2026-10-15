@@ -296,12 +296,18 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             if _is_halt(exc.reason):
                 return halted(exc.registered)
             return refused(f"provision:{exc.reason}", exc.registered)
-        record = await run_backtest(minds, clock, **run)
+        metering = None
+        try:
+            record = await run_backtest(minds, clock, **run)
+        finally:
+            if provisioner is not None:
+                # Once, after the run ends, whatever the end — a crash or SystemExit too
+                # (red-team 0021): the meter's totals reach the ledger.
+                metering = await _sync_metering(provisioner, minds, clock, law)
         out = {"ended": record.ended, "reason": record.reason,
                "registered": [m.spec.id for m in minds], "run": record_json(record)}
-        if provisioner is not None:
-            # Once, after the run ends, whatever the end: the meter's totals reach the ledger.
-            out["metering"] = await _sync_metering(provisioner, minds, clock, law)
+        if metering is not None:
+            out["metering"] = metering
         return out
     finally:
         for c in [registrar, clock, *(m.client for m in minds)]:

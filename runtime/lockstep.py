@@ -207,6 +207,11 @@ async def run_backtest(
             # place, whatever budget the replay was given (never above the caller's own).
             budget = (min(tape.tool_calls, max_tool_calls)
                       if tape is not None and tape.ended == "tool_budget" else max_tool_calls)
+            if meters and not _limits_fit(meters):
+                # Red-team 0021: a cap lowered during this step binds the next wake, not the
+                # next step. (A mind's own later turns are still billed within its key.)
+                stop = ("refused", "metered_over_cap")
+                break
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
                                 max_tool_calls=budget, tape=tape, meter=mind.meter)
             wakes.append(record)

@@ -1712,6 +1712,19 @@ metering through OpenClaw (it has its own key and model); posting after every st
 gain: totals are cumulative); fixing the O(n²) scan in `record_metered_usage` (one sync per run —
 stays in BACKLOG).
 
+**Red-team 0021 (5 holes).** Fixed in this mission: *high* — a cap lowered during a step bound only
+the next step (now Σ limits ≤ cap is checked before every wake); *low* — the sync is in a `finally`,
+so a crash or `SystemExit` out of a wake still posts the dollars. **Accepted, written, and routed to
+the hardening mission M-004 (Art. 9: a hole accepted is written, never hidden):** *medium* — until
+the single sync, physics knows no agent is metered, so a leaderboard read **during** the run ranks
+metered minds on their self-reports; "a self-report can no longer move a metered agent's cost or
+rank" is true of the finished run only (the fix, posting every key at 0 after provisioning, makes
+the cost rows no longer a trailing block — the compare-ledgers law of §6 must be written with it);
+*medium* — a rival can drain a metered mind's key by stuffing its inbox with long messages, since
+the fake bills every character (needs a per-sender message quota, a law change); *low* — a sync
+that fails part-way reports `posted: 0` and counts every key as unattributed (exit 1 is right).
+Tests: `tests/test_redteam_0021.py` (3 strict xfails).
+
 **Not done.** A real provisioner; persistence of the fake's state (a HALT before the sync leaves the
 dollars unposted — reported, exit 1, no catch-up); B-000k, B-000n, B-022.
 
