@@ -115,10 +115,12 @@ def test_scripted_builds_exactly_the_scripted_class() -> None:
 
 
 def test_every_registered_name_is_on_the_gates_list_and_says_so() -> None:
-    """Today every buildable mind is zero-cost; a spending class is an ADR (R-6)."""
-    assert set(PROVIDER_CLASSES) <= ZERO_COST_PROVIDERS
+    """Every buildable mind is on one of the gate's two lists and says which (ADR-044): a
+    spending class is a name in METERED_PROVIDERS and nothing else."""
+    from runtime.gate import METERED_PROVIDERS
+    assert set(PROVIDER_CLASSES) == ZERO_COST_PROVIDERS | METERED_PROVIDERS
     for name, cls in PROVIDER_CLASSES.items():
-        assert cls.name == name and cls.spends_money is False
+        assert cls.name == name and cls.spends_money is (name in METERED_PROVIDERS)
 
 
 def test_the_tables_are_read_only() -> None:
@@ -151,7 +153,9 @@ def test_the_adapter_takes_no_provider_object() -> None:
     params = inspect.signature(wake).parameters
     # R-4b (ADR-038): `tape` is data — exactly a `replay.Tape`, checked in the registry —
     # from which the name `cassette` builds its mind. Still no provider object.
-    assert set(params) == {"spec", "client", "workflow_input", "max_tool_calls", "tape"}
+    # M-001 (ADR-044): `meter` is the mind's own key (exactly a `metering.Meter`, checked in the
+    # registry and told to the gate as a bool): a handle on a spending limit, not a provider.
+    assert set(params) == {"spec", "client", "workflow_input", "max_tool_calls", "tape", "meter"}
 
 
 # --- the scripted provider -------------------------------------------------------------

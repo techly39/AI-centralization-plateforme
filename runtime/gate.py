@@ -6,9 +6,10 @@ The gate reads the law literally and fails closed:
 * **Cap** ``null`` → only a provider named in :data:`ZERO_COST_PROVIDERS`,
   through an adapter named in :data:`ZERO_COST_ADAPTERS`, may wake. Every
   other pair is refused, unknown names included.
-* **Cap set** → a spending provider is still refused (``no_metered_key``) until
-  per-agent metered keys exist (R-6): a cap the Runtime cannot meter is a cap
-  it cannot keep.
+* **Cap set** → a spending provider is refused (``no_metered_key``) unless it is named in
+  :data:`METERED_PROVIDERS`, goes through :data:`METERED_ADAPTERS`, and the Runtime says it holds
+  the mind's own key (``metered is True``, ADR-044): a cap the Runtime cannot meter is a cap it
+  cannot keep. The gate is told that a key exists; it never asks the provider.
 
 The gate decides on the provider and adapter **names** taken from the AgentSpec, which the
 operator writes and no mind can edit. It never asks a provider object what it
@@ -35,17 +36,25 @@ ZERO_COST_PROVIDERS = frozenset({"scripted", "cassette"})
 #: spending (ADR-032 (4); red-team 0012 H1: ``scripted`` + ``openclaw`` woke).
 ZERO_COST_ADAPTERS = frozenset({"native"})
 
+#: The only spending provider: a fake, network-free class charged by a fake provisioner
+#: (ADR-044). A real provider is a new name by its own ADR, with the Human's cap (Q-0001).
+METERED_PROVIDERS = frozenset({"fake-metered"})
+
+#: The only adapter a metered mind may wake through (openclaw has its own key and model).
+METERED_ADAPTERS = frozenset({"native"})
+
 
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
-    #: ``zero_cost`` | ``halted`` | ``cap_null`` | ``no_metered_key`` | ``ok``
+    #: ``zero_cost`` | ``metered`` | ``halted`` | ``cap_null`` | ``no_metered_key`` | ``ok``
     reason: str
 
 
-def decide_wake(provider: str, adapter: str) -> Decision:
-    """Before every wake: may a mind with this provider and adapter wake now?"""
-    return decide_wake_under(provider, adapter, read_governance())
+def decide_wake(provider: str, adapter: str, *, metered: object = False) -> Decision:
+    """Before every wake: may a mind with this provider and adapter wake now?
+    ``metered`` is the Runtime's word that this mind holds its own key."""
+    return decide_wake_under(provider, adapter, read_governance(), metered=metered)
 
 
 def decide_batch() -> Decision:
@@ -55,7 +64,8 @@ def decide_batch() -> Decision:
     return Decision(True, "ok")
 
 
-def decide_wake_under(provider: object, adapter: object, law: Governance) -> Decision:
+def decide_wake_under(provider: object, adapter: object, law: Governance, *,
+                      metered: object = False) -> Decision:
     """The same decision against a law already read (one read per report)."""
     if law.halted:
         return Decision(False, "halted")
@@ -68,4 +78,10 @@ def decide_wake_under(provider: object, adapter: object, law: Governance) -> Dec
         return Decision(True, "zero_cost")
     if law.monthly_llm_usd_cap is None:
         return Decision(False, "cap_null")
+    if (
+        metered is True  # exactly True: a truthy object is not a key
+        and type(provider) is str and provider in METERED_PROVIDERS
+        and type(adapter) is str and adapter in METERED_ADAPTERS
+    ):
+        return Decision(True, "metered")
     return Decision(False, "no_metered_key")

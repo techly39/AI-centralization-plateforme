@@ -53,7 +53,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime.gate import ZERO_COST_ADAPTERS, ZERO_COST_PROVIDERS, decide_batch
+from runtime.gate import (
+    METERED_ADAPTERS,
+    METERED_PROVIDERS,
+    ZERO_COST_ADAPTERS,
+    ZERO_COST_PROVIDERS,
+    decide_batch,
+)
+from runtime.metering import Meter
 from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
 from runtime.replay import Recording
 from runtime.spec import AgentSpec
@@ -65,10 +72,12 @@ MAX_DAYS_PER_STEP = 366
 
 @dataclass(frozen=True)
 class Mind:
-    """A spec and the client that acts as its App agent."""
+    """A spec and the client that acts as its App agent. A metered mind also holds its own
+    key at the provisioner (``meter``, ADR-044); a zero-cost mind holds none."""
 
     spec: AgentSpec
     client: FundClient
+    meter: Meter | None = None
 
 
 @dataclass(frozen=True)
@@ -187,7 +196,7 @@ async def run_backtest(
             budget = (min(tape.tool_calls, max_tool_calls)
                       if tape is not None and tape.ended == "tool_budget" else max_tool_calls)
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
-                                max_tool_calls=budget, tape=tape)
+                                max_tool_calls=budget, tape=tape, meter=mind.meter)
             wakes.append(record)
             if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
                 # B-054: a HALT that lands between two wakes refuses the next one at the gate;
@@ -261,7 +270,7 @@ async def check_clock(clock: FundClient) -> str | None:
 
 #: Physics' kind for each zero-cost provider (``app.run_clock.MIND_KINDS``; a test
 #: pins the copy). Any other mind is a model answering now: ``model``.
-_KIND = {"scripted": "scripted", "cassette": "cassette"}
+_KIND = {"scripted": "scripted", "cassette": "cassette", "fake-metered": "scripted"}
 
 
 def mind_kinds(specs: Sequence[AgentSpec]) -> list[str]:
@@ -270,7 +279,9 @@ def mind_kinds(specs: Sequence[AgentSpec]) -> list[str]:
     zero-cost (the gate's own sets): ``scripted`` through ``openclaw`` runs
     OpenClaw's model (audit c28 WARN 1). Anything else is declared ``model``."""
     def kind(s: AgentSpec) -> str:
-        if s.provider in ZERO_COST_PROVIDERS and s.adapter in ZERO_COST_ADAPTERS:
+        # A fake metered mind is code from a closed table: physics hears ``scripted`` (ADR-044).
+        if ((s.provider in ZERO_COST_PROVIDERS and s.adapter in ZERO_COST_ADAPTERS)
+                or (s.provider in METERED_PROVIDERS and s.adapter in METERED_ADAPTERS)):
             return _KIND.get(s.provider, "model")
         return "model"
     return sorted({kind(s) for s in specs})

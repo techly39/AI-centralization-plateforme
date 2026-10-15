@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from runtime import replay, scripted
-from runtime.gate import ZERO_COST_PROVIDERS
+from runtime import metering, replay, scripted
+from runtime.gate import METERED_PROVIDERS, ZERO_COST_PROVIDERS
 from runtime.providers import LLMProvider
 from runtime.spec import AgentSpec
 
@@ -32,6 +32,7 @@ from runtime.spec import AgentSpec
 PROVIDER_CLASSES = MappingProxyType({
     "scripted": scripted.ScriptedProvider,
     "cassette": replay.CassetteProvider,
+    "fake-metered": metering.FakeMeteredProvider,
 })
 
 
@@ -52,19 +53,36 @@ def check_spec(spec: AgentSpec) -> None:
             raise ProviderRefused("contradiction", f"provider {name!r} runs no model; `model` is set")
         if spec.budget_usd != 0:
             raise ProviderRefused("contradiction", f"provider {name!r} spends nothing; `budget_usd` is set")
-    if name != "scripted" and spec.script is not None:
-        raise ProviderRefused("contradiction", f"`script` is for provider 'scripted', not {name!r}")
-    if name == "scripted":
+    if name not in ("scripted", *METERED_PROVIDERS) and spec.script is not None:
+        raise ProviderRefused(
+            "contradiction", f"`script` is for provider 'scripted' or 'fake-metered', not {name!r}")
+    if name in METERED_PROVIDERS:
+        if spec.model is not None:
+            raise ProviderRefused("contradiction", f"provider {name!r} runs no model; `model` is set")
+        if metering.usd_to_micros_floor(spec.budget_usd) <= 0:
+            raise ProviderRefused("no_budget", f"provider {name!r} spends: `budget_usd` must buy "
+                                  "at least one micro-dollar")
+    if name == "scripted" or name in METERED_PROVIDERS:
         if type(spec.script) is not str or spec.script not in scripted.SCRIPTS:
             raise ProviderRefused("unknown_script", f"no script named {spec.script!r}")
     elif name not in PROVIDER_CLASSES:
         raise ProviderRefused("unknown_provider", f"no provider named {name!r}")
 
 
-def build_provider(spec: AgentSpec, tape: replay.Tape | None = None) -> LLMProvider:
-    """The mind for ``spec``, or :class:`ProviderRefused`. ``tape`` is for ``cassette`` only."""
+def build_provider(spec: AgentSpec, tape: replay.Tape | None = None,
+                   meter: metering.Meter | None = None) -> LLMProvider:
+    """The mind for ``spec``, or :class:`ProviderRefused`. ``tape`` is for ``cassette`` only,
+    ``meter`` (the mind's own key) for ``fake-metered`` only."""
     check_spec(spec)
     name = spec.provider
+    if meter is not None and name not in METERED_PROVIDERS:
+        raise ProviderRefused("contradiction", f"a meter is for a metered provider, not {name!r}")
+    if name in METERED_PROVIDERS:
+        if tape is not None:
+            raise ProviderRefused("contradiction", "a tape is for provider 'cassette'")
+        if type(meter) is not metering.Meter:  # a key is a Meter, not whatever claims to be one
+            raise ProviderRefused("unavailable", "a metered provider needs its mind's own key")
+        return PROVIDER_CLASSES[name](scripted.SCRIPTS[spec.script], meter)
     if name == "scripted":
         if tape is not None:
             raise ProviderRefused("contradiction", "a tape is for provider 'cassette'")
