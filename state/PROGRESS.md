@@ -1,17 +1,20 @@
-Cycle: 0038 · Mission: none active (M-001 merged) · Branch: main
-Done so far: M-001 (metered pod month) merged: gate opens `fake-metered` with a key; keys under the
-budget/cap law; one sync after the run; `GET /metering/agents`; ADR-044; EC4 ticked. Red-team: high+low
-fixed, 2 medium + 1 low routed to M-004 (`tests/test_redteam_0021.py`, 3 strict xfails).
-Next: build session → start M-002 (`protocol/CYCLE.md` §2): set it active, branch
-`mission/M-002-proof-object`, architect plans it (Gate 2), write `acceptance/M-002.py`, see it fail.
+Cycle: 0039 · Mission: M-002 (A run is a self-contained proof object) · Branch: mission/M-002-proof-object
+Done so far: M-002 set `active`, branch created from main, `M-002: start` committed (12c2696).
+The `architect` was launched for Gate 2 (plan) but its plan had NOT arrived when this session ended:
+nothing is saved in `state/missions/M-002.md`, `acceptance/M-002.py` does not exist, no code written.
+Next: (1) if `state/missions/M-002.md` is missing, launch the `architect` again (brief: missions.json
+entry M-002 + notes, protocol/MISSIONS.md, runtime/cassette.py, replay.py, cli.py, app/ledger/compare.py,
+scripts/smoke_run.py, ADR-044 §6; ask for cassette v2 design + v1 handling, `replay --cassette X --verify`
+verdict IDENTICAL / DIVERGED at <wake/step>, setup errors never read as diverged, acceptance spec that
+fails if the feature is broken, milestones, RED-TEAM yes/no, claim list, B-051 fold decision).
+(2) save its plan verbatim to `state/missions/M-002.md`, commit `M-002: plan`.
+(3) write `acceptance/M-002.py`, see it fail for the right reason, commit
+`M-002: acceptance (fails before the work)`, push the branch. Then build the milestones.
 Watch out:
-- The Human committed the cap (`monthly_llm_usd_cap: 50`, 5ae0942, 2026-10-16); the real-law
-  tripwire now pins it (`test_the_real_human_yaml_reads_as_cap_50`). Still NEVER `git add -A`: stage
-  by path (it swept a Human edit into a commit once).
-- The guard blocks Bash heredocs, `sed -i`, `python -c`, and any command naming the law directory
-  (use Read). Write files with Write/Edit. The sandbox denied cloning into $TMPDIR (validator too).
-- A metered month's bill grows with the published tool list (each new MCP tool moves it); acceptance
-  asserts relations, not dollar constants.
-- M-002 owns the compare-ledgers law for a trailing `cost_metered` block IF its cassette carries a
-  metered run (ADR-044 §6); M-001 refuses `--cassette` on a metered run.
-Acceptance: acceptance/M-001.py passes (ACCEPTED, Σ = exact); suite 1974 passed / 12 xfailed.
+- Stop hook reads `state/loop_status.json` and `state/PROGRESS.md`: both must name this cycle before
+  a session ends (loop_status is `progress`, cycle 39).
+- Still NEVER `git add -A`: stage by path. Guard blocks Bash heredocs, `sed -i`, `python -c`, and
+  commands naming the law directory (use Read/Write/Edit).
+- M-001 refuses `--cassette` on a metered run; the `cost_metered` compare block is M-002's only if its
+  cassette carries a metered run (ADR-044 §6) — the plan should say out of scope unless cheap.
+Acceptance: acceptance/M-002.py not written yet (nothing to run). Suite last known: 1974 passed / 12 xfailed.
