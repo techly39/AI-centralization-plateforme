@@ -9,7 +9,7 @@
       "question": "Can the Runtime wake a spending mind only when the system meters it, and can every dollar of a run be attributed to one agent from the meter alone? (Era I EC4; vision M4)",
       "acceptance": "acceptance/M-001.py",
       "demo": "uv run python acceptance/M-001.py → a two-mind pod (PM + Analyst) on the fake metered provider lives a month under an injected numeric cap on a local App; prints, per agent, the provisioner's charges, the App's system-reported cost and the self-report gap (equal / non-zero), the leaderboard costs taken from the meter, the sum of metered $ == the provisioner's total, and that the same specs under the real law (cap null) are refused before physics is told",
-      "status": "active",
+      "status": "done",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [],

@@ -2,6 +2,25 @@
 
 *Earlier reports (cycles 1–36) are in git: `git show 1826a1b:state/REPORT.md`.*
 
+## 2026-10-15 — Cycle 38: M-001 merged (metered pod month) — one thing needs you
+
+**Done.** `uv run python acceptance/M-001.py` (5 s) shows a two-mind pod living a month on a fake
+metered provider: each mind is charged to its own key, the totals reach the ledger once, and the pod's
+cost comes from that meter (analyst said $0.31, meter says $4.05). Era I exit criterion 4 is ticked.
+**Needs you:** you answered Q-0001 ($50/month) by editing `governance/human.yaml`, but the edit is
+still uncommitted. Until you commit it, the suite fails locally in exactly one test
+(`test_the_real_human_yaml_reads_as_cap_null`, which pins the committed `null`) — a fresh checkout is
+green. When you commit the cap, that test's expected value must change to `50.0` in the same step
+(the next Builder session will do it; I did not, because a test that names a law the repo does not
+hold yet would turn `main` red). Also: I swept your uncommitted edit into one of my commits by mistake
+and un-did it before any push; nothing of yours was lost or changed.
+**Not yet possible:** no real provider exists, so nothing can spend your $50 or use the OpenRouter key.
+A real provider needs its own decision first, plus a monthly (not per-run) spend check and the
+secret-scan test (B-022) — both are queued in M-004.
+**Open holes (written, queued in M-004):** a leaderboard read during a run still ranks metered minds on
+their self-reports until the end-of-run sync; a rival can drain a metered mind's budget by flooding its
+inbox with long messages; a sync that fails half-way mislabels how much was posted.
+
 ## 2026-10-13 — Cycle 37: the first mission queue (Builder v2)
 
 **What the world can do now.** A pod of two scripted minds (an analyst and a PM) can live a simulated

@@ -8,14 +8,19 @@ blocked on budget. Cycle 34: R-6a metering physics half (ADR-041).
 This file was compacted on 2026-10-13 (Human-directed loop repair). The detailed per-capability
 notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) and in the ADRs.
 
-## Era I exit criteria — 3 of 7 ticked (ADR-036, `tests/test_runtime_lockstep.py` "Era I exit criteria")
+## Era I exit criteria — 4 of 7 ticked (ADR-036, `tests/test_runtime_lockstep.py` "Era I exit criteria")
 - [x] EC3 look-ahead refused at the agent level · [x] EC5 HALT stops within one tick ·
-  [x] EC6 null cap refuses every spending mind (holds only under Q-0005 answer B).
+  [x] EC6 null cap refuses every spending mind (holds only under Q-0005 answer B) ·
+  [x] EC4 every (fake) dollar attributed by the meter (M-001, ADR-044, `acceptance/M-001.py`).
 - [ ] EC1 1-month pod backtest via the Runtime (real minds, R-8) · [ ] EC2 cassette replay =
-  identical ledger (met end to end for scripted minds by R-4b-2a; ticked at R-8) · [ ] EC4
-  metering (R-6) · [ ] EC7 OpenClaw conformance (R-7/R-8).
-- Tests: **1846 passed + 9 xfailed** (+3 = red-team 0020 open lows: B-055 ×2, B-056); smoke 32/32
-  (a real two-server record → replay → compare).
+  identical ledger (met end to end for scripted minds by R-4b-2a; ticked at R-8) · [ ] EC7
+  OpenClaw conformance (M-003 static half; live probes need real minds).
+- Tests: **1974 passed + 12 xfailed** (9 old + 3 red-team 0021 lows routed to M-004); smoke green.
+  Locally 1 fails while the Human's cap edit (50) is uncommitted: the tripwire pins the committed
+  `null` (`test_the_real_human_yaml_reads_as_cap_null`) — see REPORT.
+- **Metered minds (M-001):** provider `fake-metered` (gate: cap numeric + native + a key told by the
+  Runtime) → `vet` Σ budgets ≤ cap → one key per agent → `FakeMeteredProvider` bills per turn →
+  one sync after the run → `GET /metering/agents`. `docs/metering_v1_runtime.md`.
 
 ## What is true now — the Runtime (`runtime/`, ADR-032 + amendments a–p, ADR-033, -037, -038, -040)
 - **Replay CLI + ledger comparison** (R-4b-2a, ADR-040, `tests/test_replay_cli.py`,
@@ -100,10 +105,10 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
 
 ## Next moves
-1. **Mission queue (cycle 37 plan, ADR-043), `state/missions.json`:** M-001 metered month (EC4) →
-   M-002 one-file proof object (EC2 path) → M-003 OpenClaw certified (EC7 static) → M-004 holes
-   closed (9 strict xfails) → M-005 Truman shock → M-006 risk ladder (Era II EC2). Era II work
-   proceeds while EC1/EC2/EC7-live wait on Q-0001.
-2. Next session: build, start M-001 (architect → `acceptance/M-001.py` red first).
+1. **Mission queue (cycle 37 plan, ADR-043), `state/missions.json`:** M-001 metered month ✔ (done,
+   cycle 38) → M-002 one-file proof object (EC2 path) → M-003 OpenClaw certified (EC7 static) →
+   M-004 holes closed (9 strict xfails + 3 from M-001's red-team) → M-005 Truman shock → M-006 risk
+   ladder (Era II EC2). Q-0001 is answered ($50/month) but not yet committed to `human.yaml`.
+2. Next session: build, start M-002 (architect → `acceptance/M-002.py` red first).
 3. Keep from the old X-rules (now in the auditor's checks): "what does the artifact hold that the
    reader never compares?" and "name the one-line production change that turns each new test red".

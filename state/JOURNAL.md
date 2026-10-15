@@ -1483,3 +1483,18 @@ Next: build → M-001 (architect, acceptance red first).
 - With Q-0001 answered (cap $50/month) the key is usable in principle. A real `metered` provider
   still needs its own ADR (M-001 plan §"Which name"); per-key limits sum to ≤ the cap.
 - B-022 (secret-scan test) now matters: a real key exists on this machine.
+
+## Cycle 0038 — build — M-001 metered pod month (2026-10-15)
+Architect planned (verdict: ready, 3 sessions; done in 1). Acceptance written red first (Part B passes as
+the control; C and A failed with `no_metered_key`). Built in three milestones: gate + `fake-metered`
+provider + meter; keys under the budget/cap law + one sync + exit codes; `GET /metering/agents`.
+Validator PASS; red-team found 5 holes — fixed the high (a cap lowered mid-step bound only the next step:
+now checked before every wake) and the low (sync in a `finally`); 2 mediums + 1 low are written in
+ADR-044 and routed to M-004. Auditor BLOCKED twice, both fair: no determinism test (added), "never" claims
+that are only true after the sync (narrowed), and a test I changed to pin the Human's cap before they
+committed it (reverted: the referee runs the committed law). Result: merged.
+Learned: (1) the run's bill grows with the tool list — adding one MCP tool moved a $5.15 month to $5.20 —
+so acceptance asserts relations. (2) `git add -A` swept the Human's uncommitted law edit into my commit
+mid-session; caught by a red test, un-committed with a soft reset before any push. Stage by path.
+(3) The Human answered Q-0001 ($50/month) and Q-0002 during the session; `governance/human.yaml` stays
+uncommitted for them. Next: M-002 (one-file proof object).
