@@ -16,8 +16,7 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   identical ledger (met end to end for scripted minds by R-4b-2a; ticked at R-8) · [ ] EC7
   OpenClaw conformance (M-003 static half; live probes need real minds).
 - Tests: **1974 passed + 12 xfailed** (9 old + 3 red-team 0021 lows routed to M-004); smoke green.
-  Locally 1 fails while the Human's cap edit (50) is uncommitted: the tripwire pins the committed
-  `null` (`test_the_real_human_yaml_reads_as_cap_null`) — see REPORT.
+  The real-law tripwire pins the committed cap of $50/month (`test_the_real_human_yaml_reads_as_cap_50`).
 - **Metered minds (M-001):** provider `fake-metered` (gate: cap numeric + native + a key told by the
   Runtime) → `vet` Σ budgets ≤ cap → one key per agent → `FakeMeteredProvider` bills per turn →
   one sync after the run → `GET /metering/agents`. `docs/metering_v1_runtime.md`.

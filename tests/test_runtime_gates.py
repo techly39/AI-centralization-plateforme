@@ -54,11 +54,11 @@ def test_reader_paths_are_the_constitutions() -> None:
     assert governance.HUMAN_YAML == root / "governance" / "human.yaml"
 
 
-def test_the_real_human_yaml_reads_as_cap_null() -> None:
-    """Today's law, read through the real file (not a fixture)."""
+def test_the_real_human_yaml_reads_as_cap_50() -> None:
+    """Today's law, read through the real file (not a fixture): the Human's Q-0001 answer, $50/month."""
     g = governance.read_governance()
-    assert g.monthly_llm_usd_cap is None
-    assert g.cap_problem is None  # null is a valid answer, not a parse failure
+    assert g.monthly_llm_usd_cap == 50.0
+    assert g.cap_problem is None
 
 
 def test_a_numeric_cap_is_read(gov: Path) -> None:
