@@ -52,6 +52,14 @@ REAL_HALT_FILE = halt.HALT_FILE
 DEFAULT_PRICES = {"AAPL": 200.0, "MSFT": 400.0, "NVDA": 100.0}
 
 
+@pytest.fixture(scope="session")
+def hosted_cassette(tmp_path_factory):
+    """A short month recorded in a world the Runtime hosted (M-002): one recording, shared by
+    every e2e test that needs a proof object (it starts real ``fund-env`` processes: ~15 s)."""
+    from tests.hosted_month import record
+    return record(tmp_path_factory.mktemp("hosted"))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def quiet_logs() -> None:
     """Keep the app's INFO-level JSON logs out of test failure output.

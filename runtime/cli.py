@@ -74,7 +74,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime import cassette
+from runtime import cassette, world
 from runtime.cassette import CassetteError, redact  # noqa: F401 - ``cli.redact`` is public
 from runtime.gate import METERED_PROVIDERS, decide_wake_under
 from runtime.governance import Governance, read_governance
@@ -122,14 +122,18 @@ def main(argv: list[str] | None = None, *,
     bt.add_argument("--input", type=Path, help="workflow input: a JSON object every wake sees")
     bt.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS,
                     help="tool-call budget per wake")
-    bt.add_argument("--server", default=os.environ.get(SERVER_ENV) or DEFAULT_SERVER,
+    bt.add_argument("--server", default=None,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
+    bt.add_argument("--world", type=Path, metavar="FILE",
+                    help="host the run in a fresh world built from this recipe (start, admin, pods) "
+                         "instead of an App the operator built; needs --cassette and the world key "
+                         f"in ${world.WORLD_KEY_ENV}; the cassette then proves the run (ADR-045)")
     bt.add_argument("--cassette", type=Path, metavar="PATH",
                     help=f"write the run's record to a new PATH{cassette.SUFFIX} (never overwritten)")
     rp = sub.add_parser("replay", help="replay a recorded run's minds from its cassette (no model, $0)")
     rp.add_argument("--cassette", type=Path, required=True, metavar="PATH",
                     help=f"the recorded run's {cassette.SUFFIX} (a completed run of scripted minds)")
-    rp.add_argument("--server", default=os.environ.get(SERVER_ENV) or DEFAULT_SERVER,
+    rp.add_argument("--server", default=None,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
     args = parser.parse_args(argv)
     if args.command == "backtest":
@@ -163,14 +167,19 @@ def main(argv: list[str] | None = None, *,
 def _shared(args: argparse.Namespace, steps: int | None = None) -> tuple[dict[str, Any], str, str, str]:
     """What ``backtest`` and ``replay`` check alike, before anything is contacted:
     ``(workflow_input, registrar_key, clock_key, server)``."""
+    workflow_input = _check_run_flags(args, steps)
+    return (workflow_input, *_keys(args))
+
+
+def _check_run_flags(args: argparse.Namespace, steps: int | None) -> dict[str, Any]:
+    """The run flags' ranges and the workflow input (the part of :func:`_shared` that needs no key)."""
     # --steps 0 would make the run's agents and live nothing (audit c27 NOTE 3).
     for flag, value, low, top in (("--steps", steps, 1, MAX_STEPS),
                                   ("--days-per-step", args.days_per_step, 1, MAX_DAYS_PER_STEP),
                                   ("--max-tool-calls", args.max_tool_calls, 0, MAX_TOOL_CALLS)):
         if value is not None and not low <= value <= top:
             raise _Usage(f"{flag} is in [{low}, {top}]")
-    workflow_input = _read_input(args.input)
-    return (workflow_input, *_keys(args))
+    return _read_input(args.input)
 
 
 def _keys(args: argparse.Namespace) -> tuple[str, str, str]:
@@ -179,7 +188,7 @@ def _keys(args: argparse.Namespace) -> tuple[str, str, str]:
     if registrar_key == clock_key:
         raise _Usage("the registrar key and the clock key are one key: the clock "
                      "identity registers nobody")
-    return registrar_key, clock_key, _loopback(args.server)
+    return registrar_key, clock_key, _loopback(args.server or os.environ.get(SERVER_ENV) or DEFAULT_SERVER)
 
 
 def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None) -> int:
@@ -216,11 +225,25 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
 
 
 def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None) -> int:
+    hosting = args.world is not None
     try:
         specs = load_specs(args.specs)
         if not specs:
             raise _Usage(f"no specs in {args.specs}: a run needs minds")
-        workflow_input, registrar_key, clock_key, server = _shared(args, args.steps)
+        if hosting:
+            if args.server is not None:
+                raise _Usage("--world and --server are exclusive: the run is hosted in its own "
+                             "world, or in an App the operator built")
+            if args.cassette is None:
+                raise _Usage("--world needs --cassette: a hosted world exists to be recorded")
+            workflow_input = _check_run_flags(args, args.steps)
+            try:
+                recipe, key = world.load_world(args.world), world.world_key()
+            except world.WorldError as exc:
+                raise _Usage(f"--world: {exc.reason}") from exc
+            registrar_key = clock_key = server = ""
+        else:
+            workflow_input, registrar_key, clock_key, server = _shared(args, args.steps)
         if args.cassette is not None and any(s.provider in METERED_PROVIDERS for s in specs):
             # No law yet says how to replay the trailing cost block (ADR-044 §6).
             raise _Usage("a metered run's cassette is not defined yet: run without --cassette")
@@ -232,10 +255,18 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
     except (SpecError, _Usage) as exc:
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
-    out = asyncio.run(_conduct(specs, server, registrar_key, clock_key, transport,
-                               steps=args.steps, days_per_step=args.days_per_step,
-                               workflow_input=workflow_input,
-                               max_tool_calls=args.max_tool_calls))
+    run = dict(steps=args.steps, days_per_step=args.days_per_step, workflow_input=workflow_input,
+               max_tool_calls=args.max_tool_calls)
+    ledger = None
+    if hosting:
+        try:
+            out, ledger = asyncio.run(_hosted(specs, recipe, key, **run))
+        except world.WorldError as exc:  # no run began: there is nothing to record
+            print(f"fund-runtime: world: {exc.reason}" + (f"\n{exc.detail}" if exc.detail else ""),
+                  file=sys.stderr)
+            return 1
+    else:
+        out = asyncio.run(_conduct(specs, server, registrar_key, clock_key, transport, **run))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
     code = 0 if out["ended"] == "completed" else 1
     if (lost := _unattributed(out.get("metering"))):
@@ -247,16 +278,34 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         try:
             redactions = cassette.write(
                 args.cassette, out,
-                parameters={"steps": args.steps, "days_per_step": args.days_per_step,
-                            "max_tool_calls": args.max_tool_calls,
-                            "workflow_input": workflow_input},
-                specs=[spec.model_dump(mode="json") for spec in specs])
+                parameters={k: run[k] for k in ("steps", "days_per_step", "max_tool_calls",
+                                                "workflow_input")},
+                specs=[spec.model_dump(mode="json") for spec in specs],
+                world={"recipe": recipe} if ledger is not None else None, ledger=ledger)
         except CassetteError as exc:
             print(f"fund-runtime: {exc}", file=sys.stderr)
             return 1
         print(f"fund-runtime: cassette {args.cassette} ({redactions} redactions)",
               file=sys.stderr)
     return code
+
+
+async def _hosted(specs: list[AgentSpec], recipe: dict[str, Any], key: str,
+                  **run: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """The run in a world of its own (:mod:`runtime.world`): ``(outcome, ledger)``. The ledger is
+    physics' own export of the world's database after the server stopped; ``None`` if physics
+    could not write it down (the outcome is still returned: a trial is never hidden)."""
+    async with world.hosted(recipe, key) as hosted_world:
+        url = await hosted_world.serve()
+        try:
+            out = await _conduct(specs, url, hosted_world.registrar_key, hosted_world.clock_key,
+                                 None, **run)
+        finally:
+            hosted_world.stop()
+        try:
+            return out, hosted_world.export_ledger()
+        except world.WorldError:
+            return out, None
 
 
 async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, clock_key: str,

@@ -29,7 +29,7 @@ from alembic.config import Config as AlembicConfig
 from app.config import REPO_ROOT, get_settings
 from app.db.base import session_scope
 from app.db.models import AgentRole
-from app.ledger.compare import LedgerFileError, compare, ledger_rows
+from app.ledger.compare import LedgerFileError, compare, ledger_rows, locate, rows_document
 from app.ledger.rebuild import rebuild_state
 from app.logging_setup import setup_logging
 from app.registry.pods import create_pod, fund_pod
@@ -41,15 +41,20 @@ from app.registry.service import (
     rotate_runtime_key,
     seed_runtime_agent,
 )
-from app.run_clock import RunClockError, install_run_clock, start_backtest
+from app.run_clock import RunClockError, install_run_clock, run_minds, start_backtest
 
 #: Commands that do not run on the database's clock: ``init-db`` may find no
 #: schema yet, ``start-backtest`` creates the clock, ``serve`` installs it itself.
-_NO_RUN_CLOCK = frozenset({"init-db", "start-backtest", "serve", "compare-ledgers"})
+_NO_RUN_CLOCK = frozenset({"init-db", "start-backtest", "serve", "compare-ledgers",
+                           "export-ledger"})
 
 
 def _alembic_config() -> AlembicConfig:
-    return AlembicConfig(str(REPO_ROOT / "alembic.ini"))
+    config = AlembicConfig(str(REPO_ROOT / "alembic.ini"))
+    # alembic.ini's ``script_location = migrations`` is relative to the working directory, so
+    # ``init-db`` failed from anywhere but the repo root (found planning M-002): make it absolute.
+    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
+    return config
 
 
 def cmd_init_db(_: argparse.Namespace) -> int:
@@ -202,12 +207,37 @@ def cmd_compare_ledgers(args: argparse.Namespace) -> int:
     """Exit 0 if the ledgers are equal but for the one allowed difference, 1 if they differ,
     2 if a path is not a readable fund database. Read-only, touches no configured database."""
     try:
-        result = compare(ledger_rows(args.recorded), ledger_rows(args.replayed))
+        recorded, replayed = ledger_rows(args.recorded), ledger_rows(args.replayed)
     except LedgerFileError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps(dataclasses.asdict(result), sort_keys=True))
+    result = compare(recorded, replayed)
+    # Where the first difference sits in the run (null, not 0, when equal): M-002's verdict names it.
+    where = (None if result.first_difference is None
+             else locate(recorded, result.first_difference)
+             or locate(replayed, result.first_difference))
+    print(json.dumps({**dataclasses.asdict(result), "locate": where}, sort_keys=True))
     return 0 if result.equal else 1
+
+
+def cmd_export_ledger(args: argparse.Namespace) -> int:
+    """Print the ledger of the database at ``path`` as a canonical rows document (the cassette's
+    recorded ledger). Read-only; exit 2 if the path is not a readable fund database."""
+    try:
+        print(rows_document(ledger_rows(args.database)))
+    except LedgerFileError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def cmd_run_minds(_: argparse.Namespace) -> int:
+    """Print what drove this run's minds, as the ledger proves it (B-051): ``{"minds": [...]}``,
+    or ``{"minds": null}`` for a live run or a declaration the ledger does not support."""
+    with session_scope() as session:
+        minds = run_minds(session)
+    print(json.dumps({"minds": None if minds is None else list(minds)}))
+    return 0
 
 
 def cmd_rebuild_state(_: argparse.Namespace) -> int:
@@ -290,6 +320,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_cmp.add_argument("recorded", type=Path, help="the recorded run's database file")
     p_cmp.add_argument("replayed", type=Path, help="the replay's database file")
     p_cmp.set_defaults(func=cmd_compare_ledgers)
+
+    p_exp = sub.add_parser(
+        "export-ledger",
+        help="read-only: print DATABASE's ledger as a canonical rows document (JSON)",
+    )
+    p_exp.add_argument("database", type=Path, help="a fund database file")
+    p_exp.set_defaults(func=cmd_export_ledger)
+
+    p_minds = sub.add_parser(
+        "run-minds", help="read-only: what drove this run's minds, as the ledger proves it"
+    )
+    p_minds.set_defaults(func=cmd_run_minds)
 
     p_rebuild = sub.add_parser("rebuild-state", help="rebuild derived tables from events")
     p_rebuild.set_defaults(func=cmd_rebuild_state)

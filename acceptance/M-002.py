@@ -84,6 +84,12 @@ def never_diverged(r: subprocess.CompletedProcess[str]) -> bool:
     return "DIVERGED" not in r.stdout and "DIVERGED" not in r.stderr
 
 
+def left_over(vtmp: Path) -> list[str]:
+    """What the Runtime left in its TMPDIR: its temp worlds. (``uv run`` keeps its own ``uv-*.lock``
+    there; that is uv's, not the Runtime's.)"""
+    return [p.name for p in vtmp.iterdir() if not p.name.startswith("uv-")]
+
+
 def wakes(doc: dict) -> list[tuple[int, dict]]:
     return [(s["step"], w) for s in doc["outcome"]["run"]["steps"] for w in s.get("wakes") or []]
 
@@ -150,7 +156,7 @@ def main() -> int:
               len(declared) == 1 and json.loads(declared[0][4]) == {"minds": ["scripted"]}
               and types.count("clock_advanced") == STEPS)
         check("A: the world key is nowhere", KEY not in text and KEY not in r.stdout + r.stderr)
-        check("A: no stray database, no temp world left", not sentinel.exists() and not any(vtmp.iterdir()))
+        check("A: no stray database, no temp world left", not sentinel.exists() and not left_over(vtmp))
         if n == 0:
             return finish(started)
 
@@ -169,7 +175,7 @@ def main() -> int:
               and (ev.get("compare") or {}).get("equal") is True
               and (ev.get("compare") or {}).get("allowed") == 1 and ev.get("replay_usd") == 0, str(ev)[:300])
         check("B: nothing left behind", os.listdir(elsewhere) == ["m.cassette.json"]
-              and not any(vtmp.iterdir()) and not sentinel.exists())
+              and not left_over(vtmp) and not sentinel.exists())
 
         # ---- Part C
         target = None
@@ -220,7 +226,7 @@ def main() -> int:
         noenv = {k: v for k, v in env.items() if k != "FUND_MARKETDATA__SYNTHETIC_KEY"}
         r = runtime(noenv, "replay", "--cassette", str(lone), "--verify", cwd=elsewhere)
         check("E2: no key is exit 2, nothing spawned", r.returncode == 2 and never_diverged(r)
-              and not any(vtmp.iterdir()), f"exit {r.returncode}: {r.stderr.strip()[-200:]}")
+              and not left_over(vtmp), f"exit {r.returncode}: {r.stderr.strip()[-200:]}")
         d4 = copy.deepcopy(doc)
         for entry in d4["specs"]:
             if entry["spec"]["id"] == "b-pm":
@@ -245,7 +251,7 @@ def main() -> int:
                     "--verify", cwd=elsewhere)
         check("F2: a cassette without a world is refused by name (exit 2)",
               r.returncode == 2 and "no world" in r.stderr, f"exit {r.returncode}: {r.stderr.strip()[-200:]}")
-        check("end: no temp world left", not any(vtmp.iterdir()) and not sentinel.exists())
+        check("end: no temp world left", not left_over(vtmp) and not sentinel.exists())
     return finish(started)
 
 
