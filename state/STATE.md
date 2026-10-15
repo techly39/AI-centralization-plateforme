@@ -90,7 +90,8 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - No USD caps (Human: the subscription limit is the stop); 4 sessions/run, 8/day; waits for usage
   resets ≤ 6 h; 8 h hang guard; Bash in the OS sandbox (GitHub + PyPI only).
 - Before v2: cycles 1–36 in slices (`state/BACKLOG.md`, `state/METRICS.md`, retrospectives c10/20/30).
-- Human: accepted P-0001/2/3. Open: Q-0001 (budget, blocks R-8 only), Q-0002, Q-0005, Q-0006.
+- Human: accepted P-0001/2/3. No open questions.
+  Answered 2026-10-15: Q-0001 (cap $50/month), Q-0002 (provisioning key in gitignored `.env`), Q-0005 (B), Q-0006 (cassette).
 - OpenClaw 2026.5.12 mapped; firm in its own profile (ADR-019); nothing in OpenClaw changed.
 - **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
   `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`

@@ -9,13 +9,16 @@ Update (cycle 37): after missions M-001…M-004, this cap is the **only** thing 
 exit. The remaining three criteria (the real-model month, its replay, and OpenClaw's live probes) need
 real minds. A small cap is enough for one month of a two-mind pod on a cheap model (estimate at R-8).
 Until then the Builder works on Era II (ADR-043).
-Human answer:
+Human answer:yes, $50/month
 
 ## Q-0002 (cycle 0) — OpenRouter provisioning credential
 Context: per-agent keys (ADR-007) need an OpenRouter provisioning key in a gitignored local file
 or env var (`FUND_OPENROUTER_PROVISIONING_KEY`).
 Chosen: build against a fake provisioning API until it exists.
-Human answer:
+Human answer: (2026-10-15) a dedicated OpenRouter **provisioning** key was created and is stored in
+the gitignored repo-root `.env` (mode 600) as `FUND_OPENROUTER_PROVISIONING_KEY`. An earlier
+regular API key was replaced. With Q-0001 answered ($50/month), Q-0001 and Q-0002 together let a
+real `metered` provider be built (its own ADR). The sum of per-key credit limits stays ≤ the cap.
 
 ## Q-0003 (cycle 5) — The management key committed in `test_api.py`
 Context: `test_api.py:10` holds the live API key of agent `id=1 'management'` in your local
@@ -74,11 +77,11 @@ AI and spends nothing, so B keeps the cap law exactly as strict for every model 
 Runtime refuses to wake agents" will use a spending provider.
 Reversible: yes. Tell me A, and the gate will refuse every provider; the scripted tests would then
 run only in-process, as the probe does today.
-Human answer:
+Human answer: (2026-10-15) B, agreed.
 
 ## Q-0006 (cycle 32) — Is the run label for a replay `cassette` or `replay`?
 Context: Q-0005 wrote "`minds: replay`". Physics already accepts the closed kinds
 `{scripted, cassette, model}` and the Runtime's label is the sorted provider name, so a replay is
 labelled `cassette`. Chosen: `cassette` (no physics change, one name for one thing). Reversible:
 rename the kind in `app/run_clock.MIND_KINDS` (a physics change with a red-team) if you prefer.
-Human answer:
+Human answer: (2026-10-15) cassette, agreed.
