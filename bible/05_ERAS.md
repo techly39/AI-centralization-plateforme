@@ -121,8 +121,11 @@ test criteria and may be met by tests using scripted or fake providers)*:
       *(Cycle 30, ADR-036: `test_ec3_*` in `tests/test_runtime_lockstep.py` — a conducted
       mind through the MCP tools: tomorrow's window 400, a window across now clipped, the
       clock not in its hand.)*
-- [ ] Every LLM dollar of the run is attributed to an agent via system-reported cost
-      (or the fake provider in tests).
+- [x] Every LLM dollar of the run is attributed to an agent via system-reported cost
+      (or the fake provider in tests). *(M-001, ADR-044: `acceptance/M-001.py` — a two-mind pod
+      lives a month on the fake metered provider under an injected cap; Σ provisioner == Σ ledger
+      per-key max == Σ `GET /metering/agents`, exact; the self-report does not count. A real
+      provider waits on the cap, Q-0001.)*
 - [x] Creating `governance/HALT` mid-run stops the run within one tick (test).
       *(Cycle 30, ADR-036: `test_ec5_*` — the call in flight finishes; no further call, wake,
       advance or event.)*
