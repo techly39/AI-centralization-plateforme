@@ -1680,7 +1680,7 @@ each dollar is charged by the system to the mind that spent it (Era I EC4, visio
    stays the real HALT. The acceptance check proves the real law refuses the same specs.
 4. **Limits.** key limit = floor(`budget_usd` × 10⁶) micro-dollars, in 1..10¹². `vet` refuses
    `budget_over_cap` when Σ limits > floor(cap × 10⁶); the conductor re-checks every step
-   (`metered_over_cap`), so minds handed in around `vet`, or a cap lowered mid-run, are met. Enforced
+   before every wake (`metered_over_cap`), so minds handed in around `vet`, or a cap lowered mid-run, are met. Enforced
    per run: **monthly accounting across runs must exist before any real key** (a gate for R-8, with B-022).
 5. **One key per metered agent**, minted right after registration and bound to that agent's id; the
    conductor refuses a key that is not its agent's (`meter_mismatch`). A charge past the limit raises

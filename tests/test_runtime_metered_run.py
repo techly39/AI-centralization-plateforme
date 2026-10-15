@@ -54,6 +54,11 @@ def mspecs(tmp_path: Path) -> Path:
                         _m_spec("b-pm", "desk-2-pm", 2, "read-b"))
 
 
+def _spec_zero(id: str, name: str, pod: int, script: str) -> dict:
+    return {"id": id, "name": name, "role": "pm", "pod": pod, "provider": "scripted",
+            "script": script, "charter": "Read the clock."}
+
+
 def _cap(gov: Path, value) -> None:
     (gov / "human.yaml").write_text(CAP.format(value))
 
@@ -153,10 +158,11 @@ def test_zero_cost_minds_get_no_key(SessionFactory, world, woke, gov) -> None:
 
 def test_metered_specs_without_a_provisioner_are_refused(SessionFactory, world, woke, gov) -> None:
     _cap(gov, 50)
+    before = _ledger(SessionFactory)
     with pytest.raises(ProvisionError) as exc:
         _provision(SessionFactory, _specs(_m_spec("a-pm", "desk-1-pm", 1)), world["admin"])
     assert exc.value.reason == "no_provisioner" and exc.value.registered == ()
-    assert [e for e in _ledger(SessionFactory) if e[1] == "agent_registered"][-1][0] > 0
+    assert _ledger(SessionFactory) == before                 # no agent was registered
 
 
 # --- the conductor ----------------------------------------------------------------------
@@ -360,11 +366,17 @@ def test_metered_backtest_refuses_cassette_exit_2(
 
 def test_replay_refuses_fake_metered_specs_exit_2(
         SessionFactory, keys, mspecs, woke, gov, capsys, tmp_path) -> None:
+    """A real recording of the same ids (scripted minds), so the refusal is the specs' own."""
     from runtime.cassette import SUFFIX
+    scripted_specs = _write_specs(tmp_path / "scripted", _spec_zero("a-pm", "desk-1-pm", 1, "read-a"),
+                                  _spec_zero("b-pm", "desk-2-pm", 2, "read-b"))
     path = tmp_path / f"r{SUFFIX}"
-    path.write_text("{}")
+    code, out, err = _run(SessionFactory, ["--specs", str(scripted_specs), "--steps", "2",
+                                           "--cassette", str(path)], capsys)
+    assert code == 0 and path.is_file(), err
     code = cli.main(["replay", "--cassette", str(path), "--specs", str(mspecs)])
     assert code == 2
+    assert "cannot replay as cassette minds" in capsys.readouterr().err
 
 
 def test_the_status_command_judges_a_metered_spec_as_vet_does(

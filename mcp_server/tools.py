@@ -485,7 +485,8 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """What each metered agent cost, by the system's meter. Management only.
 
         Next to each agent's own self-reported cost and the gap between the two. The meter
-        is the number pods are ranked on; a self-report is only the cross-check.
+        is the number pods are ranked on once the run's costs are synced (until then a ranking
+        still uses self-reports); a self-report is only the cross-check.
         """
         return await call("GET", "/metering/agents")
 
