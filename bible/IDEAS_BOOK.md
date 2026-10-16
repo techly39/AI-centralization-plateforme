@@ -103,8 +103,8 @@ Status: not started
 A pod = PM + Analyst + Analyst (+ Engineer). The PM builds their own pod: chooses the people,
 creates agents (picks role, charter, model), builds their own strategy, within the rules the
 manager and the firm's laws set. Every agent the PM creates is paid from the pod's budget.
-Now: a two-mind pod (PM + Analyst) lived a 31-day month with *scripted* minds
-(`specs/desk-month/`, `fund-runtime backtest`). No real AI pod yet; a PM cannot yet create agents.
+Now (cycle 43): a real AI pod exists: a PM and two analysts (Haiku 5.5) lived a 31-day month
+(`specs/real-desk/`). Its team is fixed by its specs: a PM cannot yet create agents.
 
 ### Management above the pods
 From: Human
@@ -160,8 +160,9 @@ Status: not started
 The packages an AI can be given: 1) just market prices, 2) fake company data, 3) fake headlines +
 description, 4) everything together. The data is a table of days × tickers (Mon/Tue/Wed × AAPL,
 NVDA, TSLA…). Each package is versioned, so a run says exactly what each mind saw.
-Now: prices exist (synthetic keyed market, static and yfinance providers in `app/marketdata/`).
-No company data or headlines yet.
+Now: prices exist (synthetic keyed market, static and yfinance providers in `app/marketdata/`),
+and the first versioned package, `prices-v1`, is handed to each real mind every morning
+(`runtime/packages.py`). No company data or headlines yet.
 
 ### Known expected outcomes: tests of behaviour
 From: Human
@@ -249,8 +250,10 @@ From: Human
 Status: working
 Every agent's LLM cost is measured by the system (not self-reported) and charged to that agent and
 its pod. A pod that earns $100 using $120 of tokens lost money.
-Now: works end to end with a fake metered provider (`acceptance/M-001.py`). With the first real
-provider it must stay true for real dollars, inside the $50/month cap.
+Now: true for real dollars since cycle 43: each real agent has its own capped OpenRouter key, the
+system charges what the provider bills, all runs of a month stay inside the $50 cap
+(`acceptance/M-001.py` with a fake provider, `acceptance/real_agents_backtest.py` with the real one).
+Not yet: the pod's P&L net of its thinking cost as the number that ranks it.
 
 ## Communication and orchestration
 
@@ -266,7 +269,8 @@ Status: not started
 Roles talk inside a pod and pods talk to each other, for efficiency: an agent that finds something
 can warn the others. Chat must work correctly through the tools (MCP).
 Now: the physics works (`POST /messages` to an agent, a pod or the whole firm; `GET /me`; latest n
-messages; one MCP tool per endpoint). No real agent has used it yet.
+messages; one MCP tool per endpoint). Real agents used it in cycle 43: the analysts message their PM
+each day (one forgot to send on 7 of 31 days: `state/FINDINGS.md` F-0003). Nothing between pods yet.
 
 ### The pod hub
 From: Human
@@ -341,13 +345,16 @@ what it cost.
 
 ### Who hosts the agents: OpenClaw or the app's own runtime
 From: Human
-Status: not started
+Status: working
 The Human's open question: keep app × OpenClaw, or have the app manage its own agent hierarchy.
 **The Builder decides, with evidence, and records why** (`bible/07_DECISIONS.md`). Facts on
 2026-10-16: the app's own runtime can already wake a mind and give it the firm's tools
 (`runtime/native.py`); OpenClaw 2026.5.12 is installed and mapped (`bible/08_OPENCLAW.md`), but no
 `firm-` OpenClaw agent exists or has been certified yet. Whatever is chosen, never touch the
 Human's own (non-`firm-`) OpenClaw agents.
+Now (cycle 42, ADR-047): decided. The app's own runtime hosts the firm's agents: it already gives a
+mind the firm's tools, the gates, HALT, per-agent metering and the recording, which OpenClaw cannot
+yet meter per agent. OpenClaw stays a possible later adapter.
 
 # Part 4 — The Builder's ideas
 
@@ -392,7 +399,15 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 (Done, cycle 43: the backtest with real AI agents is working.)
 
 1. **The pitch and the gates.** A PM pitches; the strategy runs as an isolated function through the
-   validation gates; the pitch and its numbers are visible to the Human.
+   validation gates; the pitch and its numbers are visible to the Human. Cut in three (cycle 44
+   plan), each one something you can see working:
+   a. *Ready:* a real PM researches a strategy written as a rule (no agent code runs yet), every
+      research backtest counted, then pitches; the app's gates (IC, deflated Sharpe, capacity,
+      correlation) judge it on a held-out window and the Human reads the verdict. The gates are
+      proven first on a planted signal (must pass) and on noise (must fail).
+   b. A backtest operator re-runs the strategy independently, and a bull and a bear argue the pitch
+      in a thread; the firm's process decides (and judges the economic hypothesis).
+   c. Strategies as agent-written code, run in a sandboxed subprocess (seal work).
 2. **The multi-manager machine.** Several pods, the allocation algorithm, the drawdown ladder;
    pods get cut and closed, and new PMs are hired to replace them.
 3. **The monthly generation.** Reset, selection, lessons kept, the next generation starts.

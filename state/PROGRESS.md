@@ -1,15 +1,18 @@
-Cycle 0043 · merged: real AI agents (a PM and two analysts) live a backtest month on fake money · branch: idea/real-agents-backtest
+Cycle 0044 · plan · next: a real PM researches a strategy, pitches it, and the app's validation gates give a verdict the Human can read · branch: idea/pitch-gates (to create)
 Done this session:
-- Red-team (foreground) attacked the real-model month: 9 holes, 3 high. All fixed, each pinned as a
-  test: one run mints keys at a time and counts its own keys at once; the check before every wake
-  asks the account for the whole month; keys the provider does not bound exactly are disabled at
-  once; a key stops at its limit; turns are capped at 4096 tokens; keys are disabled whatever ends
-  the run; `replay --verify` refuses rewritten cost rows.
-- Auditor: PASS, no blocks; its notes fixed (wording in the decision record, Ctrl-C while minting).
-- Merged to main; the idea is "working" in the book.
-Next: plan the next idea from "Next up" (the pitch and the gates), or the richer data packages
-(company data, headlines) if the plan session judges them first.
-Watch out: the demo replays the recorded month, so it proves the record, not the live path (the live
-OpenRouter path is tested against a fake account). OpenRouter credit ≈ $1.60. The mint lock is one
-file per copy of the repo (`.openrouter-mint.lock`, gitignored). Never `cd "<repo>" && …`.
-Demo: passes (`uv run python acceptance/real_agents_backtest.py`, $0, ~7 s).
+- Looked back: the real-agents month merged in 2 build sessions (estimate 4), ~$16 of building;
+  every finished idea's demo still passes on main; no new comments from the Human.
+- The book made true: a real pod exists, the analysts message their PM, prices-v1 is handed out
+  daily, thinking costs real dollars inside the cap, and "who hosts the agents" is decided (ADR-047).
+- "The pitch and the gates" cut in three; the first piece is queued `ready` in state/missions.json
+  with its shape: the strategy is a rule (data, not code), every research backtest is counted, the
+  gates judge on a held-out window, the Human reads the verdict, no capital granted yet.
+- Process: a demo that measures or judges must show both a "yes" case and a "no" case.
+Next: build session — branch idea/pitch-gates, write state/NOW.md from the queue entry's notes, the
+acceptance demo (gate controls first: planted signal passes, noise fails, 1 vs 200 attempts), then
+the rule language and gate engine as pure functions, then the endpoints + MCP tools, then one real
+PM session recorded.
+Watch out: the synthetic market is pure noise (random walk), so the real PM's pitch is expected to
+FAIL the gates; that is the honest result, not a bug. Physics tier (new permissions + real spend):
+red-team + auditor before merge. OpenRouter credit ≈ $1.60. Never `cd "<repo>" && …`.
+Demo: none yet for this idea (acceptance/pitch_gates.py to write).

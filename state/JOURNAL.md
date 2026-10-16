@@ -1504,3 +1504,4 @@ Gate 2 done: architect plan saved (3 sessions; hosted-world recipe, v1 refused, 
 
 - cycle 0041 (2026-10-16) rework: Builder v3 (ADR-046). Goals now come from bible/IDEAS_BOOK.md; light, risk-tiered process; Opus leads; the Console shows what is being built and takes comments. Next: real AI agents live a backtest month.
 - cycle 0043 (2026-10-16) build: red-team found 9 holes in the real-model month (3 broke the cap); all fixed, auditor passed, merged — real AI agents now live a backtest month.
+- cycle 0044 (2026-10-16) plan: book made true after the real-agents month; "the pitch and the gates" cut in three, first piece ready (a real PM pitches a rule-based strategy, the gates judge it on held-out data, proven on a planted signal and on noise); demos that judge must show a yes and a no.

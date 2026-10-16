@@ -45,6 +45,10 @@ killed when the session ends).
 3. Write the acceptance demo `acceptance/<slug>.py` (exit 0 = the idea works end to end; it may
    start failing, no ceremony about it). It must run at **$0 of real LLM spend**: a check that needs
    real minds replays a recorded run (cassette + `replay --verify`) or reads recorded artifacts.
+   If the idea *measures or judges* something (a gate, a score, a detector), the demo feeds it a
+   case whose answer must be "yes" and one whose answer must be "no": a check that always says no
+   passes a no-only demo. (Cycle 44 plan; judged by: no auditor BLOCK of the kind "this check
+   cannot fail" on the next measuring idea.)
 4. Add the entry to `state/missions.json` (fields below), set it `active`; mark the idea
    `Status: building` in the book. Commit "start: <goal>" and push the branch.
 
