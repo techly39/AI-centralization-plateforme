@@ -49,3 +49,5 @@ before merge.
 
 ## Progress
 - cycle 45: plan, acceptance demo, the rule language and the gate engine.
+- cycle 45: rules, gates, endpoints, the real PM session recorded ($0.005); demo passes (cut by the usage limit).
+- cycle 46: safety sweeps extended to the new routes (top_n had no ceiling); red-team and auditor.
