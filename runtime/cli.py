@@ -74,7 +74,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime import cassette, world
+from runtime import cassette, packages, world
 from runtime.cassette import CassetteError, redact  # noqa: F401 - ``cli.redact`` is public
 from runtime.gate import METERED_PROVIDERS, decide_wake_under
 from runtime.governance import Governance, read_governance
@@ -123,6 +123,9 @@ def main(argv: list[str] | None = None, *,
     bt.add_argument("--input", type=Path, help="workflow input: a JSON object every wake sees")
     bt.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS,
                     help="tool-call budget per wake")
+    bt.add_argument("--package", default=None, metavar="NAME",
+                    help="hand every wake its day's data package (known: "
+                         f"{', '.join(sorted(packages.PACKAGES))}); needs a `universe` in --input")
     bt.add_argument("--server", default=None,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
     bt.add_argument("--world", type=Path, metavar="FILE",
@@ -218,6 +221,11 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
             raise _Usage("the cassette's specs are not the recording's minds: their ids differ")
         if cas.parameters["steps"] != rec.steps:
             raise _Usage("the cassette's parameters disagree with its recording (steps)")
+        if (package := cas.parameters.get("package")) is not None:
+            try:
+                packages.check(package, cas.parameters["workflow_input"])
+            except packages.PackageError as exc:
+                raise _Usage(f"{args.cassette}: {exc}") from exc
         try:
             for spec in specs:  # the recorded spec itself must be one a mind is built from
                 check_spec(spec)
@@ -233,7 +241,8 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
     out = asyncio.run(_conduct(specs, server, registrar_key, clock_key, transport,
                                steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
                                workflow_input=cas.parameters["workflow_input"],
-                               max_tool_calls=cas.parameters["max_tool_calls"], replay=rec))
+                               max_tool_calls=cas.parameters["max_tool_calls"], replay=rec,
+                               package=cas.parameters.get("package")))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
     return 0 if out["ended"] == "completed" else 1
 
@@ -258,6 +267,11 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
             registrar_key = clock_key = server = ""
         else:
             workflow_input, registrar_key, clock_key, server = _shared(args, args.steps)
+        if args.package is not None:
+            try:
+                packages.check(args.package, workflow_input)
+            except packages.PackageError as exc:
+                raise _Usage(str(exc)) from exc
         if args.cassette is not None and any(s.provider in METERED_PROVIDERS for s in specs):
             # No law yet says how to replay the trailing cost block (ADR-044 §6).
             raise _Usage("a metered run's cassette is not defined yet: run without --cassette")
@@ -270,7 +284,7 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
     run = dict(steps=args.steps, days_per_step=args.days_per_step, workflow_input=workflow_input,
-               max_tool_calls=args.max_tool_calls)
+               max_tool_calls=args.max_tool_calls, package=args.package)
     ledger = None
     if hosting:
         try:
@@ -293,7 +307,8 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
             redactions = cassette.write(
                 args.cassette, out,
                 parameters={k: run[k] for k in ("steps", "days_per_step", "max_tool_calls",
-                                                "workflow_input")},
+                                                "workflow_input", "package")
+                            if k != "package" or run[k] is not None},
                 specs=[spec.model_dump(mode="json") for spec in specs],
                 world={"recipe": recipe} if ledger is not None else None, ledger=ledger)
         except CassetteError as exc:

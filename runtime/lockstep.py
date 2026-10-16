@@ -60,6 +60,7 @@ from runtime.gate import (
     ZERO_COST_PROVIDERS,
     decide_batch,
 )
+from runtime import packages
 from runtime.governance import read_governance
 from runtime.metering import Meter, usd_to_micros_floor
 from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
@@ -119,6 +120,7 @@ async def run_backtest(
     workflow_input: Mapping[str, Any] | None = None,
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
     replay: Recording | None = None,
+    package: str | None = None,
 ) -> RunRecord:
     """Live ``steps`` steps of a backtest with ``minds``, the clock in the Runtime's hand.
 
@@ -126,6 +128,9 @@ async def run_backtest(
     must be the recording's, and each wake replays its recorded tape. The first wake that
     leaves the recording ends the run ``diverged:<id>:<step>:<seq>:<kind>`` and the clock is
     not advanced after it.
+
+    With ``package`` (a name in :data:`runtime.packages.PACKAGES`), every wake is handed that
+    day's data package, built through the mind's own key at the step's now.
     """
     for value, top in ((steps, MAX_STEPS), (days_per_step, MAX_DAYS_PER_STEP)):
         if type(value) is not int or not 0 <= value <= top:
@@ -148,6 +153,7 @@ async def run_backtest(
     # The input is copied once, deeply, here: every wake of the run sees the same
     # document, whoever else holds a nested value (red-team 0015 H4).
     step_input = copy.deepcopy(dict(workflow_input or {}))
+    universe = None if package is None else packages.check(package, step_input)
 
     refusal = await check_clock(clock)
     if refusal is not None:
@@ -218,8 +224,10 @@ async def run_backtest(
                 # next step. (A mind's own later turns are still billed within its key.)
                 stop = ("refused", "metered_over_cap")
                 break
+            day = (None if universe is None
+                   else await packages.build(package, mind.client, at, universe))
             record = await wake(mind.spec, mind.client, workflow_input=step_input,
-                                max_tool_calls=budget, tape=tape, meter=mind.meter)
+                                max_tool_calls=budget, tape=tape, meter=mind.meter, package=day)
             wakes.append(record)
             if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
                 # B-054: a HALT that lands between two wakes refuses the next one at the gate;

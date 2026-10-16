@@ -140,6 +140,10 @@ def _refuse_constant(name: str) -> Any:
     raise CassetteError(f"{name} is not JSON")
 
 
+#: A data package's name (``runtime.packages``); the cassette records it, the conductor checks it.
+_PACKAGE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
+
+
 def _in_range(value: Any, bounds: tuple[int, int]) -> bool:
     return type(value) is int and bounds[0] <= value <= bounds[1]
 
@@ -155,7 +159,10 @@ def _validate(doc: Any) -> Cassette:
         raise CassetteError("redactions is a non-negative int and the outcome an object")
     params = doc["parameters"]
     if (type(params) is not dict
-            or set(params) != {"steps", "days_per_step", "max_tool_calls", "workflow_input"}
+            or set(params) - {"package"} != {"steps", "days_per_step", "max_tool_calls",
+                                              "workflow_input"}
+            or ("package" in params and not (type(params["package"]) is str
+                                             and _PACKAGE.fullmatch(params["package"])))
             or not _in_range(params["steps"], STEPS_RANGE)
             or not _in_range(params["days_per_step"], DAYS_PER_STEP_RANGE)
             or not _in_range(params["max_tool_calls"], MAX_TOOL_CALLS_RANGE)

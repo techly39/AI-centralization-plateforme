@@ -155,7 +155,10 @@ def test_the_adapter_takes_no_provider_object() -> None:
     # from which the name `cassette` builds its mind. Still no provider object.
     # M-001 (ADR-044): `meter` is the mind's own key (exactly a `metering.Meter`, checked in the
     # registry and told to the gate as a bool): a handle on a spending limit, not a provider.
-    assert set(params) == {"spec", "client", "workflow_input", "max_tool_calls", "tape", "meter"}
+    # The idea "real AI agents in a backtest" (ADR-047): `package` is the day's data, plain JSON
+    # checked like the input, shown to the mind; not a provider either.
+    assert set(params) == {"spec", "client", "workflow_input", "max_tool_calls", "tape", "meter",
+                           "package"}
 
 
 # --- the scripted provider -------------------------------------------------------------

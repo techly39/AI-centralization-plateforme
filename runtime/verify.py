@@ -39,7 +39,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from runtime import cassette, world
+from runtime import cassette, packages, world
 from runtime.cassette import CassetteError
 from runtime.registry import ProviderRefused, check_spec
 from runtime.replay import Recording, RecordingError, as_cassette
@@ -191,6 +191,8 @@ async def verify(path: Path) -> tuple[int, str, str]:
             return usage("the cassette's specs are not the recording's minds: their ids differ")
         if cas.parameters["steps"] != rec.steps:
             return usage("the cassette's parameters disagree with its recording (steps)")
+        if (package := cas.parameters.get("package")) is not None:
+            packages.check(package, cas.parameters["workflow_input"])
         for spec in specs:  # the recorded spec itself must be one a mind is built from
             check_spec(spec)
         minds = [as_cassette(s) for s in specs]
@@ -222,7 +224,8 @@ async def verify(path: Path) -> tuple[int, str, str]:
                     minds, url, hosted_world.registrar_key, hosted_world.clock_key, None,
                     steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
                     workflow_input=cas.parameters["workflow_input"],
-                    max_tool_calls=cas.parameters["max_tool_calls"], replay=rec)
+                    max_tool_calls=cas.parameters["max_tool_calls"], replay=rec,
+                    package=cas.parameters.get("package"))
             finally:
                 hosted_world.stop()
             if outcome.get("ended") == "completed":
