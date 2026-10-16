@@ -4,12 +4,14 @@ the held-out window, the attempt count and the verdict in the ledger."""
 from __future__ import annotations
 
 import json
+import math
 from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import select
 
 from app.db.models import Event
+from app.limits import MAX_USD_PER_REPORT
 from app.marketdata import SyntheticProvider, set_provider
 from tests.support import world_key
 
@@ -134,3 +136,31 @@ def test_a_rule_that_is_not_strategy_v1_is_refused_before_anything_runs(client, 
     assert client.post("/pitches", headers={**h(world["pm1"]), "Content-Type": "application/json"},
                        content=raw).status_code == 422
     assert events(db, "pitch_submitted") == []
+
+
+#: The floats in these bodies (tests/test_finite.py's guard lists them and points here).
+_FLOATS = [
+    ("/pitches", lambda v: {**PITCH, "budget_usd": v}, "budget_usd", MAX_USD_PER_REPORT),
+    ("/pitches", lambda v: {**PITCH, "rule": {**RULE, "gross": v}}, "gross", 2.0),
+    ("/research/backtests", lambda v: {"rule": {**RULE, "gross": v}}, "gross", 2.0),
+]
+
+
+@pytest.mark.parametrize(("path", "make", "field", "cap"), _FLOATS,
+                         ids=["pitch-budget", "pitch-gross", "research-gross"])
+def test_every_float_is_finite_and_capped(client, world, db, path, make, field, cap):
+    """Non-finite and just-over-the-cap are a clean 422 naming the field, nothing written;
+    the cap itself is accepted."""
+    marker = "0.123456789"
+    before = len(list(db.scalars(select(Event))))
+    for token in ("NaN", "Infinity", "-Infinity", "1e309", "1e308",
+                  repr(math.nextafter(cap, math.inf))):
+        raw = json.dumps(make(float(marker))).replace(marker, token)
+        r = client.post(path, headers={**h(world["pm1"]), "Content-Type": "application/json"},
+                        content=raw)
+        assert r.status_code == 422, (token, r.text)
+        json.loads(r.text)
+        assert any(field in [str(p) for p in e["loc"]] for e in r.json()["detail"]), r.text
+    db.expire_all()
+    assert len(list(db.scalars(select(Event)))) == before
+    assert client.post(path, headers=h(world["pm1"]), json=make(cap)).status_code == 201

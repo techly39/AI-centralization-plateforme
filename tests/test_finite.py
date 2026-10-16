@@ -284,6 +284,10 @@ FLOAT_FIELDS = {
     ("OrderCreateRequest", "qty"): (0, MAX_ORDER_QTY),
     ("OrderCreateRequest", "limit_price"): (0, MAX_PRICE),
     ("CostReportRequest", "usd_cost"): (0, MAX_USD_PER_REPORT),
+    # Attacked in tests/test_pitches.py (it has the market the rule needs).
+    ("PitchIn", "budget_usd"): (0, MAX_USD_PER_REPORT),
+    ("PitchIn.rule", "gross"): (0, 2.0),
+    ("ResearchBacktestIn.rule", "gross"): (0, 2.0),
 }
 
 #: Leaf types that cannot carry a float: nothing to bound, nothing to walk.
@@ -335,13 +339,36 @@ def _request_body_schemas(client) -> dict[str, dict]:
     return {n: spec["components"]["schemas"][n] for n in names}
 
 
+def _fields(name: str, schema: dict, components: dict):
+    """(model, field), prop for every field, nested models walked: ``PitchIn.rule`` names the
+    fields of the rule inside a pitch, so a float or int inside a nested model is seen too."""
+    for field, prop in schema.get("properties", {}).items():
+        ref = prop.get("$ref")
+        sub = components.get(ref.rsplit("/", 1)[-1], {}) if ref else {}
+        if sub.get("properties"):
+            yield from _fields(f"{name}.{field}", sub, components)
+        else:
+            yield (name, field), prop
+
+
+def test_every_nested_request_integer_has_an_upper_bound(client):
+    """The integer walk above sees top-level fields; this one sees inside nested models."""
+    spec = client.get("/openapi.json").json()
+    components = spec["components"]["schemas"]
+    unbounded = [key for name, schema in _request_body_schemas(client).items()
+                 for key, prop in _fields(name, schema, components)
+                 for v in prop.get("anyOf", [prop])
+                 if v.get("type") == "integer" and "maximum" not in v]
+    assert unbounded == []
+
+
 def test_every_request_float_is_bounded_and_every_free_json_field_is_attacked(client):
     schemas = _request_body_schemas(client)
     assert schemas, "no request bodies found — the walk is broken, not the API safe"
     components = client.get("/openapi.json").json()["components"]["schemas"]
-    found = {(name, field): _classify(prop, components)
+    found = {key: _classify(prop, components)
              for name, schema in schemas.items()
-             for field, prop in schema.get("properties", {}).items()}
+             for key, prop in _fields(name, schema, components)}
     assert [k for k, (kind, _) in found.items() if kind == "unclassified"] == []
     assert {k: b for k, (kind, b) in found.items() if kind == "float"} == FLOAT_FIELDS, \
         "a request float without both bounds, or one these tests do not attack"

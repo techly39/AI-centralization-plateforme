@@ -190,6 +190,15 @@ _EVERY_ROUTE = [
     ("GET", "/metrics/pod/1", None),
     ("GET", "/metrics/leaderboard", None),
     ("GET", "/metering/agents", None),   # M-001 (ADR-044): the Runtime writes the meter, never reads it
+    # ADR-048: research and pitches are a pod's acts, never the Runtime's.
+    ("GET", "/research/backtests", None),
+    ("POST", "/research/backtests", {"rule": {"universe": ["AAPL", "MSFT"], "signal": "momentum",
+                                              "lookback": 20, "rebalance_every": 5, "top_n": 1}}),
+    ("GET", "/pitches", None),
+    ("GET", "/pitches/1", None),
+    ("POST", "/pitches", {"hypothesis": "h", "data_needed": "d", "team": "t", "budget_usd": 1.0,
+                          "rule": {"universe": ["AAPL", "MSFT"], "signal": "momentum",
+                                   "lookback": 20, "rebalance_every": 5, "top_n": 1}}),
 ]
 
 

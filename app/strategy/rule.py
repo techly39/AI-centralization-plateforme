@@ -63,7 +63,7 @@ class StrategyRule(BaseModel):
     signal: Literal["momentum", "mean_reversion", "low_volatility"]
     lookback: int = Field(ge=2, le=MAX_LOOKBACK, description="Days of history behind a score.")
     rebalance_every: int = Field(ge=1, le=MAX_REBALANCE_EVERY, description="Days between rebalances.")
-    top_n: int = Field(ge=1, description="Names held long (and short, for long_short).")
+    top_n: int = Field(ge=1, le=MAX_UNIVERSE, description="Names held long (and short, for long_short).")
     side: Literal["long_only", "long_short"] = "long_only"
     gross: float = Field(default=1.0, gt=0.0, le=2.0, description="Sum of absolute weights.")
 
