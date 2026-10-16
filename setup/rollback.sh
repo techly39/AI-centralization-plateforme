@@ -32,8 +32,19 @@ done
 tar -xf "$BK/protected-before.tar"
 git add -A .claude loop governance bible/00_CONSTITUTION.md bible/01_GENESIS.md
 git commit --quiet -m "human: roll back the Builder install's protected files (restore $BK)"
-git revert --no-edit -m 1 "$(cat "$BK/merge-commit")"
+reverted=yes
+if ! git revert --no-edit -m 1 "$(cat "$BK/merge-commit")" >/dev/null 2>&1; then
+  # The Builder changed the same files after the install: keep its work, restore only your files.
+  git revert --abort
+  reverted=no
+fi
 bash loop/seal.sh
 echo 0 > "$FIRM_HOME/failures"
 git push --quiet origin main
-echo "Rolled back to the protected files of $BK and reverted the install's merge."
+echo "Rolled back to the protected files of $BK."
+if [ "$reverted" = yes ]; then
+  echo "The install's merge (the Builder-owned side) was reverted too."
+else
+  echo "The Builder-owned side (ideas book, protocol, state) was NOT reverted: the Builder changed those"
+  echo "files after the install. Your protected files are back and sealed; ask Claude to undo the rest."
+fi
