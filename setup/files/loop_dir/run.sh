@@ -34,6 +34,9 @@ case "$sessions" in ''|*[!0-9]*) echo "usage: loop/run.sh [number of sessions] [
 forced_mode="${2:-}"
 case "$forced_mode" in ''|plan|build) ;; *) echo "mode must be plan or build"; exit 2 ;; esac
 export CLAUDE_CODE_SUBAGENT_MODEL="$(cfg builder.team.helpers.model)"
+# Builder v3: never kill a subagent still working when the lead's last turn ends (session 40 lost its
+# planner that way). The hang guard below still stops a session after builder.max_session_hours.
+export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
 export FIRM_BUILDER_SESSION=1          # the Stop hook (.claude/hooks/stop_gate.py) only acts in loop sessions
 per_session="$(cfg builder.max_usd_per_cycle)"
 per_run="$(cfg builder.max_usd_per_run)"
@@ -42,9 +45,9 @@ hang_hours="$(cfg builder.max_session_hours)"
 run_spent=0
 
 echo "[$(date '+%F %T')] run starting: $sessions session(s); lead $(cfg builder.team.lead.model)," \
-     "hard $(cfg builder.team.lead_hard.model), architect $(cfg builder.team.architect.model)," \
+     "hard $(cfg builder.team.lead_hard.model)," \
      "auditor $(cfg builder.team.auditor.model), red-team $(cfg builder.team.red-team.model)," \
-     "validator $(cfg builder.team.validator.model), helpers $CLAUDE_CODE_SUBAGENT_MODEL;" \
+     "helpers $CLAUDE_CODE_SUBAGENT_MODEL;" \
      "caps: session \$${per_session:-none} run \$${per_run:-none}"
 
 i=1

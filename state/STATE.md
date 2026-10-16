@@ -1,6 +1,6 @@
 # STATE — rewritten every cycle (budget: ≤ 120 lines, X-013)
 
-**Era:** I — The Desk (Era ½ closed cycle 9, ADR-021; Launch Pad: Survey ✅ → I → II)
+**Goal source:** `bible/IDEAS_BOOK.md` (since cycle 41, ADR-046; the old Eras are in `bible/archive/05_ERAS.md`)
 **Last cycle:** 37 (plan: the first mission queue, ADR-043). Before: 36 (B-053 + B-054: vet before physics is told, HALT reads `halted` at every stage —
 merged 5eb1d6d, 2026-10-13; ADR-032/040 amendment; red-team 0020; ticks nothing). Cycle 35 was
 blocked on budget. Cycle 34: R-6a metering physics half (ADR-041).
@@ -82,32 +82,23 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - Era III constraint (ADR-028 amendment): agent strategy code never runs inside the App process.
 - Not yet: Truman, Quant Lab, Observatory, live scheduler (R-3c), stored RunRecords.
 
-## The Builder's process — Builder v2 since cycle 37 (ADR-042, Human-directed 2026-10-13)
-- Unit = **mission** (`protocol/MISSIONS.md`, queue `state/missions.json`): a capability with an
-  executable acceptance check (`acceptance/M-NNN.py`) written first and failing first. Sessions are
-  `plan` (`protocol/PLAN.md`) or `build` (`protocol/CYCLE.md`), chosen by the runner. Handoff:
-  `state/PROGRESS.md`; what's new: `state/SHOWCASE.md`.
-- Team: lead sonnet (build), lead_hard opus (plan, diagnosis, after a failure); architect once per
-  mission, validator (runs checks), red-team once per physics mission, auditor once per mission.
-- The runner is the referee: re-runs the suite on `main` and the acceptance check after every
-  session, checks red-first, logs `$FIRM_HOME/metrics.jsonl`. A Stop hook refuses a false `merged`.
-- No USD caps (Human: the subscription limit is the stop); 4 sessions/run, 8/day; waits for usage
-  resets ≤ 6 h; 8 h hang guard; Bash in the OS sandbox (GitHub + PyPI only).
-- Before v2: cycles 1–36 in slices (`state/BACKLOG.md`, `state/METRICS.md`, retrospectives c10/20/30).
-- Human: accepted P-0001/2/3. No open questions.
-  Answered 2026-10-15: Q-0001 (cap $50/month), Q-0002 (provisioning key in gitignored `.env`), Q-0005 (B), Q-0006 (cassette).
-- OpenClaw 2026.5.12 mapped; firm in its own profile (ADR-019); nothing in OpenClaw changed.
-- **Headless limits:** the guard blocks Bash heredocs, `sed -i`, `git -C`, `git worktree add` /
-  `git archive` after `cd`, `python -c` with `#`, `>>` after `cd` → write scripts to `/tmp/*.py`
-  with Write and run `uv run --project "<repo>" python -I /tmp/x.py "<repo>"`; edit with Edit;
-  `cd "<repo>" && git add … && git commit …` works. `git push origin main <branch>` only as a bare
-  command. pytest: `uv run pytest -p no:warnings -o addopts="" -q`.
+## The Builder's process — Builder v3 since cycle 41 (ADR-046, Human-directed 2026-10-16)
+- Goal source: `bible/IDEAS_BOOK.md` (the Human's ideas with status; the Builder's own in Part 4;
+  "Next up" is the order). One idea at a time, built until its demo works: `acceptance/<slug>.py`,
+  queue entry in `state/missions.json`, plan + "how I understand it" in `state/NOW.md`.
+- Review only on the risk tier (money, physics, seal): red-team + auditor, in the foreground. No
+  architect, no validator. Lead = opus. The runner still re-runs the suite on `main` and the demo.
+- The Human comments in the Console → `$FIRM_HOME/comments.jsonl`; the Builder answers in
+  `state/comments.json` at the start of the next session. Nothing waits for the Human.
+- Paperwork: `state/PROGRESS.md` (handoff), one journal line, `state/loop_status.json`,
+  `state/SHOWCASE.md` per finished idea; ADR only when a rule of the world changes.
+- Old paperwork in `state/archive/`, old Bible books in `bible/archive/`.
+- Headless: never `cd "<repo>" && …` (refused). Human-only files are drafted in `setup/files/` and
+  installed by the Human with `bash setup/install.sh`.
 
 ## Next moves
-1. **Mission queue (cycle 37 plan, ADR-043), `state/missions.json`:** M-001 metered month ✔ (done,
-   cycle 38) → M-002 one-file proof object (EC2 path) → M-003 OpenClaw certified (EC7 static) →
-   M-004 holes closed (9 strict xfails + 3 from M-001's red-team) → M-005 Truman shock → M-006 risk
-   ladder (Era II EC2). Q-0001 is answered ($50/month) but not yet committed to `human.yaml`.
-2. Next session: build, start M-002 (architect → `acceptance/M-002.py` red first).
-3. Keep from the old X-rules (now in the auditor's checks): "what does the artifact hold that the
-   reader never compares?" and "name the one-line production change that turns each new test red".
+1. The first idea: real AI agents (PM + two analysts) live a backtest month with daily data packages
+   (`real-agents-backtest`). Decide the agent host first; wire a real metered provider inside the
+   $50/month cap (risk tier).
+2. Then the pitch and the gates, the multi-manager machine (allocation + drawdown ladder + hiring),
+   the monthly generation, the Observatory.

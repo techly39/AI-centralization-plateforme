@@ -12,7 +12,7 @@ from the inside (it imports `app`, on a temporary database only).
 | `setup_demo_firm.py` | Registers an analyst and a PM, through MCP, as management. Writes their keys to `agents.local.json` (gitignored, mode 600). |
 | `agent_console.py` | One interactive agent. Launches `fund-env-mcp` as a subprocess over stdio, does the MCP handshake, and lets you make the tool calls a model would make. |
 | `smoke_run.py` | Run check outside pytest: builds a database in a temp dir with the real CLI, starts `fund-env serve` on a free port, connects `fund-env-mcp` with the seeded key and calls read tools. Never touches `fund.db`. Exit 0 = everything starts. |
-| `survey_probe_physics.py` | Survey measurements (cycle 4, `state/SURVEY.md` P1–P9): migration drift, unledgered writes, replay order under a moving clock, API edge cases, Sharpe scaling, `mcp_server` imports. Temp DB only; reports, never asserts. |
+| `survey_probe_physics.py` | Survey measurements (cycle 4, `state/archive/SURVEY.md` P1–P9): migration drift, unledgered writes, replay order under a moving clock, API edge cases, Sharpe scaling, `mcp_server` imports. Temp DB only; reports, never asserts. |
 
 ## First run
 

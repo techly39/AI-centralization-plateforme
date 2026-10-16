@@ -9,7 +9,7 @@ firm app/                      (git: origin = AI-centralization-plateforme)
   CLAUDE.md                    Builder entry point (auto-loaded every session)
   bible/                       this Bible. 00, 01 human-only. 09 = the Builder's own vision.
   governance/                  HUMAN-ONLY. human.yaml (caps, gates), HALT (stop file)
-  state/                       Builder's memory + lab notebook (see 06_LOOP.md)
+  state/                       Builder's memory + lab notebook (see protocol/CYCLE.md)
   loop/                        HUMAN-ONLY. run_forever.sh, preflight.py, seal.sh
   .claude/                     Builder tooling: settings.json + hooks (human-only),
                                agents/, commands/, skills/ (Builder may extend)
@@ -57,7 +57,7 @@ sells, realised P&L), market data (yfinance + static), bus (agent/pod/broadcast,
 max DD, hit rate, cost-adjusted P&L, leaderboard), MCP server with one tool per
 endpoint (tested against OpenAPI).
 
-**"Works" with known holes (Survey, `state/SURVEY.md` §2a/§4a/§4b; the full list is the
+**"Works" with known holes (Survey, `state/archive/SURVEY.md` §2a/§4a/§4b; the full list is the
 backlog's physics section), e.g.:** time is the weak spot —
 daily bars leak the day's close (B-005;
 the test double `HistoricalProvider` leaks the same way, so the suite would certify it),
@@ -80,13 +80,13 @@ constant (SURVEY §4a.9 — B-002 places it in the dependency law). The Phase 2 
 | Truman as a `MarketDataProvider` | I | data world behind the existing interface |
 | System-reported costs (from metered keys) override self-reports | I | see §4 |
 | World events table (Truman injections, law changes) visible to agents | I | Art. 10.2 |
-| Risk engine: drawdown ladder, exposure/concentration limits, reduce-only mode | II | `04_FIRM.md` §5 |
-| Allocation algorithm (deterministic) | II | `04_FIRM.md` §6 |
-| Generations: epoch boundaries, reset, fitness snapshot | II | `04_FIRM.md` §7 |
+| Risk engine: drawdown ladder, exposure/concentration limits, reduce-only mode | II | `archive/04_FIRM.md` §5, IDEAS_BOOK |
+| Allocation algorithm (deterministic) | II | `archive/04_FIRM.md` §6, IDEAS_BOOK |
+| Generations: epoch boundaries, reset, fitness snapshot | II | `archive/04_FIRM.md` §7, IDEAS_BOOK |
 | Agent lineage + budgets per agent/pod (compute treasury) | II–IV | |
-| Validation gates as physics (capital requires passing) | III | `04_FIRM.md` §4 |
+| Validation gates as physics (capital requires passing) | III | `archive/04_FIRM.md` §4, IDEAS_BOOK |
 | Strategy registry + sandboxed backtest runs (trial counting) | III | |
-| Laws table: firm rules as versioned data the physics reads | V | `04_FIRM.md` §9 |
+| Laws table: firm rules as versioned data the physics reads | V | `archive/04_FIRM.md` §9, IDEAS_BOOK |
 | Internal credits, contracts, information market | V | |
 | Multi-firm, endogenous price impact, exchange/regulator hooks | VI | |
 
@@ -183,7 +183,7 @@ TRD Phase 4 stack (FastAPI + Jinja2 + htmx). Read-only views: message feed, pod
 portfolios, cost-adjusted leaderboard, event explorer. Grows to: generation timeline,
 lineage tree, social graph of messages, findings browser, run replay.
 Human controls (Era II+): halt toggle, approve/reject pitches while the Human still
-holds that gate, read `state/REPORT.md`.
+holds that gate, read `state/NOW.md` and `state/PROGRESS.md`.
 
 ## 8. Where things run
 

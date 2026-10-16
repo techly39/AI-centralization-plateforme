@@ -1,22 +1,21 @@
-# setup/ — Builder v2 installer (HUMAN-RUN, ADR-042)
+# setup/ — installer for the Human-only files (HUMAN-RUN)
 
-The Builder may not write protected files (Constitution Art. 6), so changes to them are staged here and
-installed by the Human.
+The Builder may not write protected files (Constitution §10), so their new versions are staged here
+and installed by the Human. Current staging: **Builder v3** (ADR-046), on branch `builder-v3`.
 
 | Path | Installed as |
 |---|---|
-| `files/claude_dir/commands/cycle.md` | `.claude/commands/cycle.md` (the gates) |
-| `files/claude_dir/agents/*.md` | `.claude/agents/` (architect, auditor, red-team, **validator**, **worker**) |
-| `files/claude_dir/hooks/guard.py`, `stop_gate.py` | `.claude/hooks/` (guard fix + the Stop hook) |
-| `files/claude_dir/settings.json` | `.claude/settings.json` (+ Stop hook) |
-| `files/loop_dir/run.sh`, `builder.sh`, `preflight.py` | `loop/` (session modes, referee, metrics, usage-limit wait) |
-| `files/governance_dir/human.yaml` | `governance/human.yaml` (new team roles, no USD caps, sandbox) |
+| `files/bible_dir/00_CONSTITUTION.md`, `01_GENESIS.md` | `bible/` (short rulebook, new decision rule) |
+| `files/claude_dir/commands/cycle.md` | `.claude/commands/cycle.md` (the few gates) |
+| `files/claude_dir/agents/*.md` | `.claude/agents/` (auditor, red-team, worker; architect and validator removed) |
+| `files/claude_dir/hooks/guard.py`, `stop_gate.py` | `.claude/hooks/` (guard blocks only writes to protected paths) |
+| `files/claude_dir/settings.json` | `.claude/settings.json` (Bash allowed; deny list kept) |
+| `files/loop_dir/run.sh`, `builder.sh`, `preflight.py` | `loop/` (v3 team, `idea/*` branches, subagents not killed) |
+| `files/governance_dir/human.yaml` | `governance/human.yaml` (opus leads, cap $50 unchanged, pitches don't wait, OpenRouter reachable for metered runs) |
 
 ```bash
-bash setup/install.sh          # from branch builder-v2, with no Builder run going
-loop/builder.sh start          # first session = planning (the re-foundation)
+bash setup/install.sh          # with no Builder run going, from a clean tree
+loop/builder.sh start          # the first session starts the first idea of the book
 bash setup/rollback.sh ~/.firm/backups/install-<time>   # undo
+bash setup/test_install.sh     # what was tested before this was offered (scratch clone, stub claude)
 ```
-
-Tested in a scratch clone with a stub `claude` (install, plan → build, referee, false-done, usage limit)
-before it was offered to the Human.
