@@ -116,7 +116,7 @@ Now: a `management` role and the leaderboard / pod metrics endpoints exist.
 
 ### The pitch, then a full report
 From: Human
-Status: not started
+Status: building
 Before a pod gets capital, its PM pitches: the economic idea, the data it needs, the strategy as a
 function, backtest results, validation numbers, the team and budget asked for. Then a full report
 on what the pod will do. The pitch goes to a backtest operator (an agent who reruns the strategy
@@ -194,14 +194,14 @@ clock. This is the score that counts. Backtests are the training ground before i
 
 ### A strategy is an isolated function
 From: Human
-Status: not started
+Status: building
 A strategy must become a function: data (1999–2026) → strategy → result. Isolated, so it can be
 backtested on any period or synthetic world and rerun by someone else. Agent-written strategy code
 never runs inside the app process (it runs in a sandboxed subprocess).
 
 ### Validation gates before capital
 From: Human
-Status: not started
+Status: building
 A strategy gets capital only if it passes, on data it was not tuned on:
 - **Economic hypothesis:** a causal story ("two prices correlate" without a mechanism fails;
   gold and oil tankers needs the logic behind it).

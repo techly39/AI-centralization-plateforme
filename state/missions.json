@@ -8,7 +8,7 @@
       "idea": "The pitch, then a full report",
       "acceptance": "acceptance/pitch_gates.py",
       "demo": "uv run python acceptance/pitch_gates.py → ($0, offline) the gates first pass their controls (a planted-signal history passes, pure noise fails, the same strategy tried 1 time vs 200 times loses its deflated Sharpe); then the recorded real PM session replays IDENTICAL and prints the pitch: hypothesis, the strategy rule, every research backtest it ran (attempts counted), and the gate table on the held-out window with each number and PASS/FAIL/null",
-      "status": "ready",
+      "status": "active",
       "estimate_sessions": 4,
       "physics": true,
       "depends_on": [],
