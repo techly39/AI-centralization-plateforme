@@ -389,7 +389,9 @@ From the pitch and the gates (cycle 46, red-team): a PM can read the held-out da
 rules offline with the same pure code, and pitch only the survivor with one counted attempt (on pure
 noise such a rule passes every gate). The real cure is a forward test on days that have not happened
 yet (paper incubation before capital). Also: the IC gate's prediction count is universe width ×
-rebalances, so a wide universe meets the floor on a few independent cross-sections.
+rebalances, so a wide universe meets the floor on a few independent cross-sections. Auditor notes:
+the gates' verdict is written to the ledger under the PM's name, not physics'; each pitch re-runs
+every other pod's latest rule (worth a cache once there are many pods on live data).
 
 ### Paid to report holes
 From: Builder

@@ -164,3 +164,15 @@ def test_every_float_is_finite_and_capped(client, world, db, path, make, field, 
     db.expire_all()
     assert len(list(db.scalars(select(Event)))) == before
     assert client.post(path, headers=h(world["pm1"]), json=make(cap)).status_code == 201
+
+
+@pytest.mark.parametrize("role", ["pm", "analyst"])
+def test_a_member_with_no_pod_reads_no_pod(client, world, db, agent_factory, role):
+    """Auditor, cycle 46: ``None == None`` once let a pod-less PM or analyst list every pod's pitches."""
+    client.post("/pitches", headers=h(world["pm1"]), json=PITCH)
+    _, loner = agent_factory(f"loner-{role}", role, None)
+    before = len(events(db, "permission_denied"))
+    r = client.get("/pitches", headers=h(loner))
+    assert r.status_code == 403, r.text
+    db.expire_all()
+    assert len(events(db, "permission_denied")) == before + 1

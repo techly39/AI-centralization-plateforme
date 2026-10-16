@@ -35,7 +35,8 @@ def _scope(session: Session, actor: Agent, pod_id: int | None, action: Action) -
     caller with no pod), only with cross-pod rights."""
     if pod_id is None and actor.pod_id is not None:
         return actor.pod_id
-    if pod_id == actor.pod_id or has_permission(actor.role, Action.READ_CROSS_POD):
+    if (pod_id is not None and pod_id == actor.pod_id) or has_permission(actor.role,
+                                                                          Action.READ_CROSS_POD):
         return pod_id
     raise deny(session, actor, action, detail=(
         "you have no pod: name none you may not read" if pod_id is None
