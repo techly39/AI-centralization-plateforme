@@ -43,7 +43,7 @@ gates:
   min_periods: 60              # fewer daily returns → the ratio is null, not a number
   impact_coefficient: 1.0      # square-root impact: cost = k σ sqrt(traded / daily dollar volume)
   capacity_edge_share: 0.5     # capacity = capital at which impact eats this share of the edge
-  min_capacity_usd: 1000000    # a strategy must carry at least this much capital
+  min_capacity_usd: 1000000    # a strategy must carry at least this much gross exposure
   max_correlation: 0.5         # with any other pod's latest pitch, on the same days
 
 # MCP server (mcp_server/). It is a CLIENT of the API above, in its own process.

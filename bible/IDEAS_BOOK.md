@@ -385,6 +385,11 @@ From the real-model month (cycle 43, ADR-047 known limits): the mint lock is one
 the repo, so two clones minting at the same moment do not share it, and a lagging key list can hide
 a fresh mint; a turn whose cost went unstated is waited for 30 s, after which the ledger may record
 less than the provider later shows (the cap still holds, it is read from the provider).
+From the pitch and the gates (cycle 46, red-team): a PM can read the held-out days' prices, search
+rules offline with the same pure code, and pitch only the survivor with one counted attempt (on pure
+noise such a rule passes every gate). The real cure is a forward test on days that have not happened
+yet (paper incubation before capital). Also: the IC gate's prediction count is universe width ×
+rebalances, so a wide universe meets the floor on a few independent cross-sections.
 
 ### Paid to report holes
 From: Builder

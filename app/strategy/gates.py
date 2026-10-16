@@ -176,8 +176,10 @@ def deflated_sharpe(returns: Sequence[float], attempts: int) -> dict[str, float]
     if var <= 0:
         return None
     sd = math.sqrt(var)
-    skew = sum((x - m) ** 3 for x in returns) / t / sd**3
-    kurt = sum((x - m) ** 4 for x in returns) / t / sd**4
+    # Moments of the standardised series: scale-free, so tiny returns cannot underflow them to 0/0.
+    z = [(x - m) / sd for x in returns]
+    skew = sum(v**3 for v in z) / t
+    kurt = sum(v**4 for v in z) / t
     sr = m / _std(returns)
     sr0 = expected_max_normal(attempts) / math.sqrt(t)
     spread = 1 - skew * sr + (kurt - 1) / 4 * sr**2
@@ -206,7 +208,10 @@ def capacity_gate(evaluation: Evaluation, law: GatesConfig) -> dict[str, Any]:
     edge = _mean(r) if r else 0.0
     if a <= 0 or not r:
         return _row("capacity", "null", None, law.min_capacity_usd, edge_daily=_finite(edge))
-    usd = 0.0 if edge <= 0 else (law.capacity_edge_share * edge / a) ** 2
+    capital = 0.0 if edge <= 0 else (law.capacity_edge_share * edge / a) ** 2
+    # Judged as the gross exposure that capital carries, not the capital itself: capital scales as
+    # 1/gross, so a strategy cannot buy capacity by turning its leverage knob down.
+    usd = capital * evaluation.rule.gross
     return _row("capacity", "pass" if usd >= law.min_capacity_usd else "fail", usd,
                 law.min_capacity_usd, edge_daily=_finite(edge))
 

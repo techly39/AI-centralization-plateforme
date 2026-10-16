@@ -286,8 +286,8 @@ FLOAT_FIELDS = {
     ("CostReportRequest", "usd_cost"): (0, MAX_USD_PER_REPORT),
     # Attacked in tests/test_pitches.py (it has the market the rule needs).
     ("PitchIn", "budget_usd"): (0, MAX_USD_PER_REPORT),
-    ("PitchIn.rule", "gross"): (0, 2.0),
-    ("ResearchBacktestIn.rule", "gross"): (0, 2.0),
+    ("PitchIn.rule", "gross"): (0.01, 2.0),
+    ("ResearchBacktestIn.rule", "gross"): (0.01, 2.0),
 }
 
 #: Leaf types that cannot carry a float: nothing to bound, nothing to walk.

@@ -1891,8 +1891,9 @@ every attempt counted. No LLM runs in `app/`, and agent-written code would need 
    benchmark `E[max of N normals]/√T` with N = the pod's research backtests + pitches, each try's
    Sharpe taken as an independent estimate of zero (variance 1/T); **capacity** = the capital at
    which square-root impact (`k σ √(traded / daily dollar volume)` per trade) eats
-   `capacity_edge_share` of the mean daily net return, ≥ `min_capacity_usd` (no edge: 0; no trade:
-   null); **correlation** = the highest correlation of daily returns with any other pod's latest
+   `capacity_edge_share` of the mean daily net return, judged as the gross exposure that capital
+   carries (capital × gross, so turning the leverage knob down buys nothing; amended cycle 46,
+   red-team) ≥ `min_capacity_usd` (no edge: 0; no trade: null); a rule's gross is at least 0.01; **correlation** = the highest correlation of daily returns with any other pod's latest
    pitch re-run on the same days, ≤ `max_correlation` (none: null, which does not block). The
    **hypothesis** is recorded, never judged by physics. **Eligible** = IC, deflated Sharpe and
    capacity pass and correlation does not fail. Eligibility grants nothing yet (allocation is a

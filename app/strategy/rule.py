@@ -49,6 +49,8 @@ SIGNALS = ("momentum", "mean_reversion", "low_volatility")
 MAX_UNIVERSE = 50
 MAX_LOOKBACK = 250
 MAX_REBALANCE_EVERY = 63
+#: A book a hundred times smaller than its capital is not a strategy (red-team, cycle 46).
+MIN_GROSS = 0.01
 #: Trailing shared days behind each trade's volatility and dollar volume (the capacity gate).
 IMPACT_WINDOW = 20
 
@@ -65,7 +67,7 @@ class StrategyRule(BaseModel):
     rebalance_every: int = Field(ge=1, le=MAX_REBALANCE_EVERY, description="Days between rebalances.")
     top_n: int = Field(ge=1, le=MAX_UNIVERSE, description="Names held long (and short, for long_short).")
     side: Literal["long_only", "long_short"] = "long_only"
-    gross: float = Field(default=1.0, gt=0.0, le=2.0, description="Sum of absolute weights.")
+    gross: float = Field(default=1.0, ge=MIN_GROSS, le=2.0, description="Sum of absolute weights.")
 
     @field_validator("universe")
     @classmethod

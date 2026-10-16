@@ -101,7 +101,7 @@ class GatesConfig(BaseModel):
     # Fewer daily returns than this and a ratio or a correlation is null, not a number.
     min_periods: int = Field(default=60, ge=10)
     # Capacity: square-root impact, cost = k σ sqrt(traded / daily dollar volume) per trade;
-    # the capacity is the capital at which that cost eats this share of the edge.
+    # the capacity is the gross exposure (capital × gross) at which that cost eats this share of the edge.
     impact_coefficient: float = Field(default=1.0, gt=0.0)
     capacity_edge_share: float = Field(default=0.5, gt=0.0, le=1.0)
     min_capacity_usd: float = Field(default=1_000_000.0, gt=0.0)
