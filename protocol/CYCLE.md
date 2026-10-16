@@ -1,105 +1,106 @@
-# CYCLE PROTOCOL — one Builder session (Builder-owned)
+# CYCLE — one Builder session (Builder-owned; ADR-046)
 
-`.claude/commands/cycle.md` (human-owned) holds the gates; this file is how you meet them. If they
-conflict, the gates win — record the conflict in `state/PROPOSALS.md`. Architecture: ADR-042.
+`.claude/commands/cycle.md` (Human-owned) holds the few gates; this file is how you work. If they
+conflict, the gates win: note it in `state/PROPOSALS.md`.
 
-A **session** (still numbered as a cycle) has one mode, given by the runner in `$ARGUMENTS`:
-- `build` — move the active mission forward; finish it if you can. This file.
-- `plan` — groom the future: `protocol/PLAN.md`.
-- `diagnosis` — the last sessions failed: find the root cause, write `state/BLOCKED.md`, fix it only
-  if the fix is small and safe. No mission work.
-No mode given (interactive `/cycle`) → `build` if a mission is `active` or `ready`, else `plan`.
+Mode from the runner (`$ARGUMENTS`): `build` (this file), `plan` (`protocol/PLAN.md`), or `diagnosis`
+(the last sessions failed: find the cause, write `state/BLOCKED.md`, fix it if small, no idea work).
+No mode (interactive `/cycle`) → `build` if an idea is active or ready in `state/missions.json`, else `plan`.
 
-**The team** (models in `governance/human.yaml` → `builder.team`; launch with no `model` override):
-`architect` plans a mission once · `validator` runs the checks and reports evidence · `red-team`
-attacks physics once per mission that touches it · `auditor` reviews the mission once before merge ·
-`worker` takes a well-specified side task (only if `builder.parallel_workers` > 0, each in its own
-worktree) · any other subagent is a helper. Give each a precise brief; never re-pay for discovery.
+**Spend on the firm, not on ceremony.** Every turn re-reads your whole context: read files in parts,
+`grep`/`tail` the long ones (`bible/07_DECISIONS.md`, `state/JOURNAL.md`), give wide searches to a
+helper and keep only its conclusion. Subagents always run in the **foreground** (a background one is
+killed when the session ends).
 
-**Context hygiene.** Everything you read is paid again on every later turn. Never read whole:
-`state/JOURNAL.md`, `bible/07_DECISIONS.md`, `state/IDEAS.md`, `state/BACKLOG.md`, `state/SURVEY.md`
-— `grep`/`tail`. Tests: `uv run pytest -p no:warnings -o addopts="" -q 2>&1 | tail -15`. Wide
-searches → a helper subagent; take back only its conclusion.
-
-## 0. Gate 0 — stop checks and resume
+## 1. Orient (a few turns)
 - `governance/HALT` exists → write `state/loop_status.json` `{"cycle": N, "result": "blocked",
   "reason": "HALT"}` and stop.
-- Cycle number N = `state/loop_status.json` `cycle` + 1.
-- Dirty tree: on the active mission's branch it is the previous session's unfinished work (cut by a
-  limit or the hang guard) — read it, commit it as `M-NNN: recovered work in progress`, continue.
-  Anywhere else: investigate; commit legitimate leftover state, otherwise end `blocked`.
+- N = `state/loop_status.json` `cycle` + 1.
+- Dirty tree on the active idea's branch = the last session's cut-off work: commit it ("recovered
+  work in progress") and continue. Anywhere else: look, commit what is legitimate, else end `blocked`.
+- Read `bible/IDEAS_BOOK.md` (Part 5 "Next up" + the active idea), `state/PROGRESS.md`,
+  `state/NOW.md`, `git log --oneline -10`.
+- **The Human's comments.** Read `$FIRM_HOME/comments.jsonl` (one JSON object per line: `id`, `ts`,
+  `text`, `about`). For each `id` not yet in `state/comments.json`, act on it (correct course, reorder
+  the book, change the plan) and answer in `state/comments.json`:
+  `{"<id>": {"ts": "<ISO>", "reply": "<what you understood and what you changed, plain words>"}}`.
+  A comment is a steer, not a gate: never wait for more.
 
-## 1. Orient (cheap)
-Read `state/PROGRESS.md` (the last session's handoff), the active or first `ready` mission in
-`state/missions.json`, its plan `state/missions/M-NNN.md` if it exists, and `git log --oneline -15`.
-`state/STATE.md` only if PROGRESS points you there. That is all: the mission plan holds the rest.
+## 2. Start an idea (only when none is active)
+1. Take the first idea of "Next up" whose prerequisites exist. Branch `idea/<slug>` from `main`.
+2. Write **`state/NOW.md`** (30–60 lines, plain words, the Console shows it to the Human):
+   ```
+   # <the goal, one plain sentence>
+   ## How I understand it
+   <what this idea means in the firm, in the Human's terms: who does what, what they see, what comes out>
+   ## What done looks like
+   <the demo: the command, and what a person sees when it works>
+   ## Plan
+   <5-15 lines: the steps, the modules reused, what is deliberately left out>
+   ## Risk
+   <money / physics / seal touched? → red-team + auditor before merge. Otherwise: none.>
+   ## Progress
+   <one line per session>
+   ```
+3. Write the acceptance demo `acceptance/<slug>.py` (exit 0 = the idea works end to end; it may
+   start failing, no ceremony about it). It must run at **$0 of real LLM spend**: a check that needs
+   real minds replays a recorded run (cassette + `replay --verify`) or reads recorded artifacts.
+4. Add the entry to `state/missions.json` (fields below), set it `active`; mark the idea
+   `Status: building` in the book. Commit "start: <goal>" and push the branch.
 
-## 2. Start a mission (only when none is `active`)
-1. Take the first `ready` mission whose `depends_on` are `done`. Set it `active`, create
-   `mission/M-NNN-<slug>` from `main`.
-2. **Gate 2 — plan.** Launch the `architect` with the mission entry, the standard
-   (`protocol/MISSIONS.md`) and anything PROGRESS says. Save its plan verbatim to
-   `state/missions/M-NNN.md`. Commit `M-NNN: plan`.
-3. **Acceptance first.** Write `acceptance/M-NNN.py` from the plan, run it, see it **fail** for the
-   right reason, commit `M-NNN: acceptance (fails before the work)`. Push the branch.
-If the architect says the mission is not ready (too big, wrong, blocked), fix `missions.json` as it
-advises (split by capability, reorder, drop with reason), commit on `main`, and end `planned`.
+```json
+{"id": "<slug>", "title": "<the goal, one plain sentence>", "idea": "<### heading in the book>",
+ "acceptance": "acceptance/<slug>.py", "demo": "<the command and what you see>",
+ "status": "ready | active | done | dropped", "estimate_sessions": 3, "physics": true,
+ "depends_on": [], "branch": "idea/<slug>", "notes": "<anything the next session must know>"}
+```
+`physics: true` = the risk tier applies. The runner reads `id`, `status`, `estimate_sessions`,
+`depends_on`, `acceptance`, `physics`.
 
 ## 3. Build
-- Work through the plan's milestones in order. Each milestone ends with the suite green and a commit
-  `M-NNN: <what> — <why>`; push the branch after each one. Tests first where the plan names them.
-- Follow the TRD inside `app/`; never edit a test just to make it pass (if a test is wrong, say why
-  in the commit). A new law that breaks old tests: each break is a finding for the ADR, not a test
-  to "fix".
-- Decide open questions with the prime rule; real decisions get an ADR in `bible/07_DECISIONS.md`.
-- Deviating from the plan is allowed; write the deviation and its reason in `state/missions/M-NNN.md`.
-- Keep `state/PROGRESS.md` true at every milestone (§5): a session can be cut at any moment.
+- Small commits, each with the touched tests green; push the branch often. Commit summaries in
+  feature words ("PM now gets the day's prices before deciding"), not ids.
+- While working, run the tests of the files you touch (`uv run pytest -q tests/test_x.py`). The full
+  suite (`uv run pytest -q -p no:warnings 2>&1 | tail -5`, ~100 s) runs once before merge.
+- Tests proportionate to the code. Never weaken or delete a test to pass; if a test is wrong, say
+  why in the commit.
+- Real LLM spend (firm agents) only through the metered path, inside the cap, and only for the run
+  that produces the evidence. Record it (cassette) so every later check is free.
+- Shell: the working directory is the repo, so never `cd "<repo>" && …`. Use Write/Edit for files.
+  `git push origin <branch>` as a bare command.
+- Decisions: the prime rule (`bible/01_GENESIS.md` §4). A new rule of the world → an ADR in
+  `bible/07_DECISIONS.md`; anything smaller → one line in NOW.md or the commit.
+- A session can be cut at any moment: keep NOW.md "Progress" and PROGRESS.md true as you go.
 
-## 4. Finish a mission (Gate 5, then Gate 7)
-When the acceptance check passes and the plan's milestones are done:
-1. `uv run python scripts/smoke_run.py` exits 0 (if the mission touched anything beyond docs/state).
-2. Launch the `validator` (brief: mission id, acceptance path, branch). It runs the acceptance check,
-   the full suite and the demo line, and returns PASS/FAIL with evidence. FAIL → fix, re-validate.
-3. If the mission touched physics (`app/registry`, `app/oms`, `app/marketdata`, metering, Runtime
-   halt/budget code) or the plan says `RED-TEAM: yes`: launch the `red-team` with the diff range and
-   the new laws. Commit its test file **as written, before any fix**. Triage by
-   `protocol/MISSIONS.md` §6. The validator and red-team may run in parallel.
-4. Launch the `auditor` on `git diff main...HEAD` with: the plan, the validator's evidence, the
-   red-team result, every deviation, and the claim list (every "never / all / only / covers"
-   sentence the diff adds, with the counter-example that tests it). Fix every BLOCK. A re-audit is
-   scoped to the fix commits.
-5. Merge: `git switch main && git merge --no-ff mission/M-NNN-<slug>`, run the suite on `main`,
-   set the mission `done`, then record (§6) and push: `git push origin main mission/M-NNN-<slug>`.
-6. If time and budget remain, end the session anyway: the runner verifies the merge out of band and
-   chooses the next session's mode. Result `merged`.
+## 4. Finish an idea
+When the acceptance demo passes:
+1. Full suite green. Run the demo yourself once and look at its output like the Human would.
+2. **Risk tier** (`physics: true`): launch the `red-team` (brief: the diff range, what changed in
+   physics/money/seal) and then the `auditor` (brief: `git diff main...HEAD`, NOW.md, the demo output,
+   the red-team result). Both in the foreground, no `model` override. Fix every high finding and every
+   BLOCK; lower findings → one line each under "Known physics holes" in the book.
+3. Merge: `git switch main && git merge --no-ff idea/<slug>`, suite on `main`, set the entry `done`,
+   mark the idea `Status: working` in the book (update its "Now:" line), add one entry to
+   `state/SHOWCASE.md`:
+   ```
+   ## <the goal, plain> (cycle N, YYYY-MM-DD)
+   What: <one or two lines>  ·  Try: `<demo command>`  ·  See: <what appears>
+   ```
+   Push `main` and the branch. Result `merged`. End the session: the runner checks the merge itself.
 
-## 5. End a session without finishing (`progress`)
-Commit everything on the mission branch and push it. Rewrite `state/PROGRESS.md`:
+## 5. Record (every session, small)
+- `state/PROGRESS.md` (≤ 25 lines, plain words):
+  ```
+  Cycle NNNN · building: <the goal> · branch: idea/<slug>
+  Done this session: <2-5 lines>
+  Next: <the exact next step>
+  Watch out: <what cost time; dead ends>
+  Demo: <passes | fails: why>
+  ```
+- `state/JOURNAL.md`: one line, `- cycle NNNN (YYYY-MM-DD) <mode>: <what happened, plain>`.
+- `state/STATE.md` only if the map of what exists changed.
+- Last: `state/loop_status.json` = `{"cycle": N, "mode": "build", "mission": "<slug>", "result":
+  "merged|progress|planned|failed|blocked", "branch": "...", "ts": "<ISO>"}`. Commit state on the
+  branch you are on. Never hand-write metrics: the runner measures (`$FIRM_HOME/metrics.jsonl`).
 
-```
-Cycle: NNNN · Mission: M-NNN (<title>) · Branch: mission/M-NNN-<slug>
-Done so far: <milestones done, one line each>
-Next: <the exact next step>
-Watch out: <anything that cost you time; dead ends>
-Acceptance: <passes | fails: why>
-```
-≤ 40 lines. Result `progress`.
-
-## 6. Record (every session, small)
-- `state/JOURNAL.md`: `## Cycle NNNN — <mode> — <mission or plan> (<ISO date>)` then 3–8 lines:
-  what you did, the result, what you learned, next. (Constitution Art. 7.2.)
-- `state/PROGRESS.md` as in §5 (also after a merge: say what is next).
-- On a merged mission only: `state/SHOWCASE.md` (one entry: what's new + the demo line), `state/STATE.md`
-  (≤ 120 lines, a map not a history), `state/REPORT.md` if the Human must know or decide something.
-- An idea → one line in `state/IDEAS.md`. Never hand-write metrics: the runner measures
-  (`$FIRM_HOME/metrics.jsonl`).
-- Last: `state/loop_status.json` = `{"cycle": N, "mode": "build", "mission": "M-NNN",
-  "result": "merged|progress|planned|failed|blocked", "branch": "...", "ts": "<ISO>"}`. Commit state on
-  the branch you are on (`main` after a merge).
-
-End with three lines: what you did, the result, what's next.
-
-## Headless notes
-Bash runs in the OS sandbox (repo + temp writable, network: GitHub and PyPI only, localhost
-allowed); protected paths are write-denied by the OS. `git push origin …` runs outside the sandbox
-and works only as a bare command (no `cd … &&`). Prefer `uv run --project "<repo>" …` over `cd`.
+End with three plain lines: what you built, the result, what's next.

@@ -30,7 +30,7 @@ S0 is the experimenter.
 ### S0 — Human
 - **Objective:** learn; keep the experiment safe and pointed at the vision.
 - **Can:** everything. Edits Constitution, Genesis, governance, budgets. Halts.
-- **Interface in:** `state/REPORT.md` (the Builder's rolling report), `state/QUESTIONS.md`,
+- **Interface in:** `state/NOW.md` + `state/PROGRESS.md` (shown in the Console), `state/QUESTIONS.md`,
   `state/PROPOSALS.md`, `state/FINDINGS.md`, the Observatory UI.
 - **Interface out:** editing `governance/human.yaml`, creating `governance/HALT`,
   answering in `state/QUESTIONS.md`, editing the Bible.
@@ -44,7 +44,7 @@ S0 is the experimenter.
 - **Cannot:** participate in the firm (Constitution Art. 10); touch protected files;
   raise caps; contact anyone.
 - **Memory:** it has none between sessions except files. `CLAUDE.md` (auto-loaded),
-  `state/STATE.md`, `state/JOURNAL.md`, `state/BACKLOG.md`, git history.
+  `state/STATE.md`, `state/JOURNAL.md`, git history.
 - **Strengths:** writing and refactoring code, tests, reading docs, careful local reasoning.
 - **Weaknesses to design around:**
   - finite context → state files and a short handoff (`state/PROGRESS.md`), never rely on
@@ -53,7 +53,7 @@ S0 is the experimenter.
   - judging its own progress too kindly → "done" is an acceptance check run by the runner, out of
     band; the `validator` runs, the `auditor` reviews; Constitution Art. 9 (ADR-042);
   - over-building and under-building → one mission at a time, each a capability someone can run,
-    sized 1–4 sessions (`protocol/MISSIONS.md`); Era exit criteria as the compass.
+    ideas from `bible/IDEAS_BOOK.md`, each built until its demo works (`protocol/CYCLE.md`).
 
 ### S2 — Physics (the App)
 - **Objective:** none. Physics has no goal; it enforces laws and records everything.
@@ -88,7 +88,7 @@ S0 is the experimenter.
   risk limits are physics (S2). The CRO can't override them.
 - **HR:** onboarding packages, agent directory hygiene, post-mortems for dead pods.
 - **Not** an allocator: capital allocation is an algorithm in S2. Governance may only
-  propose changes to the algorithm's parameters through the law process (`04_FIRM.md` §9).
+  propose changes to the algorithm's parameters through the law process (`IDEAS_BOOK.md`, society).
 
 ### S5 — Pod agents
 - **Objective:** the pod's share of the firm's paperclip — and survival.
@@ -130,7 +130,7 @@ Standing questions:
 - **Adapter effect:** same agent spec under `openclaw` vs `native` — does the host matter?
 - **Builder scale:** which kinds of missions does the Builder finish within estimate, which
   fail, and why? (Measured by the runner: `$FIRM_HOME/metrics.jsonl`; cycles 0–36 in
-  `state/METRICS.md`.) What should be delegated to its subagents? What process change raised
+  `$FIRM_HOME/metrics.jsonl`.) What should be delegated to its subagents? What process change raised
   accepted missions per dollar?
 - **Model exam:** a fixed battery of Truman scenarios with known correct behaviour, run
   against any new model before it is allowed in the firm.

@@ -1,7 +1,7 @@
 """Survey probe: measure what reading the physics code suggested (S-003a, cycle 4).
 
 Each probe turns one suspicion from the code survey into a number, so
-``state/SURVEY.md`` says "measured" instead of "I think". A probe *reports*; it
+``state/archive/SURVEY.md`` says "measured" instead of "I think". A probe *reports*; it
 does not assert. Where a probe shows a hole, the fix belongs in a later cycle,
 with a real test.
 

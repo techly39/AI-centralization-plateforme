@@ -125,7 +125,7 @@ def test_held_pm_broadcast_is_scoped_to_own_pod(client, two_desks):
 
 
 def test_held_no_central_pod_restriction_cross_pod_chat_works(client, two_desks):
-    """04_FIRM.md asks whether chat is restricted to a central pod. It is not."""
+    """The Human's notes ask whether chat is restricted to a central pod. It is not."""
     pm1_id, pm1_key = two_desks["pm1"]
     _, an2_key = two_desks["an2"]
     resp = send(client, an2_key, to=f"agent:{pm1_id}", body="cross-pod hello")

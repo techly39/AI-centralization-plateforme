@@ -1747,3 +1747,53 @@ reply text of a wake is not hashed (pinned limit, `tests/test_runtime_verify.py`
 **Not done (by the Human's call, 2026-10-16: finish quickly, process to be slimmed).** The scoped
 red-team, the validator and the auditor did not run on this mission; the smoke hosted step and the
 design note were dropped. Recorded here so the gap is visible (Art. 9).
+
+## ADR-046 — Builder v3: the ideas book is the goal source; a light, risk-tiered process (Human-directed rework) — accepted (cycle 41, 2026-10-16)
+
+**Why.** After 40 cycles no AI agent had traded. The Human's brief
+(`bible/sources/REWORK_BRIEF_2026-10-16.md`) traced it to the setup, not the idea: goals came from
+AI-written measurement criteria (`05_ERAS.md`) while the Human's ideas sat in "original notes"; firm
+agents could not run until the cap was set (2026-10-15); the rulebook read as a safety manual; every
+mission paid the full ceremony (architect, red-first, validator, red-team, auditor, re-audit, six state
+files); tool friction (session 40: 16 refused commands, all `cd "<repo>" && …`; its architect, run in
+the background, was killed at session end); the cheaper model built while the stronger one reviewed.
+
+**Decision.**
+1. `bible/IDEAS_BOOK.md` is the only goal source: the project at full scale, the Human's ideas
+   (matured from `bible/sources/REQUIREMENTS.md` and the brief, read as ideas, not a pathway), each with
+   an honest status, the Builder's own ideas (Part 4), and "Next up". The firm's model, per the Human
+   (2026-10-16): a multi-manager hedge fund with high turnover (allocation + drawdown ladder + hiring).
+2. A unit of work = one idea, built until its demo works (`acceptance/<slug>.py`, $0 of real LLM spend).
+   A short plan with "how I understand it" in `state/NOW.md`, shown in the Console. No architect, no
+   validator (the runner already checks out of band). Red-team + auditor only for money, physics or the
+   seal. Tests proportionate. Paperwork: handoff, one journal line, loop status, a SHOWCASE entry per
+   finished idea; an ADR only when a rule of the world changes.
+3. No human in the loop. The Human comments in the Console (`$FIRM_HOME/comments.jsonl`); the Builder
+   answers in `state/comments.json` at the next session. `approvals.pitch_requires_human` → false (draft).
+4. Rulebook: short Constitution and Genesis (drafts in `setup/files/bible_dir/`), same hard limits;
+   tie-breakers reordered: inside the seal → makes the firm more real or capable now → deterministic
+   physics → reuse → measurement where it matters.
+5. Setup (drafts in `setup/files/`, installed by the Human with `bash setup/install.sh`): lead = opus;
+   architect and validator removed; Bash allowed broadly (deny list kept); the guard blocks only writes
+   aimed at protected paths; subagents in the foreground; the runner accepts `idea/*` branches and
+   flags a merge without the auditor only for risk-tier ideas.
+6. Archived: `bible/04_FIRM.md`, `05_ERAS.md`, `06_LOOP.md`, `09_BUILDER_VISION.md` → `bible/archive/`;
+   `state/BACKLOG, IDEAS, SURVEY, BILLS, METRICS, REPORT, plans/` → `state/archive/`;
+   `protocol/MISSIONS.md` folded into `protocol/CYCLE.md`. Old missions M-003…M-006 dropped, re-cut into
+   book ideas. The first idea: real AI agents live a backtest month.
+
+**Coverage check (brief → where it lives).** Brief §1 (full scale) → book Part 1. §6 seeds → book Part 3:
+pods/PM builds pod → "Pods"; manager/CEO → "Management above the pods"; pitch → "The pitch"; strategy as
+a function → "A strategy is an isolated function"; backtest + packages + days×tickers + known outcomes +
+model comparison → the five backtest ideas; validation (hypothesis, IC, DSR, capacity, correlation) →
+"Validation gates"; Barra → "Barra-like…"; allocation → "The allocation algorithm"; 5/7.5/10% →
+"The central risk ladder"; pod metrics → "Pod metrics"; communication + hub + bus → three ideas;
+orchestration → "Workflows as programs"; monthly reset + evolution → "Generations and evolution";
+cost → "Thinking costs money"; society/civilisation → three ideas; the Human's view → two ideas; the
+open host decision → "Who hosts the agents" (the Builder decides). Brief §5 hard limits → draft
+Constitution §1 (seal, fake money, origin only), §2 (no LLM in `app/`), §3 (HALT), §4 (caps), §5
+(not a participant; non-`firm-` OpenClaw agents), §6 (honest measurement), §7 (main green,
+append-only, no force-push).
+
+**Reversible.** Yes: `bash setup/rollback.sh <backup>` restores the protected files and reverts the
+merge; the archived files are one `git mv` away.
