@@ -119,12 +119,12 @@ def main() -> int:
         if pkg.get("name") != PACKAGE or pkg.get("day") != day:
             missing.append(f"{step['step']}:{w['spec_id']}")
             continue
-        for ticker, bars in (pkg.get("bars") or {}).items():
-            if any(str(b.get("ts", ""))[:10] > day for b in bars):
+        for ticker, bars in (pkg.get("bars") or {}).items():   # rows: [day, open, high, low, close, volume]
+            if not bars or any(str(row[0])[:10] > day for row in bars):
                 late.append(f"{step['step']}:{w['spec_id']}:{ticker}")
     check("C: every wake got its own day's package", not missing and bool(wakes(doc)),
           f"{len(wakes(doc))} wakes" + (f"; missing {missing[:5]}" if missing else ""))
-    check("C: no package shows tomorrow", not late, str(late[:5]))
+    check("C: no package shows tomorrow, and none is empty", not late, str(late[:5]))
 
     # ---- D
     pm = next((s["id"] for s in specs if s["role"] == "pm"), None)
@@ -211,6 +211,19 @@ def report(doc: dict, specs: list[dict], keys: list[dict]) -> None:
         print(day)
         for line in per_day[day]:
             print(line)
+    book = []
+    for step, w in wakes(doc):
+        for c, r in calls(w):
+            if c["name"] == "get_portfolio" and r and not r.get("is_error"):
+                try:
+                    book.append((step["at"][:10], json.loads(r["content"])["total_value"]))
+                except (ValueError, KeyError, TypeError):
+                    pass
+    if book:
+        print("\n== The pod's book, as the PM last saw it each day ==")
+        print("  " + "  ".join(f"{d[5:]} ${v:,.0f}" for d, v in book))
+        first, last = book[0][1], book[-1][1]
+        print(f"  from ${first:,.0f} to ${last:,.0f} ({(last / first - 1) * 100:+.2f}%), before thinking costs")
     print("\n== Cost, charged by the system ==")
     for k in keys:
         print(f"  {names.get(k['spec_id'], k['spec_id'])}: ${k['spent_usd_micros'] / 1e6:.4f} "

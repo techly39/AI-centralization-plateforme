@@ -1828,3 +1828,28 @@ neither meter it per turn nor replay it from a tape. The OpenRouter account has 
    that holds anything shaped like an OpenRouter key.
 6. **A replayed mind keeps its recorded model** (provider `cassette` + `model` is no longer a
    contradiction): the request hash includes the model, and a cassette mind still calls nothing.
+7. **The day's data package** (`runtime/packages.py`, `backtest --package NAME`): built by the Runtime
+   through the mind's own key at the step's now (the look-ahead guard holds), put in the wake's first
+   user message beside `me` and `input`, its name recorded in the cassette's `parameters.package`
+   (optional key; a replay rebuilds it from the replayed world). `prices-v1` = 30 days of daily bars
+   per ticker of the input's `universe`, as `[day, open, high, low, close, volume]` rows.
+8. **A metered run is recorded, and verified with the trailing-block law of ADR-044 §6**
+   (`runtime.verify.metered_block`): the recorded ledger ends with exactly one `cost_metered` row per
+   key the sync posted, each that key's (agent, label, total), all by one actor that is none of the
+   run's minds; `replay --verify` compares the rest and reports the block apart
+   (`IDENTICAL: … (+k metered cost rows of the recorded run, reported apart)`, evidence
+   `metered_block`). A block that is not the recording's reads DIVERGED. `app/ledger/compare.py` is
+   unchanged (one allowed difference).
+
+**Old tests this law changed (restated, not loosened).** `test_only_fake_metered_is_metered` and
+`test_the_metered_list_is_exactly_one_name` (now two names, every near-miss still refused);
+the cassette `model` contradiction (a cassette mind keeps its recorded model; budget and script still
+refused; a recorded spec that contradicts itself still refuses the replay); the adapter's parameter
+set (+`package`); `test_metered_backtest_refuses_cassette_exit_2` (a metered run now records).
+
+**Known limits.** Two runs minting keys at the same moment could each pass the monthly check (no
+lock across processes); every key's hard limit at the provider still bounds each one. Usage is read
+from the provider after the run and never reported below what the turns' own answers billed.
+
+**Reversible.** Yes: one name in the gate's list, one class in the registry's table; disabled keys
+stay at the provider as the history.

@@ -46,4 +46,7 @@ Money and physics (new spending provider, gate, metering, provisioning): red-tea
 before merge.
 
 ## Progress
-- cycle 42: plan, decision record, acceptance demo; building the provider and the provisioner.
+- cycle 42: plan, decision record (ADR-047), acceptance demo. Built steps 1-8: the OpenRouter
+  provider and per-agent keys with cross-run monthly accounting, the daily price package, metered
+  cassettes verified with the cost rows apart, key redaction, `specs/real-desk/`. A 1-day trial
+  with real models worked ($0.0067 for the three). The real month recorded; red-team, auditor next.

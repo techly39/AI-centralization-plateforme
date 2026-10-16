@@ -30,3 +30,6 @@ experiments/*/runs/
 
 # OS
 .DS_Store
+
+# Recorded runs kept as evidence of an idea (keys redacted, world key never inside)
+!evidence/**/*.cassette.json
