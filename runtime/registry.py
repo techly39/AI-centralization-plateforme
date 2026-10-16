@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from runtime import metering, replay, scripted
+from runtime import metering, openrouter, replay, scripted
 from runtime.gate import METERED_PROVIDERS, ZERO_COST_PROVIDERS
 from runtime.providers import LLMProvider
 from runtime.spec import AgentSpec
@@ -33,6 +33,7 @@ PROVIDER_CLASSES = MappingProxyType({
     "scripted": scripted.ScriptedProvider,
     "cassette": replay.CassetteProvider,
     "fake-metered": metering.FakeMeteredProvider,
+    "openrouter": openrouter.OpenRouterProvider,
 })
 
 
@@ -49,20 +50,24 @@ def check_spec(spec: AgentSpec) -> None:
     one. Builds nothing (a ``cassette`` spec needs a tape to be built)."""
     name = spec.provider
     if name in ZERO_COST_PROVIDERS:
-        if spec.model is not None:
+        # A cassette mind may carry the model it was recorded with (ADR-047 §6): the request
+        # hash names it, and the mind still calls nothing.
+        if spec.model is not None and name != "cassette":
             raise ProviderRefused("contradiction", f"provider {name!r} runs no model; `model` is set")
         if spec.budget_usd != 0:
             raise ProviderRefused("contradiction", f"provider {name!r} spends nothing; `budget_usd` is set")
-    if name not in ("scripted", *METERED_PROVIDERS) and spec.script is not None:
+    if name not in ("scripted", "fake-metered") and spec.script is not None:
         raise ProviderRefused(
             "contradiction", f"`script` is for provider 'scripted' or 'fake-metered', not {name!r}")
     if name in METERED_PROVIDERS:
-        if spec.model is not None:
-            raise ProviderRefused("contradiction", f"provider {name!r} runs no model; `model` is set")
         if metering.usd_to_micros_floor(spec.budget_usd) <= 0:
             raise ProviderRefused("no_budget", f"provider {name!r} spends: `budget_usd` must buy "
                                   "at least one micro-dollar")
-    if name == "scripted" or name in METERED_PROVIDERS:
+    if name == "fake-metered" and spec.model is not None:
+        raise ProviderRefused("contradiction", f"provider {name!r} runs no model; `model` is set")
+    if name == "openrouter" and (type(spec.model) is not str or not spec.model.strip()):
+        raise ProviderRefused("no_model", "provider 'openrouter' needs the spec's `model`")
+    if name in ("scripted", "fake-metered"):
         if type(spec.script) is not str or spec.script not in scripted.SCRIPTS:
             raise ProviderRefused("unknown_script", f"no script named {spec.script!r}")
     elif name not in PROVIDER_CLASSES:
@@ -72,7 +77,7 @@ def check_spec(spec: AgentSpec) -> None:
 def build_provider(spec: AgentSpec, tape: replay.Tape | None = None,
                    meter: metering.Meter | None = None) -> LLMProvider:
     """The mind for ``spec``, or :class:`ProviderRefused`. ``tape`` is for ``cassette`` only,
-    ``meter`` (the mind's own key) for ``fake-metered`` only."""
+    ``meter`` (the mind's own key) for a metered provider only."""
     check_spec(spec)
     name = spec.provider
     if meter is not None and name not in METERED_PROVIDERS:
@@ -82,6 +87,13 @@ def build_provider(spec: AgentSpec, tape: replay.Tape | None = None,
             raise ProviderRefused("contradiction", "a tape is for provider 'cassette'")
         if type(meter) is not metering.Meter:  # a key is a Meter, not whatever claims to be one
             raise ProviderRefused("unavailable", "a metered provider needs its mind's own key")
+        if name == "openrouter":
+            # The key must live at the real provisioner: a fake key would answer nothing.
+            if type(meter.provisioner) is not openrouter.OpenRouterProvisioner:
+                raise ProviderRefused("unavailable", "an openrouter mind's key is an OpenRouter key")
+            return PROVIDER_CLASSES[name](spec.model, meter)
+        if type(meter.provisioner) is not metering.FakeProvisioner:
+            raise ProviderRefused("unavailable", "a fake metered mind's key is a fake key")
         return PROVIDER_CLASSES[name](scripted.SCRIPTS[spec.script], meter)
     if name == "scripted":
         if tape is not None:

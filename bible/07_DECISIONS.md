@@ -1797,3 +1797,69 @@ append-only, no force-push).
 
 **Reversible.** Yes: `bash setup/rollback.sh <backup>` restores the protected files and reverts the
 merge; the archived files are one `git mv` away.
+
+## ADR-047 — The app's own runtime hosts the firm's agents; OpenRouter is the first real metered provider (idea: real AI agents in a backtest month) — accepted (cycle 42)
+
+**Context.** The Human left open who hosts the agents (book: "Who hosts the agents"). The first idea
+needs real language models on fake money, each dollar metered per agent, inside the $50/month cap.
+Facts on 2026-10-16: `runtime/native.py` already wakes a mind over the firm's MCP tools with every
+gate (HALT before each turn and call, identity, tool budget, cap), records cassettes and replays them;
+metering (ADR-041/044) charges each mind's own key. OpenClaw 2026.5.12 is installed but no `firm-`
+agent exists; an OpenClaw agent runs its own model on its own key (ADR-032 (4)), so the Runtime can
+neither meter it per turn nor replay it from a tape. The OpenRouter account has a provisioning key
+(`.env`) and about $1.86 of credit.
+
+**Decision.**
+1. **Host = the app's own runtime** (adapter `native`). OpenClaw stays a later adapter, to be
+   certified when it can be metered and replayed like a native mind. Never touch non-`firm-` agents.
+2. **`openrouter` joins `METERED_PROVIDERS`.** It builds `runtime.openrouter.OpenRouterProvider`:
+   OpenAI-compatible chat completions with tools, the spec's `model` (required), the mind's own key,
+   a wall-clock timeout, no retries. The turn's cost is the provider's own `usage.cost`; the meter is
+   the provider's per-key usage, posted once after the run (ADR-044 §6), never the mind's word.
+3. **One provisioned key per agent**, named `firm-<run>-<spec id>`, limit = floor(`budget_usd`).
+   After the run every key the run made is **disabled, never deleted**, so the provider keeps the
+   history.
+4. **Monthly accounting across runs, read from the provider.** Before any key is made, every `firm-`
+   key on the account counts against the cap: an enabled key its whole limit, a disabled one what it
+   spent this month. That sum + the new limits ≤ `firm.monthly_llm_usd_cap`, or nothing is made.
+   Keys whose name does not start with `firm-` (the Human's) are listed with the rest by the provider, but never counted or changed.
+5. **Keys never leave the process.** A minted key lives only in the provider object; the cassette,
+   the output and the ledger hold the key's hash-label only; anything shaped like a key that reaches a
+   cassette is blanked out on write (the redaction), and the tests scan every output for the shape.
+6. **A replayed mind keeps its recorded model** (provider `cassette` + `model` is no longer a
+   contradiction): the request hash includes the model, and a cassette mind still calls nothing.
+7. **The day's data package** (`runtime/packages.py`, `backtest --package NAME`): built by the Runtime
+   through the mind's own key at the step's now (the look-ahead guard holds), put in the wake's first
+   user message beside `me` and `input`, its name recorded in the cassette's `parameters.package`
+   (optional key; a replay rebuilds it from the replayed world). `prices-v1` = 30 days of daily bars
+   per ticker of the input's `universe`, as `[day, open, high, low, close, volume]` rows.
+8. **A metered run is recorded, and verified with the trailing-block law of ADR-044 §6**
+   (`runtime.verify.metered_block`): the recorded ledger ends with exactly one `cost_metered` row per
+   key the sync posted, each that key's (agent, label, total), all by one actor that is none of the
+   run's minds; `replay --verify` compares the rest and reports the block apart
+   (`IDENTICAL: … (+k metered cost rows of the recorded run, reported apart)`, evidence
+   `metered_block`). A block that is not the recording's reads DIVERGED. `app/ledger/compare.py` is
+   unchanged (one allowed difference).
+
+**Old tests this law changed (restated, not loosened).** `test_only_fake_metered_is_metered` and
+`test_the_metered_list_is_exactly_one_name` (now two names, every near-miss still refused);
+the cassette `model` contradiction (a cassette mind keeps its recorded model; budget and script still
+refused; a recorded spec that contradicts itself still refuses the replay); the adapter's parameter
+set (+`package`); `test_metered_backtest_refuses_cassette_exit_2` (a metered run now records).
+
+**Hardened before merge (red-team 0022-0030, cycle 43).** Minting is serialised across runs by a
+lock file in the repo (`.openrouter-mint.lock`) held from the month's count to the mint, and the keys
+a run made count their whole limit at once; the check before every wake asks the account for the
+whole month; a disabled key that does not state its spend counts its limit; a key the provider does
+not bound exactly as asked (limit differs, or resets) is disabled at once and refused; a key sends no
+turn once its turns used its limit; a turn writes at most 4096 tokens; keys are disabled whatever
+ends the run; `metered_block` also requires the `runtime` actor, physics' exact body with the agent's
+own pod, each total at least its recorded turns' cost, and a block on any run of metered minds.
+
+**Known limits.** The lock is one file per copy of the repo: two clones or worktrees do not share it,
+and the provider's key list may lag behind a mint (the recount before every wake catches a double
+mint once listed). A turn whose cost went unstated is waited for up to 30 s; past that the ledger may
+hold less than the provider later shows (the monthly count reads the provider, so the cap holds).
+
+**Reversible.** Yes: one name in the gate's list, one class in the registry's table; disabled keys
+stay at the provider as the history.

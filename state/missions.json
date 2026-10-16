@@ -7,13 +7,13 @@
       "title": "Real AI agents (a PM and two analysts) live a backtest month on fake money, each day getting their data package, and we see what they did and what it cost",
       "idea": "The backtest: real AI agents in a sealed box, fed a month day by day",
       "acceptance": "acceptance/real_agents_backtest.py",
-      "demo": "written by the first build session in state/NOW.md (expected: a recorded real-model month replays for $0 with its orders, messages and per-agent cost shown)",
-      "status": "ready",
-      "estimate_sessions": 3,
+      "demo": "uv run python acceptance/real_agents_backtest.py → replays the recorded real-model month in evidence/real-agents-backtest/ at $0 (IDENTICAL), then prints day by day what the PM and the two analysts saw, said and traded, and what each one cost",
+      "status": "done",
+      "estimate_sessions": 4,
       "physics": true,
       "depends_on": [],
       "branch": "idea/real-agents-backtest",
-      "notes": "First idea after the rework (ADR-046). Facts: runtime/native.py wakes a mind with the firm's MCP tools; runtime/gate.py METERED_PROVIDERS = {'fake-metered'} only, so a real metered provider (OpenRouter, one key per agent, sum of limits <= the $50/month cap; provisioning key in the gitignored .env as FUND_OPENROUTER_PROVISIONING_KEY) is new money/physics code -> red-team + auditor. Decide the agent host first (book: 'Who hosts the agents'). The acceptance check must cost $0: replay the recorded month (cassette + replay --verify) and check recorded artifacts. Old raw material: dropped M-003 (OpenClaw), M-004 notes (inbox flooding drains a metered key; monthly accounting across runs before any real key; secret scan B-022)."
+      "notes": "Plan in state/NOW.md (cycle 42). Host = the app's own runtime (ADR-047). OpenRouter account credit ~$1.86 on 2026-10-16 (the Human's own keys: never touch them): use a cheap pinned model. Monthly accounting across runs reads every firm- key at the provider. World key for the evidence run = sha256('fund-real-agents-backtest/1'). First idea after the rework (ADR-046). Facts: runtime/native.py wakes a mind with the firm's MCP tools; runtime/gate.py METERED_PROVIDERS = {'fake-metered'} only, so a real metered provider (OpenRouter, one key per agent, sum of limits <= the $50/month cap; provisioning key in the gitignored .env as FUND_OPENROUTER_PROVISIONING_KEY) is new money/physics code -> red-team + auditor. Decide the agent host first (book: 'Who hosts the agents'). The acceptance check must cost $0: replay the recorded month (cassette + replay --verify) and check recorded artifacts. Old raw material: dropped M-003 (OpenClaw), M-004 notes (inbox flooding drains a metered key; monthly accounting across runs before any real key; secret scan B-022)."
     },
     {
       "id": "M-001",

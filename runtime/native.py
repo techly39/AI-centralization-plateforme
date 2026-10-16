@@ -130,10 +130,12 @@ async def wake(
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
     tape: Tape | None = None,
     meter: Meter | None = None,
+    package: dict[str, Any] | None = None,
 ) -> WakeRecord:
     """Wake the mind ``spec`` describes once, acting as ``client``'s agent. ``tape`` is the
     recording a ``cassette`` mind replays (R-4b); the registry builds the mind from it.
-    ``meter`` is the mind's own key at the provisioner, for a ``fake-metered`` mind (ADR-044)."""
+    ``meter`` is the mind's own key at the provisioner, for a metered mind (ADR-044, ADR-047).
+    ``package`` is the day's data package (:mod:`runtime.packages`), shown beside ``input``."""
     if type(max_tool_calls) is not int or max_tool_calls < 0:
         raise ValueError("max_tool_calls is a non-negative int")
     if spec.adapter != "native":
@@ -160,6 +162,8 @@ async def wake(
 
     if type(workflow_input) is not dict or not _is_json(workflow_input):
         return WakeRecord(spec.id, "refused", "bad_input", 0)  # red-team 0013 H7
+    if package is not None and (type(package) is not dict or not _is_json(package)):
+        return WakeRecord(spec.id, "refused", "bad_input", 0)
 
     me = await _execute(server, None, ToolCall(id="context:me", name="whoami"))
     if me.is_error:
@@ -170,10 +174,12 @@ async def wake(
     if (identity.get("name"), identity.get("role"), identity.get("pod_id")) != (
             spec.name, spec.role, spec.pod):
         return WakeRecord(spec.id, "refused", "identity_mismatch", 0)
+    context: dict[str, Any] = {"me": identity, "input": workflow_input}
+    if package is not None:
+        context["package"] = package
     transcript: list[Message] = [
         Message(role="system", content=spec.charter),
-        Message(role="user", content=json.dumps(
-            {"me": identity, "input": workflow_input}, sort_keys=True)),
+        Message(role="user", content=json.dumps(context, sort_keys=True)),
     ]
 
     made = 0

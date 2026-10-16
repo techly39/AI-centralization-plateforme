@@ -27,3 +27,9 @@ says $4.05. The same specs are refused under a null cap and when their budgets e
 Try it: `uv run python acceptance/M-001.py` → per-agent key / limit / charges / meter, `Σ provisioner ==
 Σ ledger per-key max == Σ App = <micro-dollars> (exact)`, the leaderboard charging $5.2 against $0.31
 self-reported, then `ACCEPTED` (about 5 seconds, its own App on a temporary database).
+
+## Real AI agents live a backtest month on fake money (cycle 43, 2026-10-16)
+What: a PM and two analysts on a real model (Haiku 5.5) lived 31 days on a sealed market, each fed the
+day's prices, each on its own capped key: 17 orders, book −0.62%, $0.25 of thinking in total, recorded
+and replayed identical for $0.  ·  Try: `uv run python acceptance/real_agents_backtest.py`  ·  See: day
+by day what each agent saw, said, traded and cost, the book's path, and the cost per agent.

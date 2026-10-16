@@ -1,11 +1,15 @@
-Cycle 0041 · building: nothing yet · branch: main
-Done this session: the Builder was reworked (ADR-046, interactive session with the Human, 2026-10-16).
-- The goal source is now `bible/IDEAS_BOOK.md`: all the Human's ideas, with honest status.
-- Light process: a short plan in `state/NOW.md`, one acceptance demo per idea, red-team + auditor only
-  for money / physics / the seal. No architect, no validator. Opus leads.
-- The Human's comments arrive in `$FIRM_HOME/comments.jsonl`; answer them in `state/comments.json`.
-Next: start the first idea of Next up: real AI agents (a PM and two analysts) live a backtest month
-on fake money with daily data packages (`state/missions.json` entry `real-agents-backtest`). First
-decide who hosts the agents (book: "Who hosts the agents") and write `state/NOW.md`.
-Watch out: never `cd "<repo>" && …` (headless refuses it); subagents in the foreground only.
-Demo: none yet.
+Cycle 0043 · merged: real AI agents (a PM and two analysts) live a backtest month on fake money · branch: idea/real-agents-backtest
+Done this session:
+- Red-team (foreground) attacked the real-model month: 9 holes, 3 high. All fixed, each pinned as a
+  test: one run mints keys at a time and counts its own keys at once; the check before every wake
+  asks the account for the whole month; keys the provider does not bound exactly are disabled at
+  once; a key stops at its limit; turns are capped at 4096 tokens; keys are disabled whatever ends
+  the run; `replay --verify` refuses rewritten cost rows.
+- Auditor: PASS, no blocks; its notes fixed (wording in the decision record, Ctrl-C while minting).
+- Merged to main; the idea is "working" in the book.
+Next: plan the next idea from "Next up" (the pitch and the gates), or the richer data packages
+(company data, headlines) if the plan session judges them first.
+Watch out: the demo replays the recorded month, so it proves the record, not the live path (the live
+OpenRouter path is tested against a fake account). OpenRouter credit ≈ $1.60. The mint lock is one
+file per copy of the repo (`.openrouter-mint.lock`, gitignored). Never `cd "<repo>" && …`.
+Demo: passes (`uv run python acceptance/real_agents_backtest.py`, $0, ~7 s).

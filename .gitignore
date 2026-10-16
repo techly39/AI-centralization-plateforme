@@ -26,7 +26,11 @@ fund.db*
 
 # Cassettes and run records (R-4a, B-000i): a run is a proof object, not source
 *.cassette.json
+.openrouter-mint.lock
 experiments/*/runs/
 
 # OS
 .DS_Store
+
+# Recorded runs kept as evidence of an idea (keys redacted, world key never inside)
+!evidence/**/*.cassette.json

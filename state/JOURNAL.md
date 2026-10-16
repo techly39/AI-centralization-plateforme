@@ -1503,3 +1503,4 @@ uncommitted for them. Next: M-002 (one-file proof object).
 Gate 2 done: architect plan saved (3 sessions; hosted-world recipe, v1 refused, `replay --verify`). Acceptance written red-first (Part A fails: no `--world`). Lesson: a background architect is killed when the turn ends; run it in the foreground. Next: M1 cassette v2.
 
 - cycle 0041 (2026-10-16) rework: Builder v3 (ADR-046). Goals now come from bible/IDEAS_BOOK.md; light, risk-tiered process; Opus leads; the Console shows what is being built and takes comments. Next: real AI agents live a backtest month.
+- cycle 0043 (2026-10-16) build: red-team found 9 holes in the real-model month (3 broke the cap); all fixed, auditor passed, merged — real AI agents now live a backtest month.

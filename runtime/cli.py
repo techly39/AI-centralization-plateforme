@@ -74,7 +74,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from mcp_server.client import FundAPIError, FundClient
-from runtime import cassette, world
+from runtime import cassette, packages, world
 from runtime.cassette import CassetteError, redact  # noqa: F401 - ``cli.redact`` is public
 from runtime.gate import METERED_PROVIDERS, decide_wake_under
 from runtime.governance import Governance, read_governance
@@ -89,6 +89,7 @@ from runtime.lockstep import (
 )
 from runtime.metering import FakeProvisioner, sync_costs, usd_to_micros_floor
 from runtime.native import DEFAULT_MAX_TOOL_CALLS
+from runtime.openrouter import OpenRouterError, OpenRouterProvisioner
 from runtime.provision import ProvisionError, provision, vet
 from runtime.registry import ProviderRefused, check_spec
 from runtime.replay import Recording, RecordingError, as_cassette
@@ -122,6 +123,9 @@ def main(argv: list[str] | None = None, *,
     bt.add_argument("--input", type=Path, help="workflow input: a JSON object every wake sees")
     bt.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS,
                     help="tool-call budget per wake")
+    bt.add_argument("--package", default=None, metavar="NAME",
+                    help="hand every wake its day's data package (known: "
+                         f"{', '.join(sorted(packages.PACKAGES))}); needs a `universe` in --input")
     bt.add_argument("--server", default=None,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
     bt.add_argument("--world", type=Path, metavar="FILE",
@@ -217,11 +221,18 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
             raise _Usage("the cassette's specs are not the recording's minds: their ids differ")
         if cas.parameters["steps"] != rec.steps:
             raise _Usage("the cassette's parameters disagree with its recording (steps)")
+        if (package := cas.parameters.get("package")) is not None:
+            try:
+                packages.check(package, cas.parameters["workflow_input"])
+            except packages.PackageError as exc:
+                raise _Usage(f"{args.cassette}: {exc}") from exc
         try:
+            for spec in specs:  # the recorded spec itself must be one a mind is built from
+                check_spec(spec)
             specs = [as_cassette(s) for s in specs]
             for spec in specs:
                 check_spec(spec)
-        except (ProviderRefused, ValueError) as exc:  # a cassette v1 cannot replay a model-bearing run
+        except (ProviderRefused, ValueError) as exc:
             raise _Usage(f"the specs cannot replay as cassette minds: {exc}") from exc
         registrar_key, clock_key, server = _keys(args)
     except (SpecError, _Usage) as exc:
@@ -230,7 +241,8 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
     out = asyncio.run(_conduct(specs, server, registrar_key, clock_key, transport,
                                steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
                                workflow_input=cas.parameters["workflow_input"],
-                               max_tool_calls=cas.parameters["max_tool_calls"], replay=rec))
+                               max_tool_calls=cas.parameters["max_tool_calls"], replay=rec,
+                               package=cas.parameters.get("package")))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
     return 0 if out["ended"] == "completed" else 1
 
@@ -255,9 +267,11 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
             registrar_key = clock_key = server = ""
         else:
             workflow_input, registrar_key, clock_key, server = _shared(args, args.steps)
-        if args.cassette is not None and any(s.provider in METERED_PROVIDERS for s in specs):
-            # No law yet says how to replay the trailing cost block (ADR-044 §6).
-            raise _Usage("a metered run's cassette is not defined yet: run without --cassette")
+        if args.package is not None:
+            try:
+                packages.check(args.package, workflow_input)
+            except packages.PackageError as exc:
+                raise _Usage(str(exc)) from exc
         if args.cassette is not None:
             try:
                 cassette.check_path(args.cassette)
@@ -267,7 +281,7 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
     run = dict(steps=args.steps, days_per_step=args.days_per_step, workflow_input=workflow_input,
-               max_tool_calls=args.max_tool_calls)
+               max_tool_calls=args.max_tool_calls, package=args.package)
     ledger = None
     if hosting:
         try:
@@ -290,7 +304,8 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
             redactions = cassette.write(
                 args.cassette, out,
                 parameters={k: run[k] for k in ("steps", "days_per_step", "max_tool_calls",
-                                                "workflow_input")},
+                                                "workflow_input", "package")
+                            if k != "package" or run[k] is not None},
                 specs=[spec.model_dump(mode="json") for spec in specs],
                 world={"recipe": recipe} if ledger is not None else None, ledger=ledger)
         except CassetteError as exc:
@@ -352,16 +367,36 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             return halted()
         if problem is not None:
             return refused(problem)
-        # Where the metered minds' keys live: the fake provisioner, in this process (ADR-044).
-        provisioner = (FakeProvisioner() if any(s.provider in METERED_PROVIDERS for s in specs)
-                       else None)
+        # Where the metered minds' keys live: the fake provisioner, in this process (ADR-044),
+        # or the OpenRouter account (ADR-047). One kind per run.
+        metered = {s.provider for s in specs if s.provider in METERED_PROVIDERS}
+        provisioner: FakeProvisioner | OpenRouterProvisioner | None = None
+        if len(metered) > 1:
+            return refused("provision:mixed_metered_providers")
+        if metered == {"fake-metered"}:
+            provisioner = FakeProvisioner()
+        elif metered == {"openrouter"}:
+            try:
+                provisioner = OpenRouterProvisioner.from_env(
+                    usd_to_micros_floor(law.monthly_llm_usd_cap))
+            except OpenRouterError as exc:
+                return refused(f"provision:openrouter_unavailable:{exc.status}")
         try:
             minds = await provision(specs, registrar, connect, provisioner=provisioner)
         except ProvisionError as exc:
-            # Nothing has woken, so no key has spent anything: there is nothing to sync.
+            # Nothing has woken, so no key has spent anything: there is nothing to sync. Keys
+            # already minted are disabled all the same.
+            if isinstance(provisioner, OpenRouterProvisioner):
+                provisioner.close()
             if _is_halt(exc.reason):
                 return halted(exc.registered)
             return refused(f"provision:{exc.reason}", exc.registered)
+        except BaseException:
+            # Any other end mid-provisioning (a crash, Ctrl-C): the keys made so far still spend
+            # no more.
+            if isinstance(provisioner, OpenRouterProvisioner):
+                provisioner.close()
+            raise
         metering = None
         try:
             record = await run_backtest(minds, clock, **run)
@@ -369,7 +404,15 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             if provisioner is not None:
                 # Once, after the run ends, whatever the end — a crash or SystemExit too
                 # (red-team 0021): the meter's totals reach the ledger.
-                metering = await _sync_metering(provisioner, minds, clock, law)
+                try:
+                    metering = await _sync_metering(provisioner, minds, clock, law)
+                finally:
+                    if isinstance(provisioner, OpenRouterProvisioner):
+                        # Then every key the run made is disabled (ADR-047 §3), even if the
+                        # sync itself crashed (red-team 0027): it spends no more.
+                        left = provisioner.close()
+                        if metering is not None:
+                            metering["keys_left_enabled"] = left
         out = {"ended": record.ended, "reason": record.reason,
                "registered": [m.spec.id for m in minds], "run": record_json(record)}
         if metering is not None:
@@ -380,31 +423,54 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             await c.aclose()
 
 
-async def _sync_metering(provisioner: FakeProvisioner, minds: list[Mind], clock: FundClient,
-                         law: Governance) -> dict[str, Any]:
+async def _sync_metering(provisioner: FakeProvisioner | OpenRouterProvisioner, minds: list[Mind],
+                         clock: FundClient, law: Governance) -> dict[str, Any]:
     """Post every key's total to physics as the Runtime's identity (ADR-041) and report what the
     keys cost: who, how much, and whether each dollar reached the ledger. A sync that fails
-    is data in the outcome, not an exception: the caller exits non-zero on it."""
-    error = None
+    is data in the outcome, not an exception: the caller exits non-zero on it. The meter is
+    read **once**: what is posted and what is reported are the same numbers (a real provider's
+    usage can move between two reads)."""
+    cap = None if law.monthly_llm_usd_cap is None else usd_to_micros_floor(law.monthly_llm_usd_cap)
     try:
-        report = await sync_costs(provisioner, clock)
+        snapshot = provisioner.usage()
+    except (OpenRouterError, httpx.HTTPError) as exc:
+        # The provider could not say what was spent: nothing is posted, every key is unknown.
+        error = f"meter_unreadable:{getattr(exc, 'status', 0)}"
+        keys = [{"spec_id": m.spec.id, "agent_id": provisioner.agent_of(m.meter.key_ref),
+                 "key_ref": m.meter.key_ref, "limit_usd_micros": provisioner.limit(m.meter.key_ref),
+                 "spent_usd_micros": None, "charges": provisioner.charges(m.meter.key_ref)}
+                for m in minds if m.meter is not None]
+        return {"cap_usd_micros": cap, "keys": keys,
+                "total_usd_micros": sum(k["limit_usd_micros"] for k in keys),
+                "sync": {"posted": 0, "unchanged": 0, "halted": False, "refused": [], "error": error}}
+    try:
+        report = await sync_costs(_Snapshot(snapshot), clock)
         sync = {"posted": report.posted, "unchanged": report.unchanged, "halted": report.halted,
                 "refused": [list(r) for r in report.refused], "error": None}
     except FundAPIError as exc:  # 401/403: the wrong key; every post would fail the same way
-        error = f"sync_failed:{exc.status_code}"
-        sync = {"posted": 0, "unchanged": 0, "halted": False, "refused": [], "error": error}
-    usage = {u.key_ref: u for u in provisioner.usage()}
+        sync = {"posted": 0, "unchanged": 0, "halted": False, "refused": [],
+                "error": f"sync_failed:{exc.status_code}"}
+    usage = {u.key_ref: u for u in snapshot}
     keys = [{"spec_id": m.spec.id, "agent_id": usage[m.meter.key_ref].agent_id,
              "key_ref": m.meter.key_ref,
              "limit_usd_micros": provisioner.limit(m.meter.key_ref),
              "spent_usd_micros": usage[m.meter.key_ref].usd_micros_total,
              "charges": provisioner.charges(m.meter.key_ref)}
             for m in minds if m.meter is not None]
-    return {"cap_usd_micros": (None if law.monthly_llm_usd_cap is None
-                               else usd_to_micros_floor(law.monthly_llm_usd_cap)),
+    return {"cap_usd_micros": cap,
             "keys": keys,
             "total_usd_micros": sum(k["spent_usd_micros"] for k in keys),
             "sync": sync}
+
+
+class _Snapshot:
+    """One read of the meter, handed to :func:`sync_costs` as its provisioner."""
+
+    def __init__(self, usage: list[Any]) -> None:
+        self._usage = usage
+
+    def usage(self) -> list[Any]:
+        return list(self._usage)
 
 
 def _unattributed(metering: dict[str, Any] | None) -> int:
