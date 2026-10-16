@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Loop preflight and out-of-band referee. HUMAN-ONLY FILE (Constitution Art. 6).
 
-Builder v2 (ADR-042): the unit of work is a mission (protocol/MISSIONS.md); a "cycle" is one session
+Builder v3 (ADR-046): the unit of work is an idea from bible/IDEAS_BOOK.md (protocol/CYCLE.md); a "cycle" is one session
 of `claude -p "/cycle <mode>"`. This file decides the mode, and after each session it measures and
 verifies what the session claims — outside the Builder's reach, so a claim cannot grade itself.
 
@@ -69,7 +69,7 @@ UNSEALED = {"governance/HALT"}
 # The Builder team (builder.team in governance/human.yaml). Subagent roles map to a sealed
 # .claude/agents/<role>.md whose frontmatter carries the model; frontmatter beats the
 # CLAUDE_CODE_SUBAGENT_MODEL default (verified live 2026-10-12), which `helpers` sets.
-AGENT_ROLES = ("architect", "auditor", "red-team", "validator", "worker")
+AGENT_ROLES = ("auditor", "red-team", "worker")    # Builder v3 (ADR-046): no architect, no validator
 SESSION_ROLES = ("lead", "lead_hard", "helpers")
 MODELS = {"opus", "sonnet", "haiku", "fable"}
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
@@ -286,7 +286,7 @@ def next_mode() -> str:
     done = {m["id"] for m in ms if m.get("status") == "done"}
     active = [m for m in ms if m.get("status") == "active"]
     open_branches = [b.strip(" *+") for b in git("branch", "--no-merged", "main").splitlines()
-                     if b.strip(" *+").startswith("mission/")]
+                     if b.strip(" *+").startswith(("mission/", "idea/"))]
     if active:
         m = active[0]
         est = int(m.get("estimate_sessions") or 2)
@@ -621,10 +621,13 @@ def post(before: int, logfile: str | None, mode: str, start: int) -> None:
             flags.append("plan_without_ready_mission")
             result = "failed"
 
-    # Gate 5's auditor runs on its own model; a merge with no usage of that model means the
-    # review was skipped or downgraded. Flag it for the Human (it cannot be hidden from this log).
+    # Builder v3: only risk-tier ideas (physics: true) need the auditor. When the auditor runs on a
+    # model the lead does not use, a merge with no usage of that model means the review was skipped.
     auditor_model = (team().get("auditor") or {}).get("model")
-    if result == "merged" and auditor_model and not any(auditor_model in x for x in used):
+    lead_models = {(team().get(r) or {}).get("model") for r in ("lead", "lead_hard")}
+    entry = next((x for x in missions() if x["id"] == mission), None) or {}
+    if (result == "merged" and entry.get("physics") and auditor_model and auditor_model not in lead_models
+            and not any(auditor_model in x for x in used)):
         flags.append(f"merged-without-{auditor_model}-usage")
 
     row["result"], row["flags"] = result, flags

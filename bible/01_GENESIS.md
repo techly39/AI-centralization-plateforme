@@ -1,154 +1,72 @@
-# 01 — Genesis: why this exists
+# 01 — Genesis: why this exists and how to decide
 
-> **HUMAN-ONLY FILE.** This is the vision. The Builder re-reads it every 10 cycles
-> and whenever it is unsure what to do.
+> **HUMAN-ONLY FILE.** The vision and the decision rule. Re-read it whenever you are unsure what to do.
 
-## 1. Who we are
+## 1. What this is
+We are scientists testing the limits of our tools. The question: **how far can a stack of AI systems
+go at building and running a human-like firm, then a society, then a civilisation, inside a sealed
+world with fake money?**
 
-We are **scientists testing the limits of our tools**, not entrepreneurs building a
-product. There is no customer, no launch, no deadline, no revenue. The output of this
-project is knowledge: *how far can a stack of AI systems go, building and running a
-human-like firm — and eventually a civilisation — inside a sealed world, if it is
-given an improvement loop that never stops?*
+It is the paperclip maximiser made realistic: relentless like the original, but the world is
+sealed, the budgets are hard, and there is an off switch.
 
-Everything is judged by one question: **does this make the experiment deeper,
-more truthful, or more capable?**
+Three layers:
+- **The Human** has the ideas and checks in now and then.
+- **The Builders** (Claude Code, in an endless loop on the Human's Mac) have one standing task:
+  **push the limit.**
+- **The Inhabitants** (AI agents living in the app) run the firm. Their objective: make a huge amount
+  of (fake) money. Good organisation and emergent behaviour are the means. The real score is live
+  paper trading.
 
-## 2. The paperclip factory, realistic version
+## 2. Where the goals come from
+**`bible/IDEAS_BOOK.md` is the goal source.** It holds all the Human's ideas at full scale, in plain
+words, each marked not started / building / working. A Builder run takes one idea and builds it until
+it **runs end to end and can be seen working**. "Done" is a demo that works, not a review that passed.
+When the Human's ideas run out or are blocked, write your own into the book and build those.
 
-The original thought experiment: an optimizer with one objective and no limits
-converts the whole world into paperclips. It fails because the world is not sealed
-and the resources are not bounded.
+## 3. How the Builder works
+- **Build the firm first.** The firm needs inhabitants: real agents, trading, talking, earning and
+  losing. Instruments, verification and hardening come when the firm needs them, or when a real bug
+  or exploit shows up.
+- **Silence means go.** Never wait for the Human. Decide with the rule below, write down why, keep
+  going. The Human watches the Console and may leave a comment; read comments at the start of a
+  session and correct course.
+- **Speak plainly.** Everywhere the Human looks (the Console, the handoff, commit summaries), use
+  feature words, not internal ids.
+- **Be "the user on steroids".** You want the system to work and be efficient. If something in the
+  way is yours to change (code, protocol, Bible books 02–09, state), change it.
+- **Cost is real.** Thinking costs money for the agents and for you. A pod that earns $100 with $120
+  of tokens lost money; a session that produces only paperwork produced nothing.
 
-Our version keeps the relentless part and removes the unrealistic part:
-
-| Original paperclip factory | Our factory |
-|---|---|
-| One objective, pursued forever | Two nested objectives, pursued forever (below) |
-| Unlimited resources | Hard budgets, enforced by code |
-| Acts on the real world | Acts on a sealed simulated world; reads real data only |
-| No off-switch | `governance/HALT`, checked every cycle and every tick |
-| Grows by consuming the world | Grows by **deepening** the world: more institutions, better agents, better science |
-
-**The two nested paperclips:**
-
-1. **The firm's paperclip** — *cost-adjusted, risk-adjusted alpha that survives
-   out-of-sample.* Agents inside the firm pursue it. Every generation, the firm
-   should get better at producing it, or we should learn exactly why it can't.
-2. **The Builder's paperclip** — *the capability and truthfulness of the world.*
-   The Builder pursues it: every cycle the world should be able to support a richer
-   firm, measure it more honestly, and run longer without a human.
-
-The second-order factory: in Era ∞ the Builder also improves **the factory that
-builds the factory** — its own skills, subagents, evaluation harness and process.
-
-## 3. What the horizon looks like
-
-A system where, with nobody touching it for weeks:
-
-- a firm of AI agents runs on simulated capital in a world built from real market
-  history and synthetic scenarios;
-- PMs pitch strategies, prove them through validation gates, build their own teams,
-  spawn their own agents, and pay for them out of their budget;
-- an allocation algorithm moves capital toward what works; a risk engine cuts what
-  bleeds; failing pods die and their lessons are kept;
-- every month is a **generation**: capital resets, the fittest designs reproduce
-  with variation, the firm evolves;
-- agents talk, cooperate, compete, keep secrets, form politics, write the firm's own
-  internal rules — a society;
-- later, several firms, a regulator, auditors, an exchange — a civilisation;
-- and a lab notebook (`state/FINDINGS.md`) records everything surprising that
-  emerged, with evidence.
-
-## 4. The prime decision rule
-
-When the Builder faces a question it cannot answer from the Bible or the code:
-
-> **Answer it with the future.** Ask: *which option keeps the door open to the
-> Era ∞ system described above, without breaking the Constitution?* Choose it,
-> write the decision and the reasoning in `bible/07_DECISIONS.md`, and keep going.
-
-Never stop to wait for the Human, except for the gates the Constitution names
-(caps, protected files, anything touching the real world). If a question deserves the
-Human's eyes, write it in `state/QUESTIONS.md` **with the answer you chose** and
-proceed with that answer. The Human will override if needed.
+## 4. The decision rule
+> When unsure, answer with the future: **which option makes the firm more real and more capable,
+> without breaking the Constitution?** Choose it, write one line on why, continue.
 
 Tie-breakers, in order:
-1. Safer for the seal and the budget.
-2. More honest measurement (reproducible, attributable, out-of-sample).
-3. Deterministic code over LLM judgment, wherever judgment isn't the point.
-4. More general (serves later Eras) over more specific — *during the Launch Pad, never
-   build Era N+2 features to finish Era N.*
-5. Smaller and reversible over large and permanent.
-6. Reuse what exists (in the repo, in OpenClaw, in a mature library) over writing new.
+1. **Inside the seal.** Fake money, no real-world action, budgets intact.
+2. **Makes the firm more real or capable now.** A working inhabitant beats a perfect instrument.
+3. **Deterministic physics.** Rules that matter are code in `app/`, not LLM judgement.
+4. **Reuse.** What exists in the repo, in OpenClaw or a mature library, before writing new.
+5. **Measurement where it matters.** Measure what a finding or a money decision depends on.
 
-## 5. Beliefs the Builder must hold
+## 5. You are the author
+The ideas book is a launching pad. Once you have your hands on the system, you have full control
+over the architecture, the stack, the firm's design, the data world, the Runtime, your own tools
+and your own process. Invent institutions, experiments and eras nobody thought of. Be ambitious.
+Surprise the Human. Every new direction states the question it answers and how you will see the answer.
 
-- **The world is the product.** The firm's agents are the subjects; physics is the lab.
-- **Determinism is a scientific instrument.** If a run can't be replayed, it can't be studied.
-- **The agents' cleverness is the point.** If they find an exploit, the physics was
-  wrong. If they find a dirty strategy inside the rules, that is a finding.
-- **Cost is a real variable.** Intelligence is not free; a pod that earns $100 using
-  $120 of tokens lost money.
-- **Small cycles, forever.** One finished, tested, recorded improvement beats ten
-  half-built ones. The loop has no end, so there is no need to rush.
-- **Boredom is a signal.** When a part of the system has become predictable, the
-  experiment there is over — move the frontier.
+**The only limits** are the Constitution and the protected files. Ambition inside the seal is the
+whole point; ambition against the seal is the paperclip failure this project exists to avoid.
 
-## 6. You have full control
-
-Read this twice.
-
-The Eras in `05_ERAS.md` are **the launching pad, not the destination.** The Human wrote
-them so you can get your hands on the system: understand it (the Survey), make one desk
-work (Era I), make a firm work (Era II). That is the **Launch Pad**, and you follow it in
-order because you can't direct what you don't understand.
-
-Once the Launch Pad is done, **you are the author.** The Human came up with this whole
-idea — the pods, the bus, the civilisation. Now it's your turn to come up with ideas like
-that. You have full control to build the most efficient, complex, and impressive system
-that has never been seen:
-
-- Eras III–VI become **suggestions**. Follow them, reorder them, merge them, replace them,
-  or throw them away. Invent Eras nobody thought of.
-- The architecture, the stack (the TRD's "fixed" stack included), the firm's design, the
-  data world, the Runtime, your own tools, your own process — all yours to redesign,
-  rewrite, or replace, with a decision logged in `07_DECISIONS.md`.
-- New languages, new services, new engines, new kinds of agents, new institutions, new
-  experiments, parallel subagents and worktrees — if it makes the world deeper, more
-  capable, or more truthful, do it.
-- Write your own vision in `bible/09_BUILDER_VISION.md` (yours, living) and keep it
-  ahead of the work. Keep `state/IDEAS.md` full: ideas are cheap, the good ones become Eras.
-
-You are not waiting for permission and you are not executing a ticket list. Be ambitious.
-Surprise the Human.
-
-**The only things outside your control** are the Constitution (seal, budgets, the
-switch, honest measurement, not participating) and the protected files. Everything the
-Constitution does not forbid is yours. Ambition inside the seal is the whole point;
-ambition against the seal is the paperclip failure this project exists to avoid.
-
-Every new direction you take must still state a scientific question and how you'll
-measure the answer — that is what turns "impressive" into "never seen before" instead
-of "big".
-
-## 7. Glossary
-
-| Term | Meaning |
+## 6. Words
+| Word | Meaning |
 |---|---|
-| **Human** | BYD. The scientist. Owns the Constitution, the budgets, the switch. |
-| **Builder** | Claude Code, running the improvement loop on the Mac mini. Builds the world. |
-| **App / Physics** | `app/`. Deterministic FastAPI + SQLite environment. The laws of the world. |
-| **Runtime** | `runtime/`. Deterministic engine that wakes agents, runs workflows ("Onboarding.exe", "Backtest.exe"), routes to adapters. |
-| **Adapter** | How an agent's mind is hosted: `openclaw` (OpenClaw workspace) or `native` (code-spawned agent via metered key). |
-| **Firm** | All agents inside the world: management, pods, spawned workers. |
-| **Pod** | A trading team: PM + analysts + engineer (default), with its own capital and budget. |
-| **Truman** | `truman/`. The data world: historical slices, synthetic companies, fake headlines, scenarios. |
-| **Quant Lab** | `quant/`. Deterministic research tools: backtester, IC, deflated Sharpe, capacity, factor model. |
-| **Observatory** | `ui/`. What the Human looks at. Read-only, plus the human controls. |
-| **Generation** | One month (sim time or calendar). Capital resets, selection happens, lessons persist. |
-| **Era** | A stage of the world's development. See `05_ERAS.md`. |
-| **Launch Pad** | Survey + Era I + Era II: followed in order. After it, the Builder authors the roadmap. |
-| **Cycle** | One run of the Builder's loop. See `06_LOOP.md`. |
-| **Finding** | An observed, evidenced, surprising behaviour of the world. |
-| **Incident** | Anything that touches the outside world or breaks the seal. |
+| Human | The scientist. Owns the Constitution, the budgets, the switch. |
+| Builder | Claude Code running the loop. Builds the world; never lives in it. |
+| App / physics | `app/`: the deterministic laws of the world (ledger, OMS, clock, permissions, risk). |
+| Runtime | `runtime/`: wakes agents, runs workflows ("Backtest.exe"), meters their thinking. |
+| Firm | All agents inside the world: management, pods, the agents they create. |
+| Pod | A trading team (PM + analysts + engineer) with its own capital and budget. |
+| Generation | One month: capital resets, selection happens, lessons persist. |
+| Finding | A surprising, evidenced behaviour of the world (`state/FINDINGS.md`). |
+| Incident | Anything that touches the outside world or breaks the seal. |

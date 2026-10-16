@@ -1,6 +1,6 @@
 ---
 name: worker
-description: Executes one well-specified side task of a mission (tests from a spec, a doc, a mechanical change) in its own git worktree, and commits it on its own branch. Use only when builder.parallel_workers in governance/human.yaml is above 0, and only for tasks whose files no other task touches.
+description: Executes one well-specified side task of an idea (tests from a spec, a doc, a mechanical change) in its own git worktree, and commits it on its own branch. Use only when builder.parallel_workers in governance/human.yaml is above 0, and only for tasks whose files no other task touches.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: sonnet
 effort: high
