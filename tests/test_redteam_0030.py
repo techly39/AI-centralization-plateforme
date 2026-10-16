@@ -11,13 +11,12 @@ limit" as if that were the most it can spend; it is the limit plus one unbounded
 ``max_tokens`` derived from what is left on the key (or a fixed, small bound per turn), so the
 overshoot is bounded and the spec's budget is the most a mind can spend.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
 
 import httpx
-import pytest
 
 from runtime.metering import Meter
 from runtime.openrouter import OpenRouterProvisioner
@@ -25,9 +24,6 @@ from runtime.registry import build_provider
 from tests.test_runtime_openrouter import Account, chat, request, spec
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "LOW red-team 0030: a model turn's request carries no max_tokens, so one turn past a key's "
-    "remaining limit costs whatever the model writes"))
 def test_hole_a_turn_request_does_not_bound_its_own_output() -> None:
     account = Account()
     p = OpenRouterProvisioner("prov-key", 50_000_000, transport=httpx.MockTransport(account.handler),

@@ -398,10 +398,15 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             if provisioner is not None:
                 # Once, after the run ends, whatever the end — a crash or SystemExit too
                 # (red-team 0021): the meter's totals reach the ledger.
-                metering = await _sync_metering(provisioner, minds, clock, law)
-                if isinstance(provisioner, OpenRouterProvisioner):
-                    # Then every key the run made is disabled (ADR-047 §3): it spends no more.
-                    metering["keys_left_enabled"] = provisioner.close()
+                try:
+                    metering = await _sync_metering(provisioner, minds, clock, law)
+                finally:
+                    if isinstance(provisioner, OpenRouterProvisioner):
+                        # Then every key the run made is disabled (ADR-047 §3), even if the
+                        # sync itself crashed (red-team 0027): it spends no more.
+                        left = provisioner.close()
+                        if metering is not None:
+                            metering["keys_left_enabled"] = left
         out = {"ended": record.ended, "reason": record.reason,
                "registered": [m.spec.id for m in minds], "run": record_json(record)}
         if metering is not None:

@@ -130,6 +130,22 @@ def test_a_key_that_would_pass_the_cap_across_runs_is_not_minted(account) -> Non
     assert sum(1 for k in account.keys.values() if k["name"].startswith("firm-t1-")) == 1
 
 
+def test_a_run_never_mints_while_another_run_counts_the_month(account, monkeypatch, tmp_path) -> None:
+    import fcntl
+
+    import runtime.openrouter as openrouter
+    monkeypatch.setattr(openrouter, "MINT_LOCK_WAIT_S", 0.2)
+    lock = tmp_path / "mint.lock"
+    p = OpenRouterProvisioner("prov-key", CAP, transport=httpx.MockTransport(account.handler),
+                              run_tag="t1", settle_s=0, sleep=lambda s: None, lock_path=lock)
+    with open(lock, "a") as other_run:
+        fcntl.flock(other_run, fcntl.LOCK_EX)
+        with pytest.raises(OverCap, match="another run"):
+            p.create_key(1, 1_000_000, spec_id="pm")
+    assert [k for k in account.keys.values() if k["name"].startswith("firm-")] == []
+    p.create_key(1, 1_000_000, spec_id="pm")        # the other run is done: the mint goes ahead
+
+
 def test_an_unlimited_firm_key_makes_the_month_unbounded(account) -> None:
     account.add("firm-no-limit", limit=None)
     with pytest.raises(OverCap):

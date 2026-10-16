@@ -11,7 +11,7 @@ version that renames it, a partial row, ``null``) makes a key that spent $45 thi
 refuses (``OpenRouterError``) — this one is silently zero. A disabled key whose month spend is
 unknown should count what it could have spent (its limit) or refuse the mint.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
@@ -30,9 +30,6 @@ def _prov(account: Account) -> OpenRouterProvisioner:
                                  run_tag="t1", settle_s=0, sleep=lambda s: None)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "MEDIUM red-team 0023: a disabled firm key whose usage_monthly is absent/null counts $0; "
-    "a key that spent $45 lets a new run mint $45 more under a $50 cap"))
 @pytest.mark.parametrize("shape", ["absent", "null"])
 def test_hole_a_disabled_key_with_no_stated_month_spend_counts_zero(shape) -> None:
     account = Account()

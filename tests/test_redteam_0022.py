@@ -11,7 +11,7 @@ holds $60 of spendable limits. ADR-047 names this as a known limit and says "eve
 limit at the provider still bounds each one" — true, but nothing bounds their *sum*, which is the
 cap. Offline: one fake account, two provisioners, a barrier that makes both list before either mints.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from __future__ import annotations
 import threading
 
 import httpx
-import pytest
 
 from runtime.openrouter import OpenRouterProvisioner, OverCap
 from tests.test_runtime_openrouter import Account
@@ -54,9 +53,6 @@ def _prov(account: Account, tag: str) -> OpenRouterProvisioner:
                                  run_tag=tag, settle_s=0, sleep=lambda s: None)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HIGH red-team 0022: two runs read the month before either mints; both mint $30 under a "
-    "$50 cap (no lock or reservation across runs)"))
 def test_hole_two_concurrent_runs_each_mint_past_the_cap_together() -> None:
     account = RacingAccount()
     outcomes: dict[str, str] = {}
@@ -94,9 +90,6 @@ class LaggingAccount(Account):
         return super().handler(request)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HIGH red-team 0022: one provisioner does not count the keys it minted itself; a listing "
-    "that lags lets one run mint 3 x $20 under a $50 cap"))
 def test_hole_one_run_does_not_count_its_own_keys_when_the_listing_lags() -> None:
     account = LaggingAccount()
     p = _prov(account, "rc")

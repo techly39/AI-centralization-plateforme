@@ -12,7 +12,7 @@ while the provider applies a field the Runtime never reads back.
    refuses a charge past the limit (``LimitExceeded``); the real one sends the next request anyway,
    so a key the provider fails to stop keeps spending real money past its budget.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
@@ -49,9 +49,6 @@ def _prov(account: Account) -> OpenRouterProvisioner:
                                  run_tag="t1", settle_s=0, sleep=lambda s: None)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "MEDIUM red-team 0024: a minted key the provider answers as unlimited is accepted as a key "
-    "of the requested limit"))
 def test_hole_a_key_minted_without_its_limit_is_accepted() -> None:
     account = IgnoringAccount()
     p = _prov(account)
@@ -63,9 +60,6 @@ def test_hole_a_key_minted_without_its_limit_is_accepted() -> None:
                 f"{next(k for k in account.keys.values() if k['name'] == 'firm-t1-pm')['limit']}")
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "MEDIUM red-team 0024: the real provider sends a turn after the key's own billed turns "
-    "already passed its limit"))
 def test_hole_a_mind_keeps_calling_after_its_turns_billed_past_its_limit() -> None:
     account = Account()   # like the test account, it does not stop a key at its limit
     p = _prov(account)

@@ -10,13 +10,12 @@ $45 already spent by earlier runs and this run holding two $2.50 keys, the check
 every mind keeps waking: the month can reach $50 against a $47 cap. The pre-mint check
 (``month_committed``) knows the month; the mid-run check never asks it.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
 
 import httpx
-import pytest
 
 from tests.test_runtime_cli_backtest import _run, _write_specs, keys  # noqa: F401 - fixtures
 from tests.test_runtime_lockstep import gov, live_afterwards, world  # noqa: F401 - fixtures
@@ -24,9 +23,6 @@ from tests.test_runtime_metered_run import _cap
 from tests.test_runtime_openrouter import _or_spec, account, chat, faked  # noqa: F401 - fixtures
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HIGH red-team 0026: after the cap is lowered mid-run below the month's commitment, the "
-    "next mind still wakes and spends (the conductor sums this run's limits, not the month's)"))
 def test_hole_a_lowered_cap_ignores_what_earlier_runs_spent_this_month(
         SessionFactory, keys, tmp_path, gov, faked, capsys) -> None:  # noqa: F811
     _cap(gov, 50)

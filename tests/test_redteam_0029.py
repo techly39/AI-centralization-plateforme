@@ -19,7 +19,7 @@ IDENTICAL (exit 0):
 * the whole block and ``outcome.metering`` removed from a run whose recorded specs are metered:
   the month verifies as one that cost nothing (``metered_block: null``).
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
@@ -65,10 +65,6 @@ def _no_cost_at_all(doc) -> None:
     del doc["outcome"]["metering"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "MEDIUM red-team 0029: a metered month whose trailing cost rows were rewritten (pod moved, "
-    "actor not the runtime, totals zeroed below the tapes' own turn costs, or removed with the "
-    "outcome's metering) still verifies IDENTICAL"))
 @pytest.mark.parametrize("edit", [
     _body_edit("pod_id", lambda p: (p or 0) + 1),
     _actor_to_management,

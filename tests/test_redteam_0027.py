@@ -11,13 +11,12 @@ at the end of a run (``httpx.ConnectError`` from ``sync_costs``), a ``KeyboardIn
 up-to-30-second settle wait, or any bug in the report. Then ``provisioner.close()`` never runs and
 the outcome never says ``keys_left_enabled``. ``close()`` belongs in its own ``finally``.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
 
 import httpx
-import pytest
 
 from runtime import cli
 from tests.test_runtime_cli_backtest import _run, _write_specs, keys  # noqa: F401 - fixtures
@@ -26,9 +25,6 @@ from tests.test_runtime_metered_run import _cap
 from tests.test_runtime_openrouter import _or_spec, account, chat, faked  # noqa: F401 - fixtures
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "LOW red-team 0027: when the cost sync raises (the App's connection drops), the run's "
-    "OpenRouter keys are never disabled"))
 def test_hole_a_crashing_sync_leaves_the_keys_enabled(
         SessionFactory, keys, tmp_path, gov, faked, capsys, monkeypatch) -> None:  # noqa: F811
     _cap(gov, 50)

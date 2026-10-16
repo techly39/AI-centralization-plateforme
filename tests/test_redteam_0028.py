@@ -10,7 +10,7 @@ provider bug, a proxy that mixes answers); but the harm is a hard limit of the H
 Human's own key is disabled (and its lifetime spend is posted as a firm agent's cost). A check of
 ``data.name == name`` at mint, and of the key's name before every PATCH, closes it.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from __future__ import annotations
 import json
 
 import httpx
-import pytest
 
 from runtime.openrouter import OpenRouterError, OpenRouterProvisioner
 from tests.test_runtime_openrouter import Account
@@ -44,9 +43,6 @@ class CrossedAccount(Account):
         return super().handler(request)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "LOW red-team 0028: a mint answer naming the Human's key gets that key disabled by close() "
-    "and its spend read as the agent's"))
 def test_hole_a_crossed_mint_answer_gets_the_humans_key_disabled() -> None:
     account = CrossedAccount()
     p = OpenRouterProvisioner("prov-key", 50_000_000, transport=httpx.MockTransport(account.handler),

@@ -309,11 +309,23 @@ def _key_is(meter: Meter, agent_id: int) -> bool:
 
 def _limits_fit(meters: Sequence[Meter]) -> bool:
     """Do the keys' limits, together, fit the cap as the law reads now? A ``null`` cap is the
-    wake gate's to refuse (``cap_null``), so it is not this check's concern."""
+    wake gate's to refuse (``cap_null``), so it is not this check's concern. A provisioner that
+    can count the whole month (OpenRouter: earlier runs spent too) is asked for it (red-team
+    0026); one it cannot read stops the run."""
     cap = read_governance().monthly_llm_usd_cap
     if cap is None:
         return True
-    return sum(m.provisioner.limit(m.key_ref) for m in meters) <= usd_to_micros_floor(cap)
+    held = 0
+    for provisioner in {id(m.provisioner): m.provisioner for m in meters}.values():
+        month = getattr(provisioner, "month_committed", None)
+        if month is None:
+            held += sum(provisioner.limit(m.key_ref) for m in meters if m.provisioner is provisioner)
+            continue
+        try:
+            held += month()
+        except Exception:  # noqa: BLE001 - an unreadable month is not a month under the cap
+            return False
+    return held <= usd_to_micros_floor(cap)
 
 
 #: Physics' kind for each zero-cost provider (``app.run_clock.MIND_KINDS``; a test

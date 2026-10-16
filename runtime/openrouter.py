@@ -26,18 +26,22 @@ Boundary law: this module imports no ``app`` module.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import math
 import os
 import re
 import secrets
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from decimal import ROUND_CEILING, ROUND_HALF_EVEN, Decimal
+from pathlib import Path
 from typing import Any
 
 import httpx
 
+from runtime.governance import REPO_ROOT
 from runtime.metering import MAX_METERED_USD_MICROS, KeyUsage, Meter
 from runtime.providers import (
     CompletionRequest,
@@ -55,6 +59,13 @@ FIRM_PREFIX = "firm-"
 TURN_TIMEOUT_S = 120.0
 #: How long ``usage()`` waits for the provider's per-key spend to catch up with the turns it billed.
 SETTLE_S = 30.0
+#: Most a model may write in one turn: a turn admitted under a key's limit stays a small turn.
+MAX_TURN_TOKENS = 4096
+#: Held from the month's count to the mint, so two runs never both fit in the same room under
+#: the cap (red-team 0022). One per repo: every run of this firm passes through it.
+MINT_LOCK = REPO_ROOT / ".openrouter-mint.lock"
+#: How long a run waits for another run's mint before it gives up.
+MINT_LOCK_WAIT_S = 60.0
 #: The secret's shape, for the secret scan (:func:`holds_secret`).
 SECRET_PATTERN = re.compile(r"sk-or-[A-Za-z0-9_-]{8,}")
 
@@ -109,7 +120,8 @@ class OpenRouterProvisioner:
     def __init__(self, provisioning_key: str, cap_usd_micros: int, *,
                  transport: httpx.BaseTransport | None = None,
                  run_tag: str | None = None, settle_s: float = SETTLE_S,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 lock_path: Path = MINT_LOCK) -> None:
         if type(cap_usd_micros) is not int or cap_usd_micros < 0:
             raise ValueError("the cap is an int of micro-dollars")
         if not provisioning_key.strip():
@@ -122,11 +134,14 @@ class OpenRouterProvisioner:
             raise ValueError("a run tag is 1-16 lowercase letters or digits")
         self._settle_s = settle_s
         self._sleep = sleep
+        self._lock_path = lock_path
         #: key_ref -> (agent_id, limit µ$, provider hash, secret, name)
         self._keys: dict[str, tuple[int, int, str, str, str]] = {}
         #: key_ref -> µ$ the provider's own turn answers said this key cost (a floor for usage)
         self._billed: dict[str, int] = {}
         self._turns: dict[str, int] = {}
+        #: key_ref -> turns the provider may have billed without saying what (red-team 0025)
+        self._unstated: dict[str, int] = {}
 
     @classmethod
     def from_env(cls, cap_usd_micros: int, **kwargs: Any) -> OpenRouterProvisioner:
@@ -156,41 +171,78 @@ class OpenRouterProvisioner:
     def month_committed(self) -> int:
         """Micro-dollars the firm's keys hold this month (ADR-047 §4): an enabled key's whole
         limit (it may still spend it), a disabled key's spend this month. An enabled key with
-        no limit is unbounded, so nothing more may be minted."""
-        total = 0
+        no limit is unbounded, so nothing more may be minted. The keys this run made count
+        their whole limit from here, listed yet or not (red-team 0022)."""
+        mine = {k[2] for k in self._keys.values()}
+        total = sum(k[1] for k in self._keys.values())
         for row in self.firm_keys():
-            if row.get("disabled") is True:
+            if row.get("hash") in mine:
+                continue
+            if row.get("disabled") is True and row.get("usage_monthly") is not None:
                 total += usd_to_micros_ceil(row.get("usage_monthly"))
             elif row.get("limit") is None:
+                # Red-team 0023: a disabled key that does not say what it spent counts its limit.
                 raise OverCap(f"the firm key {row.get('name')!r} has no limit: the month is unbounded")
             else:
                 total += usd_to_micros_ceil(row.get("limit"))
         return total
+
+    @contextmanager
+    def _mint_lock(self) -> Iterator[None]:
+        """One run at a time between reading the month and minting into it (red-team 0022)."""
+        with open(self._lock_path, "a") as handle:
+            deadline = time.monotonic() + MINT_LOCK_WAIT_S
+            while True:
+                try:
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise OverCap("another run is minting keys: the month cannot be counted") from None
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     # -- the Provisioner the Runtime uses (runtime.provision / lockstep / sync_costs) ---------
 
     def create_key(self, agent_id: int, limit_usd_micros: int, *, spec_id: str = "agent") -> str:
         if type(limit_usd_micros) is not int or not 0 < limit_usd_micros <= MAX_METERED_USD_MICROS:
             raise ValueError(f"a key's limit is an int of micro-dollars in 1..{MAX_METERED_USD_MICROS}")
-        committed = self.month_committed()
-        if committed + limit_usd_micros > self._cap:
-            raise OverCap(f"the firm's keys hold {committed} µ$ this month; {limit_usd_micros} "
-                          f"more would pass the cap of {self._cap} µ$")
         name = f"{FIRM_PREFIX}{self.run_tag}-{spec_id}"
-        made = _json(self._http.post("/keys", json={"name": name, "limit": limit_usd_micros / 1e6}),
-                     "minting a key")
-        data = made.get("data") if isinstance(made, dict) else None
-        secret = made.get("key") if isinstance(made, dict) else None
-        digest = data.get("hash") if isinstance(data, dict) else None
-        if type(secret) is not str or not secret or type(digest) is not str \
-                or not re.fullmatch(r"[0-9a-f]{16,128}", digest):
-            raise OpenRouterError("minting a key: the answer holds no key and hash")
-        key_ref = f"or-{digest[:16]}"
-        if key_ref in self._keys:
-            raise OpenRouterError("minting a key: the provider answered a key already held")
-        self._keys[key_ref] = (agent_id, limit_usd_micros, digest, secret, name)
-        self._billed[key_ref] = 0
-        self._turns[key_ref] = 0
+        with self._mint_lock():
+            committed = self.month_committed()
+            if committed + limit_usd_micros > self._cap:
+                raise OverCap(f"the firm's keys hold {committed} µ$ this month; {limit_usd_micros} "
+                              f"more would pass the cap of {self._cap} µ$")
+            made = _json(self._http.post("/keys", json={"name": name, "limit": limit_usd_micros / 1e6}),
+                         "minting a key")
+            data = made.get("data") if isinstance(made, dict) else None
+            secret = made.get("key") if isinstance(made, dict) else None
+            digest = data.get("hash") if isinstance(data, dict) else None
+            if type(secret) is not str or not secret or type(digest) is not str \
+                    or not re.fullmatch(r"[0-9a-f]{16,128}", digest):
+                raise OpenRouterError("minting a key: the answer holds no key and hash")
+            if data.get("name") != name:
+                # Red-team 0028: an answer naming another key (maybe the Human's) is never held,
+                # so nothing of this run ever reads or disables it.
+                raise OpenRouterError("minting a key: the answer names another key")
+            key_ref = f"or-{digest[:16]}"
+            if key_ref in self._keys:
+                raise OpenRouterError("minting a key: the provider answered a key already held")
+            self._keys[key_ref] = (agent_id, limit_usd_micros, digest, secret, name)
+            self._billed[key_ref] = 0
+            self._turns[key_ref] = 0
+            self._unstated[key_ref] = 0
+        limit = data.get("limit")
+        if type(limit) not in (int, float) or usd_to_micros_ceil(limit) != limit_usd_micros:
+            # Red-team 0024: a key the provider does not bound as asked is ours, so it is
+            # disabled at once (close() would only report it), and the run is refused.
+            if self._disable(digest):
+                del self._keys[key_ref]
+            raise OpenRouterError(f"minting a key: the provider set its limit to {limit!r}, "
+                                  f"not {limit_usd_micros / 1e6}")
         return key_ref
 
     def limit(self, key_ref: str) -> int:
@@ -203,10 +255,18 @@ class OpenRouterProvisioner:
         """Model turns the key answered (for the run's report)."""
         return self._turns[key_ref]
 
-    def billed(self, key_ref: str, usd_micros: int) -> None:
-        """A turn on ``key_ref`` cost this, by the provider's own answer."""
-        self._billed[key_ref] += usd_micros
+    def billed(self, key_ref: str, usd_micros: int | None) -> None:
+        """A turn on ``key_ref`` cost this, by the provider's own answer (``None``: the turn
+        reached the provider but its answer did not say what it cost)."""
+        if usd_micros is None:
+            self._unstated[key_ref] += 1
+        else:
+            self._billed[key_ref] += usd_micros
         self._turns[key_ref] += 1
+
+    def spent_out(self, key_ref: str) -> bool:
+        """Have the key's turns, by their own answers, used its whole limit? (red-team 0024)"""
+        return self._billed[key_ref] >= self._keys[key_ref][1]
 
     def chat_client(self, key_ref: str) -> httpx.Client:
         """The HTTP client one mind's turns go through: its own key, nothing else."""
@@ -220,13 +280,17 @@ class OpenRouterProvisioner:
         out = []
         for key_ref in sorted(self._keys):
             agent_id, _, digest, _, _ = self._keys[key_ref]
+            floor, unstated = self._billed[key_ref], self._unstated[key_ref]
             while True:
                 row = _json(self._http.get(f"/keys/{digest}"), "reading a key's spend")
                 data = row.get("data") if isinstance(row, dict) else None
                 if not isinstance(data, dict):
                     raise OpenRouterError("reading a key's spend: no `data`")
                 spent = usd_to_micros_ceil(data.get("usage"))
-                if spent >= self._billed[key_ref] or time.monotonic() >= deadline:
+                # A turn whose cost went unstated settles only when the spend passes what the
+                # stated turns billed (red-team 0025).
+                settled = spent > floor if unstated else spent >= floor
+                if settled or time.monotonic() >= deadline:
                     break
                 self._sleep(2.0)
             out.append(KeyUsage(key_ref, agent_id, max(spent, self._billed[key_ref])))
@@ -235,15 +299,16 @@ class OpenRouterProvisioner:
     def close(self) -> list[str]:
         """Disable every key this run made (never delete: the account keeps the history).
         Returns the key_refs that could not be disabled; they still count their whole limit."""
-        failed = []
-        for key_ref in sorted(self._keys):
-            digest = self._keys[key_ref][2]
-            try:
-                _json(self._http.patch(f"/keys/{digest}", json={"disabled": True}), "disabling a key")
-            except (OpenRouterError, httpx.HTTPError):
-                failed.append(key_ref)
+        failed = [key_ref for key_ref in sorted(self._keys) if not self._disable(self._keys[key_ref][2])]
         self._http.close()
         return failed
+
+    def _disable(self, digest: str) -> bool:
+        try:
+            _json(self._http.patch(f"/keys/{digest}", json={"disabled": True}), "disabling a key")
+        except (OpenRouterError, httpx.HTTPError):
+            return False
+        return True
 
 
 # -- the mind's side -----------------------------------------------------------------------
@@ -299,9 +364,13 @@ class OpenRouterProvider:
         self._http = meter.provisioner.chat_client(meter.key_ref)
 
     def complete(self, request: CompletionRequest) -> CompletionResponse:
+        provisioner, key_ref = self._meter.provisioner, self._meter.key_ref
+        if provisioner.spent_out(key_ref):
+            raise OpenRouterError("a model turn: the key's turns have used its whole limit")
         body: dict[str, Any] = {
             "model": self._model,
             "messages": _wire_messages(request.messages),
+            "max_tokens": MAX_TURN_TOKENS,
             "usage": {"include": True},
         }
         if request.tools:
@@ -309,11 +378,19 @@ class OpenRouterProvider:
                               "function": {"name": t.name, "description": t.description,
                                            "parameters": t.input_schema or {"type": "object"}}}
                              for t in request.tools]
-        answer = _json(self._http.post("/chat/completions", json=body), "a model turn")
+        try:
+            answer = _json(self._http.post("/chat/completions", json=body), "a model turn")
+        except (OpenRouterError, httpx.HTTPError) as exc:
+            # Sent and maybe billed (a timeout after the model ran): the spend is unstated.
+            # A refusal the provider names (4xx) billed nothing.
+            if not (isinstance(exc, OpenRouterError) and 400 <= exc.status < 500):
+                provisioner.billed(key_ref, None)
+            raise
         usage = answer.get("usage") if isinstance(answer, dict) else None
         usage = usage if isinstance(usage, Mapping) else {}
-        micros = usd_to_micros_ceil(usage.get("cost"))
-        self._meter.provisioner.billed(self._meter.key_ref, micros)
+        stated = usage.get("cost")
+        micros = usd_to_micros_ceil(stated)
+        provisioner.billed(key_ref, None if stated is None else micros)
         if isinstance(answer, dict) and answer.get("error"):
             raise OpenRouterError(f"a model turn: {str(answer['error'])[:200]}")
         choices = answer.get("choices") if isinstance(answer, dict) else None

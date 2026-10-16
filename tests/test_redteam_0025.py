@@ -18,7 +18,7 @@ read says 0 and 0 is posted — once, cumulative, for a key that is then disable
 catches up. The sync should wait out the settle time (or report the spend unknown) whenever a turn's
 cost was not stated.
 
-Hole tests are ``xfail(strict=True)``: they pass once the Builder fixes the physics.
+Fixed in cycle 43; the tests now guard the fix.
 """
 
 from __future__ import annotations
@@ -62,9 +62,6 @@ class LaggingSpend(Account):
         return super().handler(request)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "MEDIUM red-team 0025: a turn whose cost the answer does not state (or that timed out after "
-    "billing) is synced as $0: usage() stops at the first read when billed is 0"))
 @pytest.mark.parametrize("timeout", [False, True], ids=["no_cost_in_answer", "client_timeout"])
 def test_hole_a_turn_with_no_stated_cost_is_synced_as_zero(timeout) -> None:
     account = LaggingSpend(timeout)
