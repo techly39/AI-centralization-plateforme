@@ -55,6 +55,7 @@ SUBCOMMANDS = frozenset({"init-db", "start-backtest", "seed-admin", "seed-runtim
 #: A recipe file bigger than this is refused (64 KiB).
 MAX_RECIPE_BYTES = 64 * 1024
 MAX_PODS = 16
+MAX_EXTRA_SYMBOLS = 50
 _NAME = r"^[a-z][a-z0-9-]{0,62}$"
 _KEY = re.compile(r"\bfk_\S+")
 _SERVE_WAIT_SECONDS = 60
@@ -86,6 +87,17 @@ class WorldRecipe(BaseModel):
     start: str
     admin: str = Field(pattern=_NAME)
     pods: tuple[PodRecipe, ...] = Field(min_length=1, max_length=MAX_PODS)
+    #: Symbols that join the configured synthetic market (``config.yaml``), each with its price
+    #: on the market's first day (ADR-048: a universe wide enough for many predictions).
+    extra_symbols: dict[str, float] | None = Field(default=None, max_length=MAX_EXTRA_SYMBOLS)
+
+    @field_validator("extra_symbols")
+    @classmethod
+    def _symbols_are_tickers_with_prices(cls, value: dict[str, float] | None) -> dict[str, float] | None:
+        if value is not None and not all(re.fullmatch(r"[A-Z][A-Z0-9]{0,15}", t) and 0 < p <= 1e6
+                                         for t, p in value.items()):
+            raise ValueError("extra_symbols: upper-case tickers, each priced in (0, 1e6]")
+        return value
 
     @field_validator("start")
     @classmethod
@@ -138,13 +150,15 @@ def fund_env() -> Path:
     return path
 
 
-def child_env(db: Path, key: str) -> dict[str, str]:
+def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None) -> dict[str, str]:
     """The environment of every child: the parent's, minus each ``FUND_*``, plus exactly the
-    world's own database, the synthetic market and its key."""
+    world's own database, the synthetic market (with the recipe's extra symbols) and its key."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
     env["FUND_DATABASE_URL"] = f"sqlite:///{db}"
     env["FUND_MARKETDATA__PROVIDER"] = "synthetic"
     env[WORLD_KEY_ENV] = key
+    if extra_symbols:
+        env["FUND_MARKETDATA__SYNTHETIC_SYMBOLS"] = json.dumps(extra_symbols, sort_keys=True)
     return env
 
 
@@ -280,7 +294,7 @@ async def hosted(recipe_doc: dict[str, Any], key: str) -> AsyncIterator[World]:
     world: World | None = None
     try:
         db = tmp / "world.db"
-        env = child_env(db, key)
+        env = child_env(db, key, recipe.extra_symbols)
         registrar, clock = await asyncio.to_thread(_genesis, recipe, tmp, env)
         world = World(tmp, db, registrar, clock, env)
         yield world

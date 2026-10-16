@@ -1863,3 +1863,52 @@ hold less than the provider later shows (the monthly count reads the provider, s
 
 **Reversible.** Yes: one name in the gate's list, one class in the registry's table; disabled keys
 stay at the provider as the history.
+
+## ADR-048 — A strategy is a rule; research is counted; pitches are judged by the validation gates on held-out days (idea: the pitch and the gates) — accepted (cycle 45)
+
+**Context.** The book's "pitch, then a full report", "a strategy is an isolated function" and
+"validation gates before capital": before a pod gets capital its PM pitches a strategy, and the
+strategy must pass IC, deflated Sharpe, capacity and correlation on data it was not tuned on, with
+every attempt counted. No LLM runs in `app/`, and agent-written code would need a sandbox (seal work).
+
+**Decision.**
+1. **strategy-v1: a strategy is data, not code** (`app/strategy/rule.py`). A rule names a universe
+   (2–50 tickers), a signal (`momentum`, `mean_reversion`, `low_volatility`), a lookback, a rebalance
+   period, `top_n`, `long_only | long_short` and a gross. Deterministic code evaluates it on any bars
+   (only days the whole universe shares; scores from closes up to the day; equal weights held to the
+   next rebalance; the OMS fee on turnover; one prediction per ticker per rebalance). Unknown fields
+   are refused. Agent code in a sandboxed subprocess is a later language.
+2. **The held-out window**: the last `gates.holdout_days` (180) days before today. A research
+   backtest (`POST /research/backtests`, PMs and analysts, own pod) may only use days before it, at
+   most `research_max_days` long. Each one is an event `research_backtest_run`, counted for the pod.
+3. **A pitch** (`POST /pitches`, the PM, own pod): hypothesis, data needed, team, budget, rule.
+   Physics runs the rule on `[today − holdout_days, today)` (every bar ended: the look-ahead guard
+   holds) and records `pitch_submitted` and `pitch_judged` (every number, the law used). A pitch is
+   itself an attempt.
+4. **The gates** (`app/strategy/gates.py`, thresholds in `config.yaml` `gates:`), each `pass | fail |
+   null` with its number and threshold: **IC** = mean Spearman rank IC ≥ `min_ic` over ≥
+   `min_predictions` predictions; **deflated Sharpe** (Bailey & López de Prado) ≥ `min_deflated_sharpe`,
+   benchmark `E[max of N normals]/√T` with N = the pod's research backtests + pitches, each try's
+   Sharpe taken as an independent estimate of zero (variance 1/T); **capacity** = the capital at
+   which square-root impact (`k σ √(traded / daily dollar volume)` per trade) eats
+   `capacity_edge_share` of the mean daily net return, ≥ `min_capacity_usd` (no edge: 0; no trade:
+   null); **correlation** = the highest correlation of daily returns with any other pod's latest
+   pitch re-run on the same days, ≤ `max_correlation` (none: null, which does not block). The
+   **hypothesis** is recorded, never judged by physics. **Eligible** = IC, deflated Sharpe and
+   capacity pass and correlation does not fail. Eligibility grants nothing yet (allocation is a
+   later idea).
+5. **Reading**: `GET /pitches`, `GET /pitches/{id}`, `GET /research/backtests`: the own pod; another
+   pod needs `read_cross_pod` (management). No table: the read side folds the events.
+6. **Anyone can rerun the numbers**: `fund-env gates BARS RULE --start --end --attempts N` runs the
+   same pure engine on a bars file (the prices-v1 rows). The acceptance demo proves the gates on
+   made-up markets first: a planted signal passes, noise fails, 200 attempts deflate the same
+   strategy below the bar, a thin market fails capacity, a copy fails correlation.
+
+**Known limits.** An agent can still *read* held-out days' prices (`GET /ohlcv`, its daily package):
+it cannot backtest on them, and probing them by pitching costs attempts. The correct out-of-sample
+test is the days after the pitch (live paper record), a later slice. Attempt numbers shown on
+research rows are labels; N itself is always a count of the pod's events. IC is not yet split by
+market regime; the deflated Sharpe uses the null variance, not the measured spread of the pod's
+trials.
+
+**Reversible.** Yes: new endpoints, events and permissions only; nothing existing changes meaning.

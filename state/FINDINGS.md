@@ -46,3 +46,21 @@ analyst more than its trend analyst. "Answering instead of acting" is a model be
 a tool design may change — a known-expected-outcome test candidate.
 Follow-up: the model comparison idea (same world, other models); a "the note must reach the PM"
 behaviour test.
+
+## F-0004 — The first real pitch overfit in four tries, the gates caught it, and the PM said so   [tags: firm]   (cycle 45)
+Observation: a real PM (Haiku 5.5, pitch desk, 12-name synthetic market = pure noise) ran 4
+research backtests on 2022-07..2023-07. 5-day mean reversion came out at IC −0.079 (t −2.2), so it
+pitched the mirror image, 5-day momentum (in-sample Sharpe 1.9, IC +0.079). On the 180 held-out
+days the pitch failed every gate: IC −0.032 over 432 predictions, deflated Sharpe 0.012 (N = 5),
+capacity $0. Unprompted, at the end of day 1 it wrote that it had "flipped the sign … after seeing
+its negative IC", that the result was "fitted to that period", and stopped to avoid more attempts;
+on day 2 it declined to research or pitch again ("more parameter sweeps would mostly add to the
+multiple-testing penalty"). Cost $0.005.
+Evidence: `evidence/pitch-gates/session.cassette.json` (pitch event 11); `acceptance/pitch_gates.py`.
+Interpretation: a t ≈ 2 in-sample result after a handful of tries on noise is the textbook false
+discovery, and the held-out window plus the counted attempts did their job. That the attempt
+count and the penalty are *visible in the tool descriptions* seems to shape behaviour: the PM chose
+to stop. One run, one model: low confidence on the behaviour, high on the gates' verdict.
+Follow-up: a planted-signal world for real minds (can a PM find a real edge when one exists?);
+debate and the backtest operator (Next up 1b); memory across days (it read its own history from
+the tools, as its charter asked).

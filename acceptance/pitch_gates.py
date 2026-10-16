@@ -227,13 +227,13 @@ def session(started: float) -> None:
         check("B: replay --verify from the file alone is IDENTICAL, at $0",
               r.returncode == 0 and line.startswith("IDENTICAL:") and ev.get("replay_usd") == 0,
               f"exit {r.returncode}: {line or r.stderr.strip()[-300:]}")
-    report(pitches, judged, research)
+    report(doc, pitches, judged, research)
 
 
-def report(pitches: list[dict], judged: list[dict], research: list[dict]) -> None:
-    """What the Human wants to read: the pitch, the work behind it, and the verdict."""
+def report(doc: dict, pitches: list[dict], judged: list[dict], research: list[dict]) -> None:
+    """What the Human wants to read: the pitch, the work behind it, the verdict, the PM's words."""
     for pitch, verdict in zip(pitches, judged):
-        print(f"\n== Pitch {pitch.get('pitch_id')} by pod {pitch.get('pod_id')} ==")
+        print(f"\n== Pitch {verdict.get('pitch_id')} by pod {pitch.get('pod_id')} ==")
         print(f"  Hypothesis: {pitch.get('hypothesis')}")
         print(f"  Data needed: {pitch.get('data_needed')}")
         print(f"  Team and budget asked: {pitch.get('team')} · ${pitch.get('budget_usd')}")
@@ -250,6 +250,19 @@ def report(pitches: list[dict], judged: list[dict], research: list[dict]) -> Non
             print(f"    {g['gate']:<16} {g['result'].upper():<12} {fmt(g.get('value')):>14}"
                   f"   bar {fmt(g.get('threshold'))}")
         print(f"  Verdict: {'ELIGIBLE for capital' if verdict['eligible'] else 'NOT eligible'}")
+    print("\n== The PM, in its own words, at the end of each day ==")
+    for step in (doc.get("outcome") or {}).get("run", {}).get("steps") or []:
+        for w in step.get("wakes") or []:
+            said = next((m["content"] for m in reversed(w.get("transcript") or [])
+                         if m["role"] == "assistant" and m.get("content")), "")
+            print(f"  day {step['step'] + 1} ({step['at'][:10]}):")
+            for line in said.strip().splitlines():
+                print(f"    {line}")
+    keys = ((doc.get("outcome") or {}).get("metering") or {}).get("keys") or []
+    print("\n== Cost, charged by the system ==")
+    for k in keys:
+        print(f"  {k['spec_id']}: ${k['spent_usd_micros'] / 1e6:.4f} of a "
+              f"${k['limit_usd_micros'] / 1e6:.2f} key")
 
 
 def main() -> int:
