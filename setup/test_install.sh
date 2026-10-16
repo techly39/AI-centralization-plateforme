@@ -29,7 +29,9 @@ git clone --quiet --bare "$REPO" "$T/origin.git"
 git clone --quiet "$T/origin.git" "$T/repo"
 cd "$T/repo" || exit 1
 git config user.email test@example.invalid; git config user.name "install test"
-git branch --quiet "$BRANCH" "origin/$BRANCH" || { echo "branch $BRANCH is not committed"; exit 1; }
+git rev-parse --verify --quiet "origin/$BRANCH" >/dev/null || { echo "branch $BRANCH is not committed"; exit 1; }
+git switch --quiet main 2>/dev/null || git switch --quiet -c main origin/main
+git rev-parse --verify --quiet "$BRANCH" >/dev/null || git branch --quiet "$BRANCH" "origin/$BRANCH"
 # The installed human.yaml is not always committed (the Human edits it): use the real one.
 cp "$REPO/governance/human.yaml" governance/human.yaml
 if [ -n "$(git status --porcelain)" ]; then git commit --quiet -am "test: the Human's installed human.yaml"; fi
