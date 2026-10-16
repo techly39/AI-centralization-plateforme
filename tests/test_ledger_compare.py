@@ -118,7 +118,8 @@ def test_compare_ledgers_cli_exit_codes(tmp_path: Path, capsys) -> None:
     assert cli.main(["compare-ledgers", str(a), str(b)]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out == {"allowed": 1, "detail": "equal but for the run_minds_declared payload",
-                   "equal": True, "first_difference": None}
+                   "equal": True, "first_difference": None,
+                   "locate": None}  # M-002: null, not 0, when equal
     assert cli.main(["compare-ledgers", str(a), str(c)]) == 1
     assert json.loads(capsys.readouterr().out)["first_difference"] == 4
     missing = tmp_path / "missing.db"

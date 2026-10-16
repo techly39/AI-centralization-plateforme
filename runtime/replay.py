@@ -90,11 +90,16 @@ class Tape:
     turns: tuple[Turn, ...] = ()
     ended: str = ""
     tool_calls: int = 0
+    #: What the recorded wake asked of the model, and the digest of the tools its requests carried
+    #: (cassette v2). ``None``: a scripted mind has no model; a hand-built tape has neither.
+    model: str | None = None
+    tools_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if (type(self.turns) is not tuple or any(type(t) is not Turn for t in self.turns)
                 or type(self.ended) is not str or type(self.tool_calls) is not int
-                or self.tool_calls < 0):
+                or self.tool_calls < 0
+                or not all(v is None or type(v) is str for v in (self.model, self.tools_sha256))):
             raise RecordingError("a tape is a tuple of Turns, how the wake ended and its calls")
 
 
@@ -153,8 +158,7 @@ class Recording:
 
     @classmethod
     def load(cls, path: Path) -> Recording:
-        outcome, _ = cassette.read(path)
-        return cls.from_outcome(outcome)
+        return cls.from_outcome(cassette.read(path).outcome)
 
     @classmethod
     def from_outcome(cls, outcome: Mapping[str, Any]) -> Recording:
@@ -210,6 +214,10 @@ class Recording:
             replayed = record.transcript[:stops[i]] if i < len(stops) else record.transcript
             if cassette.redact(_text(replayed)) != _text(turn.prefix):
                 return f"{i}:world"
+            # c32 NOTE 5: a changed tool surface or model is a surface change even when a redacted
+            # key sits in the prefix; only an unchanged surface with a key in it reads as ``key``.
+            if (record.tools_sha256, record.model) != (tape.tools_sha256, tape.model):
+                return f"{i}:surface"
             return f"{i}:key" if cassette._REDACTED in _text(turn.prefix) else f"{i}:surface"
         if len(record.exchanges) < len(tape.turns) or (record.ended, record.tool_calls) != (
                 tape.ended, tape.tool_calls):
@@ -249,7 +257,11 @@ def _tape(wake: Mapping[str, Any]) -> Tape:
     ended, calls = wake["ended"], wake["tool_calls"]
     if type(ended) is not str or type(calls) is not int:
         raise RecordingError("a wake's end is malformed")
-    return Tape(tuple(turns), ended, calls)
+    model, tools_digest = wake["model"], wake["tools_sha256"]
+    if (model is not None and type(model) is not str) or type(tools_digest) is not str or not re.fullmatch(
+            _SHA, tools_digest):
+        raise RecordingError("a wake records its model and its tools' digest")
+    return Tape(tuple(turns), ended, calls, model, tools_digest)
 
 
 def as_cassette(spec: Any) -> Any:

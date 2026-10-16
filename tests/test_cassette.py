@@ -38,6 +38,7 @@ from runtime.providers import (
     ToolSpec,
     Usage,
 )
+from tests.cassette_parts import PARTS
 from tests.test_runtime_native import (  # noqa: F401 - fixtures
     _calls,
     _spec,
@@ -63,7 +64,8 @@ def _request(**more) -> CompletionRequest:
 
 
 #: The canonical JSON of ``_request()`` and its digest. A change to either is a format
-#: change: bump ``HASH_FORMAT`` and ``CASSETTE_VERSION`` together with it.
+#: change: bump ``HASH_FORMAT`` and ``CASSETTE_VERSION`` together with it. (M-002 bumped
+#: ``CASSETTE_VERSION`` to 2 for the document's shape; the request hash did not change.)
 GOLDEN_JSON = (
     '{"messages":[{"content":"Run the desk.","is_error":false,"role":"system",'
     '"tool_call_id":null,"tool_calls":[]},{"content":"{\\"me\\": {\\"id\\": 1}}",'
@@ -75,7 +77,7 @@ GOLDEN_SHA = "7f9090e0ed9ab8853d500967f92c221f8a037335f2566c5c15371dab412ab46b"
 
 def test_request_sha256_golden_vector() -> None:
     import hashlib
-    assert HASH_FORMAT == "sha256/json-sorted-compact-ascii/1" and CASSETTE_VERSION == 1
+    assert HASH_FORMAT == "sha256/json-sorted-compact-ascii/1" and CASSETTE_VERSION == 2
     assert hashlib.sha256(GOLDEN_JSON.encode()).hexdigest() == GOLDEN_SHA
     assert request_sha256(_request()) == GOLDEN_SHA
 
@@ -121,6 +123,42 @@ async def test_exchange_per_complete_call(fund_client, desk, scripts) -> None:
     # The request is recoverable from the transcript, and the digest is of exactly that.
     requests = _prefix_requests(rec, await native.published_tools(client))
     assert [request_sha256(r) for r in requests] == [e.request_sha256 for e in rec.exchanges]
+
+
+@pytest.mark.anyio
+async def test_every_v2_wake_carries_model_and_tools_sha256(fund_client, desk, scripts) -> None:
+    """M-002: a wake that asked a turn records the model it asked and its tools' digest."""
+    _, _, pm_key = desk
+    client = fund_client(pm_key)
+    scripts(three=_calls("get_clock", turns=1))
+    rec = await wake(_spec(script="three"), client, workflow_input={})
+    published = await native.published_tools(client)
+    # A scripted mind asks no model (the registry refuses scripted + a model): ``None`` is the
+    # recorded fact; a model-bearing mind records ``spec.model`` here.
+    assert (rec.model, rec.tools_sha256) == (None, cassette.tools_sha256(published))
+    narrowed = await wake(_spec(script="three", tools=("get_clock",)), client, workflow_input={})
+    assert narrowed.model is None
+    assert narrowed.tools_sha256 == cassette.tools_sha256(
+        [t for t in published if t.name == "get_clock"]) != rec.tools_sha256
+    # A wake refused before its tools were listed has neither.
+    refused = await wake(_spec(wake_policy="never"), client, workflow_input={})
+    assert (refused.model, refused.tools_sha256) == (None, None)
+
+
+@pytest.mark.anyio
+async def test_tools_sha256_is_of_the_tools_in_the_request(fund_client, desk, scripts) -> None:
+    _, _, pm_key = desk
+    client = fund_client(pm_key)
+    scripts(three=_calls("get_clock", turns=1))
+    rec = await wake(_spec(script="three"), client, workflow_input={})
+    tools = await native.published_tools(client)
+    assert rec.tools_sha256 == cassette.tools_sha256(tools)
+    # The digest is the request's: rebuilding the first request from the record reproduces
+    # the hash only with these tools, not with a narrowed list.
+    first = CompletionRequest(messages=list(rec.transcript[:2]), tools=tools, model=None)
+    assert request_sha256(first) == rec.exchanges[0].request_sha256
+    narrowed = CompletionRequest(messages=list(rec.transcript[:2]), tools=tools[:1], model=None)
+    assert request_sha256(narrowed) != rec.exchanges[0].request_sha256
 
 
 @pytest.mark.anyio
@@ -207,7 +245,7 @@ def test_redact_count_every_position() -> None:
     k1, k2, k3 = (generate_api_key() for _ in range(3))
     outcome = {k1: "as a key", "as_a_value": k2,
                "nested": json.dumps({"api_key": k3}), "note": "fk_ alone, and fk"}
-    text, redactions = cassette.dumps(outcome)
+    text, redactions = cassette.dumps(outcome, **PARTS)
     assert not any(k in text for k in (k1, k2, k3))
     doc = json.loads(text)  # still valid JSON
     assert doc["redactions"] == redactions == 3
@@ -220,27 +258,28 @@ def test_redact_count_of_nothing_is_zero_and_keeps_the_text() -> None:
 
 def test_dumps_is_deterministic_and_versioned() -> None:
     outcome = {"b": [1, 2, {"z": None, "a": "é"}], "a": 1.5}
-    a, b = cassette.dumps(outcome), cassette.dumps(dict(reversed(list(outcome.items()))))
+    a = cassette.dumps(outcome, **PARTS)
+    b = cassette.dumps(dict(reversed(list(outcome.items()))), **PARTS)
     assert a == b and a[0].isascii()
     doc = json.loads(a[0])
     assert (doc["cassette_version"], doc["hash_format"], doc["redactions"]) == (
-        1, HASH_FORMAT, 0)
+        2, HASH_FORMAT, 0)
     assert doc["outcome"] == outcome
 
 
 def test_dumps_refuses_what_is_not_plain_json() -> None:
     for bad in ({"x": float("nan")}, {"x": object()}, {"x": {1, 2}}):
         with pytest.raises((TypeError, ValueError)):
-            cassette.dumps(bad)
+            cassette.dumps(bad, **PARTS)
 
 
 def test_write_is_0600_and_exclusive(tmp_path: Path) -> None:
     path = tmp_path / "run.cassette.json"
-    n = cassette.write(path, {"ended": "completed"})
+    n = cassette.write(path, {"ended": "completed"}, **PARTS)
     assert n == 0 and stat.S_IMODE(path.stat().st_mode) == 0o600
     before = path.read_bytes()
     with pytest.raises(CassetteError):
-        cassette.write(path, {"ended": "other"})
+        cassette.write(path, {"ended": "other"}, **PARTS)
     assert path.read_bytes() == before
 
 
@@ -252,7 +291,7 @@ def test_write_refuses_symlink_bad_suffix_and_missing_parent(tmp_path: Path) -> 
     link.symlink_to(target)  # dangling
     for bad in (link, d / "run.json", d / ".cassette.json", d / "no" / "such" / "x.cassette.json"):
         with pytest.raises(CassetteError):
-            cassette.write(bad, {"ended": "completed"})
+            cassette.write(bad, {"ended": "completed"}, **PARTS)
     assert not target.exists() and not (d / "run.json").exists()
     assert sorted(p.name for p in d.iterdir()) == ["link.cassette.json"]
 
@@ -265,7 +304,7 @@ def test_the_open_itself_refuses_a_symlink_planted_after_the_check(
     link.symlink_to(target)
     monkeypatch.setattr(cassette, "check_path", lambda p: p)
     with pytest.raises(CassetteError):
-        cassette.write(link, {"ended": "completed"})
+        cassette.write(link, {"ended": "completed"}, **PARTS)
     assert not target.exists()
 
 
@@ -289,7 +328,7 @@ def test_a_write_that_fails_part_way_leaves_no_file(
     monkeypatch.setattr(cassette.os, "fdopen", lambda fd, *a, **kw: Full(fd))
     path = tmp_path / "full.cassette.json"
     with pytest.raises(CassetteError):
-        cassette.write(path, {"ended": "completed"})
+        cassette.write(path, {"ended": "completed"}, **PARTS)
     assert not path.exists()
 
 
@@ -325,7 +364,7 @@ def test_umask_does_not_widen_the_mode(tmp_path: Path) -> None:
     old = os.umask(0)
     try:
         path = tmp_path / "m.cassette.json"
-        cassette.write(path, {})
+        cassette.write(path, {}, **PARTS)
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
     finally:
         os.umask(old)

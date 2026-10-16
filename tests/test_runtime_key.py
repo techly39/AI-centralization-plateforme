@@ -174,7 +174,7 @@ def test_cli_refuses_a_database_with_a_reserved_name_squatter(cli_on_test_db, db
 
 _ARGS = {"seed-admin": [], "seed-runtime": [], "rotate-runtime-key": [],
          "create-pod": ["--name", "desk"], "fund-pod": ["--pod-id", "1", "--delta", "1"],
-         "check-orders": [], "rebuild-state": []}
+         "check-orders": [], "rebuild-state": [], "run-minds": []}
 
 
 def test_the_cli_table_above_is_every_command_on_the_database_clock():

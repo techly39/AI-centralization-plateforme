@@ -18,10 +18,13 @@ Ids order the lockstep wake (ADR-032 (5)), so they are unique and plain.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+from runtime.cassette import spec_sha256
 
 from runtime.governance import load_unique_yaml
 
@@ -84,3 +87,24 @@ def load_specs(directory: Path) -> list[AgentSpec]:
             raise SpecError(f"{path.name}: duplicate spec id {spec.id!r}")
         specs[spec.id] = spec
     return [specs[k] for k in sorted(specs)]
+
+
+def specs_from_cassette(entries: Sequence[Mapping[str, Any]]) -> list[AgentSpec]:
+    """The specs a cassette (v2) carries, in id order: each entry's digest must be its spec's
+    (so a spec edited in the file is refused, not run), ids must be unique and sorted, and each
+    spec must validate as any spec does. The disk is never read: one file is enough (M-002)."""
+    specs: list[AgentSpec] = []
+    for entry in entries:
+        body = entry.get("spec") if isinstance(entry, Mapping) else None
+        if not isinstance(body, Mapping) or entry.get("sha256") != spec_sha256(body):
+            raise SpecError("a cassette spec does not match its digest")
+        try:
+            specs.append(AgentSpec.model_validate(body))
+        except (ValidationError, TypeError) as exc:
+            raise SpecError(f"a cassette spec is not a spec: {exc}") from exc
+    ids = [s.id for s in specs]
+    if len(set(ids)) != len(ids) or ids != sorted(ids):
+        raise SpecError("a cassette's specs are unique and sorted by id")
+    if not specs:
+        raise SpecError("a cassette holds no specs: a run needs minds")
+    return specs

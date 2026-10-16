@@ -313,7 +313,8 @@ def test_the_same_world_twice_writes_the_same_cassette_bytes(months) -> None:
     """R-4a: the cassette is a pure function of the run — nothing in it is a clock or a dice."""
     from runtime import cassette
     from runtime.lockstep import record_json
-    a, b = (cassette.dumps({"run": record_json(months[k]["run"])}) for k in "ab")
+    from tests.cassette_parts import PARTS
+    a, b = (cassette.dumps({"run": record_json(months[k]["run"])}, **PARTS) for k in "ab")
     assert a == b and a[1] == 0
     wakes = [w for st in months["a"]["run"].steps for w in st.wakes]
     assert wakes and all(len(w.exchanges) == sum(m.role == "assistant" for m in w.transcript)

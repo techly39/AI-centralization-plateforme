@@ -1730,3 +1730,20 @@ Tests: `tests/test_redteam_0021.py` (3 strict xfails).
 dollars unposted — reported, exit 1, no catch-up); B-000k, B-000n, B-022.
 
 **Reversible.** Yes: one name in the gate's list, one class in the registry's table.
+
+## ADR-045 — A run is a self-contained proof object: cassette v2 + `replay --verify` (M-002) — accepted (cycle 41)
+
+**Decision.** A recording (cassette v2) carries everything needed to re-live it: the run's parameters,
+the specs with their digests, a per-wake model/tools digest, the world's recipe and the recorded
+ledger rows. `fund-runtime backtest --world FILE` hosts a world of its own (`runtime/world.py`, the
+only spawner); `fund-runtime replay --cassette F --verify` rebuilds that world from the recipe and the
+world key (a secret, never in the file), replays every mind at $0 and prints IDENTICAL (exit 0),
+DIVERGED at <step, wake | physics, event> (1), usage (2), SETUP ERROR (3) or HALTED (4). Version 1
+cassettes are refused by name. `acceptance/M-002.py` passes.
+
+**What IDENTICAL proves.** Reproducibility under this checkout's physics, not authorship; the final
+reply text of a wake is not hashed (pinned limit, `tests/test_runtime_verify.py`).
+
+**Not done (by the Human's call, 2026-10-16: finish quickly, process to be slimmed).** The scoped
+red-team, the validator and the auditor did not run on this mission; the smoke hosted step and the
+design note were dropped. Recorded here so the gap is visible (Art. 9).

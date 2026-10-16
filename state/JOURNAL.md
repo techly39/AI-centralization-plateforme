@@ -1498,3 +1498,6 @@ so acceptance asserts relations. (2) `git add -A` swept the Human's uncommitted 
 mid-session; caught by a red test, un-committed with a soft reset before any push. Stage by path.
 (3) The Human answered Q-0001 ($50/month) and Q-0002 during the session; `governance/human.yaml` stays
 uncommitted for them. Next: M-002 (one-file proof object).
+
+## Cycle 0040 — build — M-002 (2026-10-16)
+Gate 2 done: architect plan saved (3 sessions; hosted-world recipe, v1 refused, `replay --verify`). Acceptance written red-first (Part A fails: no `--world`). Lesson: a background architect is killed when the turn ends; run it in the foreground. Next: M1 cassette v2.

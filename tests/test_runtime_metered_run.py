@@ -374,7 +374,16 @@ def test_replay_refuses_fake_metered_specs_exit_2(
     code, out, err = _run(SessionFactory, ["--specs", str(scripted_specs), "--steps", "2",
                                            "--cassette", str(path)], capsys)
     assert code == 0 and path.is_file(), err
-    code = cli.main(["replay", "--cassette", str(path), "--specs", str(mspecs)])
+    # The cassette carries its own specs now (M-002): swap in the metered ones, digests right.
+    import json
+    from runtime import cassette as cas
+    doc = json.loads(path.read_text(encoding="ascii"))
+    for entry in doc["specs"]:
+        entry["spec"].update(provider="fake-metered", script=None, budget_usd=1.0)
+        entry["sha256"] = cas.spec_sha256(entry["spec"])
+    metered = tmp_path / f"m{SUFFIX}"
+    metered.write_text(json.dumps(doc, sort_keys=True, separators=(",", ":")), encoding="ascii")
+    code = cli.main(["replay", "--cassette", str(metered)])
     assert code == 2
     assert "cannot replay as cassette minds" in capsys.readouterr().err
 
