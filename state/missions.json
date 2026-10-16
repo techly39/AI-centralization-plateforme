@@ -24,7 +24,7 @@
       "question": "Can anyone re-run a recorded month from the cassette alone (no flags to remember) and get a machine verdict 'identical ledger' or the first divergence? (Era I EC2 path, ticked only with real minds; vision §1 proof objects; prerequisite of the fork instrument)",
       "acceptance": "acceptance/M-002.py",
       "demo": "FUND_MARKETDATA__SYNTHETIC_KEY=<hex> uv run fund-runtime backtest --world specs/desk-month/world.json --specs specs/desk-month --input specs/desk-month/input.json --steps 31 --cassette $TMPDIR/m.cassette.json, then from any directory with the same key: uv run --project <repo> fund-runtime replay --cassette $TMPDIR/m.cassette.json --verify → 'IDENTICAL: <n> events, 0 differences, $0' (and a tampered cassette → 'DIVERGED at step <s>, wake <id>, …'); or uv run python acceptance/M-002.py",
-      "status": "active",
+      "status": "done",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [],
