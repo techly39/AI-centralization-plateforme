@@ -143,6 +143,45 @@ def _ledger_divergence(outcome: dict[str, Any], compare: dict[str, Any],
          "genesis": where.get("genesis")})
 
 
+def metered_block(rows: list[list[Any]], outcome: dict[str, Any]) -> list[list[Any]] | str:
+    """The recorded ledger's trailing block of metered cost rows (ADR-044 §6, ADR-047), ``[]`` for
+    a run that metered nothing, or why the block is not the recording's own (a string).
+
+    A metered run's one sync posts, after its last step, one ``cost_metered`` row per key that
+    spent. The block is the maximal run of such rows at the end of the ledger; it is the
+    recording's only if it holds exactly one row per key the outcome says was posted, each with
+    that key's agent, label and total, all by one actor that is none of the run's minds. It is
+    reported apart, never folded into the comparison."""
+    metering = outcome.get("metering")
+    k = 0
+    while k < len(rows) and len(rows[-1 - k]) == 5 and rows[-1 - k][3] == "cost_metered":
+        k += 1
+    if not isinstance(metering, dict):
+        return [] if k == 0 else "cost rows end the ledger of a run that metered nothing"
+    block = rows[len(rows) - k:]
+    keys = metering.get("keys") if isinstance(metering.get("keys"), list) else []
+    posted = (metering.get("sync") or {}).get("posted")
+    if k == 0 or posted != k:
+        return f"{k} cost rows end the ledger; the recorded sync posted {posted}"
+    want = {(key.get("agent_id"), key.get("key_ref"), key.get("spent_usd_micros"))
+            for key in keys if isinstance(key, dict)}
+    minds = {a for _, a in ((p[0], p[1]) for p in (outcome.get("run") or {}).get("agents") or [])}
+    seen = set()
+    for row in block:
+        try:
+            body = json.loads(row[4])
+            got = (body["agent_id"], body["key_ref"], body["usd_micros_total"])
+        except (ValueError, KeyError, TypeError):
+            return f"event {row[0]} is not a well-formed cost row"
+        if got not in want or got in seen or type(got[2]) is not int:
+            return f"event {row[0]} is not one of the recorded keys' totals"
+        seen.add(got)
+    actors = {row[2] for row in block}
+    if len(actors) != 1 or actors & minds:
+        return "the cost rows were not all posted by the Runtime"
+    return block
+
+
 def _replay_usd(outcome: dict[str, Any]) -> float:
     total = 0.0
     for step in (outcome.get("run") or {}).get("steps") or []:
@@ -203,6 +242,16 @@ async def verify(path: Path) -> tuple[int, str, str]:
             ValidationError) as exc:
         return usage(f"{path}: {getattr(exc, 'reason', None) or exc}")
     recorded = cas.ledger["rows"]
+    block = metered_block(recorded, cas.outcome)
+    if isinstance(block, str):
+        v = Verdict("DIVERGED", EXIT_DIVERGED, f"DIVERGED at the metered cost rows: {block}",
+                    {"kind": "metered_block", "step": None, "wake": None})
+        return v.code, v.line + "\n" + _evidence(v.name, len(recorded), v.where, None, {}, None,
+                                                  os.stat(path).st_size, cas.redactions), ""
+    if block:
+        # ADR-044 §6 / ADR-047: what the replay must leave is the recorded ledger without its
+        # trailing block of metered cost rows (a replay spends nothing, so posts nothing).
+        recorded = recorded[:-len(block)]
     events = len(recorded)
 
     from runtime import cli  # the conductor; imported here so cli can import this module lazily
@@ -230,7 +279,7 @@ async def verify(path: Path) -> tuple[int, str, str]:
                 hosted_world.stop()
             if outcome.get("ended") == "completed":
                 rows_file = hosted_world.tmp / "recorded.ledger.json"
-                _write_rows(rows_file, cas.ledger)
+                _write_rows(rows_file, {**cas.ledger, "rows": recorded})
                 compare = await asyncio.to_thread(hosted_world.compare_with, rows_file)
     except world.WorldError as exc:
         if exc.reason == "halted":
@@ -240,17 +289,22 @@ async def verify(path: Path) -> tuple[int, str, str]:
         return v.code, v.line + "\n" + _evidence(v.name, events, v.where, None, {}, None, size,
                                                   cas.redactions), ""
     v = verdict_of(outcome, compare, recorded, events)
+    if v.name == "IDENTICAL" and block:
+        v = Verdict(v.name, v.code, v.line + f" (+{len(block)} metered cost rows of the recorded "
+                    "run, reported apart)", v.where)
     return v.code, v.line + "\n" + _evidence(
         v.name, events, v.where, _replay_usd(outcome),
         {"ended": outcome.get("ended"), "reason": outcome.get("reason")}, compare, size,
-        cas.redactions), ""
+        cas.redactions, block), ""
 
 
 def _evidence(name: str, events: int, where: dict[str, Any] | None, usd: float | None,
               replay: dict[str, Any], compare: dict[str, Any] | None, size: int,
-              redactions: int) -> str:
+              redactions: int, block: list[list[Any]] | None = None) -> str:
     equal = compare.get("equal") if isinstance(compare, dict) else None
     return json.dumps({
+        "metered_block": ({"rows": len(block), "usd_micros": sum(
+            json.loads(r[4])["usd_micros_total"] for r in block)} if block else None),
         "verdict": name, "events": events,
         "differences": 0 if equal is True else None,  # null, not 0: the first one is all physics names
         "allowed": compare.get("allowed") if isinstance(compare, dict) else None,

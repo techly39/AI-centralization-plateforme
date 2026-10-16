@@ -272,9 +272,6 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
                 packages.check(args.package, workflow_input)
             except packages.PackageError as exc:
                 raise _Usage(str(exc)) from exc
-        if args.cassette is not None and any(s.provider in METERED_PROVIDERS for s in specs):
-            # No law yet says how to replay the trailing cost block (ADR-044 §6).
-            raise _Usage("a metered run's cassette is not defined yet: run without --cassette")
         if args.cassette is not None:
             try:
                 cassette.check_path(args.cassette)

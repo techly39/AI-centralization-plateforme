@@ -353,15 +353,18 @@ def test_a_wrong_clock_key_fails_the_sync_as_data_not_a_crash(
     assert "metered micro-dollars not attributed" in err
 
 
-def test_metered_backtest_refuses_cassette_exit_2(
+def test_a_metered_backtest_records_its_cassette_with_its_metering(
         SessionFactory, keys, mspecs, woke, gov, capsys, tmp_path) -> None:
+    """ADR-047 wrote the law ADR-044 §6 left open (the trailing cost block, judged apart by
+    ``replay --verify``), so a metered run is recorded like any other."""
     _cap(gov, 50)
-    before = _ledger(SessionFactory)
+    path = tmp_path / "x.cassette.json"
     code, out, err = _run(SessionFactory, ["--specs", str(mspecs), "--steps", "1",
-                                           "--cassette", str(tmp_path / "x.cassette.json")], capsys)
-    assert code == 2 and out is None and "cassette" in err
-    assert _ledger(SessionFactory) == before                                  # nothing contacted
-    assert not (tmp_path / "x.cassette.json").exists()
+                                           "--cassette", str(path)], capsys)
+    assert code == 0, err
+    doc = json.loads(path.read_text(encoding="ascii"))
+    assert doc["outcome"]["metering"] == out["metering"]
+    assert [k["spec_id"] for k in doc["outcome"]["metering"]["keys"]] == ["a-pm", "b-pm"]
 
 
 def test_replay_refuses_fake_metered_specs_exit_2(
