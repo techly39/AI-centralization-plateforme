@@ -27,6 +27,7 @@ from app.api import (
     metering,
     metrics,
     orders,
+    pitches,
     reporting,
 )
 from app.clock import get_clock, set_clock
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(reporting.router)
     app.include_router(metering.router)
     app.include_router(metrics.router)
+    app.include_router(pitches.router)
 
     logger.info("app created (env database_url={})", settings.database_url)
     return app

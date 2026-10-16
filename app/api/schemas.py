@@ -22,6 +22,7 @@ from pydantic import (
 from app.db.models import AgentRole, AgentStatus, OrderSide, OrderStatus, PriceType
 from app.finite import json_problem
 from app.ledger.events import agent_payload
+from app.strategy.rule import StrategyRule
 from app.limits import (
     MAX_ADVANCE_DAYS,
     MAX_ADVANCE_MINUTES,
@@ -600,3 +601,56 @@ class LeaderboardRowOut(BaseModel):
 class LeaderboardOut(BaseModel):
     as_of: datetime
     rows: list[LeaderboardRowOut]
+
+
+# --- Strategy science: research backtests and pitches (ADR-048) ---------------------------------
+
+class ResearchBacktestIn(BaseModel):
+    """Body of ``POST /research/backtests``: a rule and a window of the past before the held-out days."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule: StrategyRule
+    start: date | None = Field(default=None, description="First day. Default: a year before end.")
+    end: date | None = Field(
+        default=None, description="The day after the last (exclusive). Default and latest: the "
+                                  "first held-out day.")
+
+
+class ResearchBacktestOut(BaseModel):
+    id: int
+    at: datetime
+    pod_id: int
+    agent_id: int
+    attempt: int = Field(description="This pod's attempt number: every backtest and pitch counts.")
+    rule: dict[str, Any]
+    window: dict[str, str]
+    performance: dict[str, Any]
+
+
+class PitchIn(BaseModel):
+    """Body of ``POST /pitches``."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    hypothesis: str = Field(min_length=1, max_length=4000,
+                            description="The economic idea: why the edge exists, the mechanism.")
+    data_needed: str = Field(min_length=1, max_length=1000)
+    team: str = Field(min_length=1, max_length=1000, description="The team asked for.")
+    budget_usd: float = Field(ge=0.0, le=MAX_USD_PER_REPORT, description="Thinking budget asked.")
+    rule: StrategyRule
+
+
+class PitchOut(BaseModel):
+    id: int
+    submitted_at: datetime
+    pod_id: int
+    agent_id: int
+    hypothesis: str
+    data_needed: str
+    team: str
+    budget_usd: float
+    rule: dict[str, Any]
+    verdict: dict[str, Any] | None = Field(
+        description="The gates' verdict on the held-out window: eligible, each gate's number, "
+                    "threshold and pass/fail/null, the attempts counted.")

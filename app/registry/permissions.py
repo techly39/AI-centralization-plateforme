@@ -31,6 +31,9 @@ class Action(str, enum.Enum):
     READ_CLOCK = "read_clock"              # the fund's now (GET /clock) — ADR-026
     CONTROL_CLOCK = "control_clock"        # advance a backtest clock — ADR-027
     REPORT_METERED_COST = "report_metered_cost"  # system-reported cost of an agent — ADR-041
+    RUN_RESEARCH = "run_research"          # research backtests for the own pod (ADR-048)
+    SUBMIT_PITCH = "submit_pitch"          # pitch a strategy for the own pod (ADR-048)
+    READ_PITCHES = "read_pitches"          # own pod's pitches and research; others need READ_CROSS_POD
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -60,6 +63,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.LIST_AGENTS,
             Action.READ_MARKET_DATA,
             Action.READ_OWN_PORTFOLIO,
+            Action.RUN_RESEARCH,
+            Action.READ_PITCHES,
         }
     ),
     AgentRole.pm: _UNIVERSAL
@@ -71,6 +76,9 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.READ_OWN_PORTFOLIO,
             Action.PLACE_ORDER,
             Action.BROADCAST,
+            Action.RUN_RESEARCH,
+            Action.SUBMIT_PITCH,
+            Action.READ_PITCHES,
         }
     ),
     AgentRole.management: _UNIVERSAL
@@ -85,6 +93,7 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.BROADCAST,
             Action.REGISTER_AGENTS,
             Action.DEACTIVATE_AGENTS,
+            Action.READ_PITCHES,
         }
     ),
     # 'runtime' is the Runtime's identity (ADR-033, B-032): it moves a backtest's
