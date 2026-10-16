@@ -133,6 +133,10 @@ def main(argv: list[str] | None = None, *,
     rp = sub.add_parser("replay", help="replay a recorded run's minds from its cassette (no model, $0)")
     rp.add_argument("--cassette", type=Path, required=True, metavar="PATH",
                     help=f"the recorded run's {cassette.SUFFIX} (a completed run of scripted minds)")
+    rp.add_argument("--verify", action="store_true",
+                    help="rebuild the recorded world from the cassette's recipe, replay at $0 and "
+                         "say IDENTICAL or DIVERGED at <step, wake> (needs the cassette to carry a "
+                         f"world, and ${world.WORLD_KEY_ENV}); excludes --server")
     rp.add_argument("--server", default=None,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
     args = parser.parse_args(argv)
@@ -195,6 +199,13 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
     """``fund-runtime replay`` (ADR-040, ADR-045): the recorded run's minds, as cassette minds, in a
     fresh database; the specs and the run's parameters come from the cassette alone. Exit 0 only
     for ``completed``: **that is not proof of an identical ledger** (``--verify`` is)."""
+    if args.verify:
+        if args.server is not None:
+            print("fund-runtime: --verify and --server are exclusive: the verified replay is "
+                  "hosted in a world of its own", file=sys.stderr)
+            return 2
+        from runtime import verify  # imports this module's conductor, so not at the top
+        return verify.main(args.cassette)
     try:
         try:
             cas = cassette.read(args.cassette)
