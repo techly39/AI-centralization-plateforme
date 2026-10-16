@@ -33,7 +33,7 @@ import re
 import secrets
 import time
 from collections.abc import Callable, Mapping
-from decimal import ROUND_CEILING, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_EVEN, Decimal
 from typing import Any
 
 import httpx
@@ -77,12 +77,14 @@ def holds_secret(text: str) -> bool:
 
 
 def usd_to_micros_ceil(usd: object) -> int:
-    """Whole micro-dollars in ``usd``, rounded **up** (spend is never under-counted)."""
+    """Whole micro-dollars in ``usd``, rounded **up** (spend is never under-counted). Digits
+    below a nano-dollar are float noise (``0.0045000000000000001``), dropped first."""
     if usd is None:
         return 0
     if type(usd) not in (int, float) or not math.isfinite(usd) or usd < 0:
         raise OpenRouterError(f"the provider reported a spend that is not a dollar amount: {usd!r}")
-    return int((Decimal(repr(float(usd))) * 1_000_000).to_integral_value(rounding=ROUND_CEILING))
+    nanos = (Decimal(repr(float(usd))) * 1_000_000_000).to_integral_value(rounding=ROUND_HALF_EVEN)
+    return int((nanos / 1000).to_integral_value(rounding=ROUND_CEILING))
 
 
 def _client(key: str, transport: httpx.BaseTransport | None, timeout: float) -> httpx.Client:

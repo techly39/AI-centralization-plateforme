@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import httpx
@@ -35,7 +36,7 @@ class Account:
         self.add("the-humans-own", limit=None, usage=8.1, disabled=False)
 
     def add(self, name: str, *, limit, usage=0.0, usage_monthly=None, disabled=False) -> str:
-        digest = f"{len(self.keys) + 1:064x}"
+        digest = hashlib.sha256(f"{name}/{len(self.keys)}".encode()).hexdigest()
         self.keys[digest] = {"hash": digest, "name": name, "limit": limit, "usage": usage,
                              "usage_monthly": usage if usage_monthly is None else usage_monthly,
                              "disabled": disabled}
@@ -143,6 +144,8 @@ def test_a_key_limit_is_a_positive_int_of_micros(account, bad) -> None:
 
 def test_spend_is_rounded_up_and_garbage_is_refused() -> None:
     assert usd_to_micros_ceil(0.0000001) == 1 and usd_to_micros_ceil(None) == 0
+    assert usd_to_micros_ceil(0.001 + 0.0005 + 0.003) == 4500      # float noise is not spend
+    assert usd_to_micros_ceil(8.14448822) == 8144489
     for bad in (float("nan"), -1.0, "1", True):
         with pytest.raises(OpenRouterError):
             usd_to_micros_ceil(bad)
@@ -244,3 +247,81 @@ def test_an_openrouter_mind_needs_an_openrouter_key(account) -> None:
 def test_the_secret_scan_finds_a_key() -> None:
     assert holds_secret('{"k": "sk-or-v1-0123456789abcdef"}')
     assert not holds_secret('{"key_ref": "or-0123456789abcdef"}')
+
+
+# -- a run through the command (the App in-process, OpenRouter faked) --------------------------
+
+from tests.test_runtime_cli_backtest import _run, _write_specs, keys  # noqa: E402,F401 - fixtures
+from tests.test_runtime_lockstep import gov, live_afterwards, world  # noqa: E402,F401 - fixtures
+from tests.test_runtime_metered_run import _cap, _fold  # noqa: E402
+
+
+def _or_spec(id: str, name: str, pod: int, budget: float = 1.0) -> dict:
+    return {"id": id, "name": name, "role": "pm", "pod": pod, "provider": "openrouter",
+            "model": "vendor/cheap", "budget_usd": budget, "charter": "Read the clock."}
+
+
+@pytest.fixture
+def faked(account, monkeypatch):
+    """``fund-runtime`` finds this account instead of the real one."""
+    from runtime import cli
+    monkeypatch.setattr(cli.OpenRouterProvisioner, "from_env",
+                        classmethod(lambda cls, cap: provisioner(account, cap)))
+    return account
+
+
+def _answers(account: Account, wakes: int) -> None:
+    for _ in range(wakes):   # each wake: ask the clock, then stop
+        account.answers += [chat(calls=[("get_clock", "{}")], cost=0.001), chat("done", cost=0.0005)]
+
+
+def test_a_real_model_month_is_metered_synced_and_its_keys_disabled(
+        SessionFactory, keys, tmp_path, gov, faked, capsys) -> None:
+    _cap(gov, 50)
+    specs = _write_specs(tmp_path / "specs", _or_spec("a-pm", "desk-1-pm", 1),
+                         _or_spec("b-pm", "desk-2-pm", 2))
+    _answers(faked, 2 * 3)
+    code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "3"], capsys)
+    assert code == 0 and out["ended"] == "completed", (out["reason"], err)
+    m = out["metering"]
+    assert [(k["spec_id"], k["spent_usd_micros"], k["charges"]) for k in m["keys"]] == [
+        ("a-pm", 4500, 6), ("b-pm", 4500, 6)]
+    assert m["sync"]["posted"] == 2 and m["keys_left_enabled"] == []
+    top, _ = _fold(SessionFactory)
+    assert sum(top.values()) == m["total_usd_micros"] == 9000
+    firm = [k for k in faked.keys.values() if k["name"].startswith("firm-")]
+    assert sorted(k["name"] for k in firm) == ["firm-t1-a-pm", "firm-t1-b-pm"]
+    assert all(k["disabled"] for k in firm)
+    assert faked.answers == []
+    assert not holds_secret(json.dumps(out)) and not holds_secret(err)
+
+
+def test_a_run_that_would_pass_the_month_makes_no_key_beyond_it(
+        SessionFactory, keys, tmp_path, gov, faked, capsys) -> None:
+    _cap(gov, 50)
+    faked.add("firm-earlier", limit=49.5)
+    specs = _write_specs(tmp_path / "specs", _or_spec("a-pm", "desk-1-pm", 1, 0.4),
+                         _or_spec("b-pm", "desk-2-pm", 2, 0.4))
+    code, out, err = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
+    assert code == 1 and out["ended"] == "refused" and out["reason"] == "provision:key_over_cap:b-pm"
+    made = [k for k in faked.keys.values() if k["name"].startswith("firm-t1-")]
+    assert [k["name"] for k in made] == ["firm-t1-a-pm"] and made[0]["disabled"] is True
+    assert faked.chats == []
+
+
+def test_no_provisioning_key_refuses_before_any_agent_is_made(
+        SessionFactory, keys, tmp_path, gov, capsys, monkeypatch) -> None:
+    from runtime.openrouter import PROVISIONING_KEY_ENV
+    monkeypatch.delenv(PROVISIONING_KEY_ENV, raising=False)
+    _cap(gov, 50)
+    specs = _write_specs(tmp_path / "specs", _or_spec("a-pm", "desk-1-pm", 1))
+    code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
+    assert code == 1 and out["reason"] == "provision:openrouter_unavailable:0" and out["registered"] == []
+
+
+def test_a_real_model_run_under_a_null_cap_is_refused_before_anything(
+        SessionFactory, keys, tmp_path, gov, faked, capsys) -> None:
+    specs = _write_specs(tmp_path / "specs", _or_spec("a-pm", "desk-1-pm", 1))
+    code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
+    assert code == 1 and out["reason"] == "provision:wake_refused:a-pm:cap_null"
+    assert [k for k in faked.keys.values() if k["name"].startswith("firm-")] == []

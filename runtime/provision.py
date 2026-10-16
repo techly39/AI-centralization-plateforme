@@ -59,6 +59,7 @@ from runtime.metering import (
     Meter,
     usd_to_micros_floor,
 )
+from runtime.openrouter import OpenRouterProvisioner, OverCap
 from runtime.registry import ProviderRefused, check_spec
 from runtime.spec import AgentSpec
 
@@ -95,7 +96,7 @@ async def provision(
     registrar: FundClient,
     connect: Callable[[str], FundClient],
     *,
-    provisioner: FakeProvisioner | None = None,
+    provisioner: FakeProvisioner | OpenRouterProvisioner | None = None,
 ) -> list[Mind]:
     """Register one App agent per spec through ``registrar``; return the minds in id order.
 
@@ -114,6 +115,11 @@ async def provision(
         raise ProvisionError("directory_malformed")
     if provisioner is None and any(s.provider in METERED_PROVIDERS for s in ordered):
         raise ProvisionError("no_provisioner")
+    # A key is made where its mind spends: the fake's keys answer no model, OpenRouter's no script.
+    wanted = {"fake-metered": FakeProvisioner, "openrouter": OpenRouterProvisioner}
+    for spec in ordered:
+        if spec.provider in METERED_PROVIDERS and not isinstance(provisioner, wanted[spec.provider]):
+            raise ProvisionError(f"wrong_provisioner:{spec.id}")
     taken = {name_key(a["name"]) for a in directory
              if isinstance(a, dict) and type(a.get("name")) is str}
     for spec in ordered:
@@ -151,8 +157,14 @@ async def provision(
             meter = None
             if spec.provider in METERED_PROVIDERS:
                 try:
-                    meter = Meter(provisioner, provisioner.create_key(
-                        made["id"], usd_to_micros_floor(spec.budget_usd)))
+                    limit = usd_to_micros_floor(spec.budget_usd)
+                    meter = Meter(provisioner, (
+                        provisioner.create_key(made["id"], limit, spec_id=spec.id)
+                        if isinstance(provisioner, OpenRouterProvisioner)   # names the key
+                        else provisioner.create_key(made["id"], limit)))
+                except OverCap as exc:  # the firm's month is full (ADR-047 §4): no key, no wake
+                    await client.aclose()
+                    raise ProvisionError(f"key_over_cap:{spec.id}", [*done, spec.id]) from exc
                 except Exception as exc:  # noqa: BLE001 - the agent exists, its key does not
                     await client.aclose()
                     raise ProvisionError(f"key_failed:{spec.id}", [*done, spec.id]) from exc
