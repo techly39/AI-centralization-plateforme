@@ -120,7 +120,8 @@ Status: not started
 Before a pod gets capital, its PM pitches: the economic idea, the data it needs, the strategy as a
 function, backtest results, validation numbers, the team and budget asked for. Then a full report
 on what the pod will do. The pitch goes to a backtest operator (an agent who reruns the strategy
-independently). The Human can read every pitch and comment; the firm's process decides.
+independently). Then a **debate** (the notes' "3 Debate"): a bull and a bear agent argue the pitch
+in a thread before the decision. The Human can read every pitch and comment; the firm's process decides.
 `approvals.pitch_requires_human` in `governance/human.yaml` is the Human's switch.
 
 ### Hiring new PMs: turnover
