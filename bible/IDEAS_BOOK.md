@@ -142,7 +142,7 @@ the tools provided, and dynamic allocation.
 
 ### The backtest: real AI agents in a sealed box, fed a month day by day
 From: Human
-Status: not started
+Status: building
 A fictional calendar (for example one month). Each simulated day, each AI receives a
 **predetermined data package** and decides what to do; the AI never fetches data itself. We watch
 what comes out: orders, messages, reasoning, cost. Example: on day J-1, AI 1 gets data X and AI 2
