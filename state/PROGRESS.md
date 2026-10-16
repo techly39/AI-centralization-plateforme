@@ -1,10 +1,15 @@
-Cycle 0046 · building: a real PM researches a strategy, pitches it, and the gates give a verdict · branch: idea/pitch-gates
+Cycle 0046 · merged: a real PM researches a strategy, pitches it, and the gates give a verdict · branch: idea/pitch-gates
 Done this session:
-- Session 45 built everything and the demo passes, but was cut by the usage limit before the handoff.
-- The full suite had two red guards: the new routes were not in the safety sweeps. Added them; the
-  sweep now also looks inside nested rules, which found that "top_n" had no ceiling (fixed).
-- Red-team running on the pitch/research physics.
-Next: fix the red-team's high findings, then the auditor on `git diff main...HEAD`, then merge.
-Watch out: launch the red-team and auditor with run_in_background false (a background one dies with
-the session). The synthetic market is noise, so the real pitch failing every gate is honest.
+- Session 45 had built it all (demo passing) but was cut by the usage limit before the handoff.
+- The safety sweeps now cover the new routes and look inside nested rules (found: no ceiling on top_n).
+- Red-team: 4 holes. Fixed: a tiny-leverage rule crashed the pitch desk; shrinking leverage bought
+  capacity. Written down: offline search on readable held-out prices dodges the attempt count (the
+  cure is a forward test before capital); the IC floor counts universe width.
+- Auditor: one BLOCK (a member with no pod could read every pod's pitches), fixed with a test; passed.
+- Merged to main; the demo and the full suite pass on main.
+Next: plan session — slice b of "The pitch and the gates" (backtest operator + bull/bear debate),
+or a forward-test/incubation step first, since "eligible" must not grant capital while held-out
+prices are readable.
+Watch out: launch red-team/auditor with run_in_background false. A change to what a tool returns
+breaks the recorded replay (the cassette is the world as shown): keep outputs stable or re-record.
 Demo: passes.

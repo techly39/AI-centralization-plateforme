@@ -116,7 +116,10 @@ Now: a `management` role and the leaderboard / pod metrics endpoints exist.
 
 ### The pitch, then a full report
 From: Human
-Status: building
+Status: working (first slice)
+Now: a PM researches a strategy written as a rule (every backtest counted), pitches, and the gates
+(IC, deflated Sharpe, capacity, correlation) judge it on held-out days; the Human reads the verdict.
+Not yet: the backtest operator, the bull/bear debate, the full report, strategies as code.
 Before a pod gets capital, its PM pitches: the economic idea, the data it needs, the strategy as a
 function, backtest results, validation numbers, the team and budget asked for. Then a full report
 on what the pod will do. The pitch goes to a backtest operator (an agent who reruns the strategy
@@ -408,7 +411,7 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 1. **The pitch and the gates.** A PM pitches; the strategy runs as an isolated function through the
    validation gates; the pitch and its numbers are visible to the Human. Cut in three (cycle 44
    plan), each one something you can see working:
-   a. *Ready:* a real PM researches a strategy written as a rule (no agent code runs yet), every
+   a. *Done, cycle 46:* a real PM researches a strategy written as a rule (no agent code runs yet), every
       research backtest counted, then pitches; the app's gates (IC, deflated Sharpe, capacity,
       correlation) judge it on a held-out window and the Human reads the verdict. The gates are
       proven first on a planted signal (must pass) and on noise (must fail).
