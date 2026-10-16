@@ -265,5 +265,7 @@ def _tape(wake: Mapping[str, Any]) -> Tape:
 
 
 def as_cassette(spec: Any) -> Any:
-    """``spec`` as a spec for the replay: the same mind, provider ``cassette``, no script."""
-    return type(spec).model_validate({**spec.model_dump(), "provider": "cassette", "script": None})
+    """``spec`` as a spec for the replay: the same mind and model, provider ``cassette``, no
+    script, no budget (a replay spends nothing; ADR-047 §6)."""
+    return type(spec).model_validate({**spec.model_dump(), "provider": "cassette", "script": None,
+                                      "budget_usd": 0.0})

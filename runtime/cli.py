@@ -218,10 +218,12 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
         if cas.parameters["steps"] != rec.steps:
             raise _Usage("the cassette's parameters disagree with its recording (steps)")
         try:
+            for spec in specs:  # the recorded spec itself must be one a mind is built from
+                check_spec(spec)
             specs = [as_cassette(s) for s in specs]
             for spec in specs:
                 check_spec(spec)
-        except (ProviderRefused, ValueError) as exc:  # a cassette v1 cannot replay a model-bearing run
+        except (ProviderRefused, ValueError) as exc:
             raise _Usage(f"the specs cannot replay as cassette minds: {exc}") from exc
         registrar_key, clock_key, server = _keys(args)
     except (SpecError, _Usage) as exc:

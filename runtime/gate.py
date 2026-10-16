@@ -36,9 +36,9 @@ ZERO_COST_PROVIDERS = frozenset({"scripted", "cassette"})
 #: spending (ADR-032 (4); red-team 0012 H1: ``scripted`` + ``openclaw`` woke).
 ZERO_COST_ADAPTERS = frozenset({"native"})
 
-#: The only spending provider: a fake, network-free class charged by a fake provisioner
-#: (ADR-044). A real provider is a new name by its own ADR, with the Human's cap (Q-0001).
-METERED_PROVIDERS = frozenset({"fake-metered"})
+#: The spending providers: a fake, network-free class charged by a fake provisioner (ADR-044),
+#: and OpenRouter, a real model on the mind's own provisioned key (ADR-047). Each is a law change.
+METERED_PROVIDERS = frozenset({"fake-metered", "openrouter"})
 
 #: The only adapter a metered mind may wake through (openclaw has its own key and model).
 METERED_ADAPTERS = frozenset({"native"})

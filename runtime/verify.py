@@ -191,6 +191,8 @@ async def verify(path: Path) -> tuple[int, str, str]:
             return usage("the cassette's specs are not the recording's minds: their ids differ")
         if cas.parameters["steps"] != rec.steps:
             return usage("the cassette's parameters disagree with its recording (steps)")
+        for spec in specs:  # the recorded spec itself must be one a mind is built from
+            check_spec(spec)
         minds = [as_cassette(s) for s in specs]
         for mind in minds:
             check_spec(mind)

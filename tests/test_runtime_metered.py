@@ -95,10 +95,18 @@ class _Str(str):
     __hash__ = str.__hash__
 
 
-@pytest.mark.parametrize("name", ["metered", "openrouter", "Fake-Metered", "fake-metered ", "",
-                                  _Str("fake-metered"), None, 3])
-def test_only_fake_metered_is_metered(name) -> None:
+# ADR-047 made ``openrouter`` the second metered name; every near-miss of either is still refused.
+@pytest.mark.parametrize("name", ["metered", "OpenRouter", "openrouter ", "open-router",
+                                  "Fake-Metered", "fake-metered ", "", _Str("fake-metered"),
+                                  _Str("openrouter"), None, 3])
+def test_only_the_metered_names_are_metered(name) -> None:
     assert not decide_wake_under(name, "native", CAP_50, metered=True).allowed
+
+
+def test_openrouter_wakes_only_metered_native_under_a_cap() -> None:
+    assert decide_wake_under("openrouter", "native", CAP_50, metered=True).reason == "metered"
+    assert decide_wake_under("openrouter", "native", CAP_50).reason == "no_metered_key"
+    assert decide_wake_under("openrouter", "openclaw", CAP_50, metered=True).reason == "no_metered_key"
 
 
 def test_fake_metered_through_openclaw_is_refused() -> None:
@@ -106,8 +114,8 @@ def test_fake_metered_through_openclaw_is_refused() -> None:
     assert (d.allowed, d.reason) == (False, "no_metered_key")
 
 
-def test_the_metered_list_is_exactly_one_name() -> None:
-    assert METERED_PROVIDERS == frozenset({"fake-metered"})
+def test_the_metered_list_is_exactly_two_names() -> None:
+    assert METERED_PROVIDERS == frozenset({"fake-metered", "openrouter"})
     assert METERED_ADAPTERS == frozenset({"native"})
     assert not METERED_PROVIDERS & gate.ZERO_COST_PROVIDERS
 

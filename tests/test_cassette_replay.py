@@ -328,12 +328,19 @@ def test_a_tape_on_any_other_provider_is_a_contradiction() -> None:
     assert caught.value.reason == "contradiction"
 
 
-@pytest.mark.parametrize("more", [{"model": "m"}, {"budget_usd": 1.0}, {"script": "x"}])
-def test_a_cassette_spec_with_a_model_a_budget_or_a_script_is_refused_with_a_tape(more) -> None:
+@pytest.mark.parametrize("more", [{"budget_usd": 1.0}, {"script": "x"}])
+def test_a_cassette_spec_with_a_budget_or_a_script_is_refused_with_a_tape(more) -> None:
     spec = _spec(provider="cassette", **({"script": None} | more))
     with pytest.raises(ProviderRefused) as caught:
         build_provider(spec, Tape())
     assert caught.value.reason == "contradiction"
+
+
+def test_a_cassette_spec_keeps_its_recorded_model_and_still_calls_nothing() -> None:
+    # ADR-047 §6: a replayed real-model mind carries the model it was recorded with (the
+    # request hash names it); what it builds is still the tape player, nothing else.
+    spec = _spec(provider="cassette", script=None, model="vendor/some-model")
+    assert type(build_provider(spec, Tape())) is CassetteProvider
 
 
 @pytest.mark.anyio
@@ -359,7 +366,7 @@ async def test_a_cassette_mind_with_no_tape_is_refused_and_nothing_wakes(
 async def test_provisioning_refuses_every_contradiction_of_a_cassette_spec(
         fund_client, desk) -> None:
     # The refusals come before anything is contacted: the registrar is never called.
-    for more in ({"model": "m"}, {"budget_usd": 1.0}):
+    for more in ({"budget_usd": 1.0}, {"budget_usd": 1.0, "model": "m"}):
         spec = _spec(provider="cassette", **({"script": None} | more))
         with pytest.raises(ProvisionError, match="provider_refused:.*:contradiction"):
             await provision([spec], fund_client(desk[2]), fund_client)
