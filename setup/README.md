@@ -14,7 +14,8 @@ and installed by the Human. Current staging: **Builder v3** (ADR-046), on branch
 | `files/governance_dir/human.yaml` | `governance/human.yaml` (opus leads, cap $50 unchanged, pitches don't wait, OpenRouter reachable for metered runs) |
 
 ```bash
-bash setup/install.sh          # with no Builder run going, from a clean tree
+git switch builder-v3          # the new installer lives on the branch
+bash setup/install.sh          # with no Builder run going, from a clean tree (it switches to main itself)
 loop/builder.sh start          # the first session starts the first idea of the book
 bash setup/rollback.sh ~/.firm/backups/install-<time>   # undo
 bash setup/test_install.sh     # what was tested before this was offered (scratch clone, stub claude)

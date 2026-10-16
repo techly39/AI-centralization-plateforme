@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HUMAN-RUN installer for a Builder rework (v3: ADR-046). The Builder cannot run this: it writes protected files.
 #
-#   bash setup/install.sh              # installs branch builder-v3
+#   git switch builder-v3 && bash setup/install.sh    # installs branch builder-v3 (run it from that branch)
 #   bash setup/install.sh <branch>     # or another prepared branch
 #
 # What it does, in order (it stops at the first error, before touching anything it cannot undo):

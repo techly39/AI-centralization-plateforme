@@ -37,7 +37,8 @@ cp "$REPO/governance/human.yaml" governance/human.yaml
 if [ -n "$(git status --porcelain)" ]; then git commit --quiet -am "test: the Human's installed human.yaml"; fi
 uv sync --quiet >/dev/null 2>&1
 
-echo "1. install"
+echo "1. install (run from the branch being installed, as the Human does)"
+git switch --quiet "$BRANCH"
 bash setup/install.sh "$BRANCH" > "$T/install.log" 2>&1; rc=$?
 check "install.sh exits 0" "[ $rc -eq 0 ]" || tail -20 "$T/install.log"
 check "roles are auditor, red-team, worker" "[ \"\$(ls .claude/agents | tr '\n' ' ')\" = 'auditor.md red-team.md worker.md ' ]"
