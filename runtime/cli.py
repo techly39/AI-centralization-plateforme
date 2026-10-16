@@ -391,6 +391,12 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             if _is_halt(exc.reason):
                 return halted(exc.registered)
             return refused(f"provision:{exc.reason}", exc.registered)
+        except BaseException:
+            # Any other end mid-provisioning (a crash, Ctrl-C): the keys made so far still spend
+            # no more.
+            if isinstance(provisioner, OpenRouterProvisioner):
+                provisioner.close()
+            raise
         metering = None
         try:
             record = await run_backtest(minds, clock, **run)

@@ -50,3 +50,5 @@ before merge.
   provider and per-agent keys with cross-run monthly accounting, the daily price package, metered
   cassettes verified with the cost rows apart, key redaction, `specs/real-desk/`. A 1-day trial
   with real models worked ($0.0067 for the three). The real month recorded; red-team, auditor next.
+- cycle 43: red-team found 9 holes (3 high: cap broken by two runs at once, by a lagging key
+  list, by a cap lowered mid-run); all fixed and pinned as tests. Auditor: PASS. Merged.

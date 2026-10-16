@@ -142,16 +142,17 @@ the tools provided, and dynamic allocation.
 
 ### The backtest: real AI agents in a sealed box, fed a month day by day
 From: Human
-Status: building
+Status: working
 A fictional calendar (for example one month). Each simulated day, each AI receives a
 **predetermined data package** and decides what to do; the AI never fetches data itself. We watch
 what comes out: orders, messages, reasoning, cost. Example: on day J-1, AI 1 gets data X and AI 2
 gets data Y. The agents are real LLM minds on fake money, every dollar of thought metered.
-Now: the box exists for scripted minds: `fund-runtime backtest` runs a 31-day month on a sealed
-synthetic market, wakes each mind every step, refuses tomorrow's data (look-ahead guard), records a
-cassette, and `replay --verify` proves a run identical. The firm-agent cap is $50/month and an
-OpenRouter provisioning key exists (`.env`), but no real model provider is wired yet
-(`runtime/gate.py` only knows `fake-metered`). **This is the first idea to build.**
+Now (cycle 43): working. A pod of three real models (Haiku 5.5 via OpenRouter: a trend analyst, a
+risk analyst, a PM) lived a 31-day month on a sealed synthetic market for $0.25 in total, each with
+its own capped key, each morning handed the day's prices (package `prices-v1`). The month is
+recorded in `evidence/real-agents-backtest/` and replays IDENTICAL for $0:
+`uv run python acceptance/real_agents_backtest.py` shows day by day what each one saw, said, traded
+and cost. Not yet: the richer data packages (company data, headlines), memory across days.
 
 ### Data packages: prices / company data / headlines / everything
 From: Human
@@ -373,6 +374,10 @@ Status: not started
 About a dozen known small holes (tests marked strict-xfail, e.g. registering into a missing pod
 answers 500, a flood of messages can drain a metered agent's key). Fix each when real agents get
 near it. The inbox flood matters as soon as real keys exist.
+From the real-model month (cycle 43, ADR-047 known limits): the mint lock is one file per copy of
+the repo, so two clones minting at the same moment do not share it, and a lagging key list can hide
+a fresh mint; a turn whose cost went unstated is waited for 30 s, after which the ledger may record
+less than the provider later shows (the cap still holds, it is read from the provider).
 
 ### Paid to report holes
 From: Builder
@@ -384,13 +389,11 @@ into an experiment.
 
 The order the Builder builds in. The Builder may reorder it and says why in one line.
 
-1. **The backtest with real AI agents.** Real LLM agents (a PM and two analysts) live a backtest
-   month on fake money. Each day each agent gets its data package (prices first, then the richer
-   packages). We see what they do and what it costs, inside the $50/month cap, and the recorded run
-   replays for $0.
-2. **The pitch and the gates.** A PM pitches; the strategy runs as an isolated function through the
+(Done, cycle 43: the backtest with real AI agents is working.)
+
+1. **The pitch and the gates.** A PM pitches; the strategy runs as an isolated function through the
    validation gates; the pitch and its numbers are visible to the Human.
-3. **The multi-manager machine.** Several pods, the allocation algorithm, the drawdown ladder;
+2. **The multi-manager machine.** Several pods, the allocation algorithm, the drawdown ladder;
    pods get cut and closed, and new PMs are hired to replace them.
-4. **The monthly generation.** Reset, selection, lessons kept, the next generation starts.
-5. **The Observatory.** "What's new" and the agents in action, for the Human.
+3. **The monthly generation.** Reset, selection, lessons kept, the next generation starts.
+4. **The Observatory.** "What's new" and the agents in action, for the Human.

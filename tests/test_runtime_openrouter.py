@@ -341,3 +341,44 @@ def test_a_real_model_run_under_a_null_cap_is_refused_before_anything(
     code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
     assert code == 1 and out["reason"] == "provision:wake_refused:a-pm:cap_null"
     assert [k for k in faked.keys.values() if k["name"].startswith("firm-")] == []
+
+
+def test_a_key_whose_limit_resets_is_disabled_and_refused(account) -> None:
+    inner = account.handler
+
+    def resets(request: httpx.Request) -> httpx.Response:
+        response = inner(request)
+        if request.method == "POST" and request.url.path.endswith("/keys"):
+            body = json.loads(response.content)
+            body["data"]["limit_reset"] = "monthly"
+            return httpx.Response(201, json=body)
+        return response
+
+    p = OpenRouterProvisioner("prov-key", CAP, transport=httpx.MockTransport(resets),
+                              run_tag="t1", settle_s=0, sleep=lambda s: None)
+    with pytest.raises(OpenRouterError, match="limit"):
+        p.create_key(1, 1_000_000, spec_id="pm")
+    [made] = [k for k in account.keys.values() if k["name"] == "firm-t1-pm"]
+    assert made["disabled"] is True
+
+
+def test_a_ctrl_c_while_minting_still_disables_the_keys_made(
+        SessionFactory, keys, tmp_path, gov, faked, capsys) -> None:  # noqa: F811
+    _cap(gov, 50)
+    inner = faked.handler
+    mints = []
+
+    def crashes(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST" and request.url.path.endswith("/keys"):
+            mints.append(1)
+            if len(mints) == 2:
+                raise KeyboardInterrupt  # the operator's Ctrl-C mid-provisioning
+        return inner(request)
+
+    faked.handler = crashes
+    specs = _write_specs(tmp_path / "specs", _or_spec("a-pm", "desk-1-pm", 1, 0.4),
+                         _or_spec("b-pm", "desk-2-pm", 2, 0.4))
+    with pytest.raises(KeyboardInterrupt):
+        _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
+    made = [k for k in faked.keys.values() if k["name"].startswith("firm-t1-")]
+    assert [k["name"] for k in made] == ["firm-t1-a-pm"] and made[0]["disabled"] is True

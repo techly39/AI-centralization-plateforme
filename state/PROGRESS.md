@@ -1,14 +1,15 @@
-Cycle 0042 · building: real AI agents (a PM and two analysts) live a backtest month on fake money · branch: idea/real-agents-backtest
+Cycle 0043 · merged: real AI agents (a PM and two analysts) live a backtest month on fake money · branch: idea/real-agents-backtest
 Done this session:
-- Decided: the app's own runtime hosts the agents; OpenRouter is the first real metered provider (ADR-047).
-- Built: one OpenRouter key per agent with a hard limit, the month counted across runs from the
-  provider itself (the Human's own keys never touched), the daily price package, metered runs
-  recorded and verified with their cost rows judged apart, provider keys redacted.
-- The real month: 3 Haiku 5.5 minds, 31 days, 17 orders, book −0.62%, $0.25 total; replays
-  IDENTICAL at $0 (`evidence/real-agents-backtest/`, finding F-0003).
-- Red-team launched on the diff (it ran in the background by mistake; foreground from now on).
-Next: read the red-team result, fix every high finding, then the auditor (foreground) on
-`git diff main...HEAD`, fix every BLOCK, full suite, merge, mark the idea working.
-Watch out: OpenRouter credit was ~$1.86 before the month (≈$1.60 now): enough for ~6 more months
-of this pod. Never `cd "<repo>" && …`. The red-team must stay offline (no provisioning key).
-Demo: passes (`uv run python acceptance/real_agents_backtest.py`, $0, ~10 s).
+- Red-team (foreground) attacked the real-model month: 9 holes, 3 high. All fixed, each pinned as a
+  test: one run mints keys at a time and counts its own keys at once; the check before every wake
+  asks the account for the whole month; keys the provider does not bound exactly are disabled at
+  once; a key stops at its limit; turns are capped at 4096 tokens; keys are disabled whatever ends
+  the run; `replay --verify` refuses rewritten cost rows.
+- Auditor: PASS, no blocks; its notes fixed (wording in the decision record, Ctrl-C while minting).
+- Merged to main; the idea is "working" in the book.
+Next: plan the next idea from "Next up" (the pitch and the gates), or the richer data packages
+(company data, headlines) if the plan session judges them first.
+Watch out: the demo replays the recorded month, so it proves the record, not the live path (the live
+OpenRouter path is tested against a fake account). OpenRouter credit ≈ $1.60. The mint lock is one
+file per copy of the repo (`.openrouter-mint.lock`, gitignored). Never `cd "<repo>" && …`.
+Demo: passes (`uv run python acceptance/real_agents_backtest.py`, $0, ~7 s).

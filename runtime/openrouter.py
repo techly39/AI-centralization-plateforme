@@ -236,7 +236,8 @@ class OpenRouterProvisioner:
             self._turns[key_ref] = 0
             self._unstated[key_ref] = 0
         limit = data.get("limit")
-        if type(limit) not in (int, float) or usd_to_micros_ceil(limit) != limit_usd_micros:
+        if type(limit) not in (int, float) or usd_to_micros_ceil(limit) != limit_usd_micros \
+                or data.get("limit_reset") is not None:   # a limit that resets is no hard limit
             # Red-team 0024: a key the provider does not bound as asked is ours, so it is
             # disabled at once (close() would only report it), and the run is refused.
             if self._disable(digest):

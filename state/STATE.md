@@ -39,6 +39,10 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   recording (`diverged:<id>:<step>:<seq>:<kind>` or `diverged:clock:…`). The scripted 31-day
   month replays into a fresh DB with the same ledger, same transcripts, zero usage.
   Not done (R-4b-2b): cassette v2, hash links, size cap. Label `cassette` (Q-0006).
+- **Real minds** (ADR-047, `runtime/openrouter.py`, `docs/real_minds_v1.md`): provider `openrouter`
+  is metered; one capped `firm-` key per agent, minted under a repo lock after counting the whole
+  month at the provider, disabled after the run; daily package `prices-v1` (`runtime/packages.py`);
+  pod `specs/real-desk/`; the recorded real month `evidence/real-agents-backtest/` replays at $0.
 - **Cassettes** (R-4a, ADR-037, `tests/test_cassette.py`): `fund-runtime backtest --cassette PATH`
   writes a redacted, 0600, exclusive `*.cassette.json`; every `WakeRecord` has `exchanges`
   (seq, request_sha256, usage). Gitignored.
@@ -97,8 +101,6 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   installed by the Human with `bash setup/install.sh`.
 
 ## Next moves
-1. The first idea: real AI agents (PM + two analysts) live a backtest month with daily data packages
-   (`real-agents-backtest`). Decide the agent host first; wire a real metered provider inside the
-   $50/month cap (risk tier).
-2. Then the pitch and the gates, the multi-manager machine (allocation + drawdown ladder + hiring),
-   the monthly generation, the Observatory.
+1. The pitch and the gates (Next up 2), or the richer data packages (company data, headlines).
+2. Then the multi-manager machine (allocation + drawdown ladder + hiring), the monthly generation,
+   the Observatory.

@@ -1807,7 +1807,7 @@ gate (HALT before each turn and call, identity, tool budget, cap), records casse
 metering (ADR-041/044) charges each mind's own key. OpenClaw 2026.5.12 is installed but no `firm-`
 agent exists; an OpenClaw agent runs its own model on its own key (ADR-032 (4)), so the Runtime can
 neither meter it per turn nor replay it from a tape. The OpenRouter account has a provisioning key
-(`.env`) and about $1.86 of credit (the Human's own key used $8.14 of $10).
+(`.env`) and about $1.86 of credit.
 
 **Decision.**
 1. **Host = the app's own runtime** (adapter `native`). OpenClaw stays a later adapter, to be
@@ -1822,10 +1822,10 @@ neither meter it per turn nor replay it from a tape. The OpenRouter account has 
 4. **Monthly accounting across runs, read from the provider.** Before any key is made, every `firm-`
    key on the account counts against the cap: an enabled key its whole limit, a disabled one what it
    spent this month. That sum + the new limits ≤ `firm.monthly_llm_usd_cap`, or nothing is made.
-   Keys whose name does not start with `firm-` (the Human's) are never read for spend, changed or counted.
+   Keys whose name does not start with `firm-` (the Human's) are listed with the rest by the provider, but never counted or changed.
 5. **Keys never leave the process.** A minted key lives only in the provider object; the cassette,
-   the output and the ledger hold the key's hash-label only; a secret scan refuses to write a cassette
-   that holds anything shaped like an OpenRouter key.
+   the output and the ledger hold the key's hash-label only; anything shaped like a key that reaches a
+   cassette is blanked out on write (the redaction), and the tests scan every output for the shape.
 6. **A replayed mind keeps its recorded model** (provider `cassette` + `model` is no longer a
    contradiction): the request hash includes the model, and a cassette mind still calls nothing.
 7. **The day's data package** (`runtime/packages.py`, `backtest --package NAME`): built by the Runtime
@@ -1847,9 +1847,19 @@ the cassette `model` contradiction (a cassette mind keeps its recorded model; bu
 refused; a recorded spec that contradicts itself still refuses the replay); the adapter's parameter
 set (+`package`); `test_metered_backtest_refuses_cassette_exit_2` (a metered run now records).
 
-**Known limits.** Two runs minting keys at the same moment could each pass the monthly check (no
-lock across processes); every key's hard limit at the provider still bounds each one. Usage is read
-from the provider after the run and never reported below what the turns' own answers billed.
+**Hardened before merge (red-team 0022-0030, cycle 43).** Minting is serialised across runs by a
+lock file in the repo (`.openrouter-mint.lock`) held from the month's count to the mint, and the keys
+a run made count their whole limit at once; the check before every wake asks the account for the
+whole month; a disabled key that does not state its spend counts its limit; a key the provider does
+not bound exactly as asked (limit differs, or resets) is disabled at once and refused; a key sends no
+turn once its turns used its limit; a turn writes at most 4096 tokens; keys are disabled whatever
+ends the run; `metered_block` also requires the `runtime` actor, physics' exact body with the agent's
+own pod, each total at least its recorded turns' cost, and a block on any run of metered minds.
+
+**Known limits.** The lock is one file per copy of the repo: two clones or worktrees do not share it,
+and the provider's key list may lag behind a mint (the recount before every wake catches a double
+mint once listed). A turn whose cost went unstated is waited for up to 30 s; past that the ledger may
+hold less than the provider later shows (the monthly count reads the provider, so the cap holds).
 
 **Reversible.** Yes: one name in the gate's list, one class in the registry's table; disabled keys
 stay at the provider as the history.
