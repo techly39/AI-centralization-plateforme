@@ -13,6 +13,12 @@ What: <one or two lines>  ·  Try: `<demo command>`  ·  See: <what appears>
 
 ---
 
+## A PM pitches a strategy and the validation gates judge it (cycle 46, 2026-10-16)
+What: a real AI PM researched four strategy rules (each try counted), pitched the best one, and the
+gates judged it on six months it was not tuned on: it failed, and the PM explained why it overfit.
+Try: `uv run python acceptance/pitch_gates.py`  ·  See: the gates proven on a planted signal (pass) and
+noise (fail), then the PM's pitch, its research, the gate table and the PM's own words.
+
 ## A recorded month can be re-lived from one file, with a verdict (cycle 41, 2026-10-16)
 What: one recording of a month is enough to replay it on a fresh copy of the world and get a machine
 verdict: identical ledger, or the exact step where it differs. Replays cost $0.  ·  Try:

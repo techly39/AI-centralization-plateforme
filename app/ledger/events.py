@@ -48,6 +48,11 @@ EVENT_TASK_ENDED = "task_ended"           # payload: {task_id, subject, seconds,
 # metrics fold these events, there is no table).
 EVENT_COST_METERED = "cost_metered"       # payload: {agent_id, pod_id, key_ref, usd_micros_total}
 
+# Strategy science (app/strategy/service.py). Audit only: the read side folds them, no table.
+EVENT_RESEARCH_BACKTEST_RUN = "research_backtest_run"  # payload: {pod_id, agent_id, attempt, rule, window, performance}
+EVENT_PITCH_SUBMITTED = "pitch_submitted"  # payload: {pod_id, agent_id, hypothesis, data_needed, team, budget_usd, rule}
+EVENT_PITCH_JUDGED = "pitch_judged"        # payload: {pitch_id, pod_id, window, attempts, eligible, gates, performance, law}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

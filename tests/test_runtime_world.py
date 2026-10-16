@@ -94,6 +94,19 @@ def test_child_env_drops_every_fund_variable_but_the_three(monkeypatch: pytest.M
     assert env["PATH_KEPT"] == "yes"  # only FUND_* is scrubbed
 
 
+def test_a_recipe_may_widen_the_market_with_extra_symbols(monkeypatch: pytest.MonkeyPatch) -> None:
+    doc = {"start": "2024-01-02T14:30:00Z", "admin": "boss", "pods": [{"name": "p", "allocation": 1}]}
+    recipe = parse_recipe({**doc, "extra_symbols": {"SYND": 30.0, "SYNE": 12.5}})
+    env = child_env(Path("/w/world.db"), "k" * 64, recipe.extra_symbols)
+    assert json.loads(env["FUND_MARKETDATA__SYNTHETIC_SYMBOLS"]) == {"SYND": 30.0, "SYNE": 12.5}
+    monkeypatch.setenv("FUND_MARKETDATA__SYNTHETIC_SYMBOLS", '{"EVIL": 1}')
+    assert "FUND_MARKETDATA__SYNTHETIC_SYMBOLS" not in child_env(Path("/w/world.db"), "k" * 64)
+    for bad in ({"synd": 1.0}, {"SYND": 0.0}, {"SYND": float("inf")}, {"../X": 1.0},
+                {f"S{i}": 1.0 for i in range(51)}):
+        with pytest.raises(WorldError):
+            parse_recipe({**doc, "extra_symbols": bad})
+
+
 # --- genesis, with a stand-in for fund-env ----------------------------------------------
 
 STUB = '''#!/usr/bin/env python3

@@ -70,6 +70,15 @@ def _segment(value: str) -> str:
     return quote(value, safe="")
 
 
+#: A strategy-v1 rule as a tool argument (app/strategy/rule.py is the law; the API validates it).
+RuleArg = Annotated[dict, Field(description=(
+    "A strategy-v1 rule, a JSON object: {\"universe\": [tickers, 2..50], \"signal\": "
+    "\"momentum\" | \"mean_reversion\" | \"low_volatility\", \"lookback\": days 2..250, "
+    "\"rebalance_every\": days 1..63, \"top_n\": names held, \"side\": \"long_only\" | "
+    "\"long_short\", \"gross\": 0..2}. Every rebalance it ranks the universe by the signal "
+    "and holds the top_n (and shorts the bottom top_n for long_short), equal weights."))]
+
+
 def api_tool(
     server: MCPServer, *, method: str, path: str, name: str | None = None
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -311,6 +320,69 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
             f"/ohlcv/{_segment(ticker)}",
             params={"start": start, "end": end, "interval": interval},
         )
+
+    # --- Strategy science: research and pitches ------------------------------
+
+    @api_tool(server, method="POST", path="/research/backtests")
+    async def run_research_backtest(
+        rule: RuleArg,
+        start: Annotated[str | None, Field(description="YYYY-MM-DD. Default: a year before end.")] = None,
+        end: Annotated[str | None, Field(description=(
+            "YYYY-MM-DD, exclusive. Default and latest: the first held-out day (the most recent "
+            "days are kept for judging pitches)."))] = None,
+    ) -> Any:
+        """Backtest a strategy rule on past data and get its numbers (Sharpe, return, drawdown,
+        rank IC, predictions, turnover). Fees included.
+
+        Every backtest is counted for your pod, forever: when your PM pitches, the deflated
+        Sharpe is penalised by the number of things your pod tried. Test ideas, not noise.
+        """
+        return await call("POST", "/research/backtests",
+                          body={"rule": rule, "start": start, "end": end})
+
+    @api_tool(server, method="GET", path="/research/backtests")
+    async def list_research_backtests(
+        pod_id: Annotated[int | None, Field(description="Default: your own pod.", ge=1, le=MAX_ID)] = None,
+    ) -> Any:
+        """Every research backtest of your pod so far, oldest first, with its attempt number."""
+        return await call("GET", "/research/backtests", params={"pod_id": pod_id})
+
+    @api_tool(server, method="POST", path="/pitches")
+    async def submit_pitch(
+        hypothesis: Annotated[str, Field(description=(
+            "The economic idea: why this edge exists and the mechanism behind it. Recorded and "
+            "read by the firm; a correlation without a mechanism is not a hypothesis."))],
+        data_needed: Annotated[str, Field(description="The data the strategy needs.")],
+        team: Annotated[str, Field(description="The team you ask for, and why.")],
+        budget_usd: Annotated[float, Field(description="Thinking budget you ask for, USD.", ge=0)],
+        rule: RuleArg,
+    ) -> Any:
+        """Pitch a strategy for your pod. PMs only.
+
+        The fund runs your rule on the held-out days (the most recent ones, which research could
+        not backtest on) and the validation gates judge it: rank IC over many predictions,
+        deflated Sharpe (penalised by every attempt your pod made, this pitch included),
+        capacity (the capital at which trading costs eat half the edge) and correlation with
+        the other pods' pitches. The answer says whether the strategy is eligible for capital.
+        A pitch is itself an attempt.
+        """
+        return await call("POST", "/pitches", body={
+            "hypothesis": hypothesis, "data_needed": data_needed, "team": team,
+            "budget_usd": budget_usd, "rule": rule})
+
+    @api_tool(server, method="GET", path="/pitches")
+    async def list_pitches(
+        pod_id: Annotated[int | None, Field(description="Default: your own pod.", ge=1, le=MAX_ID)] = None,
+    ) -> Any:
+        """Every pitch of your pod, oldest first, each with the gates' verdict."""
+        return await call("GET", "/pitches", params={"pod_id": pod_id})
+
+    @api_tool(server, method="GET", path="/pitches/{pitch_id}")
+    async def get_pitch(
+        pitch_id: Annotated[int, Field(description="The pitch's id.", ge=1, le=MAX_ID)],
+    ) -> Any:
+        """One pitch and its verdict, gate by gate."""
+        return await call("GET", f"/pitches/{pitch_id}")
 
     # --- Orders & portfolio -------------------------------------------------
 

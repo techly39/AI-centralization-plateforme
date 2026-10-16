@@ -85,6 +85,30 @@ class MetricsConfig(BaseModel):
     trading_days_per_year: int = Field(default=252, gt=0)
 
 
+class GatesConfig(BaseModel):
+    """The validation gates' law (app/strategy/gates.py): every threshold a pitch is judged by.
+    Initial parameters from the Human's notes (IC ≈ 0.03 on many predictions), never in code."""
+
+    # The most recent days before today that research may not see; pitches are judged on them.
+    holdout_days: int = Field(default=180, ge=30)
+    # The longest window one research backtest may cover.
+    research_max_days: int = Field(default=1095, ge=30)
+    # IC: mean rank IC at least this, over at least this many predictions.
+    min_ic: float = Field(default=0.03, gt=0.0, lt=1.0)
+    min_predictions: int = Field(default=300, ge=1)
+    # Deflated Sharpe: the probability that the true Sharpe beats the best of N luckless tries.
+    min_deflated_sharpe: float = Field(default=0.95, gt=0.0, lt=1.0)
+    # Fewer daily returns than this and a ratio or a correlation is null, not a number.
+    min_periods: int = Field(default=60, ge=10)
+    # Capacity: square-root impact, cost = k σ sqrt(traded / daily dollar volume) per trade;
+    # the capacity is the gross exposure (capital × gross) at which that cost eats this share of the edge.
+    impact_coefficient: float = Field(default=1.0, gt=0.0)
+    capacity_edge_share: float = Field(default=0.5, gt=0.0, le=1.0)
+    min_capacity_usd: float = Field(default=1_000_000.0, gt=0.0)
+    # Correlation of daily returns with any other pod's latest pitch: at most this.
+    max_correlation: float = Field(default=0.5, gt=0.0, le=1.0)
+
+
 class MCPConfig(BaseModel):
     """Settings for the MCP server (``mcp_server/``), not for the API itself.
 
@@ -174,6 +198,7 @@ class Settings(BaseSettings):
     oms: OMSConfig = Field(default_factory=OMSConfig)
     marketdata: MarketDataConfig = Field(default_factory=MarketDataConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+    gates: GatesConfig = Field(default_factory=GatesConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

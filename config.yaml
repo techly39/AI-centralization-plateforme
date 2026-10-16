@@ -32,6 +32,20 @@ metrics:
   risk_free_daily: 0.0         # subtracted from daily returns before the Sharpe ratio
   trading_days_per_year: 252   # used only to annualise the daily Sharpe
 
+# Validation gates: what a pitched strategy must pass before it is eligible for capital
+# (app/strategy/gates.py). Initial parameters, the firm's law; see the ADR on the pitch.
+gates:
+  holdout_days: 180            # the last days before today research may not see; pitches are judged on them
+  research_max_days: 1095      # the longest window of one research backtest
+  min_ic: 0.03                 # mean rank IC ...
+  min_predictions: 300         # ... over at least this many predictions
+  min_deflated_sharpe: 0.95    # P(true Sharpe > best of N luckless tries), N = the pod's attempts
+  min_periods: 60              # fewer daily returns → the ratio is null, not a number
+  impact_coefficient: 1.0      # square-root impact: cost = k σ sqrt(traded / daily dollar volume)
+  capacity_edge_share: 0.5     # capacity = capital at which impact eats this share of the edge
+  min_capacity_usd: 1000000    # a strategy must carry at least this much gross exposure
+  max_correlation: 0.5         # with any other pod's latest pitch, on the same days
+
 # MCP server (mcp_server/). It is a CLIENT of the API above, in its own process.
 # Leave api_key null here and pass it in the environment — this file is
 # committed, and the key is the identity every action is attributed to:

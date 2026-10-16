@@ -20,7 +20,7 @@ import argparse
 import dataclasses
 import json
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from alembic import command
@@ -46,7 +46,7 @@ from app.run_clock import RunClockError, install_run_clock, run_minds, start_bac
 #: Commands that do not run on the database's clock: ``init-db`` may find no
 #: schema yet, ``start-backtest`` creates the clock, ``serve`` installs it itself.
 _NO_RUN_CLOCK = frozenset({"init-db", "start-backtest", "serve", "compare-ledgers",
-                           "export-ledger"})
+                           "export-ledger", "gates"})
 
 
 def _alembic_config() -> AlembicConfig:
@@ -231,6 +231,40 @@ def cmd_export_ledger(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gates(args: argparse.Namespace) -> int:
+    """Judge a strategy-v1 rule on a bars file with the validation gates and print the verdict
+    (JSON). Pure: reads no database and no feed, so anyone can rerun a pitch's numbers on any
+    world. Exit 2 if a file or the rule is not readable."""
+    from pydantic import ValidationError
+
+    from app.strategy.files import BarsFileError, read_bars
+    from app.strategy.gates import judge
+    from app.strategy.rule import EvaluationError, StrategyRule, evaluate
+
+    fee = get_settings().oms.fee_rate
+    try:
+        if args.attempts < 1:
+            raise ValueError("--attempts counts this strategy itself: at least 1")
+        bars = read_bars(args.bars)
+        rule = StrategyRule.model_validate_json(args.rule.read_text())
+        start, end = date.fromisoformat(args.start), date.fromisoformat(args.end)
+        mine = evaluate(rule, bars, start=start, end=end, fee_rate=fee)
+        others = {}
+        for spec in args.other or []:
+            name, _, path = spec.partition("=")
+            if not name or not path:
+                raise ValueError(f"--other wants NAME=RULE_FILE, not {spec!r}")
+            theirs = evaluate(StrategyRule.model_validate_json(Path(path).read_text()), bars,
+                              start=start, end=end, fee_rate=fee)
+            others[name] = (theirs.days, theirs.returns)
+    except (OSError, ValueError, ValidationError, BarsFileError, EvaluationError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    verdict = judge(mine, attempts=args.attempts, others=others, law=get_settings().gates)
+    print(json.dumps({"rule": rule.model_dump(), **verdict}, sort_keys=True))
+    return 0
+
+
 def cmd_run_minds(_: argparse.Namespace) -> int:
     """Print what drove this run's minds, as the ledger proves it (B-051): ``{"minds": [...]}``,
     or ``{"minds": null}`` for a live run or a declaration the ledger does not support."""
@@ -327,6 +361,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_exp.add_argument("database", type=Path, help="a fund database file")
     p_exp.set_defaults(func=cmd_export_ledger)
+
+    p_gates = sub.add_parser(
+        "gates", help="read-only: judge a strategy rule on a bars file with the validation gates"
+    )
+    p_gates.add_argument("bars", type=Path,
+                         help="JSON: {ticker: [[day, open, high, low, close, volume], ...]} "
+                              "(or a prices-v1 package)")
+    p_gates.add_argument("rule", type=Path, help="JSON: a strategy-v1 rule")
+    p_gates.add_argument("--start", required=True, help="first day of the judged window (ISO)")
+    p_gates.add_argument("--end", required=True, help="the day after the window (ISO, exclusive)")
+    p_gates.add_argument("--attempts", type=int, default=1,
+                         help="how many strategies the pod tried, this one included (default 1)")
+    p_gates.add_argument("--other", action="append", metavar="NAME=RULE_FILE",
+                         help="another pod's rule, run on the same bars (repeatable)")
+    p_gates.set_defaults(func=cmd_gates)
 
     p_minds = sub.add_parser(
         "run-minds", help="read-only: what drove this run's minds, as the ledger proves it"

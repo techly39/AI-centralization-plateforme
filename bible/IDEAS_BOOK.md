@@ -116,7 +116,10 @@ Now: a `management` role and the leaderboard / pod metrics endpoints exist.
 
 ### The pitch, then a full report
 From: Human
-Status: not started
+Status: working (first slice)
+Now: a PM researches a strategy written as a rule (every backtest counted), pitches, and the gates
+(IC, deflated Sharpe, capacity, correlation) judge it on held-out days; the Human reads the verdict.
+Not yet: the backtest operator, the bull/bear debate, the full report, strategies as code.
 Before a pod gets capital, its PM pitches: the economic idea, the data it needs, the strategy as a
 function, backtest results, validation numbers, the team and budget asked for. Then a full report
 on what the pod will do. The pitch goes to a backtest operator (an agent who reruns the strategy
@@ -194,14 +197,14 @@ clock. This is the score that counts. Backtests are the training ground before i
 
 ### A strategy is an isolated function
 From: Human
-Status: not started
+Status: building
 A strategy must become a function: data (1999–2026) → strategy → result. Isolated, so it can be
 backtested on any period or synthetic world and rerun by someone else. Agent-written strategy code
 never runs inside the app process (it runs in a sandboxed subprocess).
 
 ### Validation gates before capital
 From: Human
-Status: not started
+Status: building
 A strategy gets capital only if it passes, on data it was not tuned on:
 - **Economic hypothesis:** a causal story ("two prices correlate" without a mechanism fails;
   gold and oil tankers needs the logic behind it).
@@ -385,6 +388,13 @@ From the real-model month (cycle 43, ADR-047 known limits): the mint lock is one
 the repo, so two clones minting at the same moment do not share it, and a lagging key list can hide
 a fresh mint; a turn whose cost went unstated is waited for 30 s, after which the ledger may record
 less than the provider later shows (the cap still holds, it is read from the provider).
+From the pitch and the gates (cycle 46, red-team): a PM can read the held-out days' prices, search
+rules offline with the same pure code, and pitch only the survivor with one counted attempt (on pure
+noise such a rule passes every gate). The real cure is a forward test on days that have not happened
+yet (paper incubation before capital). Also: the IC gate's prediction count is universe width ×
+rebalances, so a wide universe meets the floor on a few independent cross-sections. Auditor notes:
+the gates' verdict is written to the ledger under the PM's name, not physics'; each pitch re-runs
+every other pod's latest rule (worth a cache once there are many pods on live data).
 
 ### Paid to report holes
 From: Builder
@@ -401,7 +411,7 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 1. **The pitch and the gates.** A PM pitches; the strategy runs as an isolated function through the
    validation gates; the pitch and its numbers are visible to the Human. Cut in three (cycle 44
    plan), each one something you can see working:
-   a. *Ready:* a real PM researches a strategy written as a rule (no agent code runs yet), every
+   a. *Done, cycle 46:* a real PM researches a strategy written as a rule (no agent code runs yet), every
       research backtest counted, then pitches; the app's gates (IC, deflated Sharpe, capacity,
       correlation) judge it on a held-out window and the Human reads the verdict. The gates are
       proven first on a planted signal (must pass) and on noise (must fail).
