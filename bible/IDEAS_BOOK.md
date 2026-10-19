@@ -132,7 +132,7 @@ in a thread before the decision. The Human can read every pitch and comment; the
 
 ### Hiring new PMs: turnover
 From: Human
-Status: not started
+Status: planned (Next up 1b)
 (Matured from "a lot of turnover".) When a pod dies, the firm recruits: a new PM is created (new
 charter, maybe a different model, maybe inherited lessons) and must pitch to earn capital. The
 firm, not the Builder, decides how many pods it runs and who it hires, inside the agent caps.
@@ -238,21 +238,27 @@ year that is 10% β, 3% risky bets, 2% timing and 0% α "only followed the trend
 
 ### The allocation algorithm
 From: Human
-Status: not started
+Status: working (first slice)
 An algorithm, not management, moves capital fast to the most effective pods, by viability: a
 cost-adjusted, risk-adjusted score, penalised by correlation with the rest of the book and by
 current drawdown. Example from the notes: Pod #1 high volatility, 10K → 3K; Pod #2 low volatility,
 → 7K. Every allocation change is an event with its inputs, so it can be reproduced.
-Now: a pod has an allocation and an `allocation_set` event moves it (`app/registry/pods.py`
-`fund_pod`); nothing moves it automatically yet. The order system knows no reduce-only or closed pod.
+Now (cycle 48): every few days an algorithm re-weighs capital among the machine's pods by a cost-
+and risk-adjusted score of their forward days, cut for correlation with older pods and for drawdown,
+within limits per move (`app/capital/allocation.py`); every move is one event holding its inputs and
+redoes identically. Not yet: real minds' pods in the machine, the score fed real thinking costs.
 
 ### The central risk ladder
 From: Human
-Status: not started
+Status: working (first slice)
 Drawdown from the pod's high-water mark: **5% → capital halved; 7.5% → reduce-only plus a review;
 10% → the pod is closed** (post-mortem, then a new PM is hired). Plus firm-level limits (firm
 drawdown halves every pod's limits, then reduce-only), and per-position limits. Automatic,
 deterministic physics: no agent can talk its way past it.
+Now (cycle 48): the pod ladder is physics, checked at every clock advance from each pod's high-water
+mark: 5% halves its capital, 7.5% refuses its buys (403, logged), 10% sells everything and closes
+it. Not yet: the review after reduce-only, the post-mortem and the hire (Next up 1b), firm-level and
+per-position limits.
 
 ### Pod metrics
 From: Human
@@ -430,6 +436,11 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
 results.)
 
+Cycle 49 plan: order kept. 1b next, because the machine so far moves only scripted pods: hiring a
+real mind into a dead pod's place is the first time an agent, not a script, enters the machine, and
+it is the turnover the Human put at the heart of the firm. Its hard part is the Runtime taking a new
+mind in mid-run (the roster is fixed today) and recording it so the run still replays for $0.
+
 Cycle 47 plan: the multi-manager machine moves ahead of the debate. Why: a pitch that passes the
 gates leads nowhere today (no capital moves), and "eligible" must not mean money while the held-out
 days are readable; a forward trial with small capital on days that have not happened yet is both
@@ -447,6 +458,8 @@ verdicts move capital.
       and the good pod is never cut.
    b. *A dead pod is replaced.* When a pod closes, the firm hires a new PM (a real mind, a new
       charter) who researches and pitches; an eligible pitch enters the machine. Recorded, $0 replays.
+      Queued (cycle 49): a vacancy opens on close, the hiring law fills it at the next morning
+      under the cap, the new PM is handed the dead pod's post-mortem.
    c. *The firm lives a quarter.* Several real pods inside the machine for three simulated months:
       capital moves, pods die and are replaced. The first firm-scale run.
 2. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a

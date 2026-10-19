@@ -3,6 +3,22 @@
   "standard": "protocol/CYCLE.md §2 (ADR-046)",
   "missions": [
     {
+      "id": "pod-replacement",
+      "title": "A dead pod is replaced: when the risk ladder closes a pod, the firm hires a new PM, a real mind, who researches, pitches and can earn a seed",
+      "idea": "Hiring new PMs: turnover",
+      "acceptance": "acceptance/pod_replacement.py",
+      "demo": "uv run python acceptance/pod_replacement.py — a bleeding pod is closed, a vacancy opens, a new pod and PM are hired under the cap (a refusal when the budget does not fit), the new PM gets the post-mortem, researches and pitches; an eligible pitch is seeded, noise is not; a recorded real Haiku hire replays IDENTICAL for $0",
+      "status": "ready",
+      "estimate_sessions": 3,
+      "physics": true,
+      "depends_on": [
+        "capital-machine",
+        "pitch-gates"
+      ],
+      "branch": "idea/pod-replacement",
+      "notes": "The conductor's roster is fixed today (run_backtest takes the minds up front): adding a hired mind from a step on, and recording it in the cassette so replay rebuilds the same roster, is the hard part. A mid-run mint must hold the mint lock and fit the cap with every live key (book: Known physics holes, cycle 43). The new PM reads /capital: the corr_factor leak (cycle 48 hole) becomes reachable by a real mind; judge it. Hiring is decided by law (config) in this slice; a manager mind choosing the hire comes later."
+    },
+    {
       "id": "capital-machine",
       "title": "Capital follows results: eligible pods trade forward with a seed, an algorithm moves capital to what works, and the drawdown ladder cuts what bleeds",
       "idea": "The firm is a multi-manager hedge fund with high turnover",

@@ -1,54 +1,52 @@
-# Capital follows results: eligible pods trade forward with a seed, an algorithm moves capital to what works, and the drawdown ladder cuts what bleeds
+# A dead pod is replaced: when the risk ladder closes a pod, the firm hires a new PM, a real mind, who researches, pitches and can earn a seed
 
 ## How I understand it
-The firm is a multi-manager hedge fund: the centre holds the capital, the pods hold the ideas.
-Today a PM can pitch a strategy and the gates can call it eligible, but no money moves. Now:
-- The centre opens with the firm's capital (the law, in `config.yaml`, frozen for the run).
-- An eligible pitch earns a small seed at the next day. Its pod then trades its rule forward, on
-  days that had not happened when it was judged, through the ordinary order system.
-- Every few days an algorithm (not an agent) re-weighs capital: a cost- and risk-adjusted score of
-  each pod's forward days, cut for copying an older pod and for drawdown; capital moves toward the
-  best, within limits on each move. Every move is one event holding its inputs, so anyone can redo it.
-- The drawdown ladder is physics, checked every day from each pod's own high-water mark:
-  5% down → half its capital goes back to the centre; 7.5% → it may only sell; 10% → the pod is
-  closed, its positions sold and all its money returned. No agent can argue with it.
-- Long-short rules get no seed yet: the order system cannot short (said plainly in the ledger).
+High turnover is the heart of a multi-manager fund: a pod that bleeds is shut fast and a new PM is
+hired to pitch in its place. Today the ladder closes a pod and that is the end of it. Now:
+- When a pod is closed, physics opens a **vacancy** (an event naming the dead pod, why it died, and
+  its record). A halved or frozen pod opens none.
+- The firm's **hiring law** (`config.yaml`, frozen for the run like the capital law) says how many
+  pods may live at once, the model pool a new PM is drawn from (in turn), its thinking budget and
+  its charter. The law decides, not the Builder; a management mind choosing who to hire comes later.
+- At the next morning, the onboarding program (the Runtime, "Onboarding.exe") fills the vacancy:
+  a new pod, a new PM made from the hiring template, its own capped key minted inside the $50 cap.
+  If the budget does not fit the cap, there is no hire, and the refusal is an event.
+- The new PM's first morning hands it the **post-mortem** of the pod it replaces: the dead rule,
+  its forward days, the drawdown that closed it. Then it lives like the pitch desk: researches
+  (every backtest counted), pitches; an eligible pitch earns a seed at the next capital sweep and
+  the new pod trades forward. An ineligible one earns nothing.
+- The hire is in the recording, so the whole run, hire included, replays IDENTICAL for $0.
 
 ## What done looks like
-`uv run python acceptance/capital_machine.py` ($0, offline, a made-up market): four pods pitch
-rules that the gates find eligible. Then a hundred forward days pass:
-- the planted edge's capital grows several times; the good pod is never cut;
-- a pod whose edge died at the pitch (noise forward) is not raised and ends small;
-- a pod that looked different at the pitch but moves exactly like the edge pod forward is
-  penalised for the correlation and does not grow like the original;
-- a pod whose market collapses is halved at 5%, refused a buy at 7.5% (403, logged), closed at 10%
-  with every share sold and its money back at the centre; a closed pod's order is refused too;
-- a control: the same machine with one pod's thinking cost set high scores it lower;
-- each reallocation, redone from the inputs in its event, gives the same moves; rebuilding the
-  state from the ledger gives the same cash, positions, capital and stages.
+`uv run python acceptance/pod_replacement.py` ($0, offline):
+- A (scripted, a made-up market): a pod's market collapses; it is closed at 10% and one vacancy
+  opens; a halved pod opens none. The vacancy is filled at the next morning by a new pod and PM;
+  with a budget that does not fit the cap the hire is refused (event, no agent, no key). A scripted
+  new PM that pitches the planted rule is seeded and trades; one that pitches noise is not. The
+  live-pod limit holds. Rebuilding state from the ledger gives the same pods, agents and capital.
+- B (recorded, a real Haiku 5.5 PM hired mid-run): `replay --verify` says IDENTICAL from the file;
+  the ledger shows close → vacancy → hire → the post-mortem in its first wake → research → pitch →
+  the gates' verdict → seed or no seed, consistent with the verdict. Its cost, charged by the
+  system, is shown against its key.
 
 ## Plan
-1. Law: `capital:` in config (firm capital, seed, cadence, limits, ladder thresholds).
-2. A made-up market a run can live in: a provider serving given daily bars (under the same
-   look-ahead guard as every feed).
-3. Pure parts: `app/capital/allocation.py` (scores → moves) and the ladder (drawdown → stage).
-4. Physics: `app/capital/service.py` — open the centre, seed, ladder, reallocate; run on every
-   clock advance, before the order sweep (one lock across the advance); forced sales by physics through the order system; pod
-   stage written to the ledger and the pod row; rebuild re-derives it.
-5. Order system: a reduce-only pod's buy and any order of a closed pod are refused (403 + event);
-   pending orders are cancelled at the cut.
-6. The pod's mandate: what its rule wants held today (the rule engine, unchanged law), turned into
-   orders a scripted PM sends through `POST /orders`.
-7. `GET /capital` (the allocation table) + its MCP tool. An ADR for the new rules.
-Left out (slices b, c): hiring a replacement PM, real minds in the machine, firm-level drawdown
-limits, per-position limits, a review that lifts reduce-only, the live (non-backtest) scheduler.
+1. Law: `hiring:` in config (max live pods, model pool, budget per hire, charter template path).
+2. Physics: on close the capital machine writes `vacancy_opened`; `GET /vacancies` + MCP tool;
+   filling one (`POST /vacancies/{id}/fill`, management/registrar only) creates the pod and the
+   agent in one event chain; rebuild re-derives it.
+3. The post-mortem: a pure function of the ledger (rule, record, ladder steps), a data package.
+4. Runtime: the conductor reads the vacancies each morning, provisions a mind from the hiring
+   template (same checks as `provision`: cap, HALT, names), mints its key, adds it to the roster
+   from that step on. The cassette records the hire; replay rebuilds the same roster.
+5. Record one real run (a few cents of the cap), commit it under `evidence/pod-replacement/`.
+Left out: a manager mind who chooses the hire; firing a PM who never earns a seed (deadline);
+lessons library across generations; per-position and firm-level limits.
 
 ## Risk
-Money, the order system and market data: red-team + auditor before merge.
+Money, agent creation, key minting under the cap, the Runtime's gate: red-team + auditor before
+merge. Holes it stands on (fix inside): a mid-run mint must hold the mint lock and fit the cap
+with every live key; a pod can read its correlation from its own score row (the new PM reads
+/capital: judge whether that matters once a real mind reads it).
 
 ## Progress
-- cycle 47: planned.
-- cycle 48: built — law, made-up market, algorithm + ladder, the machine on every advance, order
-  limits, mandate, GET /capital, ADR-049; the demo passes (2 s); suite green. Next: red-team, auditor.
-- cycle 48 (cont.): the red-team's 8 holes fixed; the auditor's two blocks (copies earning a second
-  seed) fixed by a copy check as each seed is paid; third pass clean; merged.
+- cycle 49: planned.

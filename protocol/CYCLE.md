@@ -83,6 +83,11 @@ When the acceptance demo passes:
    physics/money/seal) and then the `auditor` (brief: `git diff main...HEAD`, NOW.md, the demo output,
    the red-team result). Both in the foreground, no `model` override. Fix every high finding and every
    BLOCK; lower findings → one line each under "Known physics holes" in the book.
+   A BLOCK names one path to a wrong outcome; before re-running the auditor, list every other path
+   to that same outcome (other orderings, two at once, closed or older objects) and add one test
+   that asserts the outcome itself never happens, not just the named path. (Cycle 49 plan, after
+   cycle 48 needed three auditor passes for one class of flaw; judged by: the next physics idea
+   passes the auditor in at most two rounds.)
 3. Merge: `git switch main && git merge --no-ff idea/<slug>`, suite on `main`, set the entry `done`,
    mark the idea `Status: working` in the book (update its "Now:" line), add one entry to
    `state/SHOWCASE.md`:
