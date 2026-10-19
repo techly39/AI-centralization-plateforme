@@ -1913,3 +1913,57 @@ market regime; the deflated Sharpe uses the null variance, not the measured spre
 trials.
 
 **Reversible.** Yes: new endpoints, events and permissions only; nothing existing changes meaning.
+
+## ADR-049 — The capital machine: eligible pitches earn a seed, an algorithm re-weighs capital on forward days, the drawdown ladder is physics (idea: capital follows results) — accepted (cycle 48)
+
+**Context.** The book's multi-manager firm: the centre holds the capital, the pods hold the ideas;
+capital follows results by an algorithm, and hard drawdown limits cut a losing pod. Until now an
+eligible pitch led nowhere, and its verdict rests on held-out days a PM can read (known hole,
+cycle 46): capital must be earned on days that had not happened when the pitch was judged.
+
+**Decision.**
+1. **The law** is `config.yaml` `capital:` (`app/config.py` `CapitalConfig`), frozen into the ledger
+   by `capital_opened` the first time an eligible pitch exists; a run is judged by the law it
+   opened with. Before that the machine does nothing.
+2. **The centre's cash** = the law's capital − every `allocation_set` marked `source: capital`.
+   Money moves only by `allocation_set` and by fills; no new reducer.
+3. **Seeds.** The first eligible pitch of a pod gets `seed_usd` at the next clock advance
+   (`capital_seeded`, which names the pitch and its rule: the pod's mandate). A long-short rule is
+   refused once (`capital_seed_refused`: the order system cannot short); a closed pod is never
+   re-seeded; later pitches of a seeded pod change nothing yet.
+4. **The machine runs on every backtest clock advance**, after the pending-order sweep, under
+   `OMS_LOCK`, as the system identity, in one transaction (`app/capital/service.py`). Not in live
+   mode yet (no live scheduler).
+5. **The forward record** of a machine pod: its daily equity from the seed day (the reports'
+   equity curve, closes known at now), returns with flows at the day's start (money moves at the
+   open of a backtest day; `daily_returns(flows_at="start")`).
+6. **The drawdown ladder** (physics, every advance): drawdown from the high-water mark of the
+   forward return index; `halve_at` (5%) → half the pod's equity recalled; `reduce_only_at` (7.5%)
+   → its pending buys cancelled and every new buy refused; `close_at` (10%) → every pending order
+   cancelled, every position sold, all its cash recalled, every new order refused. Stages only climb
+   (`pod_stage_changed`), mirrored on `pods.status`; `rebuild_state` re-derives it and
+   `pods.current_allocation` from the ledger. The refusal is `PodLimitError` → 403 + `permission_denied`.
+7. **A recall** sells a slice of every position pro rata at the market when the pod's cash is
+   short (`force_sell`: an ordinary order and fill, placed by the system identity only), then
+   moves the cash back.
+8. **The re-weighing** every `reallocate_every_days` (`app/capital/allocation.py`, pure): viability =
+   the t-statistic of the pod's net daily mean (thinking cost metered since the seed taken out) ×
+   (1 − its highest correlation with an *older* live pod) × (1 − drawdown / `close_at`). Null below
+   `min_track_days` (capital stays); below `raise_at` capital stays; not positive → down toward
+   `min_pod_usd`; the rest share `deploy_share` of the firm by viability, raises capped at
+   `max_pod_share` of the firm (never a cut for it); steps of at most `+max_raise`/`−max_cut`; no
+   move under `min_move`; cuts first, raises paid most viable first while the centre's cash lasts.
+   `capital_reallocated` holds the whole input and result: anyone can redo it.
+9. **A made-up market**: `BarsProvider` serves given daily bars under the base's look-ahead guard;
+   its world record is a fingerprint, never a bar.
+10. **The mandate** (`app/capital/mandate.py`) is a reader: the orders that bring the pod to what
+   its seeded rule holds today (`app/strategy/rule.py` `holding`, the backtest's law). The PM sends
+   them through `POST /orders`; physics never trades a pod's rule for it.
+11. `GET /capital` (+ MCP `get_capital`): own pod's row for pod members, the whole table and the
+   centre's cash with `read_cross_pod`.
+
+**Not yet** (slices b, c): a new PM hired for a closed pod; real minds in the machine; firm-level
+drawdown limits and per-position limits; a review that lifts reduce-only; the live scheduler;
+shorting.
+
+**Proof.** `acceptance/capital_machine.py`; `tests/test_capital.py`.
