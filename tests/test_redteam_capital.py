@@ -635,3 +635,39 @@ def test_auditor_capital_an_unrelated_rule_is_still_seeded(SessionFactory, clien
     assert r.status_code == 200
     db.expire_all()
     assert sorted(book(db)["pods"]) == sorted(p[0] for p in pods)
+
+
+def test_auditor_capital_a_closed_pods_rule_is_not_funded_afresh(
+        SessionFactory, client, db, monkeypatch):
+    """WARN (auditor, third pass). The ladder closed pod 1 and its rule R; pod 2 pitches R byte for
+    byte. Neither the gate nor the seed may fund the rule the ladder killed under a new name."""
+    pods, runtime = _clone_world(SessionFactory, monkeypatch)
+    (pod1, pm1, _), (pod2, pm2, key2) = pods
+    sub = append_event(db, type=EVENT_PITCH_SUBMITTED, actor_agent_id=pm1,
+                       payload={"pod_id": pod1, "agent_id": pm1, "rule": CLONE_R})
+    append_event(db, type=EVENT_PITCH_JUDGED, actor_agent_id=pm1,
+                 payload={"pitch_id": sub.id, "pod_id": pod1, "eligible": True})
+    db.commit()
+    assert client.post("/clock/advance", headers=H(runtime), json={"days": 1}).status_code == 200
+    append_event(db, type="pod_stage_changed", actor_agent_id=None,
+                 payload={"pod_id": pod1, "from": "active", "to": "closed"})
+    db.get(Pod, pod1).status = "closed"
+    append_event(db, type=EVENT_PITCH_SUBMITTED, actor_agent_id=pm1,      # pod 1 moves on
+                 payload={"pod_id": pod1, "agent_id": pm1,
+                          "rule": {**CLONE_BASE, "universe": ["A5", "A6", "A7", "A8", "A9"]}})
+    db.commit()
+    r = client.post("/pitches", headers=H(key2), json={
+        "hypothesis": "winners keep winning", "data_needed": "daily prices", "team": "the PM",
+        "budget_usd": 0.0, "rule": CLONE_R})
+    assert r.status_code == 201, r.text
+    verdict = r.json()["verdict"]
+    assert not verdict["eligible"]
+    assert verdict["gates"][0]["against"][f"pod {pod1} mandate"] == pytest.approx(1.0)
+    sub = append_event(db, type=EVENT_PITCH_SUBMITTED, actor_agent_id=pm2,  # and if it got through
+                       payload={"pod_id": pod2, "agent_id": pm2, "rule": CLONE_R})
+    append_event(db, type=EVENT_PITCH_JUDGED, actor_agent_id=pm2,
+                 payload={"pitch_id": sub.id, "pod_id": pod2, "eligible": True})
+    db.commit()
+    assert client.post("/clock/advance", headers=H(runtime), json={"days": 1}).status_code == 200
+    db.expire_all()
+    assert pod2 not in book(db)["pods"]

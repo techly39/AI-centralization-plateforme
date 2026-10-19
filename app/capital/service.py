@@ -350,7 +350,15 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
             reason = "a long-short rule: the order system cannot short yet, so it cannot trade it"
         gate = None
         if reason is None:
-            gate = _copy_check(session, pitch=pitch, provider=provider)
+            if book(session)["centre_cash"] < law.seed_usd:
+                continue    # the centre is short today; the pitch waits
+            try:
+                gate = _copy_check(session, pitch=pitch, provider=provider)
+            except MarketDataError as exc:
+                # One pitch's feed trouble must not stall the ladder for every pod (auditor):
+                # this pitch waits for the next advance.
+                logger.bind(pod_id=pitch["pod_id"]).warning("copy check: no data, waits: {}", exc)
+                continue
             if gate is not None and gate["result"] == "fail":
                 reason = (f"it moves like a rule the centre already funds (correlation "
                           f"{gate['value']:.2f} above {gate['threshold']:.2f})")
