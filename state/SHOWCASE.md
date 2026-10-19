@@ -13,6 +13,9 @@ What: <one or two lines>  ·  Try: `<demo command>`  ·  See: <what appears>
 
 ---
 
+## Capital follows results: the centre funds what works and the drawdown ladder cuts what bleeds (cycle 48, 2026-10-19)
+What: an eligible pitch earns a seed and trades forward; an algorithm moves capital toward the pods that earn it, net of thinking cost and cut for copying; a pod that falls 5% is halved, 7.5% may only sell, 10% is closed and its money goes back  ·  Try: `uv run python acceptance/capital_machine.py`  ·  See: 100 days of an allocation table, the planted edge growing from $200k to about $3.4M, the copy staying small, the bleeder halved, frozen and closed, its refused buys
+
 ## A PM pitches a strategy and the validation gates judge it (cycle 46, 2026-10-16)
 What: a real AI PM researched four strategy rules (each try counted), pitched the best one, and the
 gates judged it on six months it was not tuned on: it failed, and the PM explained why it overfit.

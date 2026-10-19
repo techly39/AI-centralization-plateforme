@@ -139,6 +139,34 @@ def _std(xs: Sequence[float]) -> float:
     return math.sqrt(sum((x - mean) ** 2 for x in xs) / (n - 1)) if n > 1 else 0.0
 
 
+def _score(rule: StrategyRule, close: Mapping[date, float], calendar: Sequence[date],
+           i: int) -> float | None:
+    """The rule's score for one ticker on ``calendar[i]``, from closes up to that day only."""
+    if i < rule.lookback:
+        return None
+    if rule.signal == "low_volatility":
+        closes = [close[calendar[j]] for j in range(i - rule.lookback, i + 1)]
+        return -_std([b / a - 1.0 for a, b in zip(closes, closes[1:])])
+    change = close[calendar[i]] / close[calendar[i - rule.lookback]] - 1.0
+    return change if rule.signal == "momentum" else -change
+
+
+def _targets(rule: StrategyRule, scores: Mapping[str, float]) -> dict[str, float]:
+    """The weights a rebalance sets from a full set of scores (ties broken by ticker name)."""
+    ranked = sorted(rule.universe, key=lambda t: (-scores[t], t))
+    weights = dict.fromkeys(rule.universe, 0.0)
+    if rule.side == "long_only":
+        for t in ranked[: rule.top_n]:
+            weights[t] = rule.gross / rule.top_n
+    else:
+        leg = rule.gross / (2 * rule.top_n)
+        for t in ranked[: rule.top_n]:
+            weights[t] = leg
+        for t in ranked[-rule.top_n :]:
+            weights[t] = -leg
+    return weights
+
+
 def evaluate(
     rule: StrategyRule,
     bars: Mapping[str, Sequence[Bar]],
@@ -167,27 +195,10 @@ def evaluate(
         return [close[ticker][calendar[j]] for j in range(upto - length, upto + 1)]
 
     def score(ticker: str, i: int) -> float | None:
-        if i < rule.lookback:
-            return None
-        if rule.signal == "low_volatility":
-            closes = series(ticker, i, rule.lookback)
-            return -_std([b / a - 1.0 for a, b in zip(closes, closes[1:])])
-        change = close[ticker][calendar[i]] / close[ticker][calendar[i - rule.lookback]] - 1.0
-        return change if rule.signal == "momentum" else -change
+        return _score(rule, close[ticker], calendar, i)
 
     def targets(scores: dict[str, float]) -> dict[str, float]:
-        ranked = sorted(rule.universe, key=lambda t: (-scores[t], t))
-        weights = dict.fromkeys(rule.universe, 0.0)
-        if rule.side == "long_only":
-            for t in ranked[: rule.top_n]:
-                weights[t] = rule.gross / rule.top_n
-        else:
-            leg = rule.gross / (2 * rule.top_n)
-            for t in ranked[: rule.top_n]:
-                weights[t] = leg
-            for t in ranked[-rule.top_n :]:
-                weights[t] = -leg
-        return weights
+        return _targets(rule, scores)
 
     def impact(ticker: str, i: int, trade: float) -> float:
         if i < IMPACT_WINDOW:
@@ -255,3 +266,36 @@ def evaluate(
         impact_per_sqrt_dollar=impact_sum / len(days),
         warnings=tuple(warnings),
     )
+
+
+@dataclass(frozen=True)
+class Holding:
+    """What a rule holds going forward: the weights its latest rebalance set (idea: capital follows
+    results — a pod trades its rule on days that had not happened when it was judged)."""
+
+    #: The last shared day whose close is known: the day the weights are held from.
+    day: date
+    #: The decision day of the latest rebalance (``start``'s first shared day, then every
+    #: ``rebalance_every`` shared days), whose closes set the weights.
+    rebalanced_on: date
+    weights: dict[str, float]
+
+
+def holding(rule: StrategyRule, bars: Mapping[str, Sequence[Bar]], *, start: date) -> Holding:
+    """The weights ``rule`` holds after the last shared day of ``bars``, its rebalances counted from
+    the first shared day on or after ``start`` — the same law as :func:`evaluate`, whose decision
+    days these are. Flat when the latest rebalance had not ``lookback`` earlier shared days."""
+    calendar = _shared_calendar(rule, bars)
+    first = next((i for i, d in enumerate(calendar) if d >= start), None)
+    if first is None:
+        raise EvaluationError(f"no shared trading day on or after {start}")
+    close = {t: {b.ts.date(): b.close for b in bars[t]} for t in rule.universe}
+    if any(close[t][d] <= 0 or not math.isfinite(close[t][d]) for t in rule.universe
+           for d in calendar):
+        raise EvaluationError("a close is not a positive finite price")
+    last = len(calendar) - 1
+    at = first + (last - first) // rule.rebalance_every * rule.rebalance_every
+    scores = {t: _score(rule, close[t], calendar, at) for t in rule.universe}
+    weights = (_targets(rule, scores) if all(s is not None for s in scores.values())
+               else dict.fromkeys(rule.universe, 0.0))
+    return Holding(day=calendar[last], rebalanced_on=calendar[at], weights=weights)

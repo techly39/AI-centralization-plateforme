@@ -25,11 +25,14 @@ from app.api.schemas import (
     RunMindsIn,
     RunMindsOut,
 )
+from app.capital.service import safe_sweep
 from app.clock import get_clock
 from app.db.base import get_session
 from app.db.models import Agent
 from app.ledger.events import ledger_now
+from app.marketdata import get_provider
 from app.oms.monitor import check_pending_orders
+from app.oms.service import OMS_LOCK
 from app.registry.auth import require
 from app.registry.permissions import Action
 from app.run_clock import RunClockError, RunMindsError, advance, declare_minds
@@ -53,15 +56,23 @@ def advance_clock(
     agent: Agent = Depends(require(Action.CONTROL_CLOCK)),
     session: Session = Depends(get_session),
 ) -> ClockAdvanceOut:
-    try:
-        previous, now = advance(
-            session, minutes=body.total_minutes, actor_agent_id=agent.id
-        )
-    except RunClockError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
-    # Pending limit orders are checked on every advance, by the same sweep the
-    # live scheduler runs on a timer (TRD §9): one code path for both modes.
-    sweep = check_pending_orders(session)
+    # One hold of OMS_LOCK across the whole advance (red-team, capital machine): no order is
+    # placed or filled at a now the risk ladder has not judged yet.
+    with OMS_LOCK:
+        try:
+            previous, now = advance(
+                session, minutes=body.total_minutes, actor_agent_id=agent.id
+            )
+        except RunClockError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        # First the capital machine (idea: capital follows results): the drawdown ladder, seeds
+        # for eligible pitches, and the re-weighing when it is due. A no-op until a pitch is
+        # eligible. Before the order sweep, so a pod the ladder freezes now has its buys cancelled
+        # before any of them can fill at this now.
+        safe_sweep(session, provider=get_provider())
+        # Pending limit orders are checked on every advance, by the same sweep the
+        # live scheduler runs on a timer (TRD §9): one code path for both modes.
+        sweep = check_pending_orders(session)
     return ClockAdvanceOut(
         mode=get_clock().mode,
         previous=previous,

@@ -25,6 +25,7 @@ from app.marketdata.base import (
     normalise_ticker,
     validate_window,
 )
+from app.marketdata.bars_provider import BarsProvider
 from app.marketdata.static_provider import StaticProvider
 from app.marketdata.synthetic_provider import SyntheticProvider
 from app.marketdata.yfinance_provider import YFinanceProvider
@@ -65,6 +66,7 @@ __all__ = [
     "LIVE_QUOTE_WINDOW",
     "VALID_INTERVALS",
     "Bar",
+    "BarsProvider",
     "FeedDataError",
     "Interval",
     "InvalidRequestError",

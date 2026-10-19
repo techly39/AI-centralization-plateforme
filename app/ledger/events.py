@@ -53,6 +53,15 @@ EVENT_RESEARCH_BACKTEST_RUN = "research_backtest_run"  # payload: {pod_id, agent
 EVENT_PITCH_SUBMITTED = "pitch_submitted"  # payload: {pod_id, agent_id, hypothesis, data_needed, team, budget_usd, rule}
 EVENT_PITCH_JUDGED = "pitch_judged"        # payload: {pitch_id, pod_id, window, attempts, eligible, gates, performance, law}
 
+# The capital machine (app/capital/service.py). Audit only: money moves by allocation_set and
+# order_filled; the pod's stage is mirrored on its row (rebuild_state re-derives it).
+EVENT_CAPITAL_OPENED = "capital_opened"            # payload: {law, firm_capital_usd}
+EVENT_CAPITAL_SEEDED = "capital_seeded"            # payload: {pod_id, pitch_id, seed_usd, rule, cost_at_seed_usd}
+EVENT_CAPITAL_SEED_REFUSED = "capital_seed_refused"  # payload: {pod_id, pitch_id, reason}
+EVENT_CAPITAL_REALLOCATED = "capital_reallocated"  # payload: {day, inputs: {centre_cash, pods}, result}
+EVENT_POD_STAGE_CHANGED = "pod_stage_changed"      # payload: {pod_id, from, to, drawdown, index, high_water}
+EVENT_CAPITAL_SWEEP_FAILED = "capital_sweep_failed"  # payload: {error}: the machine skipped this advance
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}
