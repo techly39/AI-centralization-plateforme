@@ -326,13 +326,16 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
 
 
 def safe_sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] | None:
-    """:func:`sweep` for the clock advance: an order-system refusal inside a recall (no price for
-    a position) is logged, never a failed advance."""
+    """:func:`sweep` for the clock advance, which has already moved and committed: a failure of
+    the machine (rolled back whole) is logged loudly, never turned into a failed advance; the next
+    advance runs the machine again."""
     try:
         return sweep(session, provider=provider)
     except OMSError as exc:
         logger.warning("capital sweep skipped: {}", exc)
-        return None
+    except Exception:  # noqa: BLE001 - see the docstring
+        logger.exception("capital sweep failed")
+    return None
 
 
 def capital_view(session: Session, *, pod_id: int | None) -> dict[str, Any]:
