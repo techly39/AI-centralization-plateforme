@@ -179,3 +179,13 @@ def test_who_may_read_and_who_may_hire(client, admin_key, make_pod, close, pm_fa
     assert client.get("/vacancies/99999", headers=h(hired)).status_code == 403
     assert client.get("/vacancies/99999", headers=h(admin_key)).status_code == 404
     assert len(client.get("/vacancies", headers=h(admin_key)).json()) == 2
+
+
+def test_the_mandate_is_a_seeded_pods_own_reading(client, make_pod, pm_factory, admin_key):
+    make_pod(1)
+    make_pod(2)
+    _, mine = pm_factory("pm-1", 1)
+    _, other = pm_factory("pm-2", 2)
+    assert client.get("/mandate", headers=h(mine)).status_code == 404     # no seed yet
+    assert client.get("/mandate?pod_id=2", headers=h(mine)).status_code == 403
+    assert client.get("/mandate?pod_id=1", headers=h(admin_key)).status_code == 404

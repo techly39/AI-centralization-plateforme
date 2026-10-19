@@ -399,6 +399,13 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """
         return await call("GET", "/capital", params={"pod_id": pod_id})
 
+    @api_tool(server, method="GET", path="/mandate")
+    async def get_mandate() -> Any:
+        """Once your pod is seeded: the orders that bring your book to what your funded rule holds
+        today (sells first, sized to your equity). Nothing is placed: send each with place_order.
+        404 while your pod has no seed."""
+        return await call("GET", "/mandate")
+
     # --- Vacancies: a closed pod, and the hire that replaces it ----------------
 
     @api_tool(server, method="GET", path="/vacancies")

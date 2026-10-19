@@ -202,6 +202,7 @@ _EVERY_ROUTE = [
                                    "lookback": 20, "rebalance_every": 5, "top_n": 1}}),
     # Hiring (idea: a dead pod is replaced): the Runtime's onboarding hires with the registrar's
     # key; the clock key stays the narrowest key in the world.
+    ("GET", "/mandate", None),
     ("GET", "/vacancies", None),
     ("GET", "/vacancies/1", None),
     ("POST", "/vacancies/1/fill", None),

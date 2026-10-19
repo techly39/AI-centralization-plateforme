@@ -48,7 +48,6 @@ from fastapi.testclient import TestClient  # noqa: E402
 from loguru import logger  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-from app.capital.mandate import mandate_orders  # noqa: E402
 from app.capital.service import book  # noqa: E402
 from app.cli import main as fund_env  # noqa: E402
 from app.config import get_settings  # noqa: E402
@@ -206,13 +205,12 @@ class Firm:
         history = []
         for day in range(FORWARD):
             self.morning(day)
-            with session_scope() as s:
-                machine = book(s)["pods"]
-                plans = {name: mandate_orders(s, pod_id=p["id"], provider=self.provider)
-                         for name, p in self.pods.items()
-                         if p["id"] in machine and machine[p["id"]]["stage"] != "closed"}
-            for name, plan in plans.items():
-                for order in plan["orders"]:
+            for name, p in self.pods.items():
+                # Each PM reads its own mandate (404 until its pod is seeded) and sends the orders.
+                r = self.client.get("/mandate", headers=h(p["key"]))
+                if r.status_code != 200:
+                    continue
+                for order in r.json()["orders"]:
                     self.client.post("/orders", headers=h(self.pods[name]["key"]), json={
                         "ticker": order["ticker"], "side": order["side"], "qty": order["qty"],
                         "price_type": "market", "justification": "my rule's rebalance"})
