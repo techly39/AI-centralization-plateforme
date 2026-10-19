@@ -17,17 +17,24 @@ Costs $0 and needs no network.
        hire-1 pitches the planted rule on fresh names (F)  → eligible → seeded → trades forward
        hire-2 pitches the same rule on pure noise (N)      → not eligible → no seed
      A vacancy is filled once; rebuilding from the ledger gives the same cash, positions, pods.
-  B  the Runtime takes a hire in mid-run (a recorded run with a real model PM hired into a dead
-     pod's place): ``replay --verify`` IDENTICAL from the file, $0. Not built yet.
+  B  the Runtime hires mid-run, in a hosted world whose market (a recipe: app/marketdata/made_up.py)
+     crashes the one pod's sector 8 days after the pitch: the ladder closes it, a vacancy opens,
+     the next morning ``fund-runtime backtest --hire`` fills it and the new PM wakes with the
+     post-mortem; its pitch is judged and a seed follows the verdict.
+       B0 a scripted rehearsal, recorded now: ``replay --verify`` IDENTICAL, $0
+       B  the recorded real hire (``evidence/pod-replacement/hire.cassette.json``): a real model on
+          its own metered key, inside the cap; ``replay --verify`` IDENTICAL from the file, $0
 
     uv run python acceptance/pod_replacement.py        # exit 0 = the idea works
 """
 
 from __future__ import annotations
 
-import math
+import hashlib
+import json
 import os
-import random
+import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -55,7 +62,8 @@ from app.db.base import session_scope  # noqa: E402
 from app.db.models import Agent, AgentRole, CashBalance, Event, Pod, Position  # noqa: E402
 from app.ledger.rebuild import rebuild_state  # noqa: E402
 from app.main import create_app  # noqa: E402
-from app.marketdata import Bar, BarsProvider, get_provider, set_provider  # noqa: E402
+from app.marketdata import BarsProvider, get_provider, set_provider  # noqa: E402
+from app.marketdata.made_up import Family, MadeUpMarket, bars  # noqa: E402
 from app.registry.pods import create_pod  # noqa: E402
 from app.registry.service import register_agent, seed_runtime_agent  # noqa: E402
 from app.run_clock import start_backtest  # noqa: E402
@@ -87,39 +95,12 @@ def check(name: str, ok: bool, detail: str = "") -> bool:
 
 # --- the made-up market -------------------------------------------------------------------------
 
-def market() -> dict[str, list[Bar]]:
-    rng = random.Random(SEED)
-    days = (PITCH_DAY - ORIGIN).days + FORWARD + 5
-    pitch = (PITCH_DAY - ORIGIN).days
-    innovation = PLANTED * math.sqrt(1 - 0.99**2)
-    bars = {}
-    for family, (width, fate) in FAMILIES.items():
-        for k in range(width):
-            name, mu, path = f"{family}{k:02d}", rng.gauss(0, PLANTED), []
-            for d in range(days):
-                mu = 0.99 * mu + innovation * rng.gauss(0, 1)
-                eps = rng.gauss(0, 1)
-                if fate == "noise":
-                    path.append(NOISE * eps)
-                elif d < pitch or fate == "edge":
-                    path.append(mu + NOISE * eps)
-                elif fate.startswith("sink:"):
-                    path.append(-float(fate[5:]) + 0.003 * eps)
-                elif fate.startswith("crash:"):   # quiet, then the sector gaps down for 3 days
-                    crash = pitch + int(fate[6:])
-                    path.append(-0.05 if crash <= d < crash + 3 else 0.003 * eps)
-                elif d < pitch + 14:   # dip: about 6 % down in two weeks, then it holds
-                    path.append(-0.0045 + 0.0005 * eps)
-                else:
-                    path.append(0.0004 + 0.0005 * eps)
-            price, rows = 40.0 + 3 * (sum(map(ord, name)) % 7), []
-            for d, r in enumerate(path):
-                opened, price = price, price * math.exp(r)
-                ts = datetime.combine(ORIGIN + timedelta(d), datetime.min.time(), UTC)
-                rows.append(Bar(ts=ts, open=opened, high=max(opened, price) * 1.002,
-                                low=min(opened, price) * 0.998, close=price, volume=5e7 / price))
-            bars[name] = rows
-    return bars
+#: The market, as a recipe (app/marketdata/made_up.py): the same one a hosted world can be built from.
+MARKET = MadeUpMarket(seed=SEED, origin=ORIGIN, pivot=PITCH_DAY,
+                      days=(PITCH_DAY - ORIGIN).days + FORWARD + 5, noise=NOISE, planted=PLANTED,
+                      families=[Family(prefix=p, width=w, fate=fate.split(":")[0],
+                                       rate=float(fate.split(":")[1]) if ":" in fate else 0.0)
+                                for p, (w, fate) in FAMILIES.items()])
 
 
 def rule(family: str, top_n: int) -> dict:
@@ -141,7 +122,7 @@ def events(s, type_: str) -> list[dict]:
 class Firm:
     def __init__(self) -> None:
         assert fund_env(["init-db"]) == 0
-        set_provider(BarsProvider(market()))
+        set_provider(BarsProvider(bars(MARKET)))
         self.provider = get_provider()
         with session_scope() as s:
             start_backtest(s, start=datetime.combine(PITCH_DAY, datetime.min.time(), UTC))
@@ -343,9 +324,163 @@ def _snapshot(s) -> dict:
                            for p in s.scalars(select(Pod)))}
 
 
-def runtime_hire() -> None:
-    check("B: the Runtime takes a hire in mid-run and a recorded real hire replays IDENTICAL",
-          False, "not built yet (next session)")
+# --- B: the Runtime hires mid-run, in a hosted world -------------------------------------------
+
+EVIDENCE = REPO / "evidence" / "pod-replacement" / "hire.cassette.json"
+#: The hosted world's key (ADR-045: never in the cassette; whoever verifies must know it).
+KEY = hashlib.sha256(b"fund-pod-replacement/1").hexdigest()
+SECRET = re.compile(r"sk-or-[A-Za-z0-9-]{8,}")
+#: The world: one pod whose sector crashes 8 days after the pivot; fresh names with an edge, and
+#: noise, for whoever is hired to research.
+WORLD = {"start": "2024-09-01T14:30:00Z", "admin": "hire-mgmt",
+         "pods": [{"name": "doomed", "allocation": 0}],
+         "market": {"seed": 11, "origin": "2023-01-01", "pivot": "2024-09-01", "days": 640,
+                    "noise": NOISE, "planted": PLANTED, "families": [
+                        {"prefix": "B", "width": 10, "fate": "crash", "rate": 8},
+                        {"prefix": "F", "width": 20, "fate": "edge"},
+                        {"prefix": "N", "width": 20, "fate": "noise"}]}}
+STEPS, MAX_TOOL_CALLS = 24, 24
+#: What a hired PM may do: read its post-mortem, research, pitch, read its capital and mandate, trade.
+HIRE_TOOLS = ["whoami", "get_clock", "get_vacancy", "run_research_backtest",
+              "list_research_backtests", "submit_pitch", "list_pitches", "get_capital",
+              "get_mandate", "place_order", "get_portfolio"]
+TEMPLATES = {"scripted": {"provider": "scripted", "script": "pitch-pm"},
+             "openrouter": {"provider": "openrouter", "tools": HIRE_TOOLS}}
+
+
+def write_world(directory: Path, template: str) -> None:
+    """The hosted run's files: the world, the input, the doomed pod's PM, the hiring template."""
+    (directory / "specs").mkdir(parents=True, exist_ok=True)
+    (directory / "world.json").write_text(json.dumps(WORLD))
+    doomed_rule = {**MOMENTUM, "universe": [f"B{k:02d}" for k in range(10)], "top_n": 2}
+    rules = {"doomed-pm": doomed_rule}
+    if template == "scripted":   # the scripted hire pitches the planted names
+        rules["hire-1-pm"] = {**MOMENTUM, "universe": [f"F{k:02d}" for k in range(20)], "top_n": 5}
+    (directory / "input.json").write_text(json.dumps({
+        "universe": [f"F{k:02d}" for k in range(20)] + [f"N{k:02d}" for k in range(20)],
+        "pitch_rules": rules}))
+    (directory / "specs" / "doomed-pm.yaml").write_text(json.dumps({
+        "id": "doomed-pm", "name": "doomed-pm", "role": "pm", "pod": 1, "provider": "scripted",
+        "script": "pitch-pm", "charter": "Pitch once, then trade the mandate."}))
+    (directory / "hire.yaml").write_text(json.dumps(TEMPLATES[template]))
+
+
+def fund_runtime(argv: list[str], cwd: Path, *, offline: bool = True) -> subprocess.CompletedProcess:
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("FUND_", "OPENROUTER")) and k.lower() not in {
+               "http_proxy", "https_proxy", "all_proxy"}}
+    (cwd / "vtmp").mkdir(exist_ok=True)
+    env.update({"FUND_MARKETDATA__SYNTHETIC_KEY": KEY, "TMPDIR": str(cwd / "vtmp"),
+                "FUND_DATABASE_URL": f"sqlite:///{cwd / 'sentinel.db'}"})
+    if offline:
+        env.update({"HTTPS_PROXY": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1:9"})
+    return subprocess.run(["uv", "run", "--project", str(REPO), "fund-runtime", *argv], cwd=cwd,
+                          env=env, capture_output=True, text=True, timeout=900)
+
+
+def verify(text: str, label: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="fund-pod-replacement-") as t:
+        lone = Path(t) / "run.cassette.json"
+        lone.write_text(text, encoding="ascii")
+        r = fund_runtime(["replay", "--cassette", lone.name, "--verify"], Path(t))
+        line, _, rest = r.stdout.partition("\n")
+        try:
+            ev = json.loads(rest)
+        except ValueError:
+            ev = {}
+        check(f"{label}: replay --verify from the file alone is IDENTICAL, at $0",
+              r.returncode == 0 and line.startswith("IDENTICAL:") and ev.get("replay_usd") == 0,
+              f"exit {r.returncode}: {line or r.stderr.strip()[-300:]}")
+
+
+def chain(doc: dict, label: str) -> dict:
+    """The hire, as the recorded ledger and run tell it: close → vacancy → fill → the new PM's
+    first wake with its post-mortem → its pitch → the verdict → a seed if and only if eligible."""
+    rows = [(r[0], r[2], r[3], json.loads(r[4])) for r in (doc.get("ledger") or {}).get("rows") or []]
+    run = (doc.get("outcome") or {}).get("run") or {}
+    of = lambda t: [(i, a, p) for i, a, t2, p in rows if t2 == t]  # noqa: E731
+    closed = [(i, p) for i, _, p in of("pod_stage_changed") if p["to"] == "closed"]
+    opened = [(i, p) for i, _, p in of("vacancy_opened")]
+    filled = [(i, p) for i, _, p in of("vacancy_filled")]
+    hired = [h for h in run.get("hires") or [] if h["outcome"] == "hired"]
+    ok = (len(closed) == 1 and len(opened) == 1 and opened[0][1]["pod_id"] == closed[0][1]["pod_id"]
+          and opened[0][0] > closed[0][0] and len(filled) == 1
+          and filled[0][1]["vacancy_id"] == opened[0][0] and len(hired) == 1
+          and hired[0]["agent_id"] == filled[0][1]["agent_id"])
+    check(f"{label}: the crash closes the pod, a vacancy opens, the next morning it is filled",
+          ok, f"closed pod {closed[0][1]['pod_id']} at {closed[0][1]['drawdown']:.1%}; hire "
+              f"{filled[0][1]['agent_name']} into pod {filled[0][1]['pod_id']} at step "
+              f"{hired[0]['step']}" if ok else str((closed, opened, filled, hired))[:300])
+    if not ok:
+        return {}
+    pod, agent, step = filled[0][1]["pod_id"], filled[0][1]["agent_id"], hired[0]["step"]
+    wakes = [(s["step"], w) for s in run.get("steps") or [] for w in s.get("wakes") or []
+             if w["spec_id"] == hired[0]["spec_id"]]
+    first = json.loads(wakes[0][1]["transcript"][1]["content"]) if wakes else {}
+    check(f"{label}: the new PM wakes that morning, handed the dead pod's post-mortem",
+          bool(wakes) and wakes[0][0] == step
+          and (first.get("input", {}).get("post_mortem") or {}).get("pod_name") == "doomed",
+          f"{len(wakes)} wakes from step {wakes[0][0] if wakes else None}")
+    research = [p for _, a, p in of("research_backtest_run") if p["pod_id"] == pod]
+    pitches = [(i, p) for i, a, p in of("pitch_submitted") if p["pod_id"] == pod]
+    judged = [p for _, _, p in of("pitch_judged") if p["pod_id"] == pod]
+    seeded = [p for _, _, p in of("capital_seeded") if p["pod_id"] == pod]
+    fills = [p for _, _, p in of("order_filled") if p["pod_id"] == pod]
+    eligible = bool(judged) and judged[-1]["eligible"]
+    check(f"{label}: the new PM pitched, the gates judged it, and the seed follows the verdict",
+          len(pitches) >= 1 and len(judged) == len(pitches)
+          and bool(seeded) == any(j["eligible"] for j in judged),
+          f"{len(research)} research backtests, {len(pitches)} pitch(es), "
+          f"{'ELIGIBLE' if eligible else 'not eligible'}, "
+          f"{'seeded $' + format(seeded[0]['seed_usd'], ',.0f') if seeded else 'no seed'}, "
+          f"{len(fills)} fills")
+    return {"pod": pod, "agent": agent, "research": research, "pitches": pitches,
+            "judged": judged, "seeded": seeded, "fills": fills, "wakes": wakes}
+
+
+def rehearsal() -> None:
+    """B0, $0: the same hosted run with a scripted hire, recorded and verified now."""
+    with tempfile.TemporaryDirectory(prefix="fund-pod-replacement-") as t:
+        tmp = Path(t)
+        write_world(tmp, "scripted")
+        r = fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
+                          "hire.yaml", "--input", "input.json", "--steps", str(STEPS),
+                          "--max-tool-calls", str(MAX_TOOL_CALLS), "--cassette",
+                          "rehearsal.cassette.json"], tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted run completes and is recorded",
+                     r.returncode == 0 and tape.is_file(), f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-300:] if r.returncode else 'completed'}"):
+            return
+        text = tape.read_text(encoding="ascii")
+    chain(json.loads(text), "B0")
+    verify(text, "B0")
+
+
+def recorded() -> dict:
+    """B: the recorded real hire (a real model, metered, inside the cap)."""
+    if not check("B: the recorded real hire exists", EVIDENCE.is_file(),
+                 str(EVIDENCE.relative_to(REPO))):
+        return {}
+    text = EVIDENCE.read_text(encoding="ascii")
+    doc = json.loads(text)
+    check("B: no provider key and no world key in it", SECRET.search(text) is None and KEY not in text)
+    hiring = doc["parameters"].get("hiring") or {}
+    keys = ((doc.get("outcome") or {}).get("metering") or {}).get("keys") or []
+    hire_key = next((k for k in keys if k["spec_id"].startswith("hire-")), None)
+    check("B: the hire is a real model on the metered provider, charged by the system",
+          hiring.get("provider") == "openrouter" and hire_key is not None
+          and hire_key["spent_usd_micros"] > 0
+          and hire_key["limit_usd_micros"] == round(get_settings().hiring.budget_usd * 1e6),
+          f"{hire_key['spec_id']}: ${hire_key['spent_usd_micros'] / 1e6:.4f} of a "
+          f"${hire_key['limit_usd_micros'] / 1e6:.2f} key" if hire_key else "no key")
+    seen = chain(doc, "B")
+    if seen:
+        check("B: the real PM researched before it pitched (every backtest counted)",
+              len(seen["research"]) >= 1
+              and [p["attempt"] for p in seen["research"]] == list(range(1, len(seen["research"]) + 1)))
+    verify(text, "B")
+    return {"doc": doc, **seen}
 
 
 def report(firm: Firm, history: list[dict]) -> None:
@@ -395,11 +530,13 @@ def main() -> int:
                         for n, v in verdicts.items()))
         history = firm.live()
         checks(firm)
-        runtime_hire()
         report(firm, history)
     finally:
         firm.client.__exit__(None, None, None)
         set_provider(None)
+    rehearsal()
+    seen = recorded()
+    report_hire(seen)
     print(f"\n{len(FAILED)} failed · {time.monotonic() - started:.0f} s")
     for name in FAILED:
         print(f"  FAILED: {name}")
@@ -407,5 +544,29 @@ def main() -> int:
     return 1 if FAILED else 0
 
 
+def report_hire(seen: dict) -> None:
+    """The recorded hire, for the Human: the post-mortem it read, its research, its pitch, its words."""
+    if not seen:
+        return
+    run = seen["doc"]["outcome"]["run"]
+    print("\n== The recorded hire ==")
+    for step, w in seen["wakes"]:
+        said = next((m["content"] for m in reversed(w.get("transcript") or [])
+                     if m["role"] == "assistant" and m.get("content")), "")
+        calls = [c["name"] for m in w.get("transcript") or [] for c in m.get("tool_calls") or []]
+        at = run["steps"][step]["at"][:10]
+        print(f"  {at}: {', '.join(calls) or 'no tools'}")
+        for line in said.strip().splitlines()[:6]:
+            print(f"    {line}")
+    for (_, pitch), verdict in zip(seen["pitches"], seen["judged"]):
+        print(f"  Pitch: {pitch['hypothesis']}")
+        print(f"  Rule: {json.dumps(pitch['rule'], sort_keys=True)}")
+        print("  Gates: " + ", ".join(f"{g['gate']} {g['result']}" for g in verdict["gates"])
+              + f" → {'ELIGIBLE' if verdict['eligible'] else 'not eligible'}")
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--write-world"]:   # the files the recorded run was made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        sys.exit(0)
     sys.exit(main())

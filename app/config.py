@@ -42,7 +42,7 @@ class OMSConfig(BaseModel):
 class MarketDataConfig(BaseModel):
     # "yfinance" for real delayed quotes, "static" for an offline fixed table,
     # "synthetic" for a keyed offline random walk (backtests, ADR-030).
-    provider: Literal["yfinance", "static", "synthetic"] = "yfinance"
+    provider: Literal["yfinance", "static", "synthetic", "made_up"] = "yfinance"
     # Reuse a quote while the clock has advanced less than this. 0 disables.
     cache_ttl_seconds: float = Field(default=60.0, ge=0.0)
     # Prices used when provider == "static" (ticker -> price).
@@ -52,6 +52,10 @@ class MarketDataConfig(BaseModel):
     # `secrets.token_hex(32)`. Environment only (FUND_MARKETDATA__SYNTHETIC_KEY),
     # never config.yaml: the file is committed. No default — no key, no world.
     synthetic_key: SecretStr | None = None
+    # provider == "made_up": a market with a planted law, described by a short recipe
+    # (app/marketdata/made_up.py, validated there). Like the key, it is the world: environment only
+    # (FUND_MARKETDATA__MADE_UP, JSON), set by whoever hosts the world.
+    made_up: dict[str, Any] | None = None
     # Each symbol's price on 2000-01-01.
     synthetic_symbols: dict[str, float] = Field(
         default_factory=lambda: {"SYNA": 100.0, "SYNB": 50.0, "SYNC": 20.0}
@@ -171,8 +175,11 @@ class HiringConfig(BaseModel):
         "capital only after you pitch a strategy and it passes the fund's validation gates; an "
         "eligible pitch earns a small seed and trades forward. Research with run_research_backtest "
         "on past data (the most recent days are held out, and your pitch is judged on them; every "
-        "backtest is counted). Pitch once, with submit_pitch, when you believe in a rule. Be brief: "
-        "every word you think is paid from your pod's P&L. When you are done for the day, stop."),
+        "backtest is counted). Pitch once, with submit_pitch, when you believe in a rule. Once your "
+        "pod is seeded, each day read your mandate (get_mandate) and place its orders "
+        "(place_order): that is how your rule trades. You remember nothing between days: read "
+        "your research, pitches and capital first. Be brief: every word you think is paid from "
+        "your pod's P&L. When you are done for the day, stop."),
         min_length=1, max_length=8000)
 
     @field_validator("models")
