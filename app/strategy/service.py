@@ -26,6 +26,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.capital.service import book as capital_book
 from app.config import GatesConfig
 from app.db.models import Agent, Event
 from app.ledger.events import (
@@ -156,17 +157,25 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
     pod_id = _pod_of(actor)
     start, today = holdout_start(session, law)
     evaluation = _evaluate(provider, session, rule, start, today, fee_rate)
+    # Compared with each other pod's latest pitch, and with the rule every live pod the capital
+    # machine seeded trades: a later pitch of the original must not free a copy of its mandate to
+    # earn a second seed (red-team, capital machine).
+    compared = {f"pod {pod}": pitch["rule"]
+                for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items())}
+    for pod, entry in sorted(capital_book(session)["pods"].items()):
+        if pod != pod_id and entry["stage"] != "closed":
+            compared[f"pod {pod} mandate"] = entry["rule"]
     others: dict[str, tuple[Sequence[date], Sequence[float]]] = {}
-    for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items()):
+    for name, rule_json in compared.items():
         try:
-            theirs = _evaluate(provider, session, StrategyRule.model_validate(pitch["rule"]),
+            theirs = _evaluate(provider, session, StrategyRule.model_validate(rule_json),
                                start, today, fee_rate)
         except StrategyRequestError:
             # Another pod's rule this window cannot carry (a ticker gone): no correlation to
             # measure with it, which never blocks this pod (null, not 0).
-            others[f"pod {pod}"] = ((), ())
+            others[name] = ((), ())
             continue
-        others[f"pod {pod}"] = (theirs.days, theirs.returns)
+        others[name] = (theirs.days, theirs.returns)
     attempts = pod_attempts(session, pod_id) + 1
     submitted = append_event(session, type=EVENT_PITCH_SUBMITTED, actor_agent_id=actor.id, payload={
         "pod_id": pod_id, "agent_id": actor.id, "hypothesis": hypothesis,

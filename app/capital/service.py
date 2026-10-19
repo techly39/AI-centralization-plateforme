@@ -1,12 +1,13 @@
 """The capital machine as physics (idea: capital follows results). Runs on every backtest clock
-advance, after the pending-order sweep, under :data:`~app.oms.service.OMS_LOCK`, as the system
-identity; one transaction.
+advance, before the pending-order sweep, under the :data:`~app.oms.service.OMS_LOCK` the whole
+advance holds, as the system identity; one transaction.
 
 1. **Open.** The first time an eligible pitch exists, the centre opens with the law of the day
    (``capital:`` in ``config.yaml``), frozen into ``capital_opened``: the run is judged by it.
    Before that the machine does nothing, so a run with no eligible pitch is untouched.
 2. **The ladder**, every advance, for every live machine pod: its forward return index, high-water
-   mark and drawdown (:mod:`app.capital.allocation`); a stage that climbs is ``pod_stage_changed``,
+   mark and the worst drawdown it has lived (:mod:`app.capital.allocation`); a stage that climbs is
+   ``pod_stage_changed``,
    mirrored on the pod's row (the order system reads it). Halved → half its equity goes back to the
    centre; reduce-only → its pending buys are cancelled; closed → every pending order cancelled,
    every position sold, all its cash back to the centre.
@@ -19,7 +20,9 @@ identity; one transaction.
 
 Money only moves by ``allocation_set`` (marked ``source: capital``) and by fills: the centre's cash
 is the law's capital minus every capital ``allocation_set``. A recall sells a slice of each
-position pro rata at the market (:func:`app.oms.service.force_sell`) when the pod's cash is short.
+position pro rata at the market (:func:`app.oms.service.force_sell`) when the pod's cash is short,
+and never takes more than the centre's stake (:func:`centre_stake`): money the world gave a pod
+before its seed stays in the pod, even when it is closed.
 """
 
 from __future__ import annotations
@@ -31,7 +34,14 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.capital.allocation import STAGES, PodTrack, climb, drawdown, reallocate
+from app.capital.allocation import (
+    STAGES,
+    PodTrack,
+    climb,
+    drawdown,
+    reallocate,
+    worst_drawdown,
+)
 from app.config import CapitalConfig, get_settings
 from app.db.models import Agent, Event, Order, OrderSide, OrderStatus, Pod, Position
 from app.ledger.events import (
@@ -121,8 +131,12 @@ def track(session: Session, *, pod_id: int, entry: dict[str, Any], provider: Mar
     curve = build_equity_curve(session, pod_id=pod_id, provider=provider, as_of=now,
                                live_price=False)
     points = [p for p in curve.points if p.on >= seeded_on]
-    # The day before the seed: nothing. The seed day's return is earned on the seed itself.
-    series = [EquityPoint(on=seeded_on - timedelta(days=1), equity=0.0)] + points
+    # The day before the seed: what the pod held then (nothing, for a pod the machine made; the
+    # world's allocation, for one the world funded first), so the seed is a flow and not a gain
+    # (red-team, capital machine). The seed day's return is earned on that plus the seed.
+    before = [p for p in curve.points if p.on < seeded_on]
+    series = [EquityPoint(on=seeded_on - timedelta(days=1),
+                          equity=before[-1].equity if before else 0.0)] + points
     returns = daily_returns(series, flows_at="start")
     days = [p.on.isoformat() for prev, p in zip(series, series[1:])
             if prev.equity + p.net_flow > 0]
@@ -131,6 +145,25 @@ def track(session: Session, *, pod_id: int, entry: dict[str, Any], provider: Mar
     cost = max(0.0, costs.get(pod_id, 0.0) - float(entry["cost_at_seed_usd"]))
     return PodTrack(pod_id=pod_id, seeded=entry["seeded"], stage=entry["stage"], equity=equity,
                     days=tuple(days), returns=tuple(returns), cost_usd=cost, drawdown=dd)
+
+
+def centre_stake(session: Session, *, record: PodTrack) -> float:
+    """What the centre's share of a pod is worth now: each capital flow into (or out of) the pod,
+    grown by the pod's return index since the day it moved, as fund units are. A recall never
+    takes more: money the world gave a pod before its seed is not the centre's (red-team)."""
+    growth = list(zip(record.days, record.returns))
+    stake = 0.0
+    for event in _events(session, EVENT_ALLOCATION_SET):
+        p = event.payload_json
+        if p.get("source") != SOURCE or p.get("pod_id") != record.pod_id:
+            continue
+        moved_on = event.ts.date().isoformat()
+        grown = float(p["delta"])
+        for day, r in growth:
+            if day >= moved_on:
+                grown *= 1.0 + r
+        stake += grown
+    return max(0.0, stake)
 
 
 # --- moving money ------------------------------------------------------------------------------
@@ -152,9 +185,14 @@ def _cancel_pending(session: Session, *, pod_id: int, buys_only: bool, actor: Ag
 
 
 def recall(session: Session, *, pod_id: int, amount: float | None, actor: Agent,
-           provider: MarketDataProvider, why: str) -> float:
+           provider: MarketDataProvider, why: str, stake: float) -> float:
     """Bring ``amount`` of a pod's capital back to the centre (``None``: everything, every position
-    sold). Sells a slice of each position pro rata when its cash is short. Returns what moved."""
+    sold), never more than the centre's ``stake`` in it (:func:`centre_stake`). Sells a slice of
+    each position pro rata when its cash is short. Returns what moved."""
+    if amount is not None:
+        amount = min(amount, stake)
+        if amount <= 0:
+            return 0.0
     cash = get_cash(session, pod_id)
     positions = list(session.scalars(select(Position).where(Position.pod_id == pod_id)
                                      .order_by(Position.ticker)))
@@ -178,7 +216,7 @@ def recall(session: Session, *, pod_id: int, amount: float | None, actor: Agent,
             force_sell(session, pod_id=pod_id, ticker=pos.ticker, qty=qty, actor=actor,
                        reason=why, provider=provider)
         cash = get_cash(session, pod_id)
-    moved = max(0.0, cash if amount is None else min(amount, cash))
+    moved = max(0.0, min(stake, cash) if amount is None else min(amount, cash))
     if moved > 0:
         fund_pod(session, pod_id=pod_id, delta=-moved, actor=actor, reason=why, source=SOURCE)
     return moved
@@ -187,9 +225,11 @@ def recall(session: Session, *, pod_id: int, amount: float | None, actor: Agent,
 def _set_stage(session: Session, *, pod_id: int, old: str, new: str, record: PodTrack,
                law: CapitalConfig, actor: Agent, provider: MarketDataProvider) -> None:
     index, high, dd = drawdown(record.returns)
+    worst = worst_drawdown(record.returns)
+    stake = centre_stake(session, record=record)
     append_event(session, type=EVENT_POD_STAGE_CHANGED, actor_agent_id=actor.id, payload={
-        "pod_id": pod_id, "from": old, "to": new, "drawdown": dd, "index": index,
-        "high_water": high, "equity": record.equity,
+        "pod_id": pod_id, "from": old, "to": new, "drawdown": dd, "worst_drawdown": worst,
+        "index": index, "high_water": high, "equity": record.equity, "centre_stake": stake,
         "ladder": {"halve_at": law.halve_at, "reduce_only_at": law.reduce_only_at,
                    "close_at": law.close_at}})
     session.get(Pod, pod_id).status = new
@@ -197,12 +237,13 @@ def _set_stage(session: Session, *, pod_id: int, old: str, new: str, record: Pod
     if new == "closed":
         _cancel_pending(session, pod_id=pod_id, buys_only=False, actor=actor,
                         why="the pod was closed by the risk ladder")
-        recall(session, pod_id=pod_id, amount=None, actor=actor, provider=provider,
-               why=f"risk ladder: {dd:.1%} down from the high-water mark, the pod is closed")
+        recall(session, pod_id=pod_id, amount=None, actor=actor, provider=provider, stake=stake,
+               why=f"risk ladder: {worst:.1%} down from the high-water mark, the pod is closed")
         return
     if rank(old) < rank("halved") <= rank(new):
-        recall(session, pod_id=pod_id, amount=record.equity / 2, actor=actor, provider=provider,
-               why=f"risk ladder: {dd:.1%} down from the high-water mark, capital halved")
+        recall(session, pod_id=pod_id, amount=stake / 2, actor=actor, provider=provider,
+               stake=stake,
+               why=f"risk ladder: {worst:.1%} down from the high-water mark, capital halved")
     if new == "reduce_only":
         _cancel_pending(session, pod_id=pod_id, buys_only=True, actor=actor,
                         why="the pod is reduce-only (risk ladder): buys cancelled")
@@ -269,7 +310,10 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
             continue
         record = track(session, pod_id=pod_id, entry=entry, provider=provider, now=now,
                        costs=costs)
-        new = climb(entry["stage"], record.drawdown, law)
+        # The worst drawdown the pod has lived, not only today's: a fall and a recovery inside one
+        # advance of several days still climbs the ladder (red-team). Stages only climb, so this
+        # is the ladder checked on every day.
+        new = climb(entry["stage"], worst_drawdown(record.returns), law)
         if new != entry["stage"]:
             _set_stage(session, pod_id=pod_id, old=entry["stage"], new=new, record=record,
                        law=law, actor=system, provider=provider)
@@ -310,9 +354,11 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
                      payload={"day": now.date().isoformat(), "law": law.model_dump(),
                               "inputs": inputs, "result": result})
         moves = {row["pod_id"]: row["move"] for row in result["pods"]}
+        records = {p.pod_id: p for p in live}
         for pod_id, move in sorted(moves.items()):
             if move < 0:
                 recall(session, pod_id=pod_id, amount=-move, actor=system, provider=provider,
+                       stake=centre_stake(session, record=records[pod_id]),
                        why="capital re-weighed: cut")
         for row in sorted(result["pods"], key=lambda r: -(r["viability"] or 0.0)):
             move = row["move"]
@@ -338,9 +384,15 @@ def safe_sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, A
     return None
 
 
-def capital_view(session: Session, *, pod_id: int | None) -> dict[str, Any]:
+#: What a pod's score row says about another pod: shown only to a reader with ``read_cross_pod``.
+CROSS_POD_SCORE = ("corr_with", "corr")
+
+
+def capital_view(session: Session, *, pod_id: int | None, cross: bool) -> dict[str, Any]:
     """The allocation table: the law, and each machine pod's stage, capital and latest score (one
-    pod's row, or every pod's for ``None``). The centre's cash is the firm's, shown with ``None``."""
+    pod's row, or every pod's for ``None``). The centre's cash is the firm's, shown with ``None``.
+    Without ``cross`` (a pod member), the score keeps how much the correlation cost the pod, not
+    which pod it moves like nor how much (red-team: a slow oracle of another pod's book)."""
     state = book(session)
     latest = session.scalar(select(Event).where(Event.type == EVENT_CAPITAL_REALLOCATED)
                             .order_by(Event.id.desc()).limit(1))
@@ -350,9 +402,12 @@ def capital_view(session: Session, *, pod_id: int | None) -> dict[str, Any]:
     for pid, entry in sorted(state["pods"].items()):
         if pod_id is not None and pid != pod_id:
             continue
+        last = scores.get(pid)
+        if last is not None and not cross:
+            last = {k: v for k, v in last.items() if k not in CROSS_POD_SCORE}
         rows.append({"pod_id": pid, "stage": entry["stage"], "pitch_id": entry["pitch_id"],
                      "seeded_on": entry["seeded_on"], "allocated_usd": entry["allocated"],
-                     "rule": entry["rule"], "last_score": scores.get(pid),
+                     "rule": entry["rule"], "last_score": last,
                      "last_scored_on": latest.payload_json["day"] if pid in scores else None})
     return {"opened_on": state["opened_on"], "law": state["law"],
             "centre_cash_usd": state["centre_cash"] if pod_id is None else None, "pods": rows}

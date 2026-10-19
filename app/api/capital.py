@@ -39,4 +39,4 @@ def get_capital(
     elif pod_id is not None and pod_id != actor.pod_id and not cross:
         raise deny(session, actor, Action.READ_CROSS_POD, detail=f"pod {pod_id} is not your pod",
                    context={"pod_id": pod_id})
-    return capital_view(session, pod_id=pod_id)
+    return capital_view(session, pod_id=pod_id, cross=cross)

@@ -1967,3 +1967,18 @@ drawdown limits and per-position limits; a review that lifts reduce-only; the li
 shorting.
 
 **Proof.** `acceptance/capital_machine.py`; `tests/test_capital.py`.
+
+**Amended (cycle 48, the red-team's eight holes, `tests/test_redteam_capital.py`).**
+- (4) The whole `POST /clock/advance` holds `OMS_LOCK`, and the machine runs **before** the
+  pending-order sweep: no order is placed or filled at a now the ladder has not judged.
+- (5) A pod the world funded before its seed starts its forward record at what it held then (the
+  seed is a flow, not a gain).
+- (6) The ladder climbs on the **worst** drawdown the pod has lived on any day, not only today's.
+  Halving recalls half the centre's stake.
+- (7) A recall never takes more than the **centre's stake**: each capital flow grown by the pod's
+  return index since it moved (fund units). The world's money stays in the pod, even when it closes.
+- (8) A halved pod, like a reduce-only one, is never raised.
+- (3) The correlation gate compares a pitch with each other pod's latest pitch **and** with every
+  live seeded pod's mandate: a later pitch of the original no longer frees a copy for a second seed.
+- (11) A pod member's row hides which pod it moves like and by how much (`corr_with`, `corr`); it
+  keeps what the correlation cost it.

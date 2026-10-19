@@ -22,15 +22,15 @@ one whose viability is positive but below ``raise_at`` (not yet sure). A pod who
 not positive is taken down toward ``min_pod_usd`` (never below, never up). The pods at or above
 ``raise_at`` share what is left in proportion to their viability, each at least ``min_pod_usd``.
 A raise never takes a pod above ``max_pod_share`` of the firm (a pod already above it is not cut
-for that); a reduce-only pod is never raised. One step moves a pod by at most ``+max_raise`` /
+for that); a halved or reduce-only pod is never raised. One step moves a pod by at most ``+max_raise`` /
 ``-max_cut`` of its equity, and a move smaller than ``min_move`` of it is not made. Cuts are made
 first; raises are paid from the centre's cash and the cuts, the most viable pod first, while the
 cash lasts.
 
 **The ladder**: drawdown from the high-water mark of the pod's forward return index (the index
-starts at 1 at the seed; a flow of capital is not a gain or a loss). ``halve_at`` → half its
-capital back to the centre; ``reduce_only_at`` → it may only sell; ``close_at`` → closed. Stages
-only climb.
+starts at 1 at the seed; a flow of capital is not a gain or a loss), the worst the pod has lived on
+any day (:func:`worst_drawdown`). ``halve_at`` → half its capital back to the centre;
+``reduce_only_at`` → it may only sell; ``close_at`` → closed. Stages only climb.
 """
 
 from __future__ import annotations
@@ -44,6 +44,9 @@ from app.config import CapitalConfig
 
 ANNUALISE = math.sqrt(252)
 STAGES = ("active", "halved", "reduce_only", "closed")
+#: A pod the ladder has cut is not raised back by the re-weighing (red-team: a strong record would
+#: undo half the halving in the very sweep that made it).
+NEVER_RAISED = ("halved", "reduce_only")
 
 
 @dataclass(frozen=True)
@@ -165,7 +168,7 @@ def reallocate(pods: Sequence[PodTrack], *, centre_cash: float, law: CapitalConf
         t = target[p.pod_id]
         if t > p.equity:
             t = min(t, max(p.equity, law.max_pod_share * firm))
-            if p.stage == "reduce_only":
+            if p.stage in NEVER_RAISED:
                 t = p.equity
         t = min(max(t, p.equity * (1.0 - law.max_cut)), p.equity * (1.0 + law.max_raise))
         move = t - p.equity
@@ -198,6 +201,18 @@ def drawdown(returns: Sequence[float]) -> tuple[float, float, float]:
         index *= 1.0 + r
         peak = max(peak, index)
     return index, peak, (1.0 - index / peak) if peak > 0 else 0.0
+
+
+def worst_drawdown(returns: Sequence[float]) -> float:
+    """The deepest fall from the high-water mark the return index lived through, on any day."""
+    index = peak = 1.0
+    worst = 0.0
+    for r in returns:
+        index *= 1.0 + r
+        peak = max(peak, index)
+        if peak > 0:
+            worst = max(worst, 1.0 - index / peak)
+    return worst
 
 
 def stage_for(dd: float, law: CapitalConfig) -> str:
