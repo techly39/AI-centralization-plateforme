@@ -143,7 +143,8 @@ class HireRecord:
     vacancy_id: int
     spec_id: str
     #: ``hired`` | ``refused:<code>`` (``budget_over_cap``, ``wake_gate:<reason>``, ``physics:409``,
-    #: ``key_over_cap``, ``spec_id_taken``)
+    #: ``key_over_cap``, ``no_key_room``). ``spec_id`` is the hired mind's (its pod's name), or the
+    #: law's ``hire-<n>`` for a refusal.
     outcome: str
     agent_id: int | None = None
     #: The reason the Runtime posted to physics, word for word (a replay posts the same).
@@ -151,7 +152,7 @@ class HireRecord:
 
     def __post_init__(self) -> None:
         if (type(self.step) is not int or self.step < 0 or type(self.vacancy_id) is not int
-                or type(self.spec_id) is not str or not re.fullmatch(r"hire-[0-9]{1,6}", self.spec_id)
+                or type(self.spec_id) is not str or not re.fullmatch(r"hire-[0-9]{1,6}(-[0-9]{1,4})?", self.spec_id)
                 or type(self.outcome) is not str
                 or not re.fullmatch(r"hired|refused:[a-z_]+(:[a-z0-9_]+)?", self.outcome)
                 or not (self.agent_id is None or type(self.agent_id) is int)

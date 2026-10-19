@@ -117,6 +117,8 @@ class Onboarding:
                          else {(r.step, r.vacancy_id): r for r in recorded})
         self.minds: list[Mind] = []
         self.inputs: dict[str, dict[str, Any]] = {}
+        #: Vacancies whose key the month could not hold: refused, not retried, this run.
+        self.no_room: set[int] = set()
 
     async def morning(self, step: int, *, taken: set[str], meters: Sequence[Meter]
                       ) -> tuple[list[HireRecord], list[Mind], tuple[str, str] | None]:
@@ -156,40 +158,53 @@ class Onboarding:
         vid, hire = vacancy.get("id"), vacancy.get("hire")
         if type(vid) is not int or not isinstance(hire, dict) or type(vacancy.get("vacancy_no")) is not int:
             raise _Failed("hiring_malformed")
-        spec_id = f"{HIRE_PREFIX}{vacancy['vacancy_no']}"
+        # The law's names; physics may give the next free ``<base>-<k>`` (app/capital/hiring.py).
+        base = f"{HIRE_PREFIX}{vacancy['vacancy_no']}"
         recorded = None
         if self.recorded is not None:
             recorded = self.recorded.get((step, vid))
-            if recorded is None or recorded.spec_id != spec_id:
+            if recorded is None:
                 raise _Diverged()
             decision = (recorded.outcome, recorded.reason)
         else:
-            decision = self._decide(spec_id, hire, taken, meters, law)
+            decision = self._decide(vid, base, hire, meters, law)
         outcome, reason = decision
-        if outcome != "hired" and outcome != "refused:physics:409" and outcome != "refused:key_over_cap":
+
+        def record(spec_id: str, done: str, agent_id: int | None = None,
+                   why: str | None = None) -> HireRecord:
+            made = HireRecord(step, vid, spec_id, done, agent_id, why)
+            if recorded is not None and made != recorded:
+                raise _Diverged()
+            return made
+
+        if outcome not in ("hired", "refused:physics:409", "refused:key_over_cap"):
             # The Runtime's own refusal, written in physics' ledger; the vacancy stays open.
             try:
                 await self.registrar.post(f"/vacancies/{vid}/refuse", {"reason": reason})
             except FundAPIError as exc:
                 raise _Failed(f"hire_refusal_failed:{vid}:{exc.status_code}") from exc
-            return HireRecord(step, vid, spec_id, outcome, None, reason), None
+            return record(base, outcome, None, reason), None
         try:
             made = await self.registrar.post(f"/vacancies/{vid}/fill", {})
         except FundAPIError as exc:
             if exc.status_code == 409:   # physics refused (its pod limit) and wrote why
-                if recorded is not None and outcome != "refused:physics:409":
-                    raise _Diverged() from exc
-                return HireRecord(step, vid, spec_id, "refused:physics:409"), None
+                return record(base, "refused:physics:409"), None
             raise _Failed(f"hire_failed:{vid}:{exc.status_code}") from exc
-        if recorded is not None and outcome == "refused:physics:409":
-            raise _Diverged()
         agent = made.get("agent") if isinstance(made, dict) else None
+        filled = ((made.get("vacancy") or {}).get("filled") or {}) if isinstance(made, dict) else {}
+        pod_name = filled.get("pod_name")
         if not (isinstance(agent, dict) and type(agent.get("id")) is int
-                and type(agent.get("pod_id")) is int and agent.get("name") == hire["pm_name"]
+                and type(agent.get("pod_id")) is int and type(pod_name) is str
+                and (pod_name == base or pod_name.startswith(base + "-"))
+                and agent.get("name") == f"{pod_name}-pm" and filled.get("pod_id") == agent["pod_id"]
                 and agent.get("role") == "pm" and type(agent.get("api_key")) is str
                 and agent["api_key"]):
             raise _Failed(f"hire_wrong_agent:{vid}")
-        spec = spec_for(self.template, hire, spec_id=spec_id, pod_id=agent["pod_id"])
+        spec_id = pod_name   # unique: physics names pods once; the run's own ids cannot be hire-*
+        if spec_id in taken:
+            raise _Failed(f"hire_spec_taken:{spec_id}")
+        spec = spec_for(self.template, {**hire, "pm_name": agent["name"]}, spec_id=spec_id,
+                        pod_id=agent["pod_id"])
         if self.recorded is not None:
             spec = as_cassette(spec)
         client = self.connect(agent["api_key"])
@@ -207,23 +222,29 @@ class Onboarding:
                 over_cap = meter is None
             else:
                 over_cap = False
-            if over_cap:   # no PM lives without a mind: the new agent is deactivated
+            if over_cap:
+                # No PM lives without a mind: the new agent is deactivated (physics then closes
+                # its empty pod and opens the vacancy again), and the Runtime does not mint for
+                # this vacancy again this run.
                 await client.aclose()
                 await self._deactivate(agent["id"])
-                return HireRecord(step, vid, spec_id, "refused:key_over_cap", agent["id"]), None
+                self.no_room.add(vid)
+                return record(spec_id, "refused:key_over_cap", agent["id"]), None
+            done = record(spec_id, "hired", agent["id"])
         except BaseException:
             await client.aclose()
             raise
         mind = Mind(spec, client, meter)
         self.minds.append(mind)
         self.inputs[spec_id] = {"post_mortem": vacancy.get("post_mortem"), "vacancy_id": vid}
-        return HireRecord(step, vid, spec_id, "hired", agent["id"]), mind
+        return done, mind
 
-    def _decide(self, spec_id: str, hire: dict[str, Any], taken: set[str],
-                meters: Sequence[Meter], law: Governance) -> tuple[str, str | None]:
-        if spec_id in taken:
-            return "refused:spec_id_taken", f"the Runtime already runs a mind named {spec_id}"
-        probe = spec_for(self.template, hire, spec_id=spec_id, pod_id=1)
+    def _decide(self, vid: int, base: str, hire: dict[str, Any], meters: Sequence[Meter],
+                law: Governance) -> tuple[str, str | None]:
+        if vid in self.no_room:
+            return ("refused:no_key_room", "the month could not hold the new PM's key: the "
+                    "Runtime does not try this vacancy again this run")
+        probe = spec_for(self.template, hire, spec_id=base, pod_id=1)
         metered = probe.provider in METERED_PROVIDERS
         gate = decide_wake_under(probe.provider, probe.adapter, law, metered=metered)
         if not gate.allowed:

@@ -10,8 +10,10 @@ fund: a pod the risk ladder closes is replaced by a new PM who must pitch to ear
 2. **The fill.** A registrar (``register_agents``: management, the Runtime's onboarding) fills an
    open vacancy: physics makes the new pod and its PM (``agent_registered``, then
    ``vacancy_filled``) and hands the PM's key back once. Refused, in the ledger (``hire_refused``),
-   when the firm already has its law's number of live pods or a name the hire needs is taken; a
-   vacancy is filled once. The new pod has no capital: its PM pitches, and an eligible pitch earns
+   when the firm already has its law's number of live pods; a vacancy is filled once. Only a
+   registrar the operator made fills or refuses (the API's check): a firm mind does not hire.
+   A hired PM deactivated before its pod earns a seed is a failed hire (``hire_failed``): its
+   empty pod is closed and the vacancy opens again. The new pod has no capital: its PM pitches, and an eligible pitch earns
    a seed at the next sweep like any other.
 3. **The refusal.** The cap on thinking is the Runtime's law, not physics': when the hire's budget
    does not fit it, the Runtime says so (``POST /vacancies/{id}/refuse``) and the vacancy stays
@@ -31,10 +33,11 @@ from sqlalchemy.orm import Session
 
 from app.capital.allocation import PodTrack, worst_drawdown
 from app.config import HiringConfig, get_settings
-from app.db.models import Agent, AgentRole, Event, Pod
+from app.db.models import Agent, AgentRole, AgentStatus, Event, Pod
 from app.ledger.events import (
     EVENT_ALLOCATION_SET,
     EVENT_CAPITAL_SEEDED,
+    EVENT_HIRE_FAILED,
     EVENT_HIRE_REFUSED,
     EVENT_PITCH_SUBMITTED,
     EVENT_POD_STAGE_CHANGED,
@@ -49,6 +52,8 @@ from app.registry.service import register_agent
 SOURCE = "capital"   # app.capital.service.SOURCE (that module imports this one)
 #: The longest reason a refusal may carry.
 MAX_REASON = 200
+#: How many ``hire-<n>-<k>`` names a fill tries before it is refused.
+MAX_NAME_TRIES = 100
 
 
 class HiringError(Exception):
@@ -139,13 +144,21 @@ def vacancies(session: Session) -> list[dict[str, Any]]:
     """Every vacancy of the run, oldest first, folded from the ledger: ``status`` is ``open`` or
     ``filled``; ``filled`` names the new pod and PM; ``refusals`` lists every refused hire."""
     out: dict[int, dict[str, Any]] = {}
-    for event in _events(session, EVENT_VACANCY_OPENED, EVENT_VACANCY_FILLED, EVENT_HIRE_REFUSED):
+    for event in _events(session, EVENT_VACANCY_OPENED, EVENT_VACANCY_FILLED, EVENT_HIRE_REFUSED,
+                         EVENT_HIRE_FAILED):
         p = event.payload_json
         if event.type == EVENT_VACANCY_OPENED:
             out[event.id] = {"id": event.id, "vacancy_no": p["vacancy_no"],
                              "opened_on": event.ts.date().isoformat(), "pod_id": p["pod_id"],
                              "pod_name": p["pod_name"], "status": "open", "hire": p["hire"],
-                             "post_mortem": p["post_mortem"], "filled": None, "refusals": []}
+                             "post_mortem": p["post_mortem"], "filled": None, "refusals": [],
+                             "failed": []}
+        elif event.type == EVENT_HIRE_FAILED:
+            out[p["vacancy_id"]]["status"] = "open"
+            out[p["vacancy_id"]]["filled"] = None
+            out[p["vacancy_id"]]["failed"].append(
+                {"on": event.ts.date().isoformat(), "pod_id": p["pod_id"],
+                 "agent_id": p["agent_id"], "reason": p["reason"]})
         elif event.type == EVENT_VACANCY_FILLED:
             out[p["vacancy_id"]]["status"] = "filled"
             out[p["vacancy_id"]]["filled"] = {
@@ -173,7 +186,9 @@ def _refuse(session: Session, *, vacancy_id: int, reason: str, actor: Agent) -> 
 def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, Any], Agent, str]:
     """Fill an open vacancy: the new pod, its PM, ``vacancy_filled``; commits. Returns the vacancy
     as it is now, the PM and its plaintext key (handed out once, as ``/agents/register`` does).
-    A refusal physics decides (the pod limit, a name taken) is written to the ledger, then raised."""
+    A refusal physics decides (the pod limit) is written to the ledger, then raised. The names are
+    the law's (``hire-<n>``, ``hire-<n>-pm``), or the first free ``hire-<n>-<k>`` when someone
+    already took them (red-team: a name squatted in advance must not block the vacancy)."""
     with OMS_LOCK:  # one fill at a time, and none while a sweep closes pods
         try:
             found = vacancy(session, vacancy_id)
@@ -182,19 +197,19 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
             law = hiring_law(session)
             hire = found["hire"]
             problem = None
+            names = _free_names(session, hire["pod_name"])
             if live_pods(session) >= law.max_live_pods:
                 problem = (f"the firm is at its limit of {law.max_live_pods} live pods "
                            f"(the hiring law)")
-            elif session.scalar(select(Pod).where(Pod.name == hire["pod_name"])) is not None:
-                problem = f"a pod named {hire['pod_name']!r} already exists"
-            elif session.scalar(select(Agent).where(Agent.name == hire["pm_name"])) is not None:
-                problem = f"an agent named {hire['pm_name']!r} already exists"
+            elif names is None:
+                problem = f"no free name for the hire after {hire['pod_name']!r}"
             if problem is not None:
                 _refuse(session, vacancy_id=vacancy_id, reason=problem, actor=actor)
                 session.commit()
                 raise HiringError(409, problem)
-            pod = create_pod(session, name=hire["pod_name"])
-            agent, key = register_agent(session, name=hire["pm_name"], role=AgentRole.pm,
+            pod_name, pm_name = names
+            pod = create_pod(session, name=pod_name)
+            agent, key = register_agent(session, name=pm_name, role=AgentRole.pm,
                                         pod_id=pod.id, charter_ref=f"vacancy:{vacancy_id}",
                                         actor_agent_id=actor.id)
             append_event(session, type=EVENT_VACANCY_FILLED, actor_agent_id=actor.id, payload={
@@ -208,6 +223,42 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
         except Exception:
             session.rollback()
             raise
+
+
+def _free_names(session: Session, base: str) -> tuple[str, str] | None:
+    """``(pod name, PM name)``: the law's, else the first ``<base>-<k>`` pair nobody holds."""
+    taken = ({n.casefold() for n in session.scalars(select(Pod.name))},
+             {n.casefold() for n in session.scalars(select(Agent.name))})
+    for k in range(1, MAX_NAME_TRIES + 1):
+        pod_name = base if k == 1 else f"{base}-{k}"
+        if pod_name.casefold() not in taken[0] and f"{pod_name}-pm".casefold() not in taken[1]:
+            return pod_name, f"{pod_name}-pm"
+    return None
+
+
+def hire_failed(session: Session, *, agent: Agent, actor: Agent | None) -> Event | None:
+    """A hired PM was deactivated before its pod earned a seed, and no one else works there: the
+    hire failed. Its empty pod is closed (it holds no money: nothing to recall, and it no longer
+    holds a live-pod place) and the vacancy is open again for a new hire (red-team: a dead hire
+    must not leave the dead pod unreplaced). The caller owns the transaction. ``None``: nothing to
+    do (not a hire, a seeded pod, or a colleague still active)."""
+    ref = agent.charter_ref or ""
+    if not ref.startswith("vacancy:") or agent.pod_id is None:
+        return None
+    pod = session.get(Pod, agent.pod_id)
+    if pod is None or pod.status == "closed":
+        return None
+    if any(e.payload_json["pod_id"] == pod.id for e in _events(session, EVENT_CAPITAL_SEEDED)):
+        return None
+    if session.scalar(select(func.count()).select_from(Agent).where(
+            Agent.pod_id == pod.id, Agent.status == AgentStatus.active)):
+        return None
+    pod.status = "closed"
+    return append_event(session, type=EVENT_HIRE_FAILED,
+                        actor_agent_id=actor.id if actor is not None else None, payload={
+                            "vacancy_id": int(ref.split(":", 1)[1]), "pod_id": pod.id,
+                            "agent_id": agent.id,
+                            "reason": "its hired PM was deactivated before any seed"})
 
 
 def refuse(session: Session, *, vacancy_id: int, reason: str, actor: Agent) -> dict[str, Any]:

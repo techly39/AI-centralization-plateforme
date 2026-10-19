@@ -18,6 +18,7 @@ from app.db.base import get_session
 from app.db.models import Agent
 from app.registry.auth import deny, get_current_agent, require
 from app.registry.permissions import Action, has_permission
+from app.registry.service import registered_by_operator
 
 router = APIRouter(tags=["vacancies"])
 
@@ -31,6 +32,16 @@ class RefuseIn(BaseModel):
 
 def _answer(exc: HiringError) -> HTTPException:
     return HTTPException(exc.status, detail=exc.detail)
+
+
+def _operator_only(session: Session, actor: Agent, vacancy_id: int) -> None:
+    """Hiring is the Runtime's act through the operator's registrar: a management agent another
+    agent registered (a firm mind) is refused, logged (red-team: else a mind takes a hire the
+    Runtime refused for the cap, and holds a second identity)."""
+    if not registered_by_operator(session, actor):
+        raise deny(session, actor, Action.REGISTER_AGENTS,
+                   detail="only the operator's registrar hires: a firm mind does not fill or "
+                          "refuse a vacancy", context={"vacancy_id": vacancy_id})
 
 
 @router.get("/vacancies", response_model=list[dict[str, Any]])
@@ -75,7 +86,9 @@ def post_fill(
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """Fill an open vacancy as its law says: a new pod and a new PM. The PM's key is in this answer
-    and nowhere else, once. Refused (409, in the ledger) at the firm's pod limit."""
+    and nowhere else, once. Refused (409, in the ledger) at the firm's pod limit. The operator's
+    registrar only."""
+    _operator_only(session, actor, vacancy_id)
     try:
         found, agent, key = fill(session, vacancy_id=vacancy_id, actor=actor)
     except HiringError as exc:
@@ -93,7 +106,8 @@ def post_refuse(
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """Refuse the hire for now (the Runtime: its budget does not fit the cap). The vacancy stays
-    open; the refusal is in the ledger."""
+    open; the refusal is in the ledger. The operator's registrar only."""
+    _operator_only(session, actor, vacancy_id)
     try:
         return refuse(session, vacancy_id=vacancy_id, reason=body.reason, actor=actor)
     except HiringError as exc:

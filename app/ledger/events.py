@@ -67,6 +67,7 @@ EVENT_CAPITAL_SWEEP_FAILED = "capital_sweep_failed"  # payload: {error}: the mac
 EVENT_VACANCY_OPENED = "vacancy_opened"  # payload: {vacancy_no, pod_id, pod_name, post_mortem, hire, law}
 EVENT_VACANCY_FILLED = "vacancy_filled"  # payload: {vacancy_id, pod_id, pod_name, agent_id, agent_name, model, budget_usd}
 EVENT_HIRE_REFUSED = "hire_refused"      # payload: {vacancy_id, reason, by}
+EVENT_HIRE_FAILED = "hire_failed"        # payload: {vacancy_id, pod_id, agent_id, reason}: the hired pod is closed, the vacancy open again
 
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}

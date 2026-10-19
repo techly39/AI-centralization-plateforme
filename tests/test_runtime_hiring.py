@@ -21,6 +21,7 @@ from app.capital.allocation import PodTrack
 from app.clock import LiveClock, set_clock
 from app.db.base import Base
 from app.capital.hiring import open_vacancy
+from app.config import HiringConfig, get_settings
 from app.db.models import Agent, AgentRole, Event, Pod
 from app.ledger.events import EVENT_CAPITAL_SEEDED, EVENT_PITCH_SUBMITTED, append_event
 from app.registry.pods import create_pod
@@ -148,16 +149,27 @@ def test_a_metered_hire_gets_its_own_key_inside_the_cap(SessionFactory, keys, sp
 
 
 def test_physics_refusal_is_recorded_and_the_run_goes_on(SessionFactory, keys, specs, woke,
-                                                         tmp_path, capsys):
-    vid = _stage_vacancy(SessionFactory)
+                                                         tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(get_settings(), "hiring", HiringConfig(max_live_pods=1))
+    vid = _stage_vacancy(SessionFactory)   # the law, frozen here: one live pod; two are live
+    code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1", "--hire",
+                                         str(_template(tmp_path))], capsys)
+    assert code == 0
+    assert [(h["vacancy_id"], h["spec_id"], h["outcome"]) for h in out["run"]["hires"]] == [
+        (vid, "hire-1", "refused:physics:409")]
+
+
+def test_a_squatted_name_gives_the_hire_the_next_one(SessionFactory, keys, specs, woke,
+                                                     tmp_path, capsys):
+    _stage_vacancy(SessionFactory)
     with SessionFactory() as s:      # the operator took the name the law gives the new pod
         s.add(Pod(name="hire-1", created_at=s.get(Pod, 1).created_at))
         s.commit()
     code, out, _ = _run(SessionFactory, ["--specs", str(specs), "--steps", "1", "--hire",
                                          str(_template(tmp_path))], capsys)
     assert code == 0
-    assert [(h["vacancy_id"], h["outcome"]) for h in out["run"]["hires"]] == [
-        (vid, "refused:physics:409")]
+    assert [(h["spec_id"], h["outcome"]) for h in out["run"]["hires"]] == [("hire-1-2", "hired")]
+    assert out["registered"] == ["a-pm", "hire-1-2"]
 
 
 def test_a_runs_own_mind_may_not_wear_a_hire_id(SessionFactory, keys, tmp_path, woke, capsys):
@@ -231,3 +243,31 @@ def _reset(engine, SessionFactory) -> None:
     set_clock(LiveClock())
     os.environ[cli.REGISTRAR_KEY_ENV] = admin
     os.environ[cli.CLOCK_KEY_ENV] = clock
+
+
+def test_a_key_the_month_cannot_hold_deactivates_the_hire_and_is_not_retried(
+        SessionFactory, keys, specs, woke, tmp_path, capsys, gov, monkeypatch):
+    from runtime.metering import FakeProvisioner
+    from runtime.openrouter import OverCap
+
+    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n")
+
+    def full(self, agent_id, limit):
+        raise OverCap("another run holds the month")
+    monkeypatch.setattr(FakeProvisioner, "create_key", full)
+    vid = _stage_vacancy(SessionFactory)
+    code, out, err = _run(SessionFactory, [
+        "--specs", str(specs), "--steps", "2",
+        "--hire", str(_template(tmp_path, provider="fake-metered"))], capsys)
+    assert code == 0, err
+    hires = out["run"]["hires"]
+    assert [(h["step"], h["outcome"]) for h in hires] == [
+        (0, "refused:key_over_cap"), (1, "refused:no_key_room")]
+    with SessionFactory() as s:
+        agent = s.get(Agent, hires[0]["agent_id"])
+        assert agent.status.value == "inactive"
+        assert s.get(Pod, agent.pod_id).status == "closed"           # the failed hire's pod
+        failed = [e.payload_json for e in s.scalars(select(Event).where(
+            Event.type == "hire_failed"))]
+        assert [f["vacancy_id"] for f in failed] == [vid]
+    assert out["registered"] == ["a-pm"]

@@ -134,13 +134,34 @@ def test_the_law_is_frozen_at_the_first_vacancy_and_models_go_in_turn(db, make_p
     assert [x["pod_name"] for x in hires] == ["hire-1", "hire-2", "hire-3"]
 
 
-def test_a_name_already_taken_refuses_the_hire(client, db, admin_key, make_pod, close):
+def test_a_name_already_taken_gives_the_hire_the_next_free_name(client, db, admin_key, make_pod,
+                                                                 close):
     make_pod(1)
-    make_pod(2, "hire-1")          # the operator already used the name
+    make_pod(2, "hire-1")          # the operator already used the law's name
     vacancy_id = close(1)
     r = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key))
-    assert r.status_code == 409 and "hire-1" in r.json()["detail"]
-    assert db.scalar(select(Agent).where(Agent.name == "hire-1-pm")) is None
+    assert r.status_code == 201
+    assert r.json()["agent"]["name"] == "hire-1-2-pm"
+    assert r.json()["vacancy"]["filled"]["pod_name"] == "hire-1-2"
+
+
+def test_a_hired_pm_gone_before_its_seed_reopens_the_vacancy(client, db, admin_key, make_pod,
+                                                             close):
+    make_pod(1)
+    vacancy_id = close(1)
+    first = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key)).json()["agent"]
+    assert client.post(f"/agents/{first['id']}/deactivate", headers=h(admin_key)).status_code == 200
+    v = client.get(f"/vacancies/{vacancy_id}", headers=h(admin_key)).json()
+    assert v["status"] == "open" and v["failed"][0]["agent_id"] == first["id"]
+    db.expire_all()
+    assert db.get(Pod, first["pod_id"]).status == "closed"
+    second = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key))
+    assert second.status_code == 201 and second.json()["agent"]["name"] == "hire-1-2-pm"
+    # the rebuild agrees: the failed hire's pod is closed
+    from app.ledger.rebuild import rebuild_state
+    db.get(Pod, first["pod_id"]).status = "active"
+    rebuild_state(db)
+    assert db.get(Pod, first["pod_id"]).status == "closed"
 
 
 def test_the_runtimes_refusal_is_written_and_the_vacancy_stays_open(client, db, admin_key,

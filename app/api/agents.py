@@ -12,6 +12,7 @@ from app.api.schemas import (
     DeactivateResponse,
     DirectoryEntry,
 )
+from app.capital.hiring import hire_failed
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
 from app.registry.auth import deny, get_current_agent, require
@@ -96,6 +97,9 @@ def deactivate(
 ) -> DeactivateResponse:
     try:
         agent = deactivate_agent(session, agent_id=agent_id, actor_agent_id=actor.id)
+        # A hired PM gone before its pod's seed is a failed hire: its empty pod closes and the
+        # vacancy opens again (app/capital/hiring.py).
+        hire_failed(session, agent=agent, actor=actor)
         session.commit()
     except ReservedIdentityError as exc:  # physics' own identity (ADR-033)
         session.rollback()
