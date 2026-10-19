@@ -19,6 +19,7 @@ from loguru import logger
 from app import __version__
 from app.api import (
     agents,
+    capital,
     clock,
     events,
     halt,
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(messages.router)
     app.include_router(reporting.router)
     app.include_router(metering.router)
+    app.include_router(capital.router)
     app.include_router(metrics.router)
     app.include_router(pitches.router)
 

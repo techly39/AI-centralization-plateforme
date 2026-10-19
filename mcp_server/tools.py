@@ -384,6 +384,21 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """One pitch and its verdict, gate by gate."""
         return await call("GET", f"/pitches/{pitch_id}")
 
+    # --- Capital: the centre's allocation and the risk ladder ------------------
+
+    @api_tool(server, method="GET", path="/capital")
+    async def get_capital(
+        pod_id: Annotated[int | None, Field(description="Default: your own pod.", ge=1, le=MAX_ID)] = None,
+    ) -> Any:
+        """Your pod's capital from the centre, its risk-ladder stage and its latest score.
+
+        An eligible pitch earns a seed; an algorithm re-weighs capital every few days by each pod's
+        forward record (net of thinking cost, per unit of risk, cut for copying an older pod and for
+        drawdown). The ladder, from your pod's high-water mark: 5% down → half your capital goes
+        back; 7.5% → you may only sell; 10% → the pod is closed. The law is in the answer.
+        """
+        return await call("GET", "/capital", params={"pod_id": pod_id})
+
     # --- Orders & portfolio -------------------------------------------------
 
     @api_tool(server, method="POST", path="/orders")

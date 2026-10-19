@@ -333,3 +333,23 @@ def safe_sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, A
     except OMSError as exc:
         logger.warning("capital sweep skipped: {}", exc)
         return None
+
+
+def capital_view(session: Session, *, pod_id: int | None) -> dict[str, Any]:
+    """The allocation table: the law, and each machine pod's stage, capital and latest score (one
+    pod's row, or every pod's for ``None``). The centre's cash is the firm's, shown with ``None``."""
+    state = book(session)
+    latest = session.scalar(select(Event).where(Event.type == EVENT_CAPITAL_REALLOCATED)
+                            .order_by(Event.id.desc()).limit(1))
+    scores = ({row["pod_id"]: row for row in latest.payload_json["result"]["pods"]}
+              if latest is not None else {})
+    rows = []
+    for pid, entry in sorted(state["pods"].items()):
+        if pod_id is not None and pid != pod_id:
+            continue
+        rows.append({"pod_id": pid, "stage": entry["stage"], "pitch_id": entry["pitch_id"],
+                     "seeded_on": entry["seeded_on"], "allocated_usd": entry["allocated"],
+                     "rule": entry["rule"], "last_score": scores.get(pid),
+                     "last_scored_on": latest.payload_json["day"] if pid in scores else None})
+    return {"opened_on": state["opened_on"], "law": state["law"],
+            "centre_cash_usd": state["centre_cash"] if pod_id is None else None, "pods": rows}
