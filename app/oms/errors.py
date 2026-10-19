@@ -70,6 +70,13 @@ class PodScopeError(AccessError):
     code = "pod_scope"
 
 
+class PodLimitError(AccessError):
+    """The risk ladder limits this pod: a reduce-only pod may only sell, a closed pod may not
+    trade at all (app/capital/). Physics, not a role: no agent can talk its way past it."""
+
+    code = "pod_limit"
+
+
 class OrderNotFoundError(OMSError):
     """No such order."""
 

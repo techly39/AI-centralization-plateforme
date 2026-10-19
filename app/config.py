@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -109,6 +109,46 @@ class GatesConfig(BaseModel):
     max_correlation: float = Field(default=0.5, gt=0.0, le=1.0)
 
 
+class CapitalConfig(BaseModel):
+    """The capital machine's law (app/capital/): the centre's capital, the seed, how capital moves
+    and the drawdown ladder. Frozen into the ledger when a run's centre opens, so a run is judged by
+    the law it opened with, not by a later edit of this file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    # The centre's capital when it opens; every pod's money comes from it and returns to it.
+    firm_capital_usd: float = Field(default=10_000_000.0, gt=0.0, le=1e12)
+    # What an eligible pitch earns at the next day.
+    seed_usd: float = Field(default=200_000.0, gt=0.0, le=1e12)
+    # Days between two re-weighings of capital.
+    reallocate_every_days: int = Field(default=5, ge=1, le=365)
+    # Fewer forward daily returns than this: no score (null, not 0) and the pod's capital stays.
+    min_track_days: int = Field(default=20, ge=5, le=1000)
+    # Share of the firm's equity the algorithm may put into pods; a pod's ceiling for raises.
+    deploy_share: float = Field(default=0.8, gt=0.0, le=1.0)
+    max_pod_share: float = Field(default=0.3, gt=0.0, le=1.0)
+    # A raise needs at least this viability (the t-statistic of the pod's net daily mean, after
+    # the penalties for copying an older pod and for drawdown): below it, the capital stays.
+    raise_at: float = Field(default=2.0, gt=0.0, le=100.0)
+    # A pod with no positive score is taken down toward this, never below it, by the algorithm.
+    min_pod_usd: float = Field(default=100_000.0, ge=0.0, le=1e12)
+    # One re-weighing grows a pod's capital by at most this share, and shrinks it by at most that.
+    max_raise: float = Field(default=0.5, gt=0.0, le=10.0)
+    max_cut: float = Field(default=0.5, gt=0.0, lt=1.0)
+    # A move smaller than this share of the pod's equity is not made (no churn).
+    min_move: float = Field(default=0.05, ge=0.0, lt=1.0)
+    # The drawdown ladder, from the pod's high-water mark on its forward return index.
+    halve_at: float = Field(default=0.05, gt=0.0, lt=1.0)
+    reduce_only_at: float = Field(default=0.075, gt=0.0, lt=1.0)
+    close_at: float = Field(default=0.10, gt=0.0, lt=1.0)
+
+    @model_validator(mode="after")
+    def _ladder_climbs(self) -> CapitalConfig:
+        if not self.halve_at < self.reduce_only_at < self.close_at:
+            raise ValueError("the ladder must climb: halve_at < reduce_only_at < close_at")
+        return self
+
+
 class MCPConfig(BaseModel):
     """Settings for the MCP server (``mcp_server/``), not for the API itself.
 
@@ -199,6 +239,7 @@ class Settings(BaseSettings):
     marketdata: MarketDataConfig = Field(default_factory=MarketDataConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     gates: GatesConfig = Field(default_factory=GatesConfig)
+    capital: CapitalConfig = Field(default_factory=CapitalConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

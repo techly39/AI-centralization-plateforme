@@ -41,14 +41,28 @@ class EquityPoint:
     net_flow: float = 0.0
 
 
-def daily_returns(curve: list[EquityPoint]) -> list[float]:
+def daily_returns(curve: list[EquityPoint], *, flows_at: str = "end") -> list[float]:
     """Time-weighted daily returns, one per day after the first.
 
-    Days that follow a zero or negative equity are skipped rather than made up:
-    a pod with no capital has no return, and dividing by it would invent one.
+    ``flows_at`` says when a day's flow met the market: at the day's ``"end"`` (the
+    reports' convention: it earned nothing that day), or at its ``"start"`` (the
+    capital machine moves money at the open of a backtest day, priced at the last
+    close, so the whole day's return is earned on equity plus the flow).
+
+    Days that follow a zero or negative equity (plus, at the start, the day's
+    flow) are skipped rather than made up: a pod with no capital has no return,
+    and dividing by it would invent one.
     """
+    if flows_at not in ("end", "start"):
+        raise ValueError(f"flows_at is 'end' or 'start', not {flows_at!r}")
     returns: list[float] = []
     for previous, current in zip(curve, curve[1:]):
+        if flows_at == "start":
+            base = previous.equity + current.net_flow
+            if base <= 0:
+                continue
+            returns.append(current.equity / base - 1.0)
+            continue
         if previous.equity <= 0:
             continue
         returns.append((current.equity - current.net_flow) / previous.equity - 1.0)

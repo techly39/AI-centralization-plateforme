@@ -25,10 +25,12 @@ from app.api.schemas import (
     RunMindsIn,
     RunMindsOut,
 )
+from app.capital.service import safe_sweep
 from app.clock import get_clock
 from app.db.base import get_session
 from app.db.models import Agent
 from app.ledger.events import ledger_now
+from app.marketdata import get_provider
 from app.oms.monitor import check_pending_orders
 from app.registry.auth import require
 from app.registry.permissions import Action
@@ -62,6 +64,9 @@ def advance_clock(
     # Pending limit orders are checked on every advance, by the same sweep the
     # live scheduler runs on a timer (TRD §9): one code path for both modes.
     sweep = check_pending_orders(session)
+    # Then the capital machine (idea: capital follows results): the drawdown ladder, seeds for
+    # eligible pitches, and the re-weighing when it is due. A no-op until a pitch is eligible.
+    safe_sweep(session, provider=get_provider())
     return ClockAdvanceOut(
         mode=get_clock().mode,
         previous=previous,

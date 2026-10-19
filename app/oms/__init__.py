@@ -22,6 +22,7 @@ from app.oms.errors import (
     OrderNotFoundError,
     OrderRejected,
     OrderValidationError,
+    PodLimitError,
     PodScopeError,
     PriceUnavailableError,
     RoleNotPermittedError,
@@ -30,6 +31,7 @@ from app.oms.monitor import MonitorResult, check_pending_orders
 from app.oms.portfolio import PortfolioView, PositionView, build_portfolio
 from app.oms.service import (
     cancel_order,
+    force_sell,
     get_cash,
     get_order,
     get_position,
@@ -47,6 +49,7 @@ __all__ = [
     "OrderNotFoundError",
     "OrderRejected",
     "OrderValidationError",
+    "PodLimitError",
     "PodScopeError",
     "PortfolioView",
     "PositionView",
@@ -54,6 +57,7 @@ __all__ = [
     "RoleNotPermittedError",
     "build_portfolio",
     "cancel_order",
+    "force_sell",
     "check_pending_orders",
     "get_cash",
     "get_order",

@@ -85,7 +85,7 @@ The notes in `bible/sources/REQUIREMENTS.md` were written fast and tidied by an 
 
 ### The firm is a multi-manager hedge fund with high turnover
 From: Human
-Status: not started
+Status: building
 Run *exactly like a multi-manager hedge fund* (Millennium / Citadel style), with a lot of turnover.
 Many independent pods, each a PM with a small team, each paid on its own results and meant to be
 uncorrelated with the others. **The centre holds capital and risk; the pods hold the ideas.**

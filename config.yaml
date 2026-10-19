@@ -46,6 +46,24 @@ gates:
   min_capacity_usd: 1000000    # a strategy must carry at least this much gross exposure
   max_correlation: 0.5         # with any other pod's latest pitch, on the same days
 
+# The capital machine (app/capital/): the centre holds the capital, the pods hold the ideas.
+# Frozen into a run's ledger when its centre opens (the first eligible pitch).
+capital:
+  firm_capital_usd: 10000000   # the centre's capital when it opens
+  seed_usd: 200000             # what an eligible pitch earns at the next day
+  reallocate_every_days: 5     # an algorithm re-weighs capital this often
+  min_track_days: 20           # fewer forward days: no score (null), the pod keeps its capital
+  deploy_share: 0.8            # of the firm's equity the algorithm may put into pods
+  max_pod_share: 0.3           # no raise takes a pod above this share of the firm's equity
+  raise_at: 2.0                # a raise needs this viability: the t-statistic of the net daily mean, after penalties
+  min_pod_usd: 100000          # a pod with no positive score is taken down toward this
+  max_raise: 0.5               # one re-weighing grows a pod by at most half ...
+  max_cut: 0.5                 # ... and shrinks it by at most half
+  min_move: 0.05               # moves smaller than this share of the pod are not made
+  halve_at: 0.05               # drawdown from the pod's high-water mark: half its capital back
+  reduce_only_at: 0.075        # ... it may only sell
+  close_at: 0.10               # ... closed: every position sold, all its money back
+
 # MCP server (mcp_server/). It is a CLIENT of the API above, in its own process.
 # Leave api_key null here and pass it in the environment — this file is
 # committed, and the key is the identity every action is attributed to:

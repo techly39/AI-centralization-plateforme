@@ -49,6 +49,7 @@ def fund_pod(
     delta: float,
     actor: Agent,
     reason: str | None = None,
+    source: str | None = None,
 ) -> Pod:
     """Move a pod's allocation by ``delta`` (negative withdraws).
 
@@ -57,11 +58,15 @@ def fund_pod(
     """
     pod = get_pod(session, pod_id)
 
+    payload = {"pod_id": pod_id, "delta": float(delta), "reason": reason}
+    if source is not None:
+        # Whose money moved: "capital" = the centre's (app/capital/), which counts it.
+        payload["source"] = source
     event = append_event(
         session,
         type=EVENT_ALLOCATION_SET,
         actor_agent_id=actor.id,
-        payload={"pod_id": pod_id, "delta": float(delta), "reason": reason},
+        payload=payload,
     )
     apply_event_to_db(session, event)
 

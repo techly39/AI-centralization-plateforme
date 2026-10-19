@@ -49,6 +49,7 @@ from app.db.models import (
     Order,
     OrderSide,
     OrderStatus,
+    Pod,
     Position,
     PriceType,
 )
@@ -74,6 +75,7 @@ from app.oms.errors import (
     OrderNotFoundError,
     OrderRejected,
     OrderValidationError,
+    PodLimitError,
     PodScopeError,
     PriceUnavailableError,
     RoleNotPermittedError,
@@ -234,6 +236,8 @@ def place_order(
             if price_type is PriceType.market:
                 reference_price = _fetch_price(provider, symbol, now)
         try:
+            # Under the lock: the capital machine changes a pod's stage under it too.
+            assert_pod_may_trade(session, pod_id=pod_id, side=side)
             order = Order(
                 pod_id=pod_id,
                 created_by=actor.id,
@@ -318,6 +322,55 @@ def _fetch_price(
             f"no price available for {symbol}: {exc}",
             detail={"ticker": symbol},
         ) from exc
+
+
+# --- The risk ladder's limits (app/capital/) ----------------------------------
+
+def assert_pod_may_trade(session: Session, *, pod_id: int, side: OrderSide) -> None:
+    """Raise :class:`PodLimitError` if the ladder forbids this order: a closed pod trades
+    nothing, a reduce-only pod only sells. Read fresh from the database, never a cached row."""
+    stage = session.execute(select(Pod.status).where(Pod.id == pod_id)).scalar()
+    if stage == "closed":
+        raise PodLimitError(
+            f"pod {pod_id} is closed by the risk ladder: it may not trade",
+            detail={"pod_id": pod_id, "stage": stage})
+    if stage == "reduce_only" and side is OrderSide.buy:
+        raise PodLimitError(
+            f"pod {pod_id} is reduce-only (the risk ladder): it may sell, not buy",
+            detail={"pod_id": pod_id, "stage": stage})
+
+
+def force_sell(
+    session: Session,
+    *,
+    pod_id: int,
+    ticker: str,
+    qty: float,
+    actor: Agent,
+    reason: str,
+    provider: MarketDataProvider,
+) -> Order:
+    """Physics sells ``qty`` of a pod's position at the market (the capital machine: a recall of
+    capital, a cut, a closed pod). Placed and filled like any market order, as ``actor`` (the
+    system identity), on no agent's behalf. The caller holds :data:`OMS_LOCK` and commits."""
+    if actor.role is not AgentRole.system:
+        raise RoleNotPermittedError("only physics' own identity sells a pod's position by force")
+    now = ledger_now(session)
+    price = _fetch_price(provider, ticker, now)
+    order = Order(pod_id=pod_id, created_by=actor.id, ticker=ticker, side=OrderSide.sell,
+                  qty=float(qty), price_type=PriceType.market, limit_price=None,
+                  status=OrderStatus.pending, justification=reason, created_at=now)
+    session.add(order)
+    session.flush()
+    placed = append_event(session, type=EVENT_ORDER_PLACED, actor_agent_id=actor.id, payload={
+        "order_id": order.id, "pod_id": pod_id, "ticker": ticker, "side": "sell",
+        "qty": float(qty), "price_type": "market", "limit_price": None,
+        "reference_price": price, "justification": reason})
+    order.created_at = placed.ts
+    assert_affordable(session, pod_id=pod_id, ticker=ticker, side=OrderSide.sell,
+                      qty=float(qty), price=price)
+    execute_fill(session, order, price=price, actor_agent_id=actor.id)
+    return order
 
 
 # --- Affordability ----------------------------------------------------------

@@ -8,7 +8,7 @@
       "idea": "The firm is a multi-manager hedge fund with high turnover",
       "acceptance": "acceptance/capital_machine.py",
       "demo": "uv run python acceptance/capital_machine.py ($0, offline): made-up pods on a synthetic market live forward days; the allocation table moves capital toward the planted edge, a copy is penalised for correlation, a bleeder is halved at 5%, made reduce-only at 7.5% (its buy is refused), closed at 10%; the good pod is never cut; rebuilding from the ledger gives the same allocations.",
-      "status": "ready",
+      "status": "active",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [
