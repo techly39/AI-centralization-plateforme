@@ -432,7 +432,7 @@ def test_redteam_capital_a_halved_pod_is_raised_back_by_the_reweighing():
 # --- 8. a pod's own row tells it which other pod it moves like, and how much ----------------------
 
 def test_redteam_capital_own_row_leaks_another_pods_correlation(
-        SessionFactory, client, db):
+        SessionFactory, client, db, monkeypatch):
     """SEVERITY: low. A cross-pod read through GET /capital.
 
     A pod member may read only its own pod's row, but that row's ``last_score`` carries
@@ -444,6 +444,9 @@ def test_redteam_capital_own_row_leaks_another_pods_correlation(
     Suggested fix: strip ``corr_with``/``corr`` (keep ``corr_factor``) from a row served without
     ``read_cross_pod``.
     """
+    # Both pods pitch the same rule for brevity; the copy check at the seed (tested below) would
+    # refuse the second, and it is not what this test is about.
+    monkeypatch.setattr(capital_service, "_copy_check", lambda *a, **kw: None)
     world = open_world(SessionFactory, {}, pods=2)
     p1, p2 = world["pods"]
     for p in (p2,):
@@ -535,3 +538,100 @@ def test_auditor_capital_a_failed_sweep_is_written_to_the_ledger(
     failed = list(db.scalars(select(Event).where(Event.type == "capital_sweep_failed")))
     assert len(failed) == 1 and "the machine broke" in failed[0].payload_json["error"]
     assert book(db)["law"] is None                       # rolled back whole: the centre never opened
+
+
+# --- auditor (cycle 48, second pass): no order of pitches gets two seeds for one rule -----------
+
+CLONE_BASE = {"language": "strategy-v1", "signal": "momentum", "lookback": 10,
+              "rebalance_every": 5, "top_n": 2, "side": "long_only", "gross": 1.0}
+CLONE_R = {**CLONE_BASE, "universe": ["A0", "A1", "A2", "A3", "A4"]}
+
+
+def _clone_world(SessionFactory, monkeypatch, pods: int = 2):
+    set_provider(BarsProvider(_random_market()))
+
+    def correlation_only(evaluation, *, attempts, others, law):
+        corr = gates.correlation_gate(evaluation, others, law)
+        return {"eligible": corr["result"] != "fail", "gates": [corr],
+                "performance": gates.performance(evaluation)}
+
+    monkeypatch.setattr(strategy_service, "judge", correlation_only)
+    s = SessionFactory()
+    try:
+        start_backtest(s, start=datetime(2024, 6, 1, tzinfo=UTC))
+        out = []
+        for k in range(1, pods + 1):
+            pod = create_pod(s, name=f"desk-{k}")
+            pm, key = register_agent(s, name=f"pm-{k}", role=AgentRole.pm, pod_id=pod.id)
+            out.append((pod.id, pm.id, key))
+        _, runtime = seed_runtime_agent(s)
+        s.commit()
+    finally:
+        s.close()
+    return out, runtime
+
+
+def test_auditor_capital_a_refused_long_short_pitch_does_not_free_a_clone(
+        SessionFactory, client, db, monkeypatch):
+    """BLOCK (auditor, second pass). Pod 1's first eligible pitch is long-short (refused at the
+    seed), its second is R, its latest R3; pod 2 pitches R before the refusal. The pitch-time gate
+    never compared the copy with R; the machine's check at the seed must."""
+    ((_, _, key1), (_, _, key2)), runtime = _clone_world(SessionFactory, monkeypatch)
+
+    def pitch(key: str, rule: dict) -> dict:
+        r = client.post("/pitches", headers=H(key), json={
+            "hypothesis": "winners keep winning", "data_needed": "daily prices",
+            "team": "the PM", "budget_usd": 0.0, "rule": rule})
+        assert r.status_code == 201, r.text
+        return r.json()["verdict"]
+
+    other = ["A5", "A6", "A7", "A8", "A9"]
+    assert pitch(key1, {**CLONE_BASE, "universe": other, "side": "long_short"})["eligible"]
+    assert pitch(key1, CLONE_R)["eligible"]
+    pitch(key1, {**CLONE_BASE, "universe": other, "lookback": 20})
+    pitch(key2, CLONE_R)
+    for _ in range(3):
+        r = client.post("/clock/advance", headers=H(runtime), json={"days": 1})
+        assert r.status_code == 200
+    db.expire_all()
+    funded = [pid for pid, e in book(db)["pods"].items()
+              if e["rule"]["universe"] == CLONE_R["universe"]]
+    assert len(funded) == 1, f"pods {funded} were all seeded for the same rule"
+
+
+def test_auditor_capital_two_eligible_copies_in_the_ledger_get_one_seed(
+        SessionFactory, client, db, monkeypatch):
+    """BLOCK (auditor, second pass), the strongest form: two pods' eligible pitches of one rule
+    reach the ledger at once (no pitch-time gate saw the other). One seed, one refusal."""
+    pods, runtime = _clone_world(SessionFactory, monkeypatch)
+    for pod_id, pm_id, _ in pods:
+        sub = append_event(db, type=EVENT_PITCH_SUBMITTED, actor_agent_id=pm_id,
+                           payload={"pod_id": pod_id, "agent_id": pm_id, "rule": CLONE_R})
+        append_event(db, type=EVENT_PITCH_JUDGED, actor_agent_id=pm_id,
+                     payload={"pitch_id": sub.id, "pod_id": pod_id, "eligible": True})
+    db.commit()
+    r = client.post("/clock/advance", headers=H(runtime), json={"days": 1})
+    assert r.status_code == 200
+    db.expire_all()
+    assert list(book(db)["pods"]) == [pods[0][0]]
+    refused = [e.payload_json for e in db.scalars(
+        select(Event).where(Event.type == "capital_seed_refused"))]
+    assert [p["pod_id"] for p in refused] == [pods[1][0]]
+    assert refused[0]["gate"]["result"] == "fail"
+    assert refused[0]["gate"]["against"][f"pod {pods[0][0]} mandate"] == pytest.approx(1.0)
+
+
+def test_auditor_capital_an_unrelated_rule_is_still_seeded(SessionFactory, client, db, monkeypatch):
+    """The control: the check at the seed refuses copies, not every second pod."""
+    pods, runtime = _clone_world(SessionFactory, monkeypatch)
+    rules = [CLONE_R, {**CLONE_BASE, "universe": ["A5", "A6", "A7", "A8", "A9"]}]
+    for (pod_id, pm_id, _), rule in zip(pods, rules):
+        sub = append_event(db, type=EVENT_PITCH_SUBMITTED, actor_agent_id=pm_id,
+                           payload={"pod_id": pod_id, "agent_id": pm_id, "rule": rule})
+        append_event(db, type=EVENT_PITCH_JUDGED, actor_agent_id=pm_id,
+                     payload={"pitch_id": sub.id, "pod_id": pod_id, "eligible": True})
+    db.commit()
+    r = client.post("/clock/advance", headers=H(runtime), json={"days": 1})
+    assert r.status_code == 200
+    db.expire_all()
+    assert sorted(book(db)["pods"]) == sorted(p[0] for p in pods)

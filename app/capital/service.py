@@ -13,7 +13,8 @@ advance holds, as the system identity; one transaction.
    every position sold, all its cash back to the centre.
 3. **Seeds.** Each eligible pitch of a pod the machine has not seeded gets ``seed_usd`` from the
    centre (``capital_seeded``, then ``allocation_set``), if the centre holds it. A long-short rule
-   is refused, once, in the ledger: the order system cannot short yet.
+   is refused, once, in the ledger: the order system cannot short yet; so is a rule that fails the
+   correlation gate against a mandate the centre already funds (checked again as the seed is paid).
 4. **Re-weighing**, every ``reallocate_every_days``: :func:`app.capital.allocation.reallocate` on
    every live pod's forward record; ``capital_reallocated`` holds its whole input and its result;
    cuts are recalled first, raises paid after.
@@ -268,6 +269,24 @@ def eligible_unseeded(session: Session, seeded_pods: set[int]) -> list[dict[str,
     return out
 
 
+def _copy_check(session: Session, *, pitch: dict[str, Any], provider: MarketDataProvider
+                ) -> dict[str, Any] | None:
+    """The correlation gate, run again as the seed is paid, against every other pod's mandate the
+    centre ever funded (closed pods too, and seeds paid earlier in this sweep). The pitch-time gate
+    saw the ledger of its moment; this sees the seeds as they are paid, so no order of pitches (nor
+    two pitches at once) gets two seeds for one rule (auditor). ``None``: nothing to compare with."""
+    from app.strategy.service import seed_correlation  # the strategy desk reads this module
+
+    against = {f"pod {pod} mandate": entry["rule"]
+               for pod, entry in sorted(book(session)["pods"].items())
+               if pod != pitch["pod_id"]}
+    if not against:
+        return None
+    settings = get_settings()
+    return seed_correlation(session, rule=pitch["rule"], against=against, provider=provider,
+                            law=settings.gates, fee_rate=settings.oms.fee_rate)
+
+
 def _due(session: Session, today: date, opened_on: date, law: CapitalConfig) -> bool:
     last = session.scalar(select(Event).where(Event.type == EVENT_CAPITAL_REALLOCATED)
                           .order_by(Event.id.desc()).limit(1))
@@ -329,10 +348,16 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
             reason = "the pod is closed"
         elif pitch["rule"].get("side") != "long_only":
             reason = "a long-short rule: the order system cannot short yet, so it cannot trade it"
+        gate = None
+        if reason is None:
+            gate = _copy_check(session, pitch=pitch, provider=provider)
+            if gate is not None and gate["result"] == "fail":
+                reason = (f"it moves like a rule the centre already funds (correlation "
+                          f"{gate['value']:.2f} above {gate['threshold']:.2f})")
         if reason is not None:
             append_event(session, type=EVENT_CAPITAL_SEED_REFUSED, actor_agent_id=system.id,
                          payload={"pod_id": pitch["pod_id"], "pitch_id": pitch["pitch_id"],
-                                  "reason": reason})
+                                  "reason": reason, **({"gate": gate} if gate else {})})
             done["refused"].append(pitch["pitch_id"])
             continue
         if book(session)["centre_cash"] < law.seed_usd:

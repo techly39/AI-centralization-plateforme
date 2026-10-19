@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
+from app.capital import service as capital_service
 from app.capital.allocation import PodTrack, climb, drawdown, reallocate, score, stage_for
 from app.capital.service import book, sweep
 from app.config import CapitalConfig
@@ -242,7 +243,10 @@ def test_rebuild_restores_the_pods_capital_and_stage(db, frozen_clock, make_pod,
 
 
 def test_a_pod_reads_its_own_row_and_management_the_whole_table(
-        client, db, frozen_clock, make_pod, pm_factory, admin_key, prices):
+        client, db, frozen_clock, make_pod, pm_factory, admin_key, prices, monkeypatch):
+    # Both pods pitch the same rule for brevity; the copy check at the seed is not under test here
+    # (tests/test_redteam_capital.py tests it).
+    monkeypatch.setattr(capital_service, "_copy_check", lambda *a, **kw: None)
     make_pod(1)
     make_pod(2)
     _, pm1 = pm_factory("pm-1", 1)

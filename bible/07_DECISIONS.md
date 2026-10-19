@@ -1978,9 +1978,13 @@ shorting.
 - (7) A recall never takes more than the **centre's stake**: each capital flow grown by the pod's
   return index since it moved (fund units). The world's money stays in the pod, even when it closes.
 - (8) A halved pod, like a reduce-only one, is never raised.
-- (3) The correlation gate compares a pitch with each other pod's latest pitch, with every live
-  seeded pod's mandate, **and** with the pitch each other unseeded pod will be seeded with at the
-  next advance (auditor): a later pitch of the original no longer frees a copy for a second seed.
+- (3) The correlation gate compares a pitch with each other pod's latest pitch, with every mandate
+  the centre ever funded (a closed pod's too: the ladder's verdict on a rule is not undone by a
+  fresh seed), and with the pitch each other unseeded pod will be seeded with at the next advance.
+  And the machine **runs the correlation gate again as it pays each seed**, against every other
+  pod's mandate including seeds paid earlier in the same sweep; a failure is `capital_seed_refused`
+  holding the gate's row (auditor, two passes). No order of pitches, nor two pitches at once, gets
+  two seeds for one rule. The gates' law is the one in force at the seed (as at a pitch).
 - (4) A sweep that fails is rolled back whole and written to the ledger (`capital_sweep_failed`);
   the advance stands, the next one runs the machine again (the worst-drawdown rule catches up).
 - (11) A pod member's row drops `corr_with` and `corr`. It keeps `corr_factor` (what the

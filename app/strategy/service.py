@@ -44,7 +44,7 @@ from app.marketdata import (
     MarketDataProvider,
     UnknownTickerError,
 )
-from app.strategy.gates import judge, performance
+from app.strategy.gates import correlation_gate, judge, performance
 from app.strategy.rule import IMPACT_WINDOW, Evaluation, EvaluationError, StrategyRule, evaluate
 
 #: Days of research window when the caller names none.
@@ -150,6 +150,41 @@ def _latest_pitches(session: Session, *, besides: int) -> dict[int, dict[str, An
     return latest
 
 
+def _series(provider: MarketDataProvider, session: Session, rules: dict[str, dict[str, Any]],
+            start: date, end: date, fee_rate: float
+            ) -> dict[str, tuple[Sequence[date], Sequence[float]]]:
+    """Each named rule's daily returns on the window, for the correlation gate."""
+    out: dict[str, tuple[Sequence[date], Sequence[float]]] = {}
+    for name, rule_json in rules.items():
+        try:
+            theirs = _evaluate(provider, session, StrategyRule.model_validate(rule_json),
+                               start, end, fee_rate)
+        except StrategyRequestError:
+            # Another pod's rule this window cannot carry (a ticker gone): no correlation to
+            # measure with it, which never blocks this pod (null, not 0).
+            out[name] = ((), ())
+            continue
+        out[name] = (theirs.days, theirs.returns)
+    return out
+
+
+def seed_correlation(session: Session, *, rule: dict[str, Any], against: dict[str, dict[str, Any]],
+                     provider: MarketDataProvider, law: GatesConfig, fee_rate: float
+                     ) -> dict[str, Any]:
+    """The correlation gate's row for ``rule`` against ``against`` (name → rule) on today's
+    held-out window: the capital machine's last check before it pays a seed (auditor). A rule this
+    window cannot carry gets a null row, as at the pitch."""
+    start, today = holdout_start(session, law)
+    try:
+        mine = _evaluate(provider, session, StrategyRule.model_validate(rule), start, today,
+                         fee_rate)
+    except StrategyRequestError as exc:
+        return {"gate": "correlation", "result": "null", "value": None,
+                "threshold": law.max_correlation, "against": {}, "note": str(exc)}
+    return correlation_gate(mine, _series(provider, session, against, start, today, fee_rate),
+                            law)
+
+
 def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothesis: str,
                  data_needed: str, team: str, budget_usd: float,
                  provider: MarketDataProvider, law: GatesConfig, fee_rate: float
@@ -164,23 +199,16 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
     # about to be) its mandate to earn a second seed (red-team and auditor, capital machine).
     compared = {f"pod {pod}": pitch["rule"]
                 for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items())}
+    # A closed pod's mandate too: the ladder's verdict on a rule is not undone by a fresh seed.
+    # (The machine checks again when it pays a seed, :func:`seed_correlation`: no order of pitches
+    # gets two seeds for one rule.)
     seeded = capital_book(session)["pods"]
     for pod, entry in sorted(seeded.items()):
-        if pod != pod_id and entry["stage"] != "closed":
+        if pod != pod_id:
             compared[f"pod {pod} mandate"] = entry["rule"]
     for waiting in eligible_unseeded(session, set(seeded) | {pod_id}):
         compared[f"pod {waiting['pod_id']} seed"] = waiting["rule"]
-    others: dict[str, tuple[Sequence[date], Sequence[float]]] = {}
-    for name, rule_json in compared.items():
-        try:
-            theirs = _evaluate(provider, session, StrategyRule.model_validate(rule_json),
-                               start, today, fee_rate)
-        except StrategyRequestError:
-            # Another pod's rule this window cannot carry (a ticker gone): no correlation to
-            # measure with it, which never blocks this pod (null, not 0).
-            others[name] = ((), ())
-            continue
-        others[name] = (theirs.days, theirs.returns)
+    others = _series(provider, session, compared, start, today, fee_rate)
     attempts = pod_attempts(session, pod_id) + 1
     submitted = append_event(session, type=EVENT_PITCH_SUBMITTED, actor_agent_id=actor.id, payload={
         "pod_id": pod_id, "agent_id": actor.id, "hypothesis": hypothesis,
