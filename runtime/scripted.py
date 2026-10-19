@@ -278,10 +278,55 @@ def self_reporting(script: Script, usd_per_wake: float) -> Script:
     return run
 
 
+def pitch_pm(request: CompletionRequest) -> CompletionResponse:
+    """A PM that pitches once, then trades its mandate (idea: a dead pod is replaced).
+
+    Its rule is the workflow input's ``pitch_rules[<my name>]`` (none: it only trades). Turn 0
+    reads its pod's pitches and its mandate. Turn 1: no pitch yet → it pitches the rule (naming
+    the dead pod its ``post_mortem`` describes, if it was hired into one); else, once seeded, it
+    places the mandate's orders. Turn 2 is done.
+    """
+    context = _context(request)
+    me = context["me"]
+    rules = context["input"].get("pitch_rules")
+    rule = rules.get(me.get("name")) if isinstance(rules, dict) else None
+    turn = _turn(request)
+    if turn == 0:
+        return CompletionResponse(content="Reading my pitches and my mandate.", tool_calls=[
+            ToolCall(id="pitches", name="list_pitches", arguments={}),
+            ToolCall(id="mandate", name="get_mandate", arguments={})])
+    if turn == 1:
+        results = _results(request)
+        pitches = results.get("pitches")
+        if type(pitches) is not list:
+            return CompletionResponse(content="I could not read my pitches; nothing today.")
+        if not pitches and isinstance(rule, dict):
+            dead = context["input"].get("post_mortem")
+            why = "Slow diffusion of information: recent winners keep winning."
+            if isinstance(dead, dict):
+                why += (f" The pod before me ({dead.get('pod_name')}) was closed after "
+                        f"{dead.get('forward_days')} forward days; I trade other names.")
+            return CompletionResponse(content="Pitching my rule.", tool_calls=[
+                ToolCall(id="pitch", name="submit_pitch", arguments={
+                    "hypothesis": why, "data_needed": "daily prices", "team": "the PM alone",
+                    "budget_usd": 0.0, "rule": rule})])
+        mandate = results.get("mandate")
+        orders = mandate.get("orders") if isinstance(mandate, dict) else None
+        if not orders:
+            return CompletionResponse(content="Nothing to trade today.")
+        return CompletionResponse(content=f"Placing {len(orders)} order(s).", tool_calls=[
+            ToolCall(id=f"order:{i}:{o['ticker']}", name="place_order", arguments={
+                "ticker": o["ticker"], "side": o["side"], "qty": o["qty"],
+                "price_type": "market", "justification": "my funded rule's rebalance"})
+            for i, o in enumerate(orders)])
+    return CompletionResponse(content="Done for today.")
+
+
 #: The closed table: script name → policy. A spec names one of these keys.
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
     "ma-signal-analyst": ma_signal_analyst,
     "signal-pm": signal_pm,
     "ma-signal-analyst-underreports": self_reporting(ma_signal_analyst, 0.01),
+    "pitch-pm": pitch_pm,
 })

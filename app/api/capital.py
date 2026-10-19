@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.capital.mandate import NoMandate, mandate_orders
 from app.capital.service import capital_view
 from app.db.base import get_session
-from app.db.models import Agent
+from app.db.models import Agent, Pod
 from app.limits import MAX_ID
 from app.marketdata import MarketDataError, get_provider
 from app.registry.auth import deny, require
@@ -51,6 +51,9 @@ def get_mandate(
     pod_id = _pod_to_read(session, actor, pod_id, cross) or actor.pod_id
     if pod_id is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="name a pod_id")
+    pod = session.get(Pod, pod_id)
+    if pod is not None and pod.status == "closed":
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"pod {pod_id} is closed: no mandate")
     try:
         return mandate_orders(session, pod_id=pod_id, provider=get_provider())
     except NoMandate as exc:

@@ -136,12 +136,40 @@ def _assistants(messages: Any) -> list[int]:
     return [i for i, m in enumerate(messages) if m.role == "assistant"]
 
 
+@dataclass(frozen=True)
+class HireRecord:
+    """One hiring decision of a run (:mod:`runtime.onboarding`): data, so it lives here."""
+    step: int
+    vacancy_id: int
+    spec_id: str
+    #: ``hired`` | ``refused:<code>`` (``budget_over_cap``, ``wake_gate:<reason>``, ``physics:409``,
+    #: ``key_over_cap``, ``spec_id_taken``)
+    outcome: str
+    agent_id: int | None = None
+    #: The reason the Runtime posted to physics, word for word (a replay posts the same).
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if (type(self.step) is not int or self.step < 0 or type(self.vacancy_id) is not int
+                or type(self.spec_id) is not str or not re.fullmatch(r"hire-[0-9]{1,6}", self.spec_id)
+                or type(self.outcome) is not str
+                or not re.fullmatch(r"hired|refused:[a-z_]+(:[a-z0-9_]+)?", self.outcome)
+                or not (self.agent_id is None or type(self.agent_id) is int)
+                or not (self.reason is None or (type(self.reason) is str and 0 < len(self.reason) <= 200))):
+            raise RecordingError("a hire record is malformed")
+        # Only a hire, or a hire whose key the month could not hold, names an agent.
+        with_agent = self.outcome in ("hired", "refused:key_over_cap")
+        if with_agent != (self.agent_id is not None) or (with_agent and self.reason is not None):
+            raise RecordingError("a hire record is malformed")
+
+
 class Recording:
     """A completed run's cassette, validated, as tapes (build with :meth:`load` or
     :meth:`from_outcome`)."""
 
     def __init__(self, steps: int, tapes: Mapping[tuple[int, str], Tape],
-                 calendar: tuple[tuple[str, str], ...] = ()) -> None:
+                 calendar: tuple[tuple[str, str], ...] = (),
+                 hires: tuple[HireRecord, ...] = ()) -> None:
         if type(steps) is not int or not all(
                 type(k) is tuple and len(k) == 2 and type(k[0]) is int and type(k[1]) is str
                 and type(t) is Tape for k, t in tapes.items()):
@@ -155,6 +183,17 @@ class Recording:
         #: ``(at, advanced_to)`` per recorded step; empty for a hand-built recording.
         self._calendar = calendar
         self.spec_ids = frozenset(spec_id for _, spec_id in self._tapes)
+        if type(hires) is not tuple or any(type(h) is not HireRecord for h in hires):
+            raise RecordingError("hires are a tuple of HireRecords")
+        #: Every hiring decision of the recorded run, and the minds it hired (their wakes are in
+        #: the tapes from the step they were hired on).
+        self.hires = hires
+        self.hired_ids = frozenset(h.spec_id for h in hires if h.outcome == "hired")
+        if len(self.hired_ids) != sum(h.outcome == "hired" for h in hires):
+            raise RecordingError("a mind is hired twice")
+        for h in hires:
+            if h.outcome == "hired" and any(k[1] == h.spec_id and k[0] < h.step for k in self._tapes):
+                raise RecordingError(f"{h.spec_id} woke before it was hired")
 
     @classmethod
     def load(cls, path: Path) -> Recording:
@@ -190,7 +229,13 @@ class Recording:
                     if isinstance(exc, RecordingError):
                         raise
                     raise RecordingError(f"step {n}: a wake is malformed ({type(exc).__name__})") from exc
-        return cls(len(steps), tapes, tuple(calendar))
+        try:
+            hires = tuple(HireRecord(**h) for h in run.get("hires") or [])
+        except TypeError as exc:
+            raise RecordingError("a hire record is malformed") from exc
+        if any(h.step >= len(steps) for h in hires):
+            raise RecordingError("a hire record is past the run's last step")
+        return cls(len(steps), tapes, tuple(calendar), hires)
 
     def calendar(self, step: int) -> tuple[str, str] | None:
         """``(at, advanced_to)`` the recording had for ``step``; ``None`` for a hand-built one."""

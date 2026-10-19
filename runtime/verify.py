@@ -54,6 +54,7 @@ _MEANING = {"world": "the mind was shown a world the recording did not show",
             "key": "a key minted in the world differed (redacted in the file)",
             "surface": "the request's surface (tools or model) differed",
             "unrecorded": "the mind asked a turn the recording does not have",
+            "hire": "a vacancy was filled or refused otherwise than recorded",
             "ended": "the wake ended differently than recorded"}
 
 
@@ -63,6 +64,12 @@ class Verdict:
     code: int
     line: str
     where: dict[str, Any] | None = None
+
+
+def cli_usage() -> type[Exception]:
+    """The CLI's usage error, without importing the CLI at this module's top."""
+    from runtime import cli
+    return cli._Usage
 
 
 def _usage(message: str) -> Verdict:
@@ -281,7 +288,7 @@ async def verify(path: Path) -> tuple[int, str, str]:
         rec = Recording.from_outcome(cas.outcome)
         recipe = cas.world["recipe"]
         world.parse_recipe(recipe)
-        if {s.id for s in specs} != rec.spec_ids:
+        if {s.id for s in specs} != rec.spec_ids - rec.hired_ids:
             return usage("the cassette's specs are not the recording's minds: their ids differ")
         if cas.parameters["steps"] != rec.steps:
             return usage("the cassette's parameters disagree with its recording (steps)")
@@ -293,6 +300,10 @@ async def verify(path: Path) -> tuple[int, str, str]:
         for mind in minds:
             check_spec(mind)
         key = world.world_key()
+        from runtime import cli  # the conductor; imported here so cli can import this module lazily
+        hiring = cli.recorded_hiring(cas.parameters, rec)
+    except cli_usage() as exc:
+        return usage(f"{path}: {exc}")
     except (SpecError, RecordingError, world.WorldError, ProviderRefused, ValueError,
             ValidationError) as exc:
         return usage(f"{path}: {getattr(exc, 'reason', None) or exc}")
@@ -309,7 +320,6 @@ async def verify(path: Path) -> tuple[int, str, str]:
         recorded = recorded[:-len(block)]
     events = len(recorded)
 
-    from runtime import cli  # the conductor; imported here so cli can import this module lazily
     outcome: dict[str, Any] = {}
     compare: dict[str, Any] | None = None
     try:
@@ -329,7 +339,7 @@ async def verify(path: Path) -> tuple[int, str, str]:
                     steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
                     workflow_input=cas.parameters["workflow_input"],
                     max_tool_calls=cas.parameters["max_tool_calls"], replay=rec,
-                    package=cas.parameters.get("package"))
+                    package=cas.parameters.get("package"), hiring=hiring)
             finally:
                 hosted_world.stop()
             if outcome.get("ended") == "completed":
