@@ -60,6 +60,7 @@ EVENT_CAPITAL_SEEDED = "capital_seeded"            # payload: {pod_id, pitch_id,
 EVENT_CAPITAL_SEED_REFUSED = "capital_seed_refused"  # payload: {pod_id, pitch_id, reason}
 EVENT_CAPITAL_REALLOCATED = "capital_reallocated"  # payload: {day, inputs: {centre_cash, pods}, result}
 EVENT_POD_STAGE_CHANGED = "pod_stage_changed"      # payload: {pod_id, from, to, drawdown, index, high_water}
+EVENT_CAPITAL_SWEEP_FAILED = "capital_sweep_failed"  # payload: {error}: the machine skipped this advance
 
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}

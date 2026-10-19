@@ -1978,7 +1978,11 @@ shorting.
 - (7) A recall never takes more than the **centre's stake**: each capital flow grown by the pod's
   return index since it moved (fund units). The world's money stays in the pod, even when it closes.
 - (8) A halved pod, like a reduce-only one, is never raised.
-- (3) The correlation gate compares a pitch with each other pod's latest pitch **and** with every
-  live seeded pod's mandate: a later pitch of the original no longer frees a copy for a second seed.
-- (11) A pod member's row hides which pod it moves like and by how much (`corr_with`, `corr`); it
-  keeps what the correlation cost it.
+- (3) The correlation gate compares a pitch with each other pod's latest pitch, with every live
+  seeded pod's mandate, **and** with the pitch each other unseeded pod will be seeded with at the
+  next advance (auditor): a later pitch of the original no longer frees a copy for a second seed.
+- (4) A sweep that fails is rolled back whole and written to the ledger (`capital_sweep_failed`);
+  the advance stands, the next one runs the machine again (the worst-drawdown rule catches up).
+- (11) A pod member's row drops `corr_with` and `corr`. It keeps `corr_factor` (what the
+  correlation cost it, `1 − ρ`), so the size of its highest correlation with an older pod can be
+  worked out; which pod is hidden only when there are several. A known hole, written in the book.

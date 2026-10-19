@@ -406,6 +406,12 @@ held-out verdict buys a seed, not the book. Also: the IC gate's prediction count
 rebalances, so a wide universe meets the floor on a few independent cross-sections. Auditor notes:
 the gates' verdict is written to the ledger under the PM's name, not physics'; each pitch re-runs
 every other pod's latest rule (worth a cache once there are many pods on live data).
+From the capital machine (cycle 48, red-team and auditor; the eight holes and the auditor's block
+are fixed): a pod's own score row still lets it work out how strongly its returns move with an
+older pod's (`corr_factor` is 1 − ρ), and which pod when there is only one; a holding with no
+price is valued at cost, so the ladder cannot see a loss on it (impossible on a made-up market,
+possible if a real ticker's history fails); the demo checks the centre's books by construction,
+not by an independent sum of every dollar.
 
 ### Paid to report holes
 From: Builder

@@ -33,7 +33,7 @@ rules that the gates find eligible. Then a hundred forward days pass:
    look-ahead guard as every feed).
 3. Pure parts: `app/capital/allocation.py` (scores → moves) and the ladder (drawdown → stage).
 4. Physics: `app/capital/service.py` — open the centre, seed, ladder, reallocate; run on every
-   clock advance after the order sweep; forced sales by physics through the order system; pod
+   clock advance, before the order sweep (one lock across the advance); forced sales by physics through the order system; pod
    stage written to the ledger and the pod row; rebuild re-derives it.
 5. Order system: a reduce-only pod's buy and any order of a closed pod are refused (403 + event);
    pending orders are cancelled at the cut.

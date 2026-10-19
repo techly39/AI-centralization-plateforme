@@ -50,6 +50,7 @@ from app.ledger.events import (
     EVENT_CAPITAL_REALLOCATED,
     EVENT_CAPITAL_SEED_REFUSED,
     EVENT_CAPITAL_SEEDED,
+    EVENT_CAPITAL_SWEEP_FAILED,
     EVENT_ORDER_CANCELLED,
     EVENT_PITCH_JUDGED,
     EVENT_PITCH_SUBMITTED,
@@ -70,7 +71,7 @@ from app.registry.service import get_or_create_system_agent
 
 SOURCE = "capital"
 CAPITAL_EVENTS = (EVENT_CAPITAL_OPENED, EVENT_CAPITAL_SEEDED, EVENT_CAPITAL_SEED_REFUSED,
-                  EVENT_CAPITAL_REALLOCATED, EVENT_POD_STAGE_CHANGED)
+                  EVENT_CAPITAL_REALLOCATED, EVENT_POD_STAGE_CHANGED, EVENT_CAPITAL_SWEEP_FAILED)
 
 
 # --- the book, folded from the ledger ------------------------------------------------------------
@@ -251,7 +252,7 @@ def _set_stage(session: Session, *, pod_id: int, old: str, new: str, record: Pod
 
 # --- the sweep ---------------------------------------------------------------------------------
 
-def _eligible_unseeded(session: Session, seeded_pods: set[int]) -> list[dict[str, Any]]:
+def eligible_unseeded(session: Session, seeded_pods: set[int]) -> list[dict[str, Any]]:
     refused = {e.payload_json["pitch_id"] for e in _events(session, EVENT_CAPITAL_SEED_REFUSED)}
     submitted = {e.id: e.payload_json for e in _events(session, EVENT_PITCH_SUBMITTED)}
     out, seen = [], set(seeded_pods)
@@ -291,7 +292,7 @@ def sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] |
 
 def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] | None:
     state = book(session)
-    eligible = _eligible_unseeded(session, set(state["pods"]))
+    eligible = eligible_unseeded(session, set(state["pods"]))
     if state["law"] is None and not eligible:
         return None
     system = get_or_create_system_agent(session)
@@ -374,13 +375,23 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
 def safe_sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] | None:
     """:func:`sweep` for the clock advance, which has already moved and committed: a failure of
     the machine (rolled back whole) is logged loudly, never turned into a failed advance; the next
-    advance runs the machine again."""
+    advance runs the machine again. The skip is written to the ledger too (``capital_sweep_failed``,
+    auditor): a day the ladder did not judge is never silent."""
     try:
         return sweep(session, provider=provider)
     except OMSError as exc:
         logger.warning("capital sweep skipped: {}", exc)
-    except Exception:  # noqa: BLE001 - see the docstring
+        error = f"{type(exc).__name__}: {exc}"
+    except Exception as exc:  # noqa: BLE001 - see the docstring
         logger.exception("capital sweep failed")
+        error = f"{type(exc).__name__}: {exc}"
+    try:
+        append_event(session, type=EVENT_CAPITAL_SWEEP_FAILED, actor_agent_id=None,
+                     payload={"error": error[:500]})
+        session.commit()
+    except Exception:  # noqa: BLE001 - the log above already says it loudly
+        session.rollback()
+        logger.exception("capital sweep failure could not be recorded")
     return None
 
 

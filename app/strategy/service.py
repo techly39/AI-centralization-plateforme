@@ -27,6 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.capital.service import book as capital_book
+from app.capital.service import eligible_unseeded
 from app.config import GatesConfig
 from app.db.models import Agent, Event
 from app.ledger.events import (
@@ -157,14 +158,18 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
     pod_id = _pod_of(actor)
     start, today = holdout_start(session, law)
     evaluation = _evaluate(provider, session, rule, start, today, fee_rate)
-    # Compared with each other pod's latest pitch, and with the rule every live pod the capital
-    # machine seeded trades: a later pitch of the original must not free a copy of its mandate to
-    # earn a second seed (red-team, capital machine).
+    # Compared with each other pod's latest pitch, with the rule every live pod the capital machine
+    # seeded trades, and with the pitch each other unseeded pod will be seeded with at the next
+    # advance: a later pitch of the original must never free a copy of the rule that is (or is
+    # about to be) its mandate to earn a second seed (red-team and auditor, capital machine).
     compared = {f"pod {pod}": pitch["rule"]
                 for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items())}
-    for pod, entry in sorted(capital_book(session)["pods"].items()):
+    seeded = capital_book(session)["pods"]
+    for pod, entry in sorted(seeded.items()):
         if pod != pod_id and entry["stage"] != "closed":
             compared[f"pod {pod} mandate"] = entry["rule"]
+    for waiting in eligible_unseeded(session, set(seeded) | {pod_id}):
+        compared[f"pod {waiting['pod_id']} seed"] = waiting["rule"]
     others: dict[str, tuple[Sequence[date], Sequence[float]]] = {}
     for name, rule_json in compared.items():
         try:

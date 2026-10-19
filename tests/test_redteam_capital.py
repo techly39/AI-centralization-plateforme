@@ -465,3 +465,73 @@ def test_redteam_capital_own_row_leaks_another_pods_correlation(
     assert score.get("corr_with") is None and score.get("corr") is None, (
         f"pod {p2['id']}'s member reads that it moves like pod {score.get('corr_with')} "
         f"at ρ = {score.get('corr')}")
+
+
+# --- auditor (cycle 48): the same clone, pitched before the original's seed ----------------------
+
+def test_auditor_capital_clone_pitched_before_the_original_is_seeded_is_refused(
+        SessionFactory, client, db, monkeypatch):
+    """BLOCK (auditor). Pod 1 pitches R (eligible) and then R2 the same day, before the advance
+    that seeds R; pod 2 pitches R. The copy must be compared with the pitch pod 1 is about to be
+    seeded with, not only with pod 1's latest pitch and the already-seeded mandates."""
+    set_provider(BarsProvider(_random_market()))
+
+    def correlation_only(evaluation, *, attempts, others, law):
+        corr = gates.correlation_gate(evaluation, others, law)
+        return {"eligible": corr["result"] != "fail", "gates": [corr],
+                "performance": gates.performance(evaluation)}
+
+    monkeypatch.setattr(strategy_service, "judge", correlation_only)
+    s = SessionFactory()
+    try:
+        start_backtest(s, start=datetime(2024, 6, 1, tzinfo=UTC))
+        keys = []
+        for k in (1, 2):
+            pod = create_pod(s, name=f"desk-{k}")
+            keys.append((pod.id, register_agent(s, name=f"pm-{k}", role=AgentRole.pm,
+                                                pod_id=pod.id)[1]))
+        _, runtime = seed_runtime_agent(s)
+        s.commit()
+    finally:
+        s.close()
+    (pod1, key1), (pod2, key2) = keys
+    base = {"language": "strategy-v1", "signal": "momentum", "lookback": 10,
+            "rebalance_every": 5, "top_n": 2, "side": "long_only", "gross": 1.0}
+    rule_r = {**base, "universe": ["A0", "A1", "A2", "A3", "A4"]}
+    rule_r2 = {**base, "universe": ["A5", "A6", "A7", "A8", "A9"]}
+
+    def pitch(key: str, rule: dict) -> dict:
+        r = client.post("/pitches", headers=H(key), json={
+            "hypothesis": "winners keep winning", "data_needed": "daily prices",
+            "team": "the PM", "budget_usd": 0.0, "rule": rule})
+        assert r.status_code == 201, r.text
+        return r.json()["verdict"]
+
+    assert pitch(key1, rule_r)["eligible"]
+    pitch(key1, rule_r2)                                  # before any advance: R is not seeded yet
+    copy = pitch(key2, rule_r)
+    assert not copy["eligible"]
+    assert copy["gates"][0]["against"][f"pod {pod1} seed"] == pytest.approx(1.0)
+    r = client.post("/clock/advance", headers=H(runtime), json={"days": 1})
+    assert r.status_code == 200
+    db.expire_all()
+    pods = book(db)["pods"]
+    assert pod1 in pods and pods[pod1]["rule"]["universe"] == rule_r["universe"]
+    assert pod2 not in pods
+
+
+def test_auditor_capital_a_failed_sweep_is_written_to_the_ledger(
+        SessionFactory, client, db, monkeypatch):
+    """WARN (auditor). A sweep that fails is rolled back and the advance still succeeds, but the
+    day the ladder did not judge must be in the ledger, not only in the log."""
+    world = open_world(SessionFactory, {})
+
+    def broken(*a, **kw):
+        raise RuntimeError("the machine broke")
+
+    monkeypatch.setattr(capital_service, "_sweep", broken)
+    advance(client, world)
+    db.expire_all()
+    failed = list(db.scalars(select(Event).where(Event.type == "capital_sweep_failed")))
+    assert len(failed) == 1 and "the machine broke" in failed[0].payload_json["error"]
+    assert book(db)["law"] is None                       # rolled back whole: the centre never opened
