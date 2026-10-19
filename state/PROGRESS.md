@@ -1,15 +1,20 @@
-Cycle 0048 · building: capital follows results (the multi-manager machine, first slice) · branch: idea/capital-machine
+Cycle 0048 · merged: capital follows results (the multi-manager machine, first slice) · branch: idea/capital-machine
 Done this session:
-- The centre opens with the firm's capital the first time a pitch is eligible; an eligible pitch
-  earns a seed at the next day; long-short rules are refused a seed (the order system cannot short).
-- On every backtest clock advance the machine runs: the drawdown ladder (5% halves, 7.5% only
-  sells, 10% closes and sells everything), seeds, and every 5 days an algorithm re-weighs capital
-  by each pod's forward record (net of thinking cost, per unit of risk, cut for copying an older
-  pod and for drawdown). Every move is an event with its inputs; rebuild restores capital and stages.
-- The order system refuses a reduce-only pod's buy and any order of a closed pod (403, logged).
-- A made-up market a run can live in; a pod's mandate (its rule's orders today); GET /capital.
-- Demo passes in 2 s; full suite green.
-Next: red-team (foreground) on main...idea/capital-machine, fix highs; then the auditor; merge.
-Watch out: the algorithm targets are share-of-pool, so a small firm can cut a pod (law, not bug);
-the demo's numbers were tuned once (stronger planted edge) — the checks were not loosened.
-Demo: passes.
+- The red-team's 8 holes (5 medium, 3 low, none high) are all fixed: the whole clock advance holds
+  the order lock and the ladder runs before pending orders fill; the ladder sees the worst fall a
+  pod lived; a recall takes only the centre's own stake (money the world gave a pod stays in it);
+  a pod funded before its seed starts its record honestly; a halved pod is not raised back; a pod
+  no longer reads which pod it moves like.
+- The auditor blocked twice on copies earning a second seed (two different orders of pitches).
+  The cure: the machine runs the correlation gate again as it pays each seed, against every
+  mandate the centre ever funded (closed pods too). No order of pitches, nor two at once, gets
+  two seeds for one rule. The third pass found no block. A failed sweep is now in the ledger.
+- Merged to main; showcase, book and the rules (ADR-049 amended) updated.
+Next: Next up 1b, a dead pod is replaced (a plan session first: hire a new PM, a real mind, for
+a closed pod; recorded, $0 replays).
+Watch out: the red-team's clone test assumed the copy still passed the gate; with the gate fixed
+it fails there, so that step now asserts the refusal (stricter). Two older tests seeded two pods
+with one rule as a shortcut and now switch off only the copy check, with the reason written in.
+Known small holes left in the book: a pod can work out the size of its highest correlation from
+its own score; unpriced holdings are valued at cost.
+Demo: passes (2 s, $0).

@@ -50,3 +50,5 @@ Money, the order system and market data: red-team + auditor before merge.
 - cycle 47: planned.
 - cycle 48: built — law, made-up market, algorithm + ladder, the machine on every advance, order
   limits, mandate, GET /capital, ADR-049; the demo passes (2 s); suite green. Next: red-team, auditor.
+- cycle 48 (cont.): the red-team's 8 holes fixed; the auditor's two blocks (copies earning a second
+  seed) fixed by a copy check as each seed is paid; third pass clean; merged.

@@ -85,7 +85,7 @@ The notes in `bible/sources/REQUIREMENTS.md` were written fast and tidied by an 
 
 ### The firm is a multi-manager hedge fund with high turnover
 From: Human
-Status: building
+Status: working (first slice)
 Run *exactly like a multi-manager hedge fund* (Millennium / Citadel style), with a lot of turnover.
 Many independent pods, each a PM with a small team, each paid on its own results and meant to be
 uncorrelated with the others. **The centre holds capital and risk; the pods hold the ideas.**
@@ -93,7 +93,10 @@ Capital goes to pods through the allocation algorithm and is taken back fast. Ha
 cut a losing pod (5% → capital halved, 7.5% and 10% further cuts, the last step closes it). Failed
 pods are shut down quickly and new PMs are hired to pitch in their place, so pods constantly flow
 in and out. The allocation, risk ladder, pitch and hiring ideas below are parts of this one machine.
-Now: pods exist in physics (`app/registry/pods.py`); no allocation, no drawdown cuts, no hiring yet.
+Now: capital follows results (cycle 48): an eligible pitch earns a seed and its pod trades forward;
+an algorithm re-weighs capital every few days by a cost- and risk-adjusted score, cut for copying
+and for drawdown; the drawdown ladder halves at 5%, freezes buying at 7.5%, closes at 10%. No hiring
+of a replacement PM yet, no real minds in the machine yet.
 
 ## The firm's people
 
@@ -424,7 +427,8 @@ into an experiment.
 The order the Builder builds in. The Builder may reorder it and says why in one line.
 
 (Done, cycle 43: the backtest with real AI agents is working. Done, cycle 46: a real PM researches
-a rule, pitches it, and the gates judge it on held-out days.)
+a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
+results.)
 
 Cycle 47 plan: the multi-manager machine moves ahead of the debate. Why: a pitch that passes the
 gates leads nowhere today (no capital moves), and "eligible" must not mean money while the held-out
