@@ -18,6 +18,10 @@ trading, more decisions made by agents rather than scripts? If not, the next ide
 - Every idea's `Status:` and `Now:` line true to the code.
 - The Human's comments since the last plan acted on (answered in `state/comments.json`).
 - **Next up** re-ordered, with one line of reason for any change. Keep 3–6 ideas there.
+- Read "Known physics holes" before choosing: a hole the next idea will stand on (its money, its
+  data, its permissions) is fixed *inside* that idea and named in its queue `notes`, not left for
+  later. (Cycle 47; judged by: the next physics idea's red-team and auditor find nothing rooted in a
+  hole already written in the book.)
 - When the Human's ideas are exhausted or all blocked: write your own ideas in Part 4
   (`From: Builder`), the best into Next up. Look outward first if useful (≤ 10 searches: agent
   economies, market simulation, institutions, evolution, harnesses); cite sources in the idea.

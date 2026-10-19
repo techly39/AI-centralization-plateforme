@@ -197,14 +197,22 @@ clock. This is the score that counts. Backtests are the training ground before i
 
 ### A strategy is an isolated function
 From: Human
-Status: building
+Status: working (first slice)
 A strategy must become a function: data (1999–2026) → strategy → result. Isolated, so it can be
 backtested on any period or synthetic world and rerun by someone else. Agent-written strategy code
 never runs inside the app process (it runs in a sandboxed subprocess).
+Now (cycle 46): a strategy is a *rule* (data, not code: signal, lookback, rebalance, top n, long
+only or long-short, gross) and one pure function runs it on any stretch of bars
+(`app/strategy/rule.py`). Not yet: strategies as agent-written code in a sandbox; real 1999–2026 history.
 
 ### Validation gates before capital
 From: Human
-Status: building
+Status: working (first slice)
+Now (cycle 46): IC (with its prediction count), deflated Sharpe (every research backtest counted),
+capacity and correlation judge a pitch on held-out days (`app/strategy/gates.py`, thresholds in
+`config.yaml`), proven on a planted signal (passes) and on noise (fails). The hypothesis is
+recorded, not judged. Not yet: IC per regime; a forward test on days that have not happened (the
+held-out days are readable, see "Known physics holes"), which the capital machine brings.
 A strategy gets capital only if it passes, on data it was not tuned on:
 - **Economic hypothesis:** a causal story ("two prices correlate" without a mechanism fails;
   gold and oil tankers needs the logic behind it).
@@ -232,6 +240,8 @@ An algorithm, not management, moves capital fast to the most effective pods, by 
 cost-adjusted, risk-adjusted score, penalised by correlation with the rest of the book and by
 current drawdown. Example from the notes: Pod #1 high volatility, 10K → 3K; Pod #2 low volatility,
 → 7K. Every allocation change is an event with its inputs, so it can be reproduced.
+Now: a pod has an allocation and an `allocation_set` event moves it (`app/registry/pods.py`
+`fund_pod`); nothing moves it automatically yet. The order system knows no reduce-only or closed pod.
 
 ### The central risk ladder
 From: Human
@@ -391,7 +401,8 @@ less than the provider later shows (the cap still holds, it is read from the pro
 From the pitch and the gates (cycle 46, red-team): a PM can read the held-out days' prices, search
 rules offline with the same pure code, and pitch only the survivor with one counted attempt (on pure
 noise such a rule passes every gate). The real cure is a forward test on days that have not happened
-yet (paper incubation before capital). Also: the IC gate's prediction count is universe width ×
+yet (paper incubation before capital): Next up 1a gives capital only on forward days, so the
+held-out verdict buys a seed, not the book. Also: the IC gate's prediction count is universe width ×
 rebalances, so a wide universe meets the floor on a few independent cross-sections. Auditor notes:
 the gates' verdict is written to the ledger under the PM's name, not physics'; each pitch re-runs
 every other pod's latest rule (worth a cache once there are many pods on live data).
@@ -406,19 +417,30 @@ into an experiment.
 
 The order the Builder builds in. The Builder may reorder it and says why in one line.
 
-(Done, cycle 43: the backtest with real AI agents is working.)
+(Done, cycle 43: the backtest with real AI agents is working. Done, cycle 46: a real PM researches
+a rule, pitches it, and the gates judge it on held-out days.)
 
-1. **The pitch and the gates.** A PM pitches; the strategy runs as an isolated function through the
-   validation gates; the pitch and its numbers are visible to the Human. Cut in three (cycle 44
-   plan), each one something you can see working:
-   a. *Done, cycle 46:* a real PM researches a strategy written as a rule (no agent code runs yet), every
-      research backtest counted, then pitches; the app's gates (IC, deflated Sharpe, capacity,
-      correlation) judge it on a held-out window and the Human reads the verdict. The gates are
-      proven first on a planted signal (must pass) and on noise (must fail).
-   b. A backtest operator re-runs the strategy independently, and a bull and a bear argue the pitch
-      in a thread; the firm's process decides (and judges the economic hypothesis).
-   c. Strategies as agent-written code, run in a sandboxed subprocess (seal work).
-2. **The multi-manager machine.** Several pods, the allocation algorithm, the drawdown ladder;
-   pods get cut and closed, and new PMs are hired to replace them.
+Cycle 47 plan: the multi-manager machine moves ahead of the debate. Why: a pitch that passes the
+gates leads nowhere today (no capital moves), and "eligible" must not mean money while the held-out
+days are readable; a forward trial with small capital on days that have not happened yet is both
+how a multi-manager really works and the cure for that hole. A debate's verdict matters once
+verdicts move capital.
+
+1. **The multi-manager machine.** The centre holds the capital, the pods hold the ideas. Cut in three:
+   a. *Capital follows results.* An eligible pitch gets a small seed of capital and its pod trades
+      its rule forward, through the order system, on days that have not happened yet. An algorithm
+      (not an agent) re-weighs capital every few days by a cost- and risk-adjusted score, penalised
+      by correlation with the rest of the book and by drawdown; every move is an event with its
+      inputs. The drawdown ladder is physics: 5% halves the pod's capital, 7.5% makes it
+      reduce-only, 10% closes it and returns its capital to the centre. Proven on made-up pods: a
+      planted edge grows, noise stays small, a copy is penalised, a bleeder is halved, frozen, closed,
+      and the good pod is never cut.
+   b. *A dead pod is replaced.* When a pod closes, the firm hires a new PM (a real mind, a new
+      charter) who researches and pitches; an eligible pitch enters the machine. Recorded, $0 replays.
+   c. *The firm lives a quarter.* Several real pods inside the machine for three simulated months:
+      capital moves, pods die and are replaced. The first firm-scale run.
+2. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
+   bear argue the pitch in a thread; the firm's process decides (and judges the hypothesis).
 3. **The monthly generation.** Reset, selection, lessons kept, the next generation starts.
 4. **The Observatory.** "What's new" and the agents in action, for the Human.
+5. **Strategies as agent-written code**, run in a sandboxed subprocess (seal work).
