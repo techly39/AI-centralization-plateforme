@@ -48,4 +48,5 @@ Money, the order system and market data: red-team + auditor before merge.
 
 ## Progress
 - cycle 47: planned.
-- cycle 48: started — plan, branch, demo skeleton.
+- cycle 48: built — law, made-up market, algorithm + ladder, the machine on every advance, order
+  limits, mandate, GET /capital, ADR-049; the demo passes (2 s); suite green. Next: red-team, auditor.

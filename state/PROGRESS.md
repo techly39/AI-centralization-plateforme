@@ -1,18 +1,15 @@
-Cycle 0047 · plan · next: capital follows results (the multi-manager machine, first slice) · branch: main
+Cycle 0048 · building: capital follows results (the multi-manager machine, first slice) · branch: idea/capital-machine
 Done this session:
-- Looked back: since the last plan, one idea finished (the pitch and the gates) in two sessions,
-  one of them cut by the usage limit; every finished idea's demo still passes on main; no comments.
-- Book made true: "a strategy is an isolated function" and "validation gates" are working (first slice).
-- Next up re-ordered: the multi-manager machine comes before the debate. A pitch that passes the
-  gates leads nowhere today, and a forward trial with a small seed on days that have not happened
-  yet is how a real multi-manager works and cures the "held-out prices are readable" hole.
-- Queued `capital-machine` (ready, 3 sessions, risk tier): seed for eligible pitches, pods trade
-  their rule forward through the order system, an algorithm re-weighs capital, the drawdown ladder
-  halves / freezes / closes.
-- Factory: a plan now fixes inside the next idea any known hole that idea stands on.
-Next: build session: branch idea/capital-machine, write state/NOW.md and acceptance/capital_machine.py
-(made-up pods: planted edge grows, noise stays small, a copy is penalised, a bleeder is halved,
-frozen and closed, the good pod is never cut; rebuild from the ledger gives the same allocations).
-Watch out: the order system has no reduce-only or closed-pod notion yet; `fund_pod` in
-app/registry/pods.py already writes the allocation event. Launch red-team/auditor in the foreground.
-Demo: none yet (planned).
+- The centre opens with the firm's capital the first time a pitch is eligible; an eligible pitch
+  earns a seed at the next day; long-short rules are refused a seed (the order system cannot short).
+- On every backtest clock advance the machine runs: the drawdown ladder (5% halves, 7.5% only
+  sells, 10% closes and sells everything), seeds, and every 5 days an algorithm re-weighs capital
+  by each pod's forward record (net of thinking cost, per unit of risk, cut for copying an older
+  pod and for drawdown). Every move is an event with its inputs; rebuild restores capital and stages.
+- The order system refuses a reduce-only pod's buy and any order of a closed pod (403, logged).
+- A made-up market a run can live in; a pod's mandate (its rule's orders today); GET /capital.
+- Demo passes in 2 s; full suite green.
+Next: red-team (foreground) on main...idea/capital-machine, fix highs; then the auditor; merge.
+Watch out: the algorithm targets are share-of-pool, so a small firm can cut a pod (law, not bug);
+the demo's numbers were tuned once (stronger planted edge) — the checks were not loosened.
+Demo: passes.
