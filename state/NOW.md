@@ -59,4 +59,7 @@ with every live key; a pod can read its correlation from its own score row (the 
 
 ## Progress
 - cycle 49: planned.
-- cycle 50: started; the physics of the vacancy, the hire and the post-mortem; demo part A.
+- cycle 50: built all of it but the real run: the vacancy, the hire, the post-mortem and the pod
+  limit (physics); `GET /mandate`; the Runtime hiring mid-run (`--hire`), recorded and replayed;
+  a made-up market a hosted world can be built from. Demo A and B0 pass ($0); next: red-team,
+  then the real recorded hire, then the auditor.
