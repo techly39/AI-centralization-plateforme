@@ -30,6 +30,7 @@ from app.api import (
     orders,
     pitches,
     reporting,
+    vacancies,
 )
 from app.clock import get_clock, set_clock
 from app.config import get_settings
@@ -130,6 +131,7 @@ def create_app() -> FastAPI:
     app.include_router(capital.router)
     app.include_router(metrics.router)
     app.include_router(pitches.router)
+    app.include_router(vacancies.router)
 
     logger.info("app created (env database_url={})", settings.database_url)
     return app

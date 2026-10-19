@@ -132,7 +132,7 @@ in a thread before the decision. The Human can read every pitch and comment; the
 
 ### Hiring new PMs: turnover
 From: Human
-Status: planned (Next up 1b)
+Status: building (Next up 1b, cycle 50)
 (Matured from "a lot of turnover".) When a pod dies, the firm recruits: a new PM is created (new
 charter, maybe a different model, maybe inherited lessons) and must pitch to earn capital. The
 firm, not the Builder, decides how many pods it runs and who it hires, inside the agent caps.

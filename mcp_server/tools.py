@@ -399,6 +399,41 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """
         return await call("GET", "/capital", params={"pod_id": pod_id})
 
+    # --- Vacancies: a closed pod, and the hire that replaces it ----------------
+
+    @api_tool(server, method="GET", path="/vacancies")
+    async def list_vacancies() -> Any:
+        """Every vacancy: each pod the risk ladder closed, its post-mortem, the hire the hiring law
+        names (pod, PM, model, budget), and whether it is filled. Management only."""
+        return await call("GET", "/vacancies")
+
+    @api_tool(server, method="GET", path="/vacancies/{vacancy_id}")
+    async def get_vacancy(
+        vacancy_id: Annotated[int, Field(description="The vacancy's id.", ge=1, le=MAX_ID)],
+    ) -> Any:
+        """One vacancy and the post-mortem of the pod it replaces: the dead pod's rule and
+        hypothesis, its forward days, the drawdowns that closed it, the capital in and out. Yours
+        to read if your pod was hired into it."""
+        return await call("GET", f"/vacancies/{vacancy_id}")
+
+    @api_tool(server, method="POST", path="/vacancies/{vacancy_id}/fill")
+    async def fill_vacancy(
+        vacancy_id: Annotated[int, Field(description="The open vacancy to fill.", ge=1, le=MAX_ID)],
+    ) -> Any:
+        """Hire as the law says: a new pod and a new PM. The answer holds the PM's key, once.
+        Refused at the firm's pod limit. Needs the right to register agents."""
+        return await call("POST", f"/vacancies/{vacancy_id}/fill")
+
+    @api_tool(server, method="POST", path="/vacancies/{vacancy_id}/refuse")
+    async def refuse_hire(
+        vacancy_id: Annotated[int, Field(description="The open vacancy.", ge=1, le=MAX_ID)],
+        reason: Annotated[str, Field(description="Why the hire cannot be made now.",
+                                     min_length=1, max_length=200)],
+    ) -> Any:
+        """Refuse a hire for now (its thinking budget does not fit the cap). The vacancy stays
+        open, the refusal is in the ledger. Needs the right to register agents."""
+        return await call("POST", f"/vacancies/{vacancy_id}/refuse", body={"reason": reason})
+
     # --- Orders & portfolio -------------------------------------------------
 
     @api_tool(server, method="POST", path="/orders")

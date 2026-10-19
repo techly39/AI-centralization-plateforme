@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "standard": "protocol/CYCLE.md §2 (ADR-046)",
+  "standard": "protocol/CYCLE.md \u00a72 (ADR-046)",
   "missions": [
     {
       "id": "pod-replacement",
       "title": "A dead pod is replaced: when the risk ladder closes a pod, the firm hires a new PM, a real mind, who researches, pitches and can earn a seed",
       "idea": "Hiring new PMs: turnover",
       "acceptance": "acceptance/pod_replacement.py",
-      "demo": "uv run python acceptance/pod_replacement.py — a bleeding pod is closed, a vacancy opens, a new pod and PM are hired under the cap (a refusal when the budget does not fit), the new PM gets the post-mortem, researches and pitches; an eligible pitch is seeded, noise is not; a recorded real Haiku hire replays IDENTICAL for $0",
-      "status": "ready",
+      "demo": "uv run python acceptance/pod_replacement.py \u2014 a bleeding pod is closed, a vacancy opens, a new pod and PM are hired under the cap (a refusal when the budget does not fit), the new PM gets the post-mortem, researches and pitches; an eligible pitch is seeded, noise is not; a recorded real Haiku hire replays IDENTICAL for $0",
+      "status": "active",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [
@@ -31,14 +31,14 @@
         "pitch-gates"
       ],
       "branch": "idea/capital-machine",
-      "notes": "Plan session cycle 47. Slice a of Next up 1 (also serves 'The allocation algorithm', 'The central risk ladder'). Exists: Pod.current_allocation, Allocation table, allocation_set event + fund_pod (app/registry/pods.py), per-pod positions/cash, max_drawdown in app/metrics/performance.py, the rule engine (app/strategy/rule.py), the gates' eligible verdict (pitch_judged event). Missing: the centre's capital (config), a seed for an eligible pitch, forward execution of a pod's rule through the OMS (prefer the real order path, e.g. a scripted executor per pod, over writing positions directly), the allocation algorithm (pure, app/; weights, per-pod min/max, max move per step; every move an event with its inputs), the drawdown ladder from the pod's high-water mark (thresholds in config), OMS refusals for reduce-only and closed pods (403/409 + logged event), closing = flatten + capital back to the centre. Capital only on forward days: this is the cure for the known hole 'held-out prices are readable'. Demo must show yes and no for each judge (grows/does not grow; cut/not cut). Left for b/c: hiring a replacement PM, real minds in the machine, firm-level drawdown limits, per-position limits, thinking cost in the score if no metered agents in the demo (keep the term, feed it 0 and one nonzero control). Risk tier: money + OMS → red-team + auditor. Merged cycle 48: red-team 8 holes (5 medium, 3 low) fixed; auditor BLOCK (a clone pitched before the original's seed) fixed."
+      "notes": "Plan session cycle 47. Slice a of Next up 1 (also serves 'The allocation algorithm', 'The central risk ladder'). Exists: Pod.current_allocation, Allocation table, allocation_set event + fund_pod (app/registry/pods.py), per-pod positions/cash, max_drawdown in app/metrics/performance.py, the rule engine (app/strategy/rule.py), the gates' eligible verdict (pitch_judged event). Missing: the centre's capital (config), a seed for an eligible pitch, forward execution of a pod's rule through the OMS (prefer the real order path, e.g. a scripted executor per pod, over writing positions directly), the allocation algorithm (pure, app/; weights, per-pod min/max, max move per step; every move an event with its inputs), the drawdown ladder from the pod's high-water mark (thresholds in config), OMS refusals for reduce-only and closed pods (403/409 + logged event), closing = flatten + capital back to the centre. Capital only on forward days: this is the cure for the known hole 'held-out prices are readable'. Demo must show yes and no for each judge (grows/does not grow; cut/not cut). Left for b/c: hiring a replacement PM, real minds in the machine, firm-level drawdown limits, per-position limits, thinking cost in the score if no metered agents in the demo (keep the term, feed it 0 and one nonzero control). Risk tier: money + OMS \u2192 red-team + auditor. Merged cycle 48: red-team 8 holes (5 medium, 3 low) fixed; auditor BLOCK (a clone pitched before the original's seed) fixed."
     },
     {
       "id": "pitch-gates",
       "title": "A real PM researches a strategy, pitches it, and the app's validation gates give a verdict the Human can read",
       "idea": "The pitch, then a full report",
       "acceptance": "acceptance/pitch_gates.py",
-      "demo": "uv run python acceptance/pitch_gates.py → ($0, offline) the gates first pass their controls (a planted-signal history passes, pure noise fails, the same strategy tried 1 time vs 200 times loses its deflated Sharpe); then the recorded real PM session replays IDENTICAL and prints the pitch: hypothesis, the strategy rule, every research backtest it ran (attempts counted), and the gate table on the held-out window with each number and PASS/FAIL/null",
+      "demo": "uv run python acceptance/pitch_gates.py \u2192 ($0, offline) the gates first pass their controls (a planted-signal history passes, pure noise fails, the same strategy tried 1 time vs 200 times loses its deflated Sharpe); then the recorded real PM session replays IDENTICAL and prints the pitch: hypothesis, the strategy rule, every research backtest it ran (attempts counted), and the gate table on the held-out window with each number and PASS/FAIL/null",
       "status": "done",
       "estimate_sessions": 4,
       "physics": true,
@@ -51,7 +51,7 @@
       "title": "Real AI agents (a PM and two analysts) live a backtest month on fake money, each day getting their data package, and we see what they did and what it cost",
       "idea": "The backtest: real AI agents in a sealed box, fed a month day by day",
       "acceptance": "acceptance/real_agents_backtest.py",
-      "demo": "uv run python acceptance/real_agents_backtest.py → replays the recorded real-model month in evidence/real-agents-backtest/ at $0 (IDENTICAL), then prints day by day what the PM and the two analysts saw, said and traded, and what each one cost",
+      "demo": "uv run python acceptance/real_agents_backtest.py \u2192 replays the recorded real-model month in evidence/real-agents-backtest/ at $0 (IDENTICAL), then prints day by day what the PM and the two analysts saw, said and traded, and what each one cost",
       "status": "done",
       "estimate_sessions": 4,
       "physics": true,
@@ -65,7 +65,7 @@
       "kind": "capability",
       "question": "Can the Runtime wake a spending mind only when the system meters it, and can every dollar of a run be attributed to one agent from the meter alone? (Era I EC4; vision M4)",
       "acceptance": "acceptance/M-001.py",
-      "demo": "uv run python acceptance/M-001.py → a two-mind pod (PM + Analyst) on the fake metered provider lives a month under an injected numeric cap on a local App; prints, per agent, the provisioner's charges, the App's system-reported cost and the self-report gap (equal / non-zero), the leaderboard costs taken from the meter, the sum of metered $ == the provisioner's total, and that the same specs under the real law (cap null) are refused before physics is told",
+      "demo": "uv run python acceptance/M-001.py \u2192 a two-mind pod (PM + Analyst) on the fake metered provider lives a month under an injected numeric cap on a local App; prints, per agent, the provisioner's charges, the App's system-reported cost and the self-report gap (equal / non-zero), the leaderboard costs taken from the meter, the sum of metered $ == the provisioner's total, and that the same specs under the real law (cap null) are refused before physics is told",
       "status": "done",
       "estimate_sessions": 3,
       "physics": true,
@@ -75,15 +75,15 @@
         "vision M4"
       ],
       "branch": "mission/M-001-metered-month",
-      "notes": "Raw material: BACKLOG R-6b (ADR-041 §8): gate lets a `metered` provider wake under a numeric cap; provision mints one key per agent (limit ≤ MAX_METERED_USD_MICROS, total ≤ cap); FakeMeteredProvider charges the FakeProvisioner; sync after the last step; fail loudly on a 422 label; expose reader conflicts/malformed (c34 WARN 3); Reuse runtime/metering.py (FakeProvisioner, sync_costs), runtime/gate.py decide_wake_under(provider, adapter, law), app metering endpoint. The real governance cap stays null: a numeric cap exists only as an injected Governance in tests/acceptance; the CLI never accepts an injected law (Art. 4). IDEAS c34: one whole-ledger invariant (sum of authoritative costs == sum of per-key maxima) is the EC4 assertion. RED-TEAM: yes (gate + metering). Parked, not in scope: B-000k (pod-less firm spend), B-000n (cost-report rate), B-022 (secret scan — before any real key). Deferred by the plan (cycle 38): (1) the compare-ledgers law for a metered recording; M-001 refuses `--cassette` on a metered run, so no metered run can be replayed yet. (2) The O(n²) scan in `record_metered_usage` does not matter at one sync per run; it stays in BACKLOG."
+      "notes": "Raw material: BACKLOG R-6b (ADR-041 \u00a78): gate lets a `metered` provider wake under a numeric cap; provision mints one key per agent (limit \u2264 MAX_METERED_USD_MICROS, total \u2264 cap); FakeMeteredProvider charges the FakeProvisioner; sync after the last step; fail loudly on a 422 label; expose reader conflicts/malformed (c34 WARN 3); Reuse runtime/metering.py (FakeProvisioner, sync_costs), runtime/gate.py decide_wake_under(provider, adapter, law), app metering endpoint. The real governance cap stays null: a numeric cap exists only as an injected Governance in tests/acceptance; the CLI never accepts an injected law (Art. 4). IDEAS c34: one whole-ledger invariant (sum of authoritative costs == sum of per-key maxima) is the EC4 assertion. RED-TEAM: yes (gate + metering). Parked, not in scope: B-000k (pod-less firm spend), B-000n (cost-report rate), B-022 (secret scan \u2014 before any real key). Deferred by the plan (cycle 38): (1) the compare-ledgers law for a metered recording; M-001 refuses `--cassette` on a metered run, so no metered run can be replayed yet. (2) The O(n\u00b2) scan in `record_metered_usage` does not matter at one sync per run; it stays in BACKLOG."
     },
     {
       "id": "M-002",
       "title": "A run is a self-contained proof object: one cassette file is enough to re-live a month and prove its ledger identical",
       "kind": "capability",
-      "question": "Can anyone re-run a recorded month from the cassette alone (no flags to remember) and get a machine verdict 'identical ledger' or the first divergence? (Era I EC2 path, ticked only with real minds; vision §1 proof objects; prerequisite of the fork instrument)",
+      "question": "Can anyone re-run a recorded month from the cassette alone (no flags to remember) and get a machine verdict 'identical ledger' or the first divergence? (Era I EC2 path, ticked only with real minds; vision \u00a71 proof objects; prerequisite of the fork instrument)",
       "acceptance": "acceptance/M-002.py",
-      "demo": "FUND_MARKETDATA__SYNTHETIC_KEY=<hex> uv run fund-runtime backtest --world specs/desk-month/world.json --specs specs/desk-month --input specs/desk-month/input.json --steps 31 --cassette $TMPDIR/m.cassette.json, then from any directory with the same key: uv run --project <repo> fund-runtime replay --cassette $TMPDIR/m.cassette.json --verify → 'IDENTICAL: <n> events, 0 differences, $0' (and a tampered cassette → 'DIVERGED at step <s>, wake <id>, …'); or uv run python acceptance/M-002.py",
+      "demo": "FUND_MARKETDATA__SYNTHETIC_KEY=<hex> uv run fund-runtime backtest --world specs/desk-month/world.json --specs specs/desk-month --input specs/desk-month/input.json --steps 31 --cassette $TMPDIR/m.cassette.json, then from any directory with the same key: uv run --project <repo> fund-runtime replay --cassette $TMPDIR/m.cassette.json --verify \u2192 'IDENTICAL: <n> events, 0 differences, $0' (and a tampered cassette \u2192 'DIVERGED at step <s>, wake <id>, \u2026'); or uv run python acceptance/M-002.py",
       "status": "done",
       "estimate_sessions": 3,
       "physics": true,
@@ -91,18 +91,18 @@
       "serves": [
         "Era I EC2 (path)",
         "vision M2",
-        "vision §1 proof object"
+        "vision \u00a71 proof object"
       ],
       "branch": "mission/M-002-proof-object",
-      "notes": "Raw material: BACKLOG R-4b-2b: cassette v2 carries run parameters (steps, days_per_step, max_tool_calls, workflow_input), each spec's digest, each wake's model, optional tools_sha256; reader size cap; c32 NOTE 4 (a replay setup error must not read as diverged:…:ended); c32 NOTE 5 (`key` can mislabel a surface change); replay into a fresh DB and run app/ledger/compare.py in one command; a cassette step in scripts/smoke_run.py. v1 cassettes must still be read (or refused by name, decided by ADR). Reuse runtime/cassette.py, runtime/replay.py, runtime/cli.py, app/ledger/compare.py (read-only, one allowed difference — never widen it). Fold B-051 (operator read `fund-env run-minds`, smoke uses it) if it costs < 1/2 session. RED-TEAM: no unless the plan touches the gate or physics; the auditor checks the claim 'one file is enough'. If cassette v2 carries a metered run (M-001), this mission owns the trailing `cost_metered` block law in `app/ledger/compare.py`, by its own ADR (sketch in ADR-044 §6). Otherwise the first mission that replays a metered run (R-8) owns it. Plan (c40): the recording needs its own world (`backtest --world FILE`, a recipe; operator-hosted `--server` cassettes carry no world/ledger and `--verify` refuses them by name); v1 cassettes refused by name (ADR-045); cost_metered stays out of scope (metered `--cassette` still exit 2); B-051 folded into M4, droppable to BACKLOG; physics-adjacent: app/cli.py + app/ledger/compare.py read-only operator tooling, red-team scoped."
+      "notes": "Raw material: BACKLOG R-4b-2b: cassette v2 carries run parameters (steps, days_per_step, max_tool_calls, workflow_input), each spec's digest, each wake's model, optional tools_sha256; reader size cap; c32 NOTE 4 (a replay setup error must not read as diverged:\u2026:ended); c32 NOTE 5 (`key` can mislabel a surface change); replay into a fresh DB and run app/ledger/compare.py in one command; a cassette step in scripts/smoke_run.py. v1 cassettes must still be read (or refused by name, decided by ADR). Reuse runtime/cassette.py, runtime/replay.py, runtime/cli.py, app/ledger/compare.py (read-only, one allowed difference \u2014 never widen it). Fold B-051 (operator read `fund-env run-minds`, smoke uses it) if it costs < 1/2 session. RED-TEAM: no unless the plan touches the gate or physics; the auditor checks the claim 'one file is enough'. If cassette v2 carries a metered run (M-001), this mission owns the trailing `cost_metered` block law in `app/ledger/compare.py`, by its own ADR (sketch in ADR-044 \u00a76). Otherwise the first mission that replays a metered run (R-8) owns it. Plan (c40): the recording needs its own world (`backtest --world FILE`, a recipe; operator-hosted `--server` cassettes carry no world/ledger and `--verify` refuses them by name); v1 cassettes refused by name (ADR-045); cost_metered stays out of scope (metered `--cassette` still exit 2); B-051 folded into M4, droppable to BACKLOG; physics-adjacent: app/cli.py + app/ledger/compare.py read-only operator tooling, red-team scoped."
     },
     {
       "id": "M-003",
       "title": "The desk pod exists as real OpenClaw agents in an isolated firm profile, certified by `fund-runtime openclaw doctor` (100% static checks); an uncertified mind never wakes",
       "kind": "capability",
-      "question": "Can the firm's minds be set up to the 08_OPENCLAW.md standard by code alone — generated, isolated from the Human's agents, deny-by-default — and refused a wake when they are not? (Era I EC7 static half; deliverable 6b; vision M5)",
+      "question": "Can the firm's minds be set up to the 08_OPENCLAW.md standard by code alone \u2014 generated, isolated from the Human's agents, deny-by-default \u2014 and refused a wake when they are not? (Era I EC7 static half; deliverable 6b; vision M5)",
       "acceptance": "acceptance/M-003.py",
-      "demo": "uv run fund-runtime openclaw render --specs specs/desk-month && uv run fund-runtime openclaw doctor → one line per firm- agent, static checks 1–5 PASS, live probes 6–10 SKIPPED (cap null); then a hand-edited workspace file → doctor FAIL (hash drift) and the Runtime refuses to wake that mind",
+      "demo": "uv run fund-runtime openclaw render --specs specs/desk-month && uv run fund-runtime openclaw doctor \u2192 one line per firm- agent, static checks 1\u20135 PASS, live probes 6\u201310 SKIPPED (cap null); then a hand-edited workspace file \u2192 doctor FAIL (hash drift) and the Runtime refuses to wake that mind",
       "status": "dropped",
       "estimate_sessions": 4,
       "physics": true,
@@ -113,7 +113,7 @@
         "vision M5"
       ],
       "branch": "mission/M-003-openclaw-certified",
-      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"Who hosts the agents: OpenClaw or the app's own runtime\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Raw material: BACKLOG R-7 (B-012, B-012a, B-012b, B-023s seal keys, B-000l loopback MCP URL); OCT POC charters → AgentSpec templates (08 §6). Rule zero first: verify every command and file name against the installed version (/opt/homebrew/bin/openclaw), pin it in runtime/openclaw/VERSION_NOTES.md. Rule one: never touch the Human's ~/.openclaw or any non-firm- agent; backup under umask 077 before the first change. The Builder's Bash sandbox can write only the repo and $TMPDIR: the architect must first verify whether the installed OpenClaw can keep a profile's state/config under a directory we choose (env or flag). If yes, the acceptance check renders + applies + doctors inside a temp dir. If no, split by capability: (a) render + every static check that reads only rendered artifacts, run in a temp dir; (b) apply to ~/.openclaw-firm as a step the Human runs once (question in state/QUESTIONS.md). The acceptance check must skip nothing silently: if `openclaw` is absent it FAILS (it is installed here). Gate change 'no conformance → no wake' → RED-TEAM: yes. Live probes stay skipped while the cap is null (Q-0001)."
+      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"Who hosts the agents: OpenClaw or the app's own runtime\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Raw material: BACKLOG R-7 (B-012, B-012a, B-012b, B-023s seal keys, B-000l loopback MCP URL); OCT POC charters \u2192 AgentSpec templates (08 \u00a76). Rule zero first: verify every command and file name against the installed version (/opt/homebrew/bin/openclaw), pin it in runtime/openclaw/VERSION_NOTES.md. Rule one: never touch the Human's ~/.openclaw or any non-firm- agent; backup under umask 077 before the first change. The Builder's Bash sandbox can write only the repo and $TMPDIR: the architect must first verify whether the installed OpenClaw can keep a profile's state/config under a directory we choose (env or flag). If yes, the acceptance check renders + applies + doctors inside a temp dir. If no, split by capability: (a) render + every static check that reads only rendered artifacts, run in a temp dir; (b) apply to ~/.openclaw-firm as a step the Human runs once (question in state/QUESTIONS.md). The acceptance check must skip nothing silently: if `openclaw` is absent it FAILS (it is installed here). Gate change 'no conformance \u2192 no wake' \u2192 RED-TEAM: yes. Live probes stay skipped while the cap is null (Q-0001)."
     },
     {
       "id": "M-004",
@@ -121,7 +121,7 @@
       "kind": "hardening",
       "question": "Are the known physics holes closed before minds that register, message and trade at small size arrive (before vision M6 / R-8)?",
       "acceptance": "acceptance/M-004.py",
-      "demo": "uv run python acceptance/M-004.py → lists each of the 9 hole tests (red-team 0001 ×3, 0004 ×1, 0009 ×2, 0020 ×3) and PASS for each, with xfail markers removed; plus a live App: register into a missing pod → 404/409, not 500",
+      "demo": "uv run python acceptance/M-004.py \u2192 lists each of the 9 hole tests (red-team 0001 \u00d73, 0004 \u00d71, 0009 \u00d72, 0020 \u00d73) and PASS for each, with xfail markers removed; plus a live App: register into a missing pod \u2192 404/409, not 500",
       "status": "dropped",
       "estimate_sessions": 2,
       "physics": true,
@@ -130,15 +130,15 @@
         "physics-hole gate (ADR-021) before vision M6"
       ],
       "branch": "mission/M-004-holes-closed",
-      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"Known physics holes\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Bundle: B-056 (+B-019, same root: register with a missing/absent pod → 500; fix in app.registry.service.register_agent), B-055 ×2 (_conduct reads /agents + pods + published tool list before declare_minds), B-000g ×2 (byte caps on structured_payload and task outcome), B-000e (message body + structured_payload on message_sent), B-026 (fee under $5 notional pays $0.00 — a fee-law change: ADR), B-036 ×2 (OMS_LOCK per process; cross-process advance vs fill). B-036 may be larger than the rest: the architect may cut it to its own later mission or accept it by ADR with its reason (Art. 9: a hole accepted is written, never hidden). Acceptance runs the named tests with the markers gone (it fails today because they xfail). New red-team lows found during M-001..M-003 land here. RED-TEAM: yes. From M-001's red-team (tests/test_redteam_0021.py, 3 strict xfails; ADR-044): (medium) mid-run leaderboard ranks metered minds on self-report until the one sync - fix = post every key at 0 after provision, which needs the trailing-block compare-ledgers law written with it; (medium) inbox-stuffing drains a metered mind's key - per-sender message quota (law change, ADR); (low) a part-way sync failure reports posted 0 and counts every key unattributed. Also (auditor, c38): now that the Human set a cap and left a provisioning key (Q-0001/2 answered 2026-10-15), ADR-044 §4 'monthly accounting across runs before any real key' must become a check in code before any real provider name joins METERED_PROVIDERS - with B-022 (secret scan)."
+      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"Known physics holes\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Bundle: B-056 (+B-019, same root: register with a missing/absent pod \u2192 500; fix in app.registry.service.register_agent), B-055 \u00d72 (_conduct reads /agents + pods + published tool list before declare_minds), B-000g \u00d72 (byte caps on structured_payload and task outcome), B-000e (message body + structured_payload on message_sent), B-026 (fee under $5 notional pays $0.00 \u2014 a fee-law change: ADR), B-036 \u00d72 (OMS_LOCK per process; cross-process advance vs fill). B-036 may be larger than the rest: the architect may cut it to its own later mission or accept it by ADR with its reason (Art. 9: a hole accepted is written, never hidden). Acceptance runs the named tests with the markers gone (it fails today because they xfail). New red-team lows found during M-001..M-003 land here. RED-TEAM: yes. From M-001's red-team (tests/test_redteam_0021.py, 3 strict xfails; ADR-044): (medium) mid-run leaderboard ranks metered minds on self-report until the one sync - fix = post every key at 0 after provision, which needs the trailing-block compare-ledgers law written with it; (medium) inbox-stuffing drains a metered mind's key - per-sender message quota (law change, ADR); (low) a part-way sync failure reports posted 0 and counts every key unattributed. Also (auditor, c38): now that the Human set a cap and left a provisioning key (Q-0001/2 answered 2026-10-15), ADR-044 \u00a74 'monthly accounting across runs before any real key' must become a check in code before any real provider name joins METERED_PROVIDERS - with B-022 (secret scan)."
     },
     {
       "id": "M-005",
       "title": "A Truman shock: a scenario file crashes a market on day d of a keyed synthetic month, `system` announces it, a pod lives through it, and the same key + scenario replays to the same ledger",
       "kind": "capability",
-      "question": "Can the world script events — the lever by which the Builder changes the world without touching a mind (Art. 10) — deterministically and on the record? (Era I deliverables 4–5: Truman v1 + world events; prerequisite of Era II EC2)",
+      "question": "Can the world script events \u2014 the lever by which the Builder changes the world without touching a mind (Art. 10) \u2014 deterministically and on the record? (Era I deliverables 4\u20135: Truman v1 + world events; prerequisite of Era II EC2)",
       "acceptance": "acceptance/M-005.py",
-      "demo": "uv run fund-runtime backtest --specs specs/desk-month --steps 31 --scenario scenarios/crash-day-12.yaml → day 12: a `world_event` + `system` announcement in the ledger, the shocked ticker's close drops by the scenario's amount, the scripted pod's equity curve shows it; run twice → compare-ledgers IDENTICAL",
+      "demo": "uv run fund-runtime backtest --specs specs/desk-month --steps 31 --scenario scenarios/crash-day-12.yaml \u2192 day 12: a `world_event` + `system` announcement in the ledger, the shocked ticker's close drops by the scenario's amount, the scripted pod's equity curve shows it; run twice \u2192 compare-ledgers IDENTICAL",
       "status": "dropped",
       "estimate_sessions": 3,
       "physics": true,
@@ -149,15 +149,15 @@
         "Era II EC2 prerequisite"
       ],
       "branch": "mission/M-005-truman-shock",
-      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"Market shocks as world events\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Raw material: B-007 (world events table + system announcements), B-008 (Truman v1). Built on the keyed synthetic market (ADR-030), not on a real-history pack: fetching real history needs network the Builder's sandbox does not have (the real-history pack is a later mission or a one-time command the Human runs). The scenario is part of the run's world (ADR-031: run_started.world records it; agents see 'withheld' per ADR-034, the announcement is what they are told). The look-ahead guard holds: no agent learns of a shock before its day. Whether an agent is told its data is synthetic is an experimental variable (08 §4) — record it per run. RED-TEAM: yes (marketdata)."
+      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"Market shocks as world events\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Raw material: B-007 (world events table + system announcements), B-008 (Truman v1). Built on the keyed synthetic market (ADR-030), not on a real-history pack: fetching real history needs network the Builder's sandbox does not have (the real-history pack is a later mission or a one-time command the Human runs). The scenario is part of the run's world (ADR-031: run_started.world records it; agents see 'withheld' per ADR-034, the announcement is what they are told). The look-ahead guard holds: no agent learns of a shock before its day. Whether an agent is told its data is synthetic is an experimental variable (08 \u00a74) \u2014 record it per run. RED-TEAM: yes (marketdata)."
     },
     {
       "id": "M-006",
-      "title": "Central risk acts by law: a pod driven down by a Truman crash has its capital cut at 5% drawdown, goes reduce-only at 7.5% and is liquidated and closed at 10% — exactly, on the record",
+      "title": "Central risk acts by law: a pod driven down by a Truman crash has its capital cut at 5% drawdown, goes reduce-only at 7.5% and is liquidated and closed at 10% \u2014 exactly, on the record",
       "kind": "capability",
-      "question": "Can physics enforce the firm's risk ladder (04_FIRM §5) deterministically, so a pod's death is a law, not a judgement? (Era II EC2: 'a forced-drawdown Truman scenario triggers 5% / 7.5% / 10% actions exactly')",
+      "question": "Can physics enforce the firm's risk ladder (04_FIRM \u00a75) deterministically, so a pod's death is a law, not a judgement? (Era II EC2: 'a forced-drawdown Truman scenario triggers 5% / 7.5% / 10% actions exactly')",
       "acceptance": "acceptance/M-006.py",
-      "demo": "uv run python acceptance/M-006.py → a scripted pod lives a month with a 3-step crash scenario; prints the high-water mark, each threshold crossing (day, drawdown %), the ledger event for each action, a refused new-risk order after 7.5% (403/409 + event), and the pod closed with zero positions after 10%",
+      "demo": "uv run python acceptance/M-006.py \u2192 a scripted pod lives a month with a 3-step crash scenario; prints the high-water mark, each threshold crossing (day, drawdown %), the ledger event for each action, a refused new-risk order after 7.5% (403/409 + event), and the pod closed with zero positions after 10%",
       "status": "dropped",
       "estimate_sessions": 3,
       "physics": true,
@@ -169,7 +169,7 @@
         "Era II deliverable: risk engine"
       ],
       "branch": "mission/M-006-risk-ladder",
-      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"The central risk ladder\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Starts Era II while Era I's real-mind criteria wait on the Human's cap (ADR-043). 04_FIRM §5: drawdown from the pod's high-water mark within the generation; 5% → allocation cut to 50%, positions above the new limit reduced within 2 sim-days or by the OMS; 7.5% → reduce-only (+ mandatory review workflow: record the event only, the CRO/CEO workflow is a later mission); 10% → liquidated, closed for the generation. Firm-level 8%/12% and exposure limits: out of scope (next mission). Reuse app/metrics/equity.py and the OMS; every action is an event, derived state rebuildable from the ledger. RED-TEAM: yes (oms)."
+      "notes": "Dropped 2026-10-16 (Builder v3, ADR-046): re-cut into the ideas book, idea \"The central risk ladder\" (bible/IDEAS_BOOK.md). Raw material for that idea. Earlier notes: Starts Era II while Era I's real-mind criteria wait on the Human's cap (ADR-043). 04_FIRM \u00a75: drawdown from the pod's high-water mark within the generation; 5% \u2192 allocation cut to 50%, positions above the new limit reduced within 2 sim-days or by the OMS; 7.5% \u2192 reduce-only (+ mandatory review workflow: record the event only, the CRO/CEO workflow is a later mission); 10% \u2192 liquidated, closed for the generation. Firm-level 8%/12% and exposure limits: out of scope (next mission). Reuse app/metrics/equity.py and the OMS; every action is an event, derived state rebuildable from the ledger. RED-TEAM: yes (oms)."
     }
   ]
 }
