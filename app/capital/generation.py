@@ -41,6 +41,7 @@ from app.db.models import Agent, AgentRole, AgentStatus, Event, Pod
 from app.ledger.events import (
     EVENT_AGENT_REGISTERED,
     EVENT_CAPITAL_SEEDED,
+    EVENT_CAPITAL_SWEEP_FAILED,
     EVENT_GENERATION_ENDED,
     EVENT_PITCH_JUDGED,
     EVENT_PITCH_SUBMITTED,
@@ -323,12 +324,22 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
 
 def safe_turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] | None:
     """:func:`turnover` for the clock advance, which has already moved and committed: a failure is
-    logged loudly and the next advance tries again (the month stays unturned until it succeeds)."""
+    logged loudly and written (``capital_sweep_failed``, its error marked ``generation:``), and the
+    next advance tries again (the month stays unturned until it succeeds)."""
     try:
         return turnover(session, provider=provider)
-    except Exception:  # noqa: BLE001 - see the docstring
+    except Exception as exc:  # noqa: BLE001 - see the docstring
         logger.exception("generation turnover failed")
-        return None
+        error = f"generation: {type(exc).__name__}: {exc}"
+    try:
+        # A month's end that did not run is never silent (as the capital machine's, auditor).
+        append_event(session, type=EVENT_CAPITAL_SWEEP_FAILED, actor_agent_id=None,
+                     payload={"error": error[:500]})
+        session.commit()
+    except Exception:  # noqa: BLE001 - the log above already says it loudly
+        session.rollback()
+        logger.exception("generation turnover failure could not be recorded")
+    return None
 
 
 # --- the library --------------------------------------------------------------------------------

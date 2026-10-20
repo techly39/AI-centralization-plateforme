@@ -194,3 +194,23 @@ def test_a_recorded_charge_must_be_what_the_recorded_turns_stated():
                    run([["pm", "7", "key-pm", 500_000]])):              # not an agent id
         with pytest.raises(RecordingError):
             Recording.from_outcome(forged)
+
+
+def test_a_month_end_that_fails_is_written_and_tried_again(client, db, september, law_on,
+                                                            make_pod, pm_factory, runtime_key,
+                                                            monkeypatch):
+    from app.capital import generation
+
+    make_pod(1)
+    pm_factory("pm-1", 1)
+    real = generation._turnover
+
+    def broken(session, *, provider):
+        raise RuntimeError("no data")
+    monkeypatch.setattr(generation, "_turnover", broken)
+    _advance(client, runtime_key, 30)                  # Oct 1: the month's end fails
+    assert [p["error"] for p in _types(db, "capital_sweep_failed")] == [
+        "generation: RuntimeError: no data"]
+    monkeypatch.setattr(generation, "_turnover", real)
+    _advance(client, runtime_key, 1)                   # the next advance turns September
+    assert [g["month"] for g in _types(db, "generation_ended")] == ["2024-09"]
