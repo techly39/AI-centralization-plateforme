@@ -63,3 +63,7 @@ with every live key; a pod can read its correlation from its own score row (the 
   limit (physics); `GET /mandate`; the Runtime hiring mid-run (`--hire`), recorded and replayed;
   a made-up market a hosted world can be built from. Demo A and B0 pass ($0); next: red-team,
   then the real recorded hire, then the auditor.
+- cycle 51: red-team's 3 holes fixed. First real hire found a gap: a refused seed was invisible
+  to the PM (it re-pitched 8 times); pitches now show the capital answer. Re-recorded: the PM read
+  the refusal, went long-only, was seeded and trades. Auditor blocked once (a hire known from a
+  free-text label), fixed; second pass PASS. Merged.

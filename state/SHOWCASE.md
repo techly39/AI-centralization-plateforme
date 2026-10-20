@@ -42,3 +42,11 @@ What: a PM and two analysts on a real model (Haiku 5.5) lived 31 days on a seale
 day's prices, each on its own capped key: 17 orders, book −0.62%, $0.25 of thinking in total, recorded
 and replayed identical for $0.  ·  Try: `uv run python acceptance/real_agents_backtest.py`  ·  See: day
 by day what each agent saw, said, traded and cost, the book's path, and the cost per agent.
+
+## A dead pod is replaced by a newly hired PM (cycle 51, 2026-10-20)
+What: when the risk ladder closes a pod, a vacancy opens with its post-mortem and the firm hires a new
+pod and PM the next morning, under the cap. Recorded: a real Haiku 5.5 hire read the post-mortem,
+researched, pitched long-short (refused: no shorting yet), read why, re-pitched long-only, was seeded
+$200k and trades its mandate, for $0.07.  ·  Try: `uv run python acceptance/pod_replacement.py`  ·
+See: the close, the vacancy, the hire, each of the new PM's days in its own words, its pitches with
+the gates' verdict and the capital answer, all replayed identical for $0.

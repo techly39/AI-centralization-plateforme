@@ -1990,3 +1990,38 @@ shorting.
 - (11) A pod member's row drops `corr_with` and `corr`. It keeps `corr_factor` (what the
   correlation cost it, `1 − ρ`), so the size of its highest correlation with an older pod can be
   worked out; which pod is hidden only when there are several. A known hole, written in the book.
+
+## ADR-050 — A pod the ladder closes opens a vacancy; the hiring law fills it with a new pod and PM (idea: a dead pod is replaced) — accepted (cycle 51, 2026-10-20)
+
+**Context.** The ladder closed pods and that was the end of them. A multi-manager fund lives by
+turnover: a pod that bleeds is shut and a new PM pitches in its place.
+
+**Decision.**
+1. A close by the ladder writes `vacancy_opened`: the dead pod's post-mortem (its rule and
+   hypothesis, forward days, every ladder step with its drawdown, capital in and out), and the hire
+   the **hiring law** names (`config.yaml` `hiring:`: live-pod limit, models taken in turn, the
+   thinking budget, the charter), frozen into the run's first vacancy like the capital law. A
+   halved or reduce-only pod opens none.
+2. Only a registrar **the operator made** fills (`POST /vacancies/{id}/fill`: a new pod and PM,
+   the key returned once) or refuses (`/refuse`) a vacancy. A firm mind never hires. A fill beyond
+   the live-pod limit is refused in the ledger (`hire_refused`); a name taken in advance gives the
+   next free `hire-<n>-<k>`.
+3. The cap is the Runtime's law: before a fill it checks the hire's budget against the monthly cap
+   with every key the firm holds; a hire that does not fit is refused (no agent, no key). A key the
+   month cannot hold deactivates the new agent; that vacancy is not tried again that run.
+4. A hire whose PM is deactivated before any money enters its pod, with no colleague left, is a
+   failed hire (`hire_failed`): its empty pod is closed and the vacancy opens again. A hire is known
+   from the ledger's standing `vacancy_filled` only; `vacancy:` in `charter_ref` is physics' mark
+   and no registrar may write it (auditor).
+5. The new PM reads its own vacancy (post-mortem included), and every pitch now carries what the
+   capital machine did with it (seeded, or refused with the reason): a refusal in the ledger alone
+   left a real PM re-pitching an untradable rule.
+6. The Runtime (`fund-runtime backtest --hire TEMPLATE`) hires each morning, mid-run; the hires are
+   in the cassette, and replay follows them.
+
+**Not yet:** a management mind that chooses the hire; firing a PM who never earns a seed; lessons
+across generations; shorting.
+
+**Proof.** `acceptance/pod_replacement.py` (A scripted, B0 hosted rehearsal, B a recorded real
+Haiku 5.5 hire: refused for long-short, re-pitched long-only, seeded, trading);
+`tests/test_hiring.py`, `tests/test_runtime_hiring.py`, `tests/test_redteam_pod_replacement.py`.
