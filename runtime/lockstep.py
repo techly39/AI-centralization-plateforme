@@ -67,6 +67,9 @@ from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
 from runtime.replay import Recording
 from runtime.spec import AgentSpec
 
+#: A day package that could not be built because the mind's key is dead.
+_DEAD = object()
+
 #: The longest run one call may ask for, and the longest step: a decade of days.
 MAX_STEPS = 3660
 MAX_DAYS_PER_STEP = 366
@@ -254,12 +257,19 @@ async def run_backtest(
                 # next step. (A mind's own later turns are still billed within its key.)
                 stop = ("refused", "metered_over_cap")
                 break
-            day = (None if universe is None
-                   else await packages.build(package, mind.client, at, universe))
+            try:
+                day = (None if universe is None
+                       else await packages.build(package, mind.client, at, universe))
+            except FundAPIError as exc:
+                if exc.status_code != 401:
+                    raise
+                day = _DEAD     # its key died (a PM let go): the wake below is refused at /me
             given = step_input if hiring is None or mind.spec.id not in hiring.inputs else {
                 **step_input, **hiring.inputs[mind.spec.id]}
-            record = await wake(mind.spec, mind.client, workflow_input=given,
-                                max_tool_calls=budget, tape=tape, meter=mind.meter, package=day)
+            record = (WakeRecord(mind.spec.id, "refused", "no_identity", 0) if day is _DEAD
+                      else await wake(mind.spec, mind.client, workflow_input=given,
+                                      max_tool_calls=budget, tape=tape, meter=mind.meter,
+                                      package=day))
             wakes.append(record)
             if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
                 # B-054: a HALT that lands between two wakes refuses the next one at the gate;
@@ -270,9 +280,9 @@ async def run_backtest(
                     # Red-team 0015 H1: the agent was deactivated by an act inside the
                     # world (e.g. management firing it). That is data, not a reason for
                     # the world's time to stop: the mind is retired and the run goes on.
-                    # A replay cannot go on: a recorded run woke every mind, so a mind
-                    # that no longer wakes left the recording (ADR-038 (a), ADR-040 (2)).
-                    if replay is not None:
+                    # A replay retires it only where the recording did (a PM physics let
+                    # go): any other retirement left the recording (ADR-038 (a), ADR-040 (2)).
+                    if replay is not None and replay.retired.get(mind.spec.id) != step:
                         where = replay.divergence(step, record) or "0:ended"
                         stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
                     else:

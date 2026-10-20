@@ -29,7 +29,10 @@ Costs $0 and needs no network.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import subprocess
 import sys
 import tempfile
 from datetime import UTC, date, datetime, timedelta
@@ -364,14 +367,132 @@ def _snapshot(s) -> dict:
                            for p in s.scalars(select(Pod)))}
 
 
+# --- B: the same months as a hosted world, lived by the Runtime ----------------------------------
+
+#: The hosted world's key (ADR-045: never in the cassette; whoever verifies must know it).
+KEY = hashlib.sha256(b"fund-generation-turnover/1").hexdigest()
+DAYS_PER_STEP = 3
+STEPS = 31                      # Sep 1 + 93 days: the clock lands on Dec 3
+#: the founding pods' names in the hosted world (the minds read them: no fate in a name)
+HOSTED = {"edge": "pod-1", "noise": "pod-2", "crash": "pod-3"}
+#: what each hire pitches in the scripted rehearsal, by its PM's name
+HIRED = {"hire-1-pm": "T", "hire-2-pm": "M", "hire-3-pm": "W"}
+FIRM = (
+    "You work in a hedge fund that trades a simulated market with fake money. Several pods, each "
+    "run by its own PM, compete for the same capital. A pod gets capital only after its PM pitches "
+    "a strategy and it passes the fund's validation gates; an eligible pitch earns a small seed "
+    "and trades forward. Every month is a generation: get_capital shows the laws, including who "
+    "is let go at a month's end. Be brief: every word you think is paid from your pod's P&L.")
+WORLD = {"start": f"{START.isoformat()}T14:30:00Z", "admin": "generation-mgmt",
+         "pods": [{"name": HOSTED[name], "allocation": 0} for name in FOUNDING],
+         "market": MARKET.model_dump(mode="json"),
+         "laws": {"capital": {"tell_pms": True},
+                  "hiring": {"max_live_pods": LIMIT, "charter": "You are a newly hired PM. " + FIRM,
+                             "budget_usd": 0.20},
+                  "generation": {"on": True, "grace_days": GRACE}}}
+
+
+def write_world(directory: Path, provider: str) -> None:
+    """The hosted run's files: the world, the input, the three PMs, the hiring template."""
+    (directory / "specs").mkdir(parents=True, exist_ok=True)
+    (directory / "world.json").write_text(json.dumps(WORLD))
+    found = {f"{HOSTED[name]}-pm": FOUNDING[name] for name in FOUNDING}
+    doc = {"sectors": {pm: [f"{fam}{k:02d}" for k in range(FAMILIES[fam][0])]
+                       for pm, fam in found.items()}}
+    if provider == "scripted":   # each scripted PM pitches its sector once; each hire, its own
+        doc["pitch_rules"] = {pm: rule(fam, 5) for pm, fam in {**found, **HIRED}.items()}
+    (directory / "input.json").write_text(json.dumps(doc))
+    for pod, pm in enumerate(found, start=1):
+        spec = {"id": pm, "name": pm, "role": "pm", "pod": pod,
+                "charter": f"You are {pm}, the PM of pod-{pod}. " + FIRM,
+                "provider": "scripted", "script": "pitch-pm"}
+        (directory / "specs" / f"{pm}.yaml").write_text(json.dumps(spec))
+    (directory / "hire.yaml").write_text(json.dumps({"provider": "scripted",
+                                                     "script": "pitch-pm"}))
+
+
+def fund_runtime(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("FUND_", "OPENROUTER")) and k.lower() not in {
+               "http_proxy", "https_proxy", "all_proxy"}}
+    (cwd / "vtmp").mkdir(exist_ok=True)
+    env.update({"FUND_MARKETDATA__SYNTHETIC_KEY": KEY, "TMPDIR": str(cwd / "vtmp"),
+                "FUND_DATABASE_URL": f"sqlite:///{cwd / 'sentinel.db'}",
+                "HTTPS_PROXY": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1:9"})
+    return subprocess.run(["uv", "run", "--project", str(REPO), "fund-runtime", *argv], cwd=cwd,
+                          env=env, capture_output=True, text=True, timeout=1800)
+
+
+def verify(text: str, label: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="fund-generation-") as t:
+        lone = Path(t) / "run.cassette.json"
+        lone.write_text(text, encoding="ascii")
+        r = fund_runtime(["replay", "--cassette", lone.name, "--verify"], Path(t))
+        line, _, rest = r.stdout.partition("\n")
+        try:
+            ev = json.loads(rest)
+        except ValueError:
+            ev = {}
+        check(f"{label}: replay --verify from the file alone is IDENTICAL, at $0",
+              r.returncode == 0 and line.startswith("IDENTICAL:") and ev.get("replay_usd") == 0,
+              f"exit {r.returncode}: {line or r.stderr.strip()[-300:]}")
+
+
+def turnover_chain(doc: dict, label: str) -> None:
+    """The generations, as the recorded ledger tells them, and the Runtime's retirements."""
+    rows = [(r[0], r[3], json.loads(r[4])) for r in (doc.get("ledger") or {}).get("rows") or []]
+    of = lambda t: [p for _, t2, p in rows if t2 == t]  # noqa: E731
+    gens = of("generation_ended")
+    gone = {p["agent_name"]: p for p in of("pm_let_go")}
+    run = (doc.get("outcome") or {}).get("run") or {}
+    hired = [h["spec_id"] for h in run.get("hires") or [] if h["outcome"] == "hired"]
+    check(f"{label}: three generations end, one at each month's turn",
+          [g["month"] for g in gens] == ["2024-09", "2024-10", "2024-11"],
+          ", ".join(f"#{g['generation']} {g['month']}" for g in gens))
+    check(f"{label}: the noise PM and the next never-seeded hire go at their month's end, the "
+          "crash PM at its close",
+          (gone.get("pod-2-pm") or {}).get("generation") == 1
+          and (gone.get("hire-2-pm") or {}).get("generation") == 2
+          and (gone.get("pod-3-pm") or {}).get("reason") == "closed" and len(gone) == 3,
+          "; ".join(f"{n}: {p['why']}" for n, p in gone.items()))
+    retired = dict(zip(run.get("retired") or [], run.get("retired_at") or []))
+    check(f"{label}: the Runtime retired every let-go mind the next morning, and hired three PMs "
+          "into the freed places",
+          set(retired) == {"pod-2-pm", "pod-3-pm", "hire-2"} and hired == ["hire-1", "hire-2",
+                                                                           "hire-3"],
+          f"retired {retired}; hired {hired}")
+
+
+def rehearsal() -> None:
+    """B0, $0: the hosted months with scripted minds, recorded and verified now."""
+    with tempfile.TemporaryDirectory(prefix="fund-generation-") as t:
+        tmp = Path(t)
+        write_world(tmp, "scripted")
+        r = fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
+                          "hire.yaml", "--input", "input.json", "--steps", str(STEPS),
+                          "--days-per-step", str(DAYS_PER_STEP),
+                          "--cassette", "rehearsal.cassette.json"], tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted months completes and is recorded",
+                     r.returncode == 0 and tape.is_file(), f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-300:] if r.returncode else 'completed'}"):
+            return
+        text = tape.read_text(encoding="ascii")
+    turnover_chain(json.loads(text), "B0")
+    verify(text, "B0")
+
+
 def main() -> int:
     print("A: three months, scripted, in process")
     firm = Firm()
-    firm.live()
-    checks(firm)
-    print("\nB0: the same run hosted, through the Runtime, replayed")
-    check("B0: hosted rehearsal recorded, let-go minds retired, replay IDENTICAL", False,
-          "not built yet")
+    try:
+        firm.live()
+        checks(firm)
+    finally:
+        firm.client.__exit__(None, None, None)
+        set_provider(None)
+    print("\nB0: the same months hosted, through the Runtime, replayed")
+    rehearsal()
     print("\nB: real PMs, three generations, recorded")
     check("B: real run recorded, replay IDENTICAL for $0, generation report", False,
           "not recorded yet")

@@ -138,3 +138,35 @@ def test_a_new_tool_is_shown_only_to_a_spec_that_names_it():
     published = asyncio.run(names())
     assert "read_library" in NAMED_ONLY_TOOLS <= published
     assert published - NAMED_ONLY_TOOLS == SHOWN_TO_SPECS_THAT_NAME_NONE
+
+
+# --- a let-go PM's retirement is part of the recording ---------------------------------------------
+
+def _retired_run(retired: list, retired_at: list, *, late_wake: bool = False,
+                 reason: str = "no_identity") -> dict:
+    from tests.test_cassette_replay import _wake_json
+
+    refused = {"spec_id": "pm-gone", "ended": "refused", "reason": reason, "tool_calls": 0,
+               "tool_failures": 0, "transcript": [], "exchanges": []}
+    steps = [{"step": 0, "at": "a", "wakes": [_wake_json("pm"), _wake_json("pm-gone")],
+              "advanced_to": "b"},
+             {"step": 1, "at": "b", "wakes": [_wake_json("pm"), refused], "advanced_to": "c"},
+             {"step": 2, "at": "c", "wakes": [_wake_json("pm")]
+              + ([_wake_json("pm-gone")] if late_wake else []), "advanced_to": "d"}]
+    return {"run": {"ended": "completed", "retired": retired, "retired_at": retired_at,
+                    "steps": steps}}
+
+
+def test_a_recorded_retirement_replays_where_it_happened_and_nowhere_else():
+    from runtime.replay import Recording, RecordingError
+
+    rec = Recording.from_outcome(_retired_run(["pm-gone"], [1]))
+    assert rec.retired == {"pm-gone": 1} and "pm-gone" in rec.spec_ids
+    assert rec.tape(0, "pm-gone").turns and not rec.tape(1, "pm-gone").turns
+    for forged in (_retired_run([], []),                        # a refusal the run never retired
+                   _retired_run(["pm-gone"], [2]),              # the word, at another step
+                   _retired_run(["pm-gone"], [1], late_wake=True),   # it wakes after it
+                   _retired_run(["pm-gone"], [1], reason="cap_null"),  # not a dead key
+                   _retired_run(["pm-gone"], [])):              # a word with no step
+        with pytest.raises(RecordingError):
+            Recording.from_outcome(forged)

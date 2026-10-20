@@ -170,7 +170,8 @@ class Recording:
 
     def __init__(self, steps: int, tapes: Mapping[tuple[int, str], Tape],
                  calendar: tuple[tuple[str, str], ...] = (),
-                 hires: tuple[HireRecord, ...] = ()) -> None:
+                 hires: tuple[HireRecord, ...] = (),
+                 retired: Mapping[str, int] | None = None) -> None:
         if type(steps) is not int or not all(
                 type(k) is tuple and len(k) == 2 and type(k[0]) is int and type(k[1]) is str
                 and type(t) is Tape for k, t in tapes.items()):
@@ -183,7 +184,16 @@ class Recording:
         self._tapes = dict(tapes)
         #: ``(at, advanced_to)`` per recorded step; empty for a hand-built recording.
         self._calendar = calendar
-        self.spec_ids = frozenset(spec_id for _, spec_id in self._tapes)
+        #: spec id -> the step its agent was found deactivated inside the world (a PM let go):
+        #: the replay retires it there and nowhere else; it has no tape from that step on.
+        self.retired = dict(retired or {})
+        if not all(type(k) is str and type(v) is int and 0 <= v < max(steps, 1)
+                   for k, v in self.retired.items()):
+            raise RecordingError("retired minds are spec ids and the step each was retired at")
+        for spec_id, at in self.retired.items():
+            if any(k[1] == spec_id and k[0] >= at for k in self._tapes):
+                raise RecordingError(f"{spec_id} wakes after it was retired")
+        self.spec_ids = frozenset(spec_id for _, spec_id in self._tapes) | frozenset(self.retired)
         if type(hires) is not tuple or any(type(h) is not HireRecord for h in hires):
             raise RecordingError("hires are a tuple of HireRecords")
         #: Every hiring decision of the recorded run, and the minds it hired (their wakes are in
@@ -207,13 +217,17 @@ class Recording:
             raise RecordingError("the cassette holds no run")
         if run.get("ended") != "completed":
             raise RecordingError(f"only a completed run replays, not {run.get('ended')!r}")
-        if run.get("retired"):
-            raise RecordingError("a run in which a mind was retired does not replay yet")
+        retired, at = run.get("retired") or [], run.get("retired_at") or []
+        if (type(retired) is not list or type(at) is not list or len(retired) != len(at)
+                or len(set(map(str, retired))) != len(retired)):
+            raise RecordingError("each retired mind has the one step it was retired at")
+        retired_at = dict(zip(retired, at))
         steps = run.get("steps")
         if not isinstance(steps, list):
             raise RecordingError("the run has no steps")
         tapes: dict[tuple[int, str], Tape] = {}
         calendar: list[tuple[str, str]] = []
+        seen: set[tuple[str, int]] = set()
         for n, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("step") != n:
                 raise RecordingError(f"step {n} is out of order")
@@ -225,6 +239,14 @@ class Recording:
                     spec_id = wake["spec_id"]
                     if type(spec_id) is not str or (n, spec_id) in tapes:
                         raise RecordingError(f"step {n}: a mind wakes twice, or has no id")
+                    if wake["ended"] == "refused" and retired_at.get(spec_id) == n:
+                        # The one refused wake a completed run holds: the mind's agent was
+                        # deactivated inside the world (a PM let go) and the run retired it here.
+                        if (wake["reason"], wake["tool_calls"], wake["exchanges"]) != (
+                                "no_identity", 0, []) or (spec_id, n) in seen:
+                            raise RecordingError(f"step {n}: a retirement is malformed")
+                        seen.add((spec_id, n))
+                        continue
                     tapes[(n, spec_id)] = _tape(wake)
                 except (KeyError, TypeError, ValueError, ValidationError) as exc:
                     if isinstance(exc, RecordingError):
@@ -236,7 +258,11 @@ class Recording:
             raise RecordingError("a hire record is malformed") from exc
         if any(h.step >= len(steps) for h in hires):
             raise RecordingError("a hire record is past the run's last step")
-        return cls(len(steps), tapes, tuple(calendar), hires)
+        if seen != set(retired_at.items()):
+            # Red-team 0018 H4: a retirement is the recorded refused wake and the run's word
+            # together; either one alone is not a run that happened.
+            raise RecordingError("a retired mind's refused wake and the run's word disagree")
+        return cls(len(steps), tapes, tuple(calendar), hires, retired_at)
 
     def calendar(self, step: int) -> tuple[str, str] | None:
         """``(at, advanced_to)`` the recording had for ``step``; ``None`` for a hand-built one."""
