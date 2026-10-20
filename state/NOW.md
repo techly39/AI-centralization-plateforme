@@ -56,4 +56,8 @@ hiring under the cap, metering per step: red-team + auditor before merge.
 
 ## Progress
 - cycle 56: planned.
-- cycle 57: started; branch, plan, demo.
+- cycle 57: steps 1-5 mostly built. Demo A passes (three scripted months: three generations,
+  two PMs let go for no seed, one at its ladder close, a late hire spared, a hire reads the
+  library, the limit ignores empty pods, the report prints). B0 passes (hosted, billed stand-in
+  minds charged each step, let-go minds retired, IDENTICAL). Left: the hire check and the agent
+  cap into physics; the visibility check; the real run (B); red-team, auditor, merge.

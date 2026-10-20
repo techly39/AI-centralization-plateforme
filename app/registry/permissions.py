@@ -9,6 +9,7 @@ coarse "may this role ever do X" question, which is the Phase 0 gate.
 from __future__ import annotations
 
 import enum
+from typing import Any
 
 from app.db.models import AgentRole
 
@@ -124,3 +125,14 @@ PHYSICS_ROLES: frozenset[AgentRole] = frozenset({AgentRole.system, AgentRole.run
 
 def has_permission(role: AgentRole, action: Action) -> bool:
     return action in _MATRIX.get(role, frozenset())
+
+
+def may_hire(session: Any, actor: Any) -> bool:
+    """Hiring (filling or refusing a vacancy) is the Runtime's act through the operator's
+    registrar: a role that registers agents, made by the operator's own command, never by another
+    agent over HTTP (red-team, a dead pod is replaced: else a firm mind takes a hire the Runtime
+    refused for the cap and holds a second identity)."""
+    from app.registry.service import registered_by_operator   # it imports this module
+
+    return (has_permission(actor.role, Action.REGISTER_AGENTS)
+            and registered_by_operator(session, actor))

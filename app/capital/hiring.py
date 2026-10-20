@@ -10,8 +10,10 @@ fund: a pod the risk ladder closes is replaced by a new PM who must pitch to ear
 2. **The fill.** A registrar (``register_agents``: management, the Runtime's onboarding) fills an
    open vacancy: physics makes the new pod and its PM (``agent_registered``, then
    ``vacancy_filled``) and hands the PM's key back once. Refused, in the ledger (``hire_refused``),
-   when the firm already has its law's number of live pods; a vacancy is filled once. Only a
-   registrar the operator made fills or refuses (the API's check): a firm mind does not hire.
+   when the firm already has its law's number of live pods, or one more agent would pass the
+   Human's agent cap (:mod:`app.registry.population`); a vacancy is filled once. Only a
+   registrar the operator made fills or refuses (:func:`app.registry.permissions.may_hire`,
+   checked here and in the API): a firm mind does not hire.
    A hired PM deactivated before its pod earns a seed is a failed hire (``hire_failed``): its
    empty pod is closed and the vacancy opens again. The new pod has no capital: its PM pitches, and an eligible pitch earns
    a seed at the next sweep like any other.
@@ -46,7 +48,9 @@ from app.ledger.events import (
     append_event,
 )
 from app.oms.service import OMS_LOCK
+from app.registry.permissions import may_hire
 from app.registry.pods import create_pod
+from app.registry.population import over_cap
 from app.registry.service import register_agent
 
 SOURCE = "capital"   # app.capital.service.SOURCE (that module imports this one)
@@ -203,6 +207,9 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
     A refusal physics decides (the pod limit) is written to the ledger, then raised. The names are
     the law's (``hire-<n>``, ``hire-<n>-pm``), or the first free ``hire-<n>-<k>`` when someone
     already took them (red-team: a name squatted in advance must not block the vacancy)."""
+    if not may_hire(session, actor):
+        raise HiringError(403, "only the operator's registrar hires: a firm mind does not fill "
+                               "or refuse a vacancy")
     with OMS_LOCK:  # one fill at a time, and none while a sweep closes pods
         try:
             found = vacancy(session, vacancy_id)
@@ -215,6 +222,8 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
             if live_pods(session) >= law.max_live_pods:
                 problem = (f"the firm is at its limit of {law.max_live_pods} live pods "
                            f"(the hiring law)")
+            elif (over := over_cap(session)) is not None:
+                problem = over
             elif names is None:
                 problem = f"no free name for the hire after {hire['pod_name']!r}"
             if problem is not None:
@@ -290,6 +299,9 @@ def hire_failed(session: Session, *, agent: Agent, actor: Agent | None) -> Event
 def refuse(session: Session, *, vacancy_id: int, reason: str, actor: Agent) -> dict[str, Any]:
     """The Runtime's refusal of a hire (its budget does not fit the cap): written, the vacancy
     stays open; commits."""
+    if not may_hire(session, actor):
+        raise HiringError(403, "only the operator's registrar hires: a firm mind does not fill "
+                               "or refuse a vacancy")
     reason = " ".join(reason.split())
     if not reason or len(reason) > MAX_REASON:
         raise HiringError(422, f"a reason is 1 to {MAX_REASON} characters")

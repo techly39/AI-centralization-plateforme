@@ -231,3 +231,46 @@ def test_the_mandate_is_a_seeded_pods_own_reading(client, make_pod, pm_factory, 
     assert client.get("/mandate", headers=h(mine)).status_code == 404     # no seed yet
     assert client.get("/mandate?pod_id=2", headers=h(mine)).status_code == 403
     assert client.get("/mandate?pod_id=1", headers=h(admin_key)).status_code == 404
+
+
+def test_physics_refuses_a_hire_past_the_humans_agent_cap(client, db, admin_key, make_pod, close,
+                                                          tmp_path, monkeypatch):
+    """Red-team (the firm lives a quarter): the agent cap was the Runtime's check; now the fill
+    itself refuses, in the ledger, whoever asks."""
+    from app.registry import population
+
+    make_pod(1)
+    vacancy_id = close(1)
+    human = tmp_path / "human.yaml"
+    monkeypatch.setattr(population, "HUMAN_FILE", human)
+    alive = population.alive_agents(db)
+    for text, why in ((f"firm:\n  max_agents_total: {alive}\n", "passes the Human's cap"),
+                      ("firm: {}\n", "missing or malformed"),
+                      ("firm:\n  max_agents_total: true\n", "missing or malformed")):
+        human.write_text(text)
+        r = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key))
+        assert r.status_code == 409 and why in r.json()["detail"], r.text
+    human.unlink()                                   # unreadable: no one is hired
+    assert "not readable" in client.post(f"/vacancies/{vacancy_id}/fill",
+                                         headers=h(admin_key)).json()["detail"]
+    assert len(client.get(f"/vacancies/{vacancy_id}", headers=h(admin_key)).json()["refusals"]) == 4
+    human.write_text(f"firm:\n  max_agents_total: {alive + 1}\n")
+    assert client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key)).status_code == 201
+
+
+def test_the_fill_itself_refuses_a_registrar_the_operator_did_not_make(db, client, admin_key,
+                                                                      make_pod, close):
+    """Red-team (a dead pod is replaced): the operator-only check sat in the router alone."""
+    from app.capital.hiring import HiringError, fill, refuse
+
+    make_pod(1)
+    vacancy_id = close(1)
+    r = client.post("/agents/register", headers=h(admin_key),
+                    json={"name": "mgmt-2", "role": "management"})
+    mind = db.get(Agent, r.json()["id"])
+    for act in (lambda: fill(db, vacancy_id=vacancy_id, actor=mind),
+                lambda: refuse(db, vacancy_id=vacancy_id, reason="no", actor=mind)):
+        with pytest.raises(HiringError) as exc:
+            act()
+        assert exc.value.status == 403
+    assert client.get(f"/vacancies/{vacancy_id}", headers=h(admin_key)).json()["status"] == "open"
