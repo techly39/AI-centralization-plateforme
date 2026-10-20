@@ -399,6 +399,15 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """
         return await call("GET", "/capital", params={"pod_id": pod_id})
 
+    @api_tool(server, method="GET", path="/capital/report")
+    async def get_capital_report(
+        every_days: Annotated[int, Field(description="Days between two columns.", ge=1, le=90)] = 7,
+    ) -> Any:
+        """The quarter report: each pod's equity week by week, its P&L gross and net of thinking
+        cost, every re-weighing's scores before and after thinking cost, every seed, close and
+        hire. Management only."""
+        return await call("GET", "/capital/report", params={"every_days": every_days})
+
     @api_tool(server, method="GET", path="/mandate")
     async def get_mandate() -> Any:
         """Once your pod is seeded: the orders that bring your book to what your funded rule holds

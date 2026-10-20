@@ -145,6 +145,12 @@ class CapitalConfig(BaseModel):
     halve_at: float = Field(default=0.05, gt=0.0, lt=1.0)
     reduce_only_at: float = Field(default=0.075, gt=0.0, lt=1.0)
     close_at: float = Field(default=0.10, gt=0.0, lt=1.0)
+    # Tell each PM what the machine decided that touches its pod (idea: the firm lives a quarter):
+    # every eligible pitch gets a capital answer (a seeded pod's later pitches too: "your pod
+    # already runs pitch #N"), and its capital view carries the hiring law (a closed pod is
+    # replaced). Off by default, and left out of the frozen law while off, so a run recorded before
+    # it existed replays as it was; a world turns it on (its recipe's ``laws``).
+    tell_pms: bool = Field(default=False, exclude_if=lambda v: v is False)
 
     @model_validator(mode="after")
     def _ladder_climbs(self) -> CapitalConfig:

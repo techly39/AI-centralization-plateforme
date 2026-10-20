@@ -44,7 +44,7 @@ from app.capital.allocation import (
     reallocate,
     worst_drawdown,
 )
-from app.capital.hiring import open_vacancy
+from app.capital.hiring import hiring_law, open_vacancy
 from app.config import CapitalConfig, get_settings
 from app.db.models import Agent, Event, Order, OrderSide, OrderStatus, Pod, Position
 from app.ledger.events import (
@@ -90,6 +90,12 @@ def opened_law(session: Session) -> tuple[CapitalConfig, Event] | None:
     if first is None:
         return None
     return CapitalConfig.model_validate(first.payload_json["law"]), first
+
+
+def run_law(session: Session) -> CapitalConfig:
+    """The law this run is judged by: the one its centre opened with, else today's."""
+    opened = opened_law(session)
+    return opened[0] if opened is not None else get_settings().capital
 
 
 def book(session: Session) -> dict[str, Any]:
@@ -458,5 +464,16 @@ def capital_view(session: Session, *, pod_id: int | None, cross: bool) -> dict[s
                      "seeded_on": entry["seeded_on"], "allocated_usd": entry["allocated"],
                      "rule": entry["rule"], "last_score": last,
                      "last_scored_on": latest.payload_json["day"] if pid in scores else None})
-    return {"opened_on": state["opened_on"], "law": state["law"],
+    view = {"opened_on": state["opened_on"], "law": state["law"],
             "centre_cash_usd": state["centre_cash"] if pod_id is None else None, "pods": rows}
+    law = run_law(session)
+    if law.tell_pms:
+        # The hiring law, announced to every reader (cycle 51: no PM knew a closed pod is replaced).
+        hiring = hiring_law(session)
+        view["hiring"] = {
+            "law": (f"When the risk ladder closes a pod ({law.close_at:.0%} down from its "
+                    "high-water mark), every position is sold and all its capital goes back to the "
+                    "centre; a vacancy opens with the pod's post-mortem, and on a later morning a "
+                    "new PM is hired into a new pod in its place. A closed pod never reopens."),
+            "max_live_pods": hiring.max_live_pods, "new_pm_budget_usd": hiring.budget_usd}
+    return view

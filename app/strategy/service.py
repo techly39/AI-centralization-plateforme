@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.capital.service import book as capital_book
-from app.capital.service import eligible_unseeded
+from app.capital.service import eligible_unseeded, run_law
 from app.config import GatesConfig
 from app.db.models import Agent, Event
 from app.ledger.events import (
@@ -228,7 +228,8 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
         "law": law.model_dump(),
     }
     append_event(session, type=EVENT_PITCH_JUDGED, actor_agent_id=actor.id, payload=judged)
-    return pitch_view(submitted, judged)
+    session.flush()
+    return pitch_view(submitted, judged, capital_answers(session).get(submitted.id))
 
 
 def pitch_view(submitted: Event, judged: dict[str, Any] | None,
@@ -254,6 +255,26 @@ def capital_answers(session: Session) -> dict[int, dict[str, Any]]:
         else:
             out[p["pitch_id"]] = {"outcome": "refused", "on": e.ts.date().isoformat(),
                                   "reason": p["reason"]}
+    if not run_law(session).tell_pms:
+        return out
+    # The machine seeds a pod once: a seeded pod's other eligible pitches are never looked at, so
+    # without this their PM hears nothing (pod replacement, cycle 51: a real PM had to guess).
+    pods = capital_book(session)["pods"]
+    for e in session.scalars(select(Event).where(Event.type == EVENT_PITCH_JUDGED)
+                             .order_by(Event.id)):
+        p = e.payload_json
+        entry = pods.get(p.get("pod_id"))
+        if p.get("eligible") is not True or entry is None or p.get("pitch_id") in out:
+            continue
+        if entry["stage"] == "closed":
+            reason = "your pod was closed by the risk ladder: a closed pod gets no capital"
+        else:
+            reason = (f"your pod already runs pitch #{entry['pitch_id']}, seeded on "
+                      f"{entry['seeded_on']}: the centre seeds a pod once, and a later pitch does "
+                      "not change the rule your pod trades. Your capital now follows your pod's "
+                      "forward record (get_capital).")
+        out[p["pitch_id"]] = {"outcome": "not_seeded", "on": e.ts.date().isoformat(),
+                              "reason": reason}
     return out
 
 
