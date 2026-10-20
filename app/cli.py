@@ -284,6 +284,21 @@ def cmd_rebuild_state(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_quarter_report(args: argparse.Namespace) -> int:
+    """Print the quarter report of the run in the configured database: each pod's equity week by
+    week, its P&L gross and net of thinking, the re-weighings, the deaths and the hires. Read-only.
+    (An operator's command, not an agent's tool: a new tool would change the full tool list a
+    recorded mind was shown, and its replay would diverge.)"""
+    from app.capital.report import quarter_report, render
+    from app.marketdata import get_provider
+
+    with session_scope() as session:
+        report = quarter_report(session, provider=get_provider(), every_days=args.every_days)
+        session.rollback()
+    print(json.dumps(report, sort_keys=True) if args.json else render(report))
+    return 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -384,6 +399,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_rebuild = sub.add_parser("rebuild-state", help="rebuild derived tables from events")
     p_rebuild.set_defaults(func=cmd_rebuild_state)
+
+    p_qr = sub.add_parser("quarter-report", help="print the capital machine's quarter report")
+    p_qr.add_argument("--every-days", type=int, default=7, choices=range(1, 91),
+                      metavar="N", help="days between two columns (default 7)")
+    p_qr.add_argument("--json", action="store_true", help="the report as JSON")
+    p_qr.set_defaults(func=cmd_quarter_report)
 
     p_serve = sub.add_parser("serve", help="run the API server")
     p_serve.add_argument("--host", default=None)

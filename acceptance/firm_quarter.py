@@ -16,14 +16,24 @@ Costs $0 and needs no network.
      algorithm re-weighs capital by each pod's score net of that thinking.
      The run's capital law tells PMs everything (``tell_pms``): a seeded pod's later pitch gets an
      answer, and the capital view carries the hiring law.
-  B  (session 2) the same quarter with real PMs, recorded; ``replay --verify`` IDENTICAL for $0.
+  B  the same quarter as a hosted world (the recipe the real run is made from: the market, four
+     pods, and the world's own laws: ``tell_pms`` on, at most 4 live pods), lived by the Runtime:
+     ``fund-runtime backtest --world --hire``, three days a step.
+       B0 a scripted rehearsal, recorded now: the same deaths and hires, ``replay --verify``
+          IDENTICAL, $0
+       B  (next session) four real PMs and their hires, recorded; IDENTICAL from the file, $0
 
     uv run python acceptance/firm_quarter.py        # exit 0 = the idea works
 """
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import io
+import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -51,6 +61,7 @@ from app.cli import main as fund_env  # noqa: E402
 from app.config import CapitalConfig  # noqa: E402
 from app.db.base import session_scope  # noqa: E402
 from app.db.models import AgentRole, CashBalance, Event, Pod, Position  # noqa: E402
+from app.ledger.events import ledger_now  # noqa: E402
 from app.ledger.rebuild import rebuild_state  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.marketdata import BarsProvider, get_provider, set_provider  # noqa: E402
@@ -315,26 +326,33 @@ def _snapshot(s) -> dict:
 
 
 def report_checks(firm: Firm) -> dict:
-    """A8: the quarter report, from the API, against an independent sum of the money."""
-    r = firm.client.get("/capital/report", headers=h(firm.admin))
-    denied = firm.client.get("/capital/report", headers=h(firm.pods["edge"]["key"]))
+    """A8: the quarter report, as the operator prints it, against an independent sum of the money."""
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = fund_env(["quarter-report", "--json"])
     with session_scope() as s:
         direct = quarter_report(s, provider=get_provider())
-        cash = sum(c.balance for c in s.scalars(select(CashBalance)))
-    rep = r.json() if r.status_code == 200 else {}
-    check("A8: the quarter report reads from the API (management), not by a PM",
-          r.status_code == 200 and rep == _jsonish(direct) and denied.status_code == 403,
-          f"management {r.status_code}, a PM {denied.status_code}")
+        # The pods' money, counted apart from the report: cash plus every holding at today's close.
+        now = ledger_now(s)
+        held = sum(c.balance for c in s.scalars(select(CashBalance))) + sum(
+            p.qty * get_provider().get_price(p.ticker, as_of=now).price
+            for p in s.scalars(select(Position)))
+    rep = json.loads(out.getvalue()) if code == 0 else {}
+    check("A8: the operator prints the quarter report (fund-env quarter-report), from the ledger",
+          code == 0 and rep == _jsonish(direct), f"exit {code}")
     if not rep:
         return {}
     pods = {p["name"]: p for p in rep["pods"]}
-    # Money is kept: the firm's equity is its capital plus every pod's gross P&L, and the pods'
-    # equity on the last day is their cash plus their holdings (an independent sum).
+    # Money is kept: the firm's last-day equity is the centre's cash plus every pod's cash and
+    # holdings (counted apart), and it is the firm's capital plus every pod's gross P&L.
     firm_end = rep["firm"][-1]
     made = sum(p["pnl_gross_usd"] for p in rep["pods"])
-    check("A8: money is kept: the firm's last-day equity is its capital plus every pod's P&L",
-          abs(firm_end - (rep["firm_capital_usd"] + made)) < 1.0,
-          f"${firm_end:,.0f} = ${rep['firm_capital_usd']:,.0f} + ${made:,.0f}")
+    check("A8: money is kept: the firm's last-day equity is the centre's cash plus the pods' cash "
+          "and holdings, and its capital plus every pod's P&L",
+          abs(firm_end - (rep["centre"][-1] + held)) < 1.0
+          and abs(firm_end - (rep["firm_capital_usd"] + made)) < 1.0,
+          f"${firm_end:,.0f} = ${rep['centre'][-1]:,.0f} + ${held:,.0f} = "
+          f"${rep['firm_capital_usd']:,.0f} + ${made:,.0f}")
     weeks = len(rep["weeks"])
     check("A8: the report holds every week of the quarter, each pod's P&L gross and net of "
           "thinking, the deaths and the hires",
@@ -343,14 +361,147 @@ def report_checks(firm: Firm) -> dict:
           and all(abs(p["pnl_net_usd"] - (p["pnl_gross_usd"] - p["thinking_usd"])) < 1e-6
                   for p in rep["pods"])
           and pods["sink"]["closed_on"] and pods["crash"]["closed_on"]
-          and "hired" in pods["hire-1"]["origin"] and pods["noise"]["put_in_usd"] == 0
-          and cash > 0, f"{weeks} columns; {len(rep['happened'])} happenings")
+          and "hired" in pods["hire-1"]["origin"] and pods["noise"]["put_in_usd"] == 0,
+          f"{weeks} columns; {len(rep['happened'])} happenings")
     return rep
 
 
 def _jsonish(doc):
-    import json
     return json.loads(json.dumps(doc, default=str))
+
+
+# --- B: the quarter as a hosted world, lived by the Runtime ---------------------------------------
+
+#: The hosted world's key (ADR-045: never in the cassette; whoever verifies must know it).
+KEY = hashlib.sha256(b"fund-firm-quarter/1").hexdigest()
+DAYS_PER_STEP = 3
+STEPS = QUARTER // DAYS_PER_STEP
+WORLD = {"start": f"{START.isoformat()}T14:30:00Z", "admin": "quarter-mgmt",
+         "pods": [{"name": name, "allocation": 0} for name in FOUNDING],
+         "market": MARKET.model_dump(mode="json"),
+         "laws": {"capital": {"tell_pms": True}, "hiring": {"max_live_pods": LIMIT}}}
+PM_TOOLS = ["whoami", "get_clock", "run_research_backtest", "list_research_backtests",
+            "submit_pitch", "list_pitches", "get_capital", "get_mandate", "place_order",
+            "get_portfolio"]
+
+
+def write_world(directory: Path, provider: str) -> None:
+    """The hosted run's files: the world, the input, the four PMs, the hiring template."""
+    (directory / "specs").mkdir(parents=True, exist_ok=True)
+    (directory / "world.json").write_text(json.dumps(WORLD))
+    rules = {}
+    if provider == "scripted":   # the scripted PMs pitch their sector; the hires, F and G
+        rules = {f"{name}-pm": rule(fam) for name, fam in FOUNDING.items()}
+        rules |= {f"hire-{n}-pm": rule(fam) for n, fam in HIRES.items()}
+    (directory / "input.json").write_text(json.dumps({
+        "sectors": {f"{name}-pm": [f"{FOUNDING[name]}{k:02d}"
+                                   for k in range(FAMILIES[FOUNDING[name]][0])]
+                    for name in FOUNDING},
+        "unheld": [f"{fam}{k:02d}" for fam in HIRES.values() for k in range(FAMILIES[fam][0])],
+        "pitch_rules": rules}))
+    for pod, name in enumerate(FOUNDING, start=1):
+        spec = {"id": f"{name}-pm", "name": f"{name}-pm", "role": "pm", "pod": pod,
+                "charter": "Pitch once, then trade the mandate."}
+        spec |= ({"provider": "scripted", "script": "pitch-pm"} if provider == "scripted"
+                 else {"provider": provider, "tools": PM_TOOLS})
+        (directory / "specs" / f"{name}-pm.yaml").write_text(json.dumps(spec))
+    hire = ({"provider": "scripted", "script": "pitch-pm"} if provider == "scripted"
+            else {"provider": provider, "tools": PM_TOOLS + ["get_vacancy"]})
+    (directory / "hire.yaml").write_text(json.dumps(hire))
+
+
+def fund_runtime(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("FUND_", "OPENROUTER")) and k.lower() not in {
+               "http_proxy", "https_proxy", "all_proxy"}}
+    (cwd / "vtmp").mkdir(exist_ok=True)
+    env.update({"FUND_MARKETDATA__SYNTHETIC_KEY": KEY, "TMPDIR": str(cwd / "vtmp"),
+                "FUND_DATABASE_URL": f"sqlite:///{cwd / 'sentinel.db'}",
+                "HTTPS_PROXY": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1:9"})
+    return subprocess.run(["uv", "run", "--project", str(REPO), "fund-runtime", *argv], cwd=cwd,
+                          env=env, capture_output=True, text=True, timeout=1800)
+
+
+def verify(text: str, label: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="fund-firm-quarter-") as t:
+        lone = Path(t) / "run.cassette.json"
+        lone.write_text(text, encoding="ascii")
+        r = fund_runtime(["replay", "--cassette", lone.name, "--verify"], Path(t))
+        line, _, rest = r.stdout.partition("\n")
+        try:
+            ev = json.loads(rest)
+        except ValueError:
+            ev = {}
+        check(f"{label}: replay --verify from the file alone is IDENTICAL, at $0",
+              r.returncode == 0 and line.startswith("IDENTICAL:") and ev.get("replay_usd") == 0,
+              f"exit {r.returncode}: {line or r.stderr.strip()[-300:]}")
+
+
+def quarter_chain(doc: dict, label: str) -> None:
+    """The quarter, as the recorded ledger tells it: who was seeded, raised, closed and hired."""
+    rows = [(r[0], r[3], json.loads(r[4])) for r in (doc.get("ledger") or {}).get("rows") or []]
+    of = lambda t: [(i, p) for i, t2, p in rows if t2 == t]  # noqa: E731
+    pods = {k: name for k, name in enumerate(FOUNDING, start=1)}
+    for _, p in of("vacancy_filled"):
+        pods[p["pod_id"]] = p["pod_name"]
+    seeded = {pods.get(p["pod_id"]) for _, p in of("capital_seeded")}
+    closed = [(i, pods.get(p["pod_id"])) for i, p in of("pod_stage_changed") if p["to"] == "closed"]
+    opened = [(i, p) for i, p in of("vacancy_opened")]
+    filled = [(i, p) for i, p in of("vacancy_filled")]
+    raised = [p for _, p in of("allocation_set")
+              if p.get("source") == "capital" and "raise" in p["reason"]]
+    run = (doc.get("outcome") or {}).get("run") or {}
+    hired = [h for h in run.get("hires") or [] if h["outcome"] == "hired"]
+    check(f"{label}: edge, sink and crash are seeded, noise never; sink and crash are closed",
+          {"edge", "sink", "crash"} <= seeded and "noise" not in seeded
+          and sorted(n for _, n in closed) == ["crash", "sink"],
+          f"seeded {sorted(x for x in seeded if x)}; closed {[n for _, n in closed]}")
+    check(f"{label}: each close opens a vacancy and the Runtime fills it with a new PM, who earns "
+          "a seed", len(opened) == 2 and [f["vacancy_id"] for _, f in filled]
+          == [i for i, _ in opened] and len(hired) == 2
+          and {"hire-1", "hire-2"} <= seeded,
+          ", ".join(f"{f['pod_name']} / {f['agent_name']}" for _, f in filled))
+    law = (of("capital_opened") or [(0, {})])[0][1].get("law") or {}
+    hiring = (opened[0][1].get("law") or {}) if opened else {}
+    check(f"{label}: the world lives by its recipe's laws: PMs are told, at most {LIMIT} live pods",
+          law.get("tell_pms") is True and hiring.get("max_live_pods") == LIMIT,
+          f"tell_pms {law.get('tell_pms')}, max_live_pods {hiring.get('max_live_pods')}")
+    check(f"{label}: the algorithm raises capital, net of thinking", bool(raised),
+          f"{len(raised)} raise(s) to {sorted({pods.get(p['pod_id']) for p in raised})}")
+
+
+def rehearsal() -> None:
+    """B0, $0: the hosted quarter with scripted minds, recorded and verified now."""
+    with tempfile.TemporaryDirectory(prefix="fund-firm-quarter-") as t:
+        tmp = Path(t)
+        write_world(tmp, "scripted")
+        r = fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
+                          "hire.yaml", "--input", "input.json", "--steps", str(STEPS),
+                          "--days-per-step", str(DAYS_PER_STEP), "--max-tool-calls", "40",
+                          "--cassette", "rehearsal.cassette.json"], tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted quarter completes and is recorded",
+                     r.returncode == 0 and tape.is_file(), f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-300:] if r.returncode else 'completed'}, "
+                     f"{tape.stat().st_size / 1e6:.1f} MB" if tape.is_file() else ""):
+            return
+        text = tape.read_text(encoding="ascii")
+    quarter_chain(json.loads(text), "B0")
+    verify(text, "B0")
+
+
+EVIDENCE = REPO / "evidence" / "firm-quarter" / "quarter.cassette.json"
+
+
+def recorded() -> None:
+    """B: the recorded real quarter (real PMs, metered, inside the cap). The next session records
+    it; until then this check fails: the idea is not done without real minds."""
+    if not check("B: the recorded real quarter exists", EVIDENCE.is_file(),
+                 str(EVIDENCE.relative_to(REPO))):
+        return
+    text = EVIDENCE.read_text(encoding="ascii")
+    quarter_chain(json.loads(text), "B")
+    verify(text, "B")
 
 
 def main() -> int:
@@ -371,6 +522,8 @@ def main() -> int:
     finally:
         firm.client.__exit__(None, None, None)
         set_provider(None)
+    rehearsal()
+    recorded()
     print(f"\n{len(FAILED)} failed · {time.monotonic() - started:.0f} s")
     for name in FAILED:
         print(f"  FAILED: {name}")
@@ -379,4 +532,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--write-world"]:   # the files a recorded run is made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        sys.exit(0)
     sys.exit(main())

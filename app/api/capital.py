@@ -14,7 +14,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.capital.mandate import NoMandate, mandate_orders
-from app.capital.report import quarter_report
 from app.capital.service import capital_view
 from app.db.base import get_session
 from app.db.models import Agent, Pod
@@ -37,20 +36,6 @@ def get_capital(
     cross = has_permission(actor.role, Action.READ_CROSS_POD)
     pod_id = _pod_to_read(session, actor, pod_id, cross)
     return capital_view(session, pod_id=pod_id, cross=cross)
-
-
-@router.get("/capital/report", response_model=dict[str, Any])
-def get_capital_report(
-    every_days: int = Query(default=7, ge=1, le=90, description="Days between two columns."),
-    _: Agent = Depends(require(Action.READ_CROSS_POD)),
-    session: Session = Depends(get_session),
-) -> dict[str, Any]:
-    """The quarter report: each pod's equity week by week, its P&L gross and net of thinking cost,
-    every re-weighing's scores before and after thinking cost, every seed, close and hire."""
-    try:
-        return quarter_report(session, provider=get_provider(), every_days=every_days)
-    except MarketDataError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.get("/mandate", response_model=dict[str, Any])
