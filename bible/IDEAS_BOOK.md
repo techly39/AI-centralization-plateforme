@@ -447,6 +447,10 @@ From the firm lives a quarter (cycle 53): a recorded mind whose spec names no to
 whole published tool list, so adding any tool makes that recording's replay diverge (the scripted
 doomed PM in the cycle-51 hire recording); new recordings name each mind's tools, and the quarter
 report stays an operator command (`fund-env quarter-report`) until replays pin the tool list.
+Cycle 54: a real (metered) run posts its minds' thinking cost to the ledger once, after its last
+step, so the capital machine re-weighs a real quarter with no thinking cost at all; only the
+scripted quarter (charged each morning) shows the law "capital net of thinking" acting. At real
+prices it is cents against a $200,000 seed, but the law is not yet lived by real minds.
 
 ### Paid to report holes
 From: Builder
