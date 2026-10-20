@@ -134,8 +134,23 @@ def test_the_report_before_the_centre_opens_says_so(db, prices):
     assert "never opened" in render(report)
 
 
-def test_the_operator_prints_the_report(capsys):
+def test_the_operator_prints_the_report(capsys, SessionFactory, monkeypatch):
+    """On the test's own empty database, never the operator's ``fund.db`` (cycle 56: this read
+    the repo's ``fund.db`` and failed in a clean checkout, where there is none)."""
+    from contextlib import contextmanager
+
+    from app import cli
     from app.cli import main as fund_env
 
+    @contextmanager
+    def scope():
+        session = SessionFactory()
+        try:
+            yield session
+            session.commit()
+        finally:
+            session.close()
+
+    monkeypatch.setattr(cli, "session_scope", scope)
     assert fund_env(["quarter-report"]) == 0
     assert "never opened" in capsys.readouterr().out

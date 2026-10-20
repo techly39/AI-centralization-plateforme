@@ -258,8 +258,10 @@ Now (cycle 48): every few days an algorithm re-weighs capital among the machine'
 and risk-adjusted score of their forward days, cut for correlation with older pods and for drawdown,
 within limits per move (`app/capital/allocation.py`); every move is one event holding its inputs and
 redoes identically. The score already nets the thinking cost metered to the pod since its seed.
-Cycle 51: the first real mind's pod entered the machine (a hired PM, seeded $200k). Not yet: several
-real pods ranked against each other by it, over enough days for a score (20 forward days).
+Cycle 51: the first real mind's pod entered the machine (a hired PM, seeded $200k). Cycle 54: it
+ranked four real pods and their hires against each other for a quarter (the edge pod raised to
+$2.9M). Not yet: the real minds' thinking cost in the score while the run is live (see "Thinking
+costs money").
 
 ### The central risk ladder
 From: Human
@@ -288,7 +290,10 @@ its pod. A pod that earns $100 using $120 of tokens lost money.
 Now: true for real dollars since cycle 43: each real agent has its own capped OpenRouter key, the
 system charges what the provider bills, all runs of a month stay inside the $50 cap
 (`acceptance/M-001.py` with a fake provider, `acceptance/real_agents_backtest.py` with the real one).
-Not yet: the pod's P&L net of its thinking cost as the number that ranks it.
+Cycle 48: the allocation score ranks pods net of their thinking cost; the scripted quarter (cycle
+53) shows a costly pod ranked below a cheaper one it beat gross. Not yet: a real run charges its
+minds' cost only after its last step, so real re-weighings do not see it (the monthly generation
+fixes this: fitness is measured net of thinking).
 
 ## Communication and orchestration
 
@@ -330,6 +335,16 @@ From: Human
 Status: not started
 The system resets every month: mark to market, measure every pod's fitness, the worst die, the
 best may reproduce, capital resets, lessons and the strategy registry persist.
+Now: the parts it stands on exist: the quarter (cycle 54) runs three months of pods with the
+ladder's deaths and the morning hire; a dead pod's post-mortem reaches only its successor. What
+the quarter showed missing: a PM who thinks a whole quarter and never earns a seed is never let
+go (pod-2), and a closed pod's PM keeps waking and spending until the run ends.
+Matured (cycle 56 plan), first slice "a generation turns over": at each month's end physics
+measures every pod's fitness (its P&L net of its thinking, charged each step, not after the run),
+lets go the PMs whose pods are closed or never earned a seed in the month (they stop waking, their
+keys stop), writes each departure's lesson into a library every PM can read, and the freed places
+are hired into the next morning. Reproduction (a winner's design copied with variation) is the
+next slice, then capital reset.
 
 ### Evolution: designs that work reproduce with variation
 From: Human
@@ -344,7 +359,8 @@ Status: not started
 A dead pod writes (or gets) a post-mortem. Post-mortems and lessons go to a library every agent can
 read, so the firm learns across generations.
 Now (cycle 51): physics writes a dead pod's post-mortem (its rule, forward days, the ladder's steps)
-into the vacancy, and only its successor reads it. No library every agent can read yet.
+into the vacancy, and only its successor reads it. No library every agent can read yet: the
+monthly generation's first slice (Next up 2) builds it.
 
 ## Society and civilisation
 
@@ -477,6 +493,17 @@ a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a,
 results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
 real PMs lived a quarter, two deaths and two hires, a quarter report.)
 
+Cycle 56 plan: the monthly generation moves ahead of the pitch's part two. Why: the quarter showed
+the firm cannot yet live past a quarter without someone touching it: a PM who never earns a seed
+thinks (and spends) forever, a closed pod's PM keeps waking, the real minds' thinking cost reaches
+the score only after the run, and lessons reach one successor. The Human's horizon ("failing pods
+die and their lessons are kept; every month is a generation") needs these before anything else;
+the debate improves one step of a pitch, the generation makes the whole firm run on its own. Fixed
+inside it (holes it stands on): thinking cost charged each step in real runs; a closed or let-go
+PM stops waking; empty pods no longer count toward the live-pod limit (letting PMs go makes them);
+the agent cap and the "only the registrar hires" check move into physics (more hires go through
+them).
+
 Cycle 52 plan: order kept, 1c next. Why: every piece of the machine now works once, each proven
 with one mind or scripted pods; the firm has never had several real minds competing for the same
 capital. A quarter is the first run where the algorithm ranks real pods against each other (20
@@ -512,9 +539,17 @@ verdicts move capital.
       noise, one that sinks, one that crashes mid-quarter); they research, pitch, get seeded or
       not; the algorithm re-weighs every five days net of each pod's thinking cost; the ladder
       kills what bleeds and hires replace them. The Human gets a quarter report: capital per pod
-      week by week, deaths, hires, P&L net of thinking. Recorded, replays for $0.
-2. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
+      week by week, deaths, hires, P&L net of thinking. Recorded, replays for $0. Done (cycle 55).
+2. **The monthly generation.** Reset, selection, lessons kept, the next generation starts. Cut:
+   a. *A generation turns over.* Queued (cycle 56). At each month's end physics measures every
+      pod's fitness net of its thinking (charged each step), lets go the PMs whose pods closed or
+      never earned a seed that month (they stop waking and spending), writes each one's lesson to a
+      library every PM reads, and hires into the freed places. Three generations in one run; the
+      Human gets a generation report (who lived, who went and why, the lessons). Recorded, $0 replay.
+   b. *Designs reproduce.* A freed place is filled by a child of the fittest pod: its charter and
+      model, varied (one change), its parent named; a finding if diversity collapses.
+   c. *Capital resets* at the month's turn, the strategy registry persists.
+3. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
    bear argue the pitch in a thread; the firm's process decides (and judges the hypothesis).
-3. **The monthly generation.** Reset, selection, lessons kept, the next generation starts.
 4. **The Observatory.** "What's new" and the agents in action, for the Human.
 5. **Strategies as agent-written code**, run in a sandboxed subprocess (seal work).

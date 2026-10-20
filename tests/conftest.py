@@ -19,6 +19,14 @@ normally.
 
 from __future__ import annotations
 
+import os
+import tempfile
+
+# Before any ``app`` import builds its engine: the suite's default database is an empty scratch
+# file, never the operator's ``fund.db``. A test that leaned on the local ``fund.db`` passed here
+# and failed in the runner's clean checkout (cycle 55, main red); now it fails here too.
+os.environ["FUND_DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp(prefix='fund-suite-')}/never.db"
+
 from collections.abc import Iterator
 from pathlib import Path
 

@@ -3,6 +3,21 @@
   "standard": "protocol/CYCLE.md \u00a72 (ADR-046)",
   "missions": [
     {
+      "id": "generation-turnover",
+      "title": "A generation turns over: at each month's end the firm measures every pod net of its thinking, lets go the PMs who failed, keeps their lessons in a library every PM reads, and hires into the freed places",
+      "idea": "Every month is a generation",
+      "acceptance": "acceptance/generation_turnover.py",
+      "demo": "uv run python acceptance/generation_turnover.py \u2014 scripted: three months on one made-up market; at each month's end each pod's fitness (P&L net of thinking, charged each step) is measured; a PM whose pod closed or never earned a seed is let go (stops waking, its key stops, a refusal if it tries), its lesson enters the library, the freed place is hired the next morning and the hire reads the library; a PM that earned a seed and kept it stays; a let-go PM's empty pod does not block hiring; rebuild from the ledger gives the same books. Recorded: real Haiku PMs live three generations, replay IDENTICAL for $0, a generation report prints who lived, who went and why, the lessons",
+      "status": "ready",
+      "estimate_sessions": 3,
+      "physics": true,
+      "depends_on": [
+        "firm-quarter"
+      ],
+      "branch": "idea/generation-turnover",
+      "notes": "Plan cycle 56. Holes it stands on, fix inside it: (1) a real (metered) run posts thinking cost only after its last step (runtime/verify.py, the one sync) -> charge each step so fitness and re-weighings see it, and keep old recordings replaying (law switch, as tell_pms did); (2) a closed pod's PM stays active and keeps waking -> let-go/closed PMs stop waking and are refused; (3) empty pods count toward the live-pod limit -> letting PMs go makes empty pods, so count only pods with a live PM; (4) the agent cap and the 'only the registrar hires' check live in the Runtime / the vacancies router -> move into physics (app/registry). 'Never earned a seed in the month' is the let-go law; its thresholds in the world's laws (recipe), not hard-coded. Reuse: the quarter's world recipe, the morning hire (runtime/onboarding.py), the post-mortem (becomes the first library entries), the quarter report (extend to a generation report, operator command). Left out: reproduction (2b), capital reset (2c), a manager mind. Before spending: the visibility check of every consequence (let go, library entry) through the PM's own tools. Watch: a new agent tool changes the tool list recorded minds were shown; new recordings name their tools."
+    },
+    {
       "id": "firm-quarter",
       "title": "The firm lives a quarter: four real PMs compete for the same capital for three simulated months, pods die and are replaced, and the Human gets a quarter report",
       "idea": "The firm is a multi-manager hedge fund with high turnover",

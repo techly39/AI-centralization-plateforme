@@ -66,6 +66,10 @@ killed when the session ends).
   feature words ("PM now gets the day's prices before deciding"), not ids.
 - While working, run the tests of the files you touch (`uv run pytest -q tests/test_x.py`). The full
   suite (`uv run pytest -q -p no:warnings 2>&1 | tail -5`, ~100 s) runs once before merge.
+- The suite runs on a scratch database (`tests/conftest.py` sets `FUND_DATABASE_URL` before any
+  app import), as the runner's clean checkout does: never let a test read the local `fund.db` or
+  any file that is not committed. (Cycle 56 plan, after cycle 55's merge turned `main` red only in
+  the runner's checkout; judged by: no `main_red` flag on the next three merges.)
 - Tests proportionate to the code. Never weaken or delete a test to pass; if a test is wrong, say
   why in the commit.
 - Real LLM spend (firm agents) only through the metered path, inside the cap, and only for the run
