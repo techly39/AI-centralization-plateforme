@@ -29,12 +29,13 @@ from sqlalchemy.orm import Session
 from app.capital.service import book as capital_book
 from app.capital.service import eligible_unseeded, run_law
 from app.config import GatesConfig
-from app.db.models import Agent, Event
+from app.db.models import Agent, Event, Pod
 from app.ledger.events import (
     EVENT_CAPITAL_SEED_REFUSED,
     EVENT_CAPITAL_SEEDED,
     EVENT_PITCH_JUDGED,
     EVENT_PITCH_SUBMITTED,
+    EVENT_POD_STAGE_CHANGED,
     EVENT_RESEARCH_BACKTEST_RUN,
     append_event,
     ledger_now,
@@ -199,8 +200,12 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
     # seeded trades, and with the pitch each other unseeded pod will be seeded with at the next
     # advance: a later pitch of the original must never free a copy of the rule that is (or is
     # about to be) its mandate to earn a second seed (red-team and auditor, capital machine).
+    # A closed pod's pitches are not: it can never be seeded again, so its later pitches would only
+    # block other pods' rules at no cost to it (red-team, the firm lives a quarter).
+    closed = set(session.scalars(select(Pod.id).where(Pod.status == "closed")))
     compared = {f"pod {pod}": pitch["rule"]
-                for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items())}
+                for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items())
+                if pod not in closed}
     # A closed pod's mandate too: the ladder's verdict on a rule is not undone by a fresh seed.
     # (The machine checks again when it pays a seed, :func:`seed_correlation`: no order of pitches
     # gets two seeds for one rule.)
@@ -260,6 +265,10 @@ def capital_answers(session: Session) -> dict[int, dict[str, Any]]:
     # The machine seeds a pod once: a seeded pod's other eligible pitches are never looked at, so
     # without this their PM hears nothing (pod replacement, cycle 51: a real PM had to guess).
     pods = capital_book(session)["pods"]
+    # The day each pod was closed: a "closed" answer is never dated before it (red-team).
+    closed_on = {e.payload_json.get("pod_id"): e.ts.date().isoformat() for e in session.scalars(
+        select(Event).where(Event.type == EVENT_POD_STAGE_CHANGED).order_by(Event.id))
+        if e.payload_json.get("to") == "closed"}
     for e in session.scalars(select(Event).where(Event.type == EVENT_PITCH_JUDGED)
                              .order_by(Event.id)):
         p = e.payload_json
@@ -277,8 +286,10 @@ def capital_answers(session: Session) -> dict[int, dict[str, Any]]:
                       f"{entry['seeded_on']}: the centre seeds a pod once, and a later pitch does "
                       "not change the rule your pod trades. Your capital now follows your pod's "
                       "forward record (get_capital).")
-        out[p["pitch_id"]] = {"outcome": "not_seeded", "on": e.ts.date().isoformat(),
-                              "reason": reason}
+        on = e.ts.date().isoformat()
+        if entry["stage"] == "closed":
+            on = max(on, closed_on.get(p.get("pod_id"), on))
+        out[p["pitch_id"]] = {"outcome": "not_seeded", "on": on, "reason": reason}
     return out
 
 

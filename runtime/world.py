@@ -45,7 +45,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from runtime.cassette import LEDGER_FORMAT, redact
-from runtime.governance import read_governance
+from runtime.governance import read_agents_cap, read_governance
 
 #: The environment variable that names the world's synthetic market (a throwaway secret).
 WORLD_KEY_ENV = "FUND_MARKETDATA__SYNTHETIC_KEY"
@@ -131,9 +131,16 @@ class WorldRecipe(BaseModel):
 def parse_recipe(doc: Any) -> WorldRecipe:
     """``doc`` (parsed JSON) as a recipe, else :class:`WorldError`."""
     try:
-        return WorldRecipe.model_validate(doc)
+        recipe = WorldRecipe.model_validate(doc)
     except (ValidationError, TypeError, ValueError) as exc:
         raise WorldError(f"recipe_invalid:{type(exc).__name__}") from exc
+    # A world's laws never reach past the Human's: no more live pods than alive agents allowed.
+    pods = ((recipe.laws or {}).get("hiring") or {}).get("max_live_pods")
+    if pods is not None:
+        cap, problem = read_agents_cap()
+        if cap is None or problem is not None or type(pods) is not int or pods > cap:
+            raise WorldError("recipe_over_agent_cap")
+    return recipe
 
 
 def load_world(path: Path) -> dict[str, Any]:
