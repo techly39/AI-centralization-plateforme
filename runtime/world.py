@@ -189,7 +189,7 @@ def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
         env["FUND_MARKETDATA__SYNTHETIC_SYMBOLS"] = json.dumps(extra_symbols, sort_keys=True)
     if market is not None:
         env["FUND_MARKETDATA__MADE_UP"] = json.dumps(market, sort_keys=True)
-    if laws is None:
+    if not laws:   # none, or an empty block: no laws named
         # A recipe that names no laws lives by the laws as they were when such recipes were all
         # there was: a closed pod's later pitches still count in the correlation gate, so every
         # recording made before cycle 54 replays as recorded (auditor, the firm lives a quarter).
