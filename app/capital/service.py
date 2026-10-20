@@ -480,7 +480,7 @@ def capital_view(session: Session, *, pod_id: int | None, cross: bool) -> dict[s
                     "centre; a vacancy opens with the pod's post-mortem, and on a later morning a "
                     "new PM is hired into a new pod in its place. A closed pod never reopens."),
             "max_live_pods": hiring.max_live_pods, "new_pm_budget_usd": hiring.budget_usd}
-    generation = announcement(session)
+    generation = announcement(session, pod_id=pod_id)
     if generation is not None:
         view["generation"] = generation
     return view

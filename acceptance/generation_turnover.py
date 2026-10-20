@@ -196,6 +196,9 @@ class Firm:
                     self.client.get("/library", headers=h(p["key"])).status_code]
             return
         self.think(name)
+        # What the PM reads of the generation law about its own pod, every morning.
+        told = self.client.get("/capital", headers=h(p["key"])).json().get("generation") or {}
+        p.setdefault("told", {})[self.today()] = told.get("your_pod")
         first = day == p["joined"]
         if first and name.startswith("hire-"):
             self.first_reads[name] = {
@@ -331,6 +334,22 @@ def checks(firm: Firm) -> None:
     check("G6: the capital view every PM reads states the generation law",
           "let go" in law.get("law", "") and law.get("grace_days") == GRACE,
           law.get("law", "absent")[:120])
+
+    # G6b: before it spends, every PM can see what the generation law will do to it
+    told = lambda pod, day: (firm.pods[pod].get("told") or {}).get(day) or {}  # noqa: E731
+    edge_after = told("edge", date(2024, 10, 1)).get("last_generation") or {}
+    check("G6: each PM reads, through its own key, the month's end that will judge it and its "
+          "pod's last fitness",
+          told("noise", date(2024, 9, 1)).get("judged_on") == "2024-10-01"
+          and told("hire-1", firm.pods["hire-1"]["told"] and min(firm.pods["hire-1"]["told"]))
+          .get("judged_on") == "2024-11-01"
+          and told("edge", date(2024, 9, 1)).get("judged_on") == "2024-10-01"   # before its seed
+          and told("edge", date(2024, 9, 5)).get("judged_on") is None           # seeded: never
+          and edge_after.get("verdict") == "stays"
+          and edge_after.get("fitness_usd") == row(0, "edge").get("fitness_usd"),
+          f"noise on Sep 1: judged {told('noise', date(2024, 9, 1)).get('judged_on')}; hire-1 on "
+          f"joining: judged {told('hire-1', min(firm.pods['hire-1']['told'])).get('judged_on')}; "
+          f"edge on Oct 1: {edge_after.get('verdict')}, fitness ${edge_after.get('fitness_usd'):,.0f}")
 
     # G7: the live-pod limit counts no empty pod
     check("G7: the live-pod limit (3) holds at every hire, and an empty pod holds no place "

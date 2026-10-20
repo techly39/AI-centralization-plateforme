@@ -350,15 +350,51 @@ def library(session: Session) -> list[dict[str, Any]]:
     return list(out.values())
 
 
-def announcement(session: Session) -> dict[str, Any] | None:
-    """The generation law in plain words, for every PM's capital view (``None`` while it is off)."""
+def _judged_on(joined: date, today: date, grace_days: int) -> date:
+    """The first month's turn after ``today`` at which a PM who joined on ``joined`` has worked
+    ``grace_days``: when an unseeded pod's PM is let go."""
+    turn = (_first_of_month(today) + timedelta(days=32)).replace(day=1)
+    while (turn - joined).days < grace_days:
+        turn = (turn + timedelta(days=32)).replace(day=1)
+    return turn
+
+
+def _your_pod(session: Session, pod_id: int, law: GenerationConfig,
+              today: date) -> dict[str, Any] | None:
+    """What the generation law says of one pod, for its own PM: whether it holds a seed, the
+    month's end that judges it if it does not, and its row in the last generation."""
+    pod = session.get(Pod, pod_id)
+    if pod is None:
+        return None
+    registered = _registered_on(session)
+    joined = [registered[a.id] for a in session.scalars(select(Agent).where(
+        Agent.pod_id == pod_id, Agent.status == AgentStatus.active)) if a.id in registered]
+    seeded = pod_id in _seeded_pods(session)
+    last = session.scalar(select(Event).where(Event.type == EVENT_GENERATION_ENDED)
+                          .order_by(Event.id.desc()).limit(1))
+    row = None if last is None else next(
+        (p for p in last.payload_json["pods"] if p["pod_id"] == pod_id), None)
+    return {"seeded": seeded,
+            "judged_on": (None if seeded or not joined or pod.status == "closed"
+                          else _judged_on(min(joined), today, law.grace_days).isoformat()),
+            "last_generation": None if row is None else {
+                "generation": last.payload_json["generation"], "month": last.payload_json["month"],
+                **{k: row[k] for k in ("pnl_usd", "thinking_usd", "fitness_usd", "verdict",
+                                       "why")}}}
+
+
+def announcement(session: Session, *, pod_id: int | None = None) -> dict[str, Any] | None:
+    """The generation law in plain words, for every PM's capital view (``None`` while it is off);
+    with ``pod_id``, what it says of that pod (:func:`_your_pod`)."""
     law = generation_law(session)
     if not law.on:
         return None
     window = _window(session)
     now = ledger_now(session).date()
     nxt = (_first_of_month(now) + timedelta(days=32)).replace(day=1)
+    mine = None if pod_id is None else _your_pod(session, pod_id, law, now)
     return {
+        **({"your_pod": mine} if mine is not None else {}),
         "law": (f"Every month is a generation. At each month's end the firm measures every pod's "
                 f"fitness: its P&L that month minus its thinking cost that month. A PM whose pod "
                 f"has not earned a seed by then, after at least {law.grace_days} days in it, is "
