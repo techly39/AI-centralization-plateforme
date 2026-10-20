@@ -65,3 +65,12 @@ live-pod limit; the hire check lives in the router, not the permissions table.
   raised, noise never seeded, sink and crash closed and replaced by hires that earn seeds, a
   costly mind's rank turned by its thinking cost, money kept, report printed); B0 passes
   (hosted, IDENTICAL). Fails only on B: the real quarter is not recorded yet.
+- cycle 54: before spending, the demo checks that each PM sees every consequence of its acts
+  through its own tools the next morning (judged, seeded, raised, cut, halved, reduce-only,
+  closed, hired); one gap found and closed: a closed pod's PM is now told "closed" on every
+  pitch. The hosted world's pods and sectors got neutral names (the old ones told the minds
+  each sector's fate). The real run's checks judge the laws, not the fates (a seed only for an
+  eligible pitch, the ladder at its thresholds, one vacancy a close, the live-pod limit, no
+  trading after a close, no key past its limit), and are shown to catch three forged records;
+  the quarter report now prints from a recording alone. Real quarter recorded (see Progress).
+  Found: a real run posts thinking cost only after its last step, so its re-weighings see none.

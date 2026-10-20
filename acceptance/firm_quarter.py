@@ -9,7 +9,7 @@ Costs $0 and needs no network.
        noise  N  pure noise, no edge on any day         → never eligible, never seeded
        sink   S  bleeds 0.4 % a day from the first day  → closed by the ladder → a hire
        crash  C  quiet, then three days of −5 % on day 40 → closed at once  → a hire
-     Two sectors no one holds (F, G: an edge each) are where the hires look. The hiring law allows
+     Two sectors no one holds (T, W: an edge each) are where the hires look. The hiring law allows
      4 live pods. Every morning: the onboarding (a stand-in for the Runtime's) fills each open
      vacancy; each PM reads its mandate and sends the orders; the meter charges each PM's thinking
      (a scripted price per morning: the hire on G is an expensive mind). Every five days the
@@ -19,9 +19,13 @@ Costs $0 and needs no network.
   B  the same quarter as a hosted world (the recipe the real run is made from: the market, four
      pods, and the world's own laws: ``tell_pms`` on, at most 4 live pods), lived by the Runtime:
      ``fund-runtime backtest --world --hire``, three days a step.
-       B0 a scripted rehearsal, recorded now: the same deaths and hires, ``replay --verify``
-          IDENTICAL, $0
-       B  (next session) four real PMs and their hires, recorded; IDENTICAL from the file, $0
+       B0 a scripted rehearsal, recorded now: the same deaths and hires, the laws kept (and a
+          forged record refused), the report from the file alone, ``replay --verify`` IDENTICAL, $0
+       B  four real PMs (Haiku 5.5) and their hires, recorded (``evidence/firm-quarter/``): they
+          decide what they pitch and trade, so the checks judge the laws, not the fates; the
+          report from the recording; IDENTICAL from the file, $0
+     In the hosted world the pods are pod-1..pod-4 and the sectors K, M, P, R (T, W unheld):
+     the minds read those names, so they hint at no fate.
 
     uv run python acceptance/firm_quarter.py        # exit 0 = the idea works
 """
@@ -78,12 +82,15 @@ NOISE, PLANTED = 0.010, 0.004
 MOMENTUM = {"language": "strategy-v1", "signal": "momentum", "lookback": 20,
             "rebalance_every": 5, "side": "long_only", "gross": 1.0}
 #: family: (width, fate, rate)
-FAMILIES = {"E": (20, "edge", 0.0), "N": (20, "noise", 0.0), "S": (10, "sink", 0.004),
-            "C": (10, "crash", 40), "F": (20, "edge", 0.0), "G": (20, "edge", 0.0)}
+#: (the letters hint at nothing: the real minds read the names, never the fates)
+FAMILIES = {"K": (20, "edge", 0.0), "M": (20, "noise", 0.0), "P": (10, "sink", 0.004),
+            "R": (10, "crash", 40), "T": (20, "edge", 0.0), "W": (20, "edge", 0.0)}
 #: the founding pods: pod → its sector
-FOUNDING = {"edge": "E", "noise": "N", "sink": "S", "crash": "C"}
+FOUNDING = {"edge": "K", "noise": "M", "sink": "P", "crash": "R"}
+#: the founding pods' names in the hosted world, where real minds read them
+HOSTED = {"edge": "pod-1", "noise": "pod-2", "sink": "pod-3", "crash": "pod-4"}
 #: vacancy number → the sector its new PM pitches on
-HIRES = {1: "F", 2: "G"}
+HIRES = {1: "T", 2: "W"}
 LIMIT = 4
 #: what each PM's thinking costs a morning, by pod (the meter charges it; USD)
 #: (the second hire is an expensive mind, $400 a morning, a stand-in for a whole team: a real
@@ -183,7 +190,7 @@ class Firm:
             # The new PM's first morning: its post-mortem, the law it lives under, then a pitch.
             read = self.client.get(f"/vacancies/{v['id']}", headers=h(agent["api_key"]))
             capital = self.client.get("/capital", headers=h(agent["api_key"]))
-            verdict = self.pitch(name, HIRES.get(v["vacancy_no"], "N"))
+            verdict = self.pitch(name, HIRES.get(v["vacancy_no"], FOUNDING["noise"]))
             self.hired[v["vacancy_no"]] = {"day": day, "pod": name, "read": read.json(),
                                            "capital": capital.json(), "pitch": verdict}
 
@@ -191,7 +198,7 @@ class Firm:
         for day in range(QUARTER):
             self.morning(day)
             if day == SECOND_PITCH_DAY:
-                self.seen["second"] = self.pitch("edge", "E", top_n=4)
+                self.seen["second"] = self.pitch("edge", FOUNDING["edge"], top_n=4)
                 self.seen["edge_pitches"] = self.client.get(
                     "/pitches", headers=h(self.pods["edge"]["key"])).json()
                 self.seen["edge_capital"] = self.client.get(
@@ -479,35 +486,61 @@ def _jsonish(doc):
 KEY = hashlib.sha256(b"fund-firm-quarter/1").hexdigest()
 DAYS_PER_STEP = 3
 STEPS = QUARTER // DAYS_PER_STEP
+#: What every PM is told, the founders and the hires alike: the firm, its laws, its tools.
+#: (Nothing about any sector's fate: the minds find out, or do not.)
+FIRM = (
+    "You work in a hedge fund that trades a simulated market with fake money. Several pods, each "
+    "run by its own PM, compete for the same capital. A pod gets capital only after its PM pitches "
+    "a strategy and it passes the fund's validation gates; an eligible pitch earns a small seed "
+    "and trades forward. Every five days the centre moves capital by each pod's forward results, "
+    "net of what its PM's thinking costs; the risk ladder halves, freezes and then closes a pod "
+    "that falls from its high (get_capital shows the law and your pod's stage). Research with "
+    "run_research_backtest on past data (the most recent days are held out, and your pitch is "
+    "judged on them; every backtest is counted). Pitch with submit_pitch when you believe in a "
+    "rule. Once your pod is seeded, each day read your mandate (get_mandate) and place its orders "
+    "(place_order): that is how your rule trades. You remember nothing between days: read your "
+    "research, pitches and capital first. Be brief: every word you think is paid from your pod's "
+    "P&L. When you are done for the day, stop.")
+FOUNDER = "You are {name}, the portfolio manager of {pod}. Your sector is input.sectors[\"{name}\"]. "
+HIRE = ("You are the newly hired portfolio manager of a new pod. The pod before you was closed by "
+        "the risk ladder: its post-mortem (its rule, its forward days, the drawdown that closed "
+        "it) is in your input. The names no pod holds are input.unheld; you may "
+        "pitch on any names. ")
 WORLD = {"start": f"{START.isoformat()}T14:30:00Z", "admin": "quarter-mgmt",
-         "pods": [{"name": name, "allocation": 0} for name in FOUNDING],
+         "pods": [{"name": HOSTED[name], "allocation": 0} for name in FOUNDING],
          "market": MARKET.model_dump(mode="json"),
-         "laws": {"capital": {"tell_pms": True}, "hiring": {"max_live_pods": LIMIT}}}
+         "laws": {"capital": {"tell_pms": True},
+                  "hiring": {"max_live_pods": LIMIT, "charter": HIRE + FIRM,
+                             "budget_usd": 0.20}}}
 PM_TOOLS = ["whoami", "get_clock", "run_research_backtest", "list_research_backtests",
             "submit_pitch", "list_pitches", "get_capital", "get_mandate", "place_order",
             "get_portfolio"]
+#: The real run: every founder and every hire a Haiku 5.5 on its own capped key (a hire's model
+#: and key come from the hiring law above: Haiku 5.5, $0.20). Six keys at most: $1.40, inside the
+#: month's cap and the account's credit ($1.42 left on 2026-10-20).
+MODEL, FOUNDER_BUDGET_USD = "anthropic/claude-haiku-5.5", 0.25
+MAX_TOOL_CALLS = 24
 
 
 def write_world(directory: Path, provider: str) -> None:
     """The hosted run's files: the world, the input, the four PMs, the hiring template."""
     (directory / "specs").mkdir(parents=True, exist_ok=True)
     (directory / "world.json").write_text(json.dumps(WORLD))
-    rules = {}
-    if provider == "scripted":   # the scripted PMs pitch their sector; the hires, F and G
-        rules = {f"{name}-pm": rule(fam) for name, fam in FOUNDING.items()}
-        rules |= {f"hire-{n}-pm": rule(fam) for n, fam in HIRES.items()}
-    (directory / "input.json").write_text(json.dumps({
-        "sectors": {f"{name}-pm": [f"{FOUNDING[name]}{k:02d}"
-                                   for k in range(FAMILIES[FOUNDING[name]][0])]
-                    for name in FOUNDING},
-        "unheld": [f"{fam}{k:02d}" for fam in HIRES.values() for k in range(FAMILIES[fam][0])],
-        "pitch_rules": rules}))
-    for pod, name in enumerate(FOUNDING, start=1):
-        spec = {"id": f"{name}-pm", "name": f"{name}-pm", "role": "pm", "pod": pod,
-                "charter": "Pitch once, then trade the mandate."}
+    found = {f"{HOSTED[name]}-pm": FOUNDING[name] for name in FOUNDING}
+    doc = {"sectors": {pm: [f"{fam}{k:02d}" for k in range(FAMILIES[fam][0])]
+                       for pm, fam in found.items()},
+           "unheld": [f"{fam}{k:02d}" for fam in HIRES.values() for k in range(FAMILIES[fam][0])]}
+    if provider == "scripted":   # the scripted PMs pitch their sector; the hires, T and W
+        doc["pitch_rules"] = {pm: rule(fam) for pm, fam in found.items()}
+        doc["pitch_rules"] |= {f"hire-{n}-pm": rule(fam) for n, fam in HIRES.items()}
+    (directory / "input.json").write_text(json.dumps(doc))
+    for pod, pm in enumerate(found, start=1):
+        spec = {"id": pm, "name": pm, "role": "pm", "pod": pod,
+                "charter": FOUNDER.format(name=pm, pod=f"pod-{pod}") + FIRM}
         spec |= ({"provider": "scripted", "script": "pitch-pm"} if provider == "scripted"
-                 else {"provider": provider, "tools": PM_TOOLS})
-        (directory / "specs" / f"{name}-pm.yaml").write_text(json.dumps(spec))
+                 else {"provider": provider, "model": MODEL, "budget_usd": FOUNDER_BUDGET_USD,
+                       "tools": PM_TOOLS})
+        (directory / "specs" / f"{pm}.yaml").write_text(json.dumps(spec))
     hire = ({"provider": "scripted", "script": "pitch-pm"} if provider == "scripted"
             else {"provider": provider, "tools": PM_TOOLS + ["get_vacancy"]})
     (directory / "hire.yaml").write_text(json.dumps(hire))
@@ -573,6 +606,148 @@ def quarter_chain(doc: dict, label: str) -> None:
           f"{len(raised)} raise(s) to {sorted({pods.get(p['pod_id']) for p in raised})}")
 
 
+def lawful(doc: dict, label: str, metered: bool = True) -> None:
+    """Whatever the minds did, physics kept its laws (written before the real run was seen): each
+    seed went once to an eligible pitch of its own pod; each step of the ladder came at its
+    threshold; each close opened one vacancy; each hire filled one, inside the live-pod limit; a
+    closed pod's PM placed no order; no key spent past its limit."""
+    rows = [(r[0], r[2], r[3], json.loads(r[4])) for r in (doc.get("ledger") or {}).get("rows")
+            or []]
+    of = lambda t: [(i, a, p) for i, a, t2, p in rows if t2 == t]  # noqa: E731
+    judged = {p["pitch_id"]: p for _, _, p in of("pitch_judged")}
+    seeds = of("capital_seeded")
+    bad = [p["pitch_id"] for _, _, p in seeds
+           if not judged.get(p["pitch_id"], {}).get("eligible")
+           or judged[p["pitch_id"]].get("pod_id") != p["pod_id"]]
+    pods_seeded = [p["pod_id"] for _, _, p in seeds]
+    check(f"{label}: every seed went to an eligible pitch of its own pod, one seed a pod",
+          not bad and len(pods_seeded) == len(set(pods_seeded)),
+          f"{len(seeds)} seed(s), {len(judged)} pitch(es) judged, "
+          f"{sum(1 for p in judged.values() if p.get('eligible'))} eligible" + (
+              f"; BAD {bad}" if bad else ""))
+    at = {"halved": "halve_at", "reduce_only": "reduce_only_at", "closed": "close_at"}
+    steps = of("pod_stage_changed")
+    early = [(p["pod_id"], p["to"]) for _, _, p in steps
+             if p["worst_drawdown"] < p["ladder"][at[p["to"]]] - 1e-12]
+    check(f"{label}: every step of the risk ladder came at its threshold, never before",
+          not early, ", ".join(f"pod {p['pod_id']} {p['to']} at {p['worst_drawdown']:.1%}"
+                               for _, _, p in steps) or "no pod fell that far")
+    closes = [(i, p["pod_id"]) for i, _, p in steps if p["to"] == "closed"]
+    opened = of("vacancy_opened")
+    filled = of("vacancy_filled")
+    live, ok = len((doc.get("world") or {}).get("recipe", {}).get("pods") or []), True
+    for i, _, f in filled:
+        live_now = live + sum(1 for j, _, _ in filled if j <= i) - sum(1 for j, _ in closes
+                                                                        if j < i)
+        ok = ok and live_now <= LIMIT
+    run = (doc.get("outcome") or {}).get("run") or {}
+    hired = sorted(h["vacancy_id"] for h in run.get("hires") or [] if h["outcome"] == "hired")
+    check(f"{label}: each close opened one vacancy, each hire filled one, never past {LIMIT} live "
+          "pods", [p["pod_id"] for _, _, p in opened] == [pod for _, pod in closes]
+          and sorted(f["vacancy_id"] for _, _, f in filled) == hired
+          and set(hired) <= {i for i, _, _ in opened} and ok,
+          f"{len(closes)} close(s), {len(opened)} vacanc(ies), {len(filled)} hire(s)")
+    pms = {p["agent_id"]: p["pod_id"] for _, _, p in of("agent_registered") if p["role"] == "pm"}
+    after = [(i, p["pod_id"]) for i, a, p in of("order_placed")
+             for j, pod in closes if pod == p["pod_id"] and i > j and pms.get(a) == pod]
+    check(f"{label}: a closed pod's PM placed no order after the close", not after,
+          f"{len(of('order_placed'))} orders in all")
+    if not metered:
+        return
+    metering = (doc.get("outcome") or {}).get("metering") or {}
+    keys = metering.get("keys") or []
+    check(f"{label}: every mind's thinking was charged by the system, none past its key's limit",
+          bool(keys) and all(k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          and len(of("cost_metered")) == len(keys),
+          "; ".join(f"{k['spec_id']} ${k['spent_usd_micros'] / 1e6:.3f} of "
+                    f"${k['limit_usd_micros'] / 1e6:.2f}" for k in keys)
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
+
+
+def forged_runs(doc: dict) -> None:
+    """The law checks can say no: the rehearsal's record, forged three ways, must fail each."""
+    rows = doc["ledger"]["rows"]
+    find = lambda t, pred=lambda p: True: next(  # noqa: E731
+        k for k, r in enumerate(rows) if r[3] == t and pred(json.loads(r[4])))
+
+    def forge(k: int, change) -> dict:
+        p = json.loads(rows[k][4])
+        change(p)
+        return {**doc, "ledger": {**doc["ledger"], "rows": [
+            r if j != k else [*r[:4], json.dumps(p)] for j, r in enumerate(rows)]}}
+
+    noise_pitch = find("pitch_judged", lambda p: not p["eligible"])
+    seed = find("capital_seeded")
+    close = find("pod_stage_changed", lambda p: p["to"] == "closed")
+    cases = {
+        "a seed for a pitch the gates refused": forge(seed, lambda p: p.update(
+            pitch_id=json.loads(rows[noise_pitch][4])["pitch_id"])),
+        "a close before the ladder's threshold": forge(close, lambda p: p.update(
+            worst_drawdown=0.05)),
+        "a closed pod's PM trading after the close": {**doc, "ledger": {**doc["ledger"], "rows": [
+            *rows, [rows[-1][0] + 1, rows[-1][1], next(
+                json.loads(r[4])["agent_id"] for r in rows if r[3] == "agent_registered"
+                and json.loads(r[4])["pod_id"] == json.loads(rows[close][4])["pod_id"]),
+                "order_placed", json.dumps({"pod_id": json.loads(rows[close][4])["pod_id"]})]]}}}
+    caught = {}
+    for what, forged in cases.items():
+        before = len(FAILED)
+        with contextlib.redirect_stdout(io.StringIO()):
+            lawful(forged, "forged", metered=False)
+        caught[what] = len(FAILED) > before
+        del FAILED[before:]
+    check("B0: the law checks say no to a forged record (each of three forgeries is caught)",
+          all(caught.values()), "; ".join(f"{w}: {'caught' if c else 'MISSED'}"
+                                         for w, c in caught.items()))
+
+
+def report_from(doc: dict) -> dict:
+    """The quarter report from a recording alone: its ledger rows into an empty database (pods and
+    agents named from its recipe and its ledger), the books rebuilt, the report read."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.clock import BacktestClock, get_clock, set_clock
+    from app.db.base import Base
+    from app.db.models import Agent
+
+    rows = (doc.get("ledger") or {}).get("rows") or []
+    stamp = lambda ts: datetime.fromisoformat(ts).replace(tzinfo=UTC)  # noqa: E731
+    first = stamp(rows[0][1])
+    saved = get_clock()
+    with tempfile.TemporaryDirectory(prefix="fund-firm-quarter-") as t:
+        engine = create_engine(f"sqlite:///{Path(t) / 'report.db'}")
+        Base.metadata.create_all(engine)
+        try:
+            set_clock(BacktestClock(first))   # the ledger's own latest stamp is its now
+            with Session(engine) as s:
+                names = {k: p["name"] for k, p in enumerate(doc["world"]["recipe"]["pods"], 1)}
+                for r in rows:
+                    p = json.loads(r[4])
+                    if r[3] == "vacancy_filled":
+                        names[p["pod_id"]] = p["pod_name"]
+                for pod_id, name in sorted(names.items()):
+                    s.add(Pod(id=pod_id, name=name, status="active", current_allocation=0.0,
+                              created_at=first))
+                for r in rows:
+                    p = json.loads(r[4])
+                    if r[3] == "agent_registered":
+                        s.add(Agent(id=p["agent_id"], name=p["name"], role=AgentRole(p["role"]),
+                                    pod_id=p["pod_id"], api_key_hash=f"none-{p['agent_id']}",
+                                    created_at=stamp(r[1])))
+                s.flush()
+                for r in rows:
+                    s.add(Event(id=r[0], ts=stamp(r[1]), actor_agent_id=r[2], type=r[3],
+                                payload_json=json.loads(r[4])))
+                s.flush()
+                rebuild_state(s)
+                s.flush()
+                return _jsonish(quarter_report(s, provider=BarsProvider(bars(MARKET))))
+        finally:
+            set_clock(saved)
+            engine.dispose()
+
+
 def rehearsal() -> None:
     """B0, $0: the hosted quarter with scripted minds, recorded and verified now."""
     with tempfile.TemporaryDirectory(prefix="fund-firm-quarter-") as t:
@@ -580,7 +755,8 @@ def rehearsal() -> None:
         write_world(tmp, "scripted")
         r = fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
                           "hire.yaml", "--input", "input.json", "--steps", str(STEPS),
-                          "--days-per-step", str(DAYS_PER_STEP), "--max-tool-calls", "40",
+                          "--days-per-step", str(DAYS_PER_STEP),
+                          "--max-tool-calls", str(MAX_TOOL_CALLS),
                           "--cassette", "rehearsal.cassette.json"], tmp)
         tape = tmp / "rehearsal.cassette.json"
         if not check("B0: a scripted rehearsal of the hosted quarter completes and is recorded",
@@ -589,7 +765,18 @@ def rehearsal() -> None:
                      f"{tape.stat().st_size / 1e6:.1f} MB" if tape.is_file() else ""):
             return
         text = tape.read_text(encoding="ascii")
-    quarter_chain(json.loads(text), "B0")
+    doc = json.loads(text)
+    quarter_chain(doc, "B0")
+    lawful(doc, "B0", metered=False)
+    forged_runs(doc)
+    rep = report_from(doc)
+    pods = {p["name"]: p for p in rep["pods"]}
+    check("B0: the quarter report prints from the recording alone, and money is kept",
+          {"hire-1", "hire-2"} <= set(pods) and pods["pod-3"]["closed_on"] is not None
+          and abs(rep["firm"][-1] - (rep["firm_capital_usd"]
+                                     + sum(p["pnl_gross_usd"] for p in rep["pods"]))) < 1.0,
+          f"{len(rep['weeks'])} weeks, {len(rep['happened'])} happenings, firm "
+          f"${rep['firm'][-1]:,.0f}")
     verify(text, "B0")
 
 
@@ -603,7 +790,20 @@ def recorded() -> None:
                  str(EVIDENCE.relative_to(REPO))):
         return
     text = EVIDENCE.read_text(encoding="ascii")
-    quarter_chain(json.loads(text), "B")
+    doc = json.loads(text)
+    # Real minds decide what they pitch and trade: the checks judge the laws, not the fates.
+    lawful(doc, "B")
+    law = next((json.loads(r[4])["law"] for r in doc["ledger"]["rows"]
+                if r[3] == "capital_opened"), {})
+    check(f"B: the world lived by its recipe's laws: PMs are told, at most {LIMIT} live pods",
+          law.get("tell_pms") is True and doc["world"]["recipe"]["laws"]["hiring"][
+              "max_live_pods"] == LIMIT, f"tell_pms {law.get('tell_pms')}")
+    rep = report_from(doc)
+    made = sum(p["pnl_gross_usd"] for p in rep["pods"])
+    check("B: the quarter report prints from the recording alone, and money is kept",
+          bool(rep["weeks"]) and abs(rep["firm"][-1] - (rep["firm_capital_usd"] + made)) < 1.0,
+          f"{len(rep['weeks'])} weeks, firm ${rep['firm'][-1]:,.0f}")
+    print("\nThe recorded quarter (real PMs):\n" + render(rep))
     verify(text, "B")
 
 
