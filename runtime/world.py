@@ -189,6 +189,11 @@ def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
         env["FUND_MARKETDATA__SYNTHETIC_SYMBOLS"] = json.dumps(extra_symbols, sort_keys=True)
     if market is not None:
         env["FUND_MARKETDATA__MADE_UP"] = json.dumps(market, sort_keys=True)
+    if laws is None:
+        # A recipe that names no laws lives by the laws as they were when such recipes were all
+        # there was: a closed pod's later pitches still count in the correlation gate, so every
+        # recording made before cycle 54 replays as recorded (auditor, the firm lives a quarter).
+        env["FUND_GATES__CLOSED_POD_PITCHES_BIND"] = "true"
     for section, law in (laws or {}).items():
         for name, value in law.items():
             # A text as it is; a number, a flag or a list as JSON (how the settings read them).

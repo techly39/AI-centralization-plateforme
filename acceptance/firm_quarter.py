@@ -516,9 +516,11 @@ PM_TOOLS = ["whoami", "get_clock", "run_research_backtest", "list_research_backt
             "submit_pitch", "list_pitches", "get_capital", "get_mandate", "place_order",
             "get_portfolio"]
 #: The real run: every founder and every hire a Haiku 5.5 on its own capped key (a hire's model
-#: and key come from the hiring law above: Haiku 5.5, $0.20). Six keys at most: $1.40, inside the
-#: month's cap and the account's credit ($1.42 left on 2026-10-20).
-MODEL, FOUNDER_BUDGET_USD = "anthropic/claude-haiku-5.5", 0.25
+#: and key come from the hiring law above: Haiku 5.5, $0.20). Every key fits the month's cap; the
+#: account's credit is the tighter bound ($0.90 left after trial 1 on 2026-10-20, where the four
+#: founders spent $0.08-0.12 each in 26 steps and the hire $0.14 in 16): a run that ran the credit
+#: dry would see its turns refused and record them so, never pass a cap.
+MODEL, FOUNDER_BUDGET_USD = "anthropic/claude-haiku-5.5", 0.20
 MAX_TOOL_CALLS = 24
 
 
@@ -657,7 +659,8 @@ def lawful(doc: dict, label: str, metered: bool = True) -> None:
     metering = (doc.get("outcome") or {}).get("metering") or {}
     keys = metering.get("keys") or []
     check(f"{label}: every mind's thinking was charged by the system, none past its key's limit",
-          bool(keys) and all(type(k["spent_usd_micros"]) is int
+          {f"{HOSTED[n]}-pm" for n in FOUNDING} <= {k["spec_id"] for k in keys}
+          and all(type(k["spent_usd_micros"]) is int
                              and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
           and len(of("cost_metered")) == len(keys),
           "; ".join(f"{k['spec_id']} " + (f"${k['spent_usd_micros'] / 1e6:.3f}"

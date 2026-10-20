@@ -111,6 +111,12 @@ class GatesConfig(BaseModel):
     min_capacity_usd: float = Field(default=1_000_000.0, gt=0.0)
     # Correlation of daily returns with any other pod's latest pitch: at most this.
     max_correlation: float = Field(default=0.5, gt=0.0, le=1.0)
+    # Does a closed pod's latest pitch count among the "other pods" above? Not since cycle 54
+    # (red-team: a dead pod's PM could block live pods' rules at no cost); its traded rule still
+    # does. True is the rule as it was, kept only for hosted worlds whose recipe names no laws
+    # (every recording made before it), so they replay as recorded (auditor). Never in the law a
+    # verdict carries: those recordings were shown that law without it.
+    closed_pod_pitches_bind: bool = Field(default=False, exclude=True)
 
 
 class CapitalConfig(BaseModel):

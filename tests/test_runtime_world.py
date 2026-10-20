@@ -87,8 +87,14 @@ def test_child_env_drops_every_fund_variable_but_the_three(monkeypatch: pytest.M
         monkeypatch.setenv(name, "inherited")
     monkeypatch.setenv("PATH_KEPT", "yes")
     env = child_env(Path("/w/world.db"), "k" * 64)
+    # (+ the gate rule as it was, for a recipe that names no laws: cycle 54, auditor)
     assert {k for k in env if k.startswith("FUND_")} == {
-        "FUND_DATABASE_URL", "FUND_MARKETDATA__PROVIDER", world.WORLD_KEY_ENV}
+        "FUND_DATABASE_URL", "FUND_MARKETDATA__PROVIDER", world.WORLD_KEY_ENV,
+        "FUND_GATES__CLOSED_POD_PITCHES_BIND"}
+    assert env["FUND_GATES__CLOSED_POD_PITCHES_BIND"] == "true"
+    # a recipe with laws lives by today's gate rule
+    assert "FUND_GATES__CLOSED_POD_PITCHES_BIND" not in child_env(
+        Path("/w/world.db"), "k" * 64, laws={"capital": {"tell_pms": True}})
     assert env["FUND_DATABASE_URL"] == "sqlite:////w/world.db"
     assert env["FUND_MARKETDATA__PROVIDER"] == "synthetic" and env[world.WORLD_KEY_ENV] == "k" * 64
     assert env["PATH_KEPT"] == "yes"  # only FUND_* is scrubbed
@@ -159,8 +165,9 @@ def test_genesis_argv_is_equals_form_and_listed_subcommands_only(stub: Path, tmp
     assert all(c["argv"][0] in SUBCOMMANDS for c in calls)
     assert all(a.startswith("--") and "=" in a for c in calls for a in c["argv"][1:])
     assert {c["cwd"] for c in calls} == {str(tmp)}  # the world's own directory
-    assert {tuple(c["fund"]) for c in calls} == {(
-        "FUND_DATABASE_URL", "FUND_MARKETDATA__PROVIDER", "FUND_MARKETDATA__SYNTHETIC_KEY")}
+    assert {tuple(c["fund"]) for c in calls} == {(   # (+ the old gate rule: a recipe with no laws)
+        "FUND_DATABASE_URL", "FUND_GATES__CLOSED_POD_PITCHES_BIND", "FUND_MARKETDATA__PROVIDER",
+        "FUND_MARKETDATA__SYNTHETIC_KEY")}
     assert not tmp.exists() and os.listdir(tmp_path / "tmp") == []  # removed on the way out
 
 

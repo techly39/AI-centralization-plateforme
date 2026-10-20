@@ -202,7 +202,8 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
     # about to be) its mandate to earn a second seed (red-team and auditor, capital machine).
     # A closed pod's pitches are not: it can never be seeded again, so its later pitches would only
     # block other pods' rules at no cost to it (red-team, the firm lives a quarter).
-    closed = set(session.scalars(select(Pod.id).where(Pod.status == "closed")))
+    closed = (set() if law.closed_pod_pitches_bind
+              else set(session.scalars(select(Pod.id).where(Pod.status == "closed"))))
     compared = {f"pod {pod}": pitch["rule"]
                 for pod, pitch in sorted(_latest_pitches(session, besides=pod_id).items())
                 if pod not in closed}
