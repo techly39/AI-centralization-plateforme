@@ -477,6 +477,20 @@ could fill past it); a replay re-reads the agent cap when it rebuilds a world wi
 lowered below 4 would make the quarter's recording refuse to verify (fails closed); a seeded pod's
 "already runs" answer on an eligible pitch made before the seed carries that pitch's date; a
 closed pod's PM stays an active agent and keeps waking (and spending) until the run ends.
+(Fixed by "a generation turns over", cycles 57-58: thinking charged at every step in real runs;
+closed and let-go PMs stop waking; empty pods hold no live-pod place; the agent cap and the
+"only the operator's registrar hires" check live in physics.)
+From a generation turns over (cycle 58, red-team; the high hole, two mediums and one low are
+fixed: the agent cap now binds every registration, a pod is judged by its longest-serving PM, a
+let-go PM's pending orders are cancelled and a pod with money is not closed by the let-go):
+one advance across two month ends makes one generation spanning both; a hired pod closed by a
+failed hire is missing from its month's table, with its thinking; an empty pod restaffed by a
+registration passes the live-pod limit; a recording's charges are checked for amount, not for the
+agent they name (needs a forged recording). Strict-xfail tests in
+`tests/test_redteam_generation_turnover.py`. From the real run (cycle 58): a key's limit is soft by
+one turn: the provider lets the request that crosses it finish (hire-1 spent $0.200068 of $0.20),
+and the monthly cap counts a live key at its limit, so many keys at once could pass the Human's cap
+by one small turn each. Being fixed inside the idea before it merges.
 
 ### Paid to report holes
 From: Builder

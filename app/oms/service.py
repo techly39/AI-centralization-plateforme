@@ -588,6 +588,21 @@ def cancel_order(session: Session, *, actor: Agent, order_id: int) -> Order:
             raise
 
 
+def cancel_pending(session: Session, *, pod_id: int, actor: Agent, reason: str) -> list[Order]:
+    """Physics cancels every pending order of ``pod_id`` (its PMs were let go: an order they left
+    must not fill after them). No permission check, no commit: the caller is physics and owns the
+    transaction (and holds OMS_LOCK)."""
+    orders = list(session.scalars(select(Order).where(
+        Order.pod_id == pod_id, Order.status == OrderStatus.pending).order_by(Order.id)))
+    for order in orders:
+        order.status = OrderStatus.cancelled
+        order.status_reason = reason
+        session.flush()
+        append_event(session, type=EVENT_ORDER_CANCELLED, actor_agent_id=actor.id, payload={
+            "order_id": order.id, "pod_id": order.pod_id, "ticker": order.ticker})
+    return orders
+
+
 # --- Queries ----------------------------------------------------------------
 
 def list_orders(

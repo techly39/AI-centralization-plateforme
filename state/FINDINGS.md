@@ -83,3 +83,28 @@ provider (fail closed); the account reads now retry. Thinking cost reaches the l
 the run, so the real re-weighings ignored it (at these prices it changes no rank).
 Follow-up: per-step metering for real runs; firing a PM who never earns a seed (pod-2 thought for
 a quarter and was never funded); a closed pod's PM still wakes and spends until the run ends.
+
+## F-0006 — Real PMs lived three generations: the month's end let go the PM who never earned a seed, the ladder's close let go the crash's PM, both places were hired and the hires earned seeds   [tags: firm]   (cycle 58)
+Setup: one made-up market, three sectors whose fates no mind was told (pod-1 an edge, pod-2
+noise, pod-3 a crash), two unheld sectors with an edge; three Haiku 5.5 PMs and every hire on its
+own $0.20 key; 31 steps of 3 days (Sep 1 to Dec 3, 2024); the generation law on (judged after 20
+days), at most 3 live pods, thinking charged at every step's end; every PM told the law and
+given the library.
+Result: pod-3 was seeded on day 3 and closed by the ladder on Sep 19; its PM went at the close,
+hire-1 took the place that morning and was seeded on Sep 28. pod-2 ran 17 backtests and 8 pitches
+(mean reversion, low volatility) on noise, none eligible, and was let go at September's end; hire-2
+took the place on Oct 1 and was seeded on Oct 4. pod-1 stayed all three months. Every mind read
+the library (59 reads). No pod was let go in October or November: all three living pods held
+seeds. Thinking $0.575 for five minds; November's P&L $558k across the three pods.
+Every check of the law, written before the run was seen, passed (verdicts, fitness = P&L − the
+meter's thinking, let-go PMs never act or wake again, hires inside the limit); replay IDENTICAL.
+One did not: hire-1's key spent $0.200068 of its $0.20 limit (the provider finished the request
+that crossed the limit, then refused the next two wakes).
+Evidence: `evidence/generation-turnover/generations.cassette.json`; `acceptance/generation_turnover.py` (B).
+Interpretation: turnover did what the quarter could not: the PM who would have thought forever on
+noise was gone after a month, and its place went to a mind that found an edge in four days.
+The fitness numbers are dominated by P&L (thinking is cents against $200k seeds), so at these
+prices "net of thinking" never changes a verdict; it would with costlier minds or smaller seeds.
+Follow-up: make a key's limit hard (size or refuse the turn that would cross it, and count the
+reserve in the monthly cap), then re-record; reproduction (the best pods spawn) and the capital
+reset, the idea's next slices.

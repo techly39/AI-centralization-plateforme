@@ -40,6 +40,7 @@ from app.config import GenerationConfig, get_settings
 from app.db.models import Agent, AgentRole, AgentStatus, Event, Pod
 from app.ledger.events import (
     EVENT_AGENT_REGISTERED,
+    EVENT_ALLOCATION_SET,
     EVENT_CAPITAL_SEEDED,
     EVENT_CAPITAL_SWEEP_FAILED,
     EVENT_GENERATION_ENDED,
@@ -95,6 +96,11 @@ def _registered_on(session: Session) -> dict[int, date]:
 
 def _seeded_pods(session: Session) -> set[int]:
     return {e.payload_json["pod_id"] for e in _events(session, EVENT_CAPITAL_SEEDED)}
+
+
+def _ever_funded(session: Session, pod_id: int) -> bool:
+    return any(e.payload_json.get("pod_id") == pod_id
+               for e in _events(session, EVENT_CAPITAL_SEEDED, EVENT_ALLOCATION_SET))
 
 
 def _cost_by_pod(session: Session, upto_event_id: int | None) -> dict[int, int]:
@@ -173,10 +179,17 @@ def _let_go(session: Session, *, pod_id: int, reason: str, actor: Agent, generat
         Agent.pod_id == pod_id, Agent.status == AgentStatus.active).order_by(Agent.id)))
     if not staff:
         return []
+    from app.oms.service import cancel_pending
+
     lesson = lesson_of(session, pod_id=pod_id, reason=reason, post_mortem=post_mortem)
     why = _why(reason, lesson, law)
-    close = reason == LET_GO_NO_SEED
+    # An unseeded pod is closed only if no money ever came into it (the operator may have funded
+    # it): a pod with money is not this law's to close (red-team: it closed with its cash and
+    # holding inside). It stays open and empty, and holds no live-pod place.
+    close = reason == LET_GO_NO_SEED and not _ever_funded(session, pod_id)
     pod = session.get(Pod, pod_id)
+    # An order the PM left must not fill after it is gone (red-team: a limit buy filled later).
+    cancel_pending(session, pod_id=pod_id, actor=actor, reason=f"its PM was let go ({reason})")
     made = []
     for agent in staff:
         deactivate_agent(session, agent_id=agent.id, actor_agent_id=actor.id)
@@ -300,7 +313,9 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
         elif pod.id in seeded:
             row["verdict"], row["why"] = "stays", "its pod holds a seed"
         else:
-            tenure = min((month - registered.get(a.id, month)).days for a in staff)
+            # The pod is judged by its longest-serving PM (red-team: judged by its newest, a
+            # colleague registered on the last day kept a PM past its grace).
+            tenure = max((month - registered.get(a.id, month)).days for a in staff)
             if tenure >= law.grace_days:
                 row["verdict"], row["why"] = "let_go", "no seed this month"
                 to_let_go.append(pod.id)

@@ -780,7 +780,10 @@ def recorded() -> None:
               f"{k['spec_id']} " + (f"${k['spent_usd_micros'] / 1e6:.3f}"
                                     if type(k["spent_usd_micros"]) is int else "UNREAD")
               + f" of ${k['limit_usd_micros'] / 1e6:.2f}" for k in keys)
-          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}" + "".join(
+              f"; PAST ITS LIMIT: {k['spec_id']} by ${(k['spent_usd_micros'] - k['limit_usd_micros']) / 1e6:.6f}"
+              for k in keys if type(k["spent_usd_micros"]) is int
+              and k["spent_usd_micros"] > k["limit_usd_micros"]))
     report, text_report = report_from(doc)
     check("B: the generation report prints from the recording alone: three generations",
           len(report["generations"]) == 3,

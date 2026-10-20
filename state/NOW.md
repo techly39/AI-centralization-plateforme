@@ -61,3 +61,8 @@ hiring under the cap, metering per step: red-team + auditor before merge.
   library, the limit ignores empty pods, the report prints). B0 passes (hosted, billed stand-in
   minds charged each step, let-go minds retired, IDENTICAL). Left: the hire check and the agent
   cap into physics; the visibility check; the real run (B); red-team, auditor, merge.
+- cycle 57 (cut by the usage limit, its work committed): the agent cap and the hire check moved
+  into physics; each PM sees its own judgement through its own key; a failed month's end retries.
+- cycle 58: the real run's part of the demo: a fuller charter, checks of the month's-end law that
+  judge any recording (four forged records fail them), the report from a recording; the real
+  run recorded (three Haiku PMs and their hires); red-team, auditor.
