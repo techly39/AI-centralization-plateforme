@@ -654,3 +654,10 @@ class PitchOut(BaseModel):
     verdict: dict[str, Any] | None = Field(
         description="The gates' verdict on the held-out window: eligible, each gate's number, "
                     "threshold and pass/fail/null, the attempts counted.")
+    # Absent until there is an answer, so a pitch reads as it did before the answer existed (a
+    # recorded run replays against the same words).
+    capital: dict[str, Any] | None = Field(
+        default=None, exclude_if=lambda v: v is None,
+        description="What the capital machine did with the pitch: absent = nothing yet (it looks "
+                    "at eligible pitches at the next advance); outcome 'seeded' with seed_usd, or "
+                    "'refused' with the reason (e.g. the order system cannot short yet).")

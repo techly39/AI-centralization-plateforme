@@ -31,6 +31,8 @@ from app.capital.service import eligible_unseeded
 from app.config import GatesConfig
 from app.db.models import Agent, Event
 from app.ledger.events import (
+    EVENT_CAPITAL_SEED_REFUSED,
+    EVENT_CAPITAL_SEEDED,
     EVENT_PITCH_JUDGED,
     EVENT_PITCH_SUBMITTED,
     EVENT_RESEARCH_BACKTEST_RUN,
@@ -229,21 +231,43 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
     return pitch_view(submitted, judged)
 
 
-def pitch_view(submitted: Event, judged: dict[str, Any] | None) -> dict[str, Any]:
-    """One pitch as the read side shows it: what was asked, and the verdict."""
+def pitch_view(submitted: Event, judged: dict[str, Any] | None,
+               capital: dict[str, Any] | None = None) -> dict[str, Any]:
+    """One pitch as the read side shows it: what was asked, the verdict, and what the capital
+    machine did with it (``None``: nothing yet)."""
     return {"id": submitted.id, "submitted_at": submitted.ts, **submitted.payload_json,
-            "verdict": judged}
+            "verdict": judged, "capital": capital}
+
+
+def capital_answers(session: Session) -> dict[int, dict[str, Any]]:
+    """What the capital machine did with each pitch it looked at: ``seeded`` (with the seed) or
+    ``refused`` (with the reason), by pitch id. A pitch the machine refused is never seeded, so
+    its PM must hear why (pod replacement: a real PM re-pitched a long-short rule eight times,
+    eligible each time, never told the order system cannot short)."""
+    out: dict[int, dict[str, Any]] = {}
+    for e in session.scalars(select(Event).where(
+            Event.type.in_((EVENT_CAPITAL_SEEDED, EVENT_CAPITAL_SEED_REFUSED))).order_by(Event.id)):
+        p = e.payload_json
+        if e.type == EVENT_CAPITAL_SEEDED:
+            out[p["pitch_id"]] = {"outcome": "seeded", "on": e.ts.date().isoformat(),
+                                  "seed_usd": p["seed_usd"]}
+        else:
+            out[p["pitch_id"]] = {"outcome": "refused", "on": e.ts.date().isoformat(),
+                                  "reason": p["reason"]}
+    return out
 
 
 def list_pitches(session: Session, *, pod_id: int | None) -> list[dict[str, Any]]:
-    """Every pitch (of one pod, or of all), oldest first, each with its verdict."""
+    """Every pitch (of one pod, or of all), oldest first, each with its verdict and what the
+    capital machine did with it."""
     verdicts = {e.payload_json.get("pitch_id"): e.payload_json for e in session.scalars(
         select(Event).where(Event.type == EVENT_PITCH_JUDGED))}
+    capital = capital_answers(session)
     out = []
     for event in session.scalars(select(Event).where(Event.type == EVENT_PITCH_SUBMITTED)
                                  .order_by(Event.id)):
         if pod_id is None or event.payload_json.get("pod_id") == pod_id:
-            out.append(pitch_view(event, verdicts.get(event.id)))
+            out.append(pitch_view(event, verdicts.get(event.id), capital.get(event.id)))
     return out
 
 

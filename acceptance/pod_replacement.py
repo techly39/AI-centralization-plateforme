@@ -421,21 +421,34 @@ def chain(doc: dict, label: str) -> dict:
           bool(wakes) and wakes[0][0] == step
           and (first.get("input", {}).get("post_mortem") or {}).get("pod_name") == "doomed",
           f"{len(wakes)} wakes from step {wakes[0][0] if wakes else None}")
-    research = [p for _, a, p in of("research_backtest_run") if p["pod_id"] == pod]
+    research_ids = [(i, p) for i, a, p in of("research_backtest_run") if p["pod_id"] == pod]
+    research = [p for _, p in research_ids]
     pitches = [(i, p) for i, a, p in of("pitch_submitted") if p["pod_id"] == pod]
-    judged = [p for _, _, p in of("pitch_judged") if p["pod_id"] == pod]
+    judged_ids = [(i, p) for i, _, p in of("pitch_judged") if p["pod_id"] == pod]
+    judged = [p for _, p in judged_ids]
     seeded = [p for _, _, p in of("capital_seeded") if p["pod_id"] == pod]
+    refused = [p for _, _, p in of("capital_seed_refused") if p["pod_id"] == pod]
     fills = [p for _, _, p in of("order_filled") if p["pod_id"] == pod]
-    eligible = bool(judged) and judged[-1]["eligible"]
+    eligible = [j["pitch_id"] for j in judged if j["eligible"]]
+    # The seed follows the verdict: an ineligible pitch is never seeded; the capital machine
+    # answers every eligible pitch it looks at (a seed, or a refusal with its reason, e.g. a
+    # long-short rule the order system cannot trade); once the pod is seeded no other pitch is.
+    answered = {p["pitch_id"] for p in seeded} | {r["pitch_id"] for r in refused}
+    last_day = max((i for i, _, _ in of("clock_advanced")), default=0)
+    looked = [p for p in eligible if p < last_day]   # a morning came after it: it was looked at
     check(f"{label}: the new PM pitched, the gates judged it, and the seed follows the verdict",
-          len(pitches) >= 1 and len(judged) == len(pitches)
-          and bool(seeded) == any(j["eligible"] for j in judged),
+          len(pitches) >= 1 and len(judged) == len(pitches) and len(seeded) <= 1
+          and all(p["pitch_id"] in eligible for p in seeded)
+          and all(r["pitch_id"] in eligible for r in refused)
+          and (bool(seeded) or set(looked) <= answered),
           f"{len(research)} research backtests, {len(pitches)} pitch(es), "
-          f"{'ELIGIBLE' if eligible else 'not eligible'}, "
+          f"{len(eligible)} eligible, {len(refused)} refused a seed"
+          f"{' (' + refused[0]['reason'] + ')' if refused else ''}, "
           f"{'seeded $' + format(seeded[0]['seed_usd'], ',.0f') if seeded else 'no seed'}, "
           f"{len(fills)} fills")
     return {"pod": pod, "agent": agent, "research": research, "pitches": pitches,
-            "judged": judged, "seeded": seeded, "fills": fills, "wakes": wakes}
+            "judged": judged, "seeded": seeded, "refused": refused, "fills": fills,
+            "wakes": wakes, "research_ids": research_ids, "judged_ids": judged_ids}
 
 
 def rehearsal() -> None:
@@ -476,9 +489,20 @@ def recorded() -> dict:
           f"${hire_key['limit_usd_micros'] / 1e6:.2f} key" if hire_key else "no key")
     seen = chain(doc, "B")
     if seen:
+        # One count runs through research and pitches (a pitch is an attempt too): numbered
+        # 1, 2, 3 ... with no gap, in the order they happened, and research came first.
+        counted = sorted([(i, p["attempt"]) for i, p in seen["research_ids"]]
+                         + [(i, j["attempts"]) for i, j in seen["judged_ids"]])
+        if seen["refused"]:   # a refused seed reaches its PM: a tool answer carries the reason
+            told = [step for step, w in seen["wakes"] for m in w.get("transcript") or []
+                    if m["role"] == "tool" and seen["refused"][0]["reason"] in str(m.get("content"))]
+            check("B: the PM can read why its seed was refused (on its pitches)", bool(told),
+                  f"first read at step {told[0]}" if told else "never shown")
         check("B: the real PM researched before it pitched (every backtest counted)",
-              len(seen["research"]) >= 1
-              and [p["attempt"] for p in seen["research"]] == list(range(1, len(seen["research"]) + 1)))
+              len(seen["research"]) >= 1 and seen["research_ids"][0][0] < seen["pitches"][0][0]
+              and [n for _, n in counted] == list(range(1, len(counted) + 1)),
+              f"{len(seen['research'])} research backtests and {len(seen['pitches'])} pitches, "
+              f"counted 1..{len(counted)}")
     verify(text, "B")
     return {"doc": doc, **seen}
 
@@ -558,11 +582,14 @@ def report_hire(seen: dict) -> None:
         print(f"  {at}: {', '.join(calls) or 'no tools'}")
         for line in said.strip().splitlines()[:6]:
             print(f"    {line}")
-    for (_, pitch), verdict in zip(seen["pitches"], seen["judged"]):
-        print(f"  Pitch: {pitch['hypothesis']}")
+    answers = {p["pitch_id"]: f"seeded ${p['seed_usd']:,.0f}" for p in seen["seeded"]}
+    answers |= {r["pitch_id"]: f"refused: {r['reason']}" for r in seen["refused"]}
+    for (pid, pitch), verdict in zip(seen["pitches"], seen["judged"]):
+        print(f"  Pitch #{pid}: {pitch['hypothesis']}")
         print(f"  Rule: {json.dumps(pitch['rule'], sort_keys=True)}")
         print("  Gates: " + ", ".join(f"{g['gate']} {g['result']}" for g in verdict["gates"])
               + f" → {'ELIGIBLE' if verdict['eligible'] else 'not eligible'}")
+        print(f"  Capital: {answers.get(pid, 'no answer')}")
 
 
 if __name__ == "__main__":

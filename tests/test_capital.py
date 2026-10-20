@@ -230,6 +230,20 @@ def test_an_eligible_pitch_is_seeded_once_and_a_long_short_one_is_refused_once(
     assert 2 not in state["pods"]
 
 
+def test_a_pod_reads_on_its_pitches_whether_it_was_seeded_or_why_not(
+        db, frozen_clock, make_pod, prices):
+    from app.strategy.service import list_pitches
+    make_pod(1)
+    make_pod(2)
+    _pitch(db, 1, eligible=True)
+    _pitch(db, 2, eligible=True, side="long_short")
+    assert [p["capital"] for p in list_pitches(db, pod_id=None)] == [None, None]   # not yet
+    sweep(db, provider=prices)
+    seeded, refused = (list_pitches(db, pod_id=k)[0]["capital"] for k in (1, 2))
+    assert seeded["outcome"] == "seeded" and seeded["seed_usd"] == LAW.seed_usd
+    assert refused["outcome"] == "refused" and "cannot short" in refused["reason"]
+
+
 def test_rebuild_restores_the_pods_capital_and_stage(db, frozen_clock, make_pod, prices):
     make_pod(1)
     _pitch(db, 1, eligible=True)
