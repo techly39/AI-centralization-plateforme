@@ -85,7 +85,7 @@ The notes in `bible/sources/REQUIREMENTS.md` were written fast and tidied by an 
 
 ### The firm is a multi-manager hedge fund with high turnover
 From: Human
-Status: building (1c, the firm lives a quarter: scripted quarter and hosted rehearsal work; the real recorded quarter is next)
+Status: working (1c done, cycle 54: four real PMs lived a quarter in the machine)
 Run *exactly like a multi-manager hedge fund* (Millennium / Citadel style), with a lot of turnover.
 Many independent pods, each a PM with a small team, each paid on its own results and meant to be
 uncorrelated with the others. **The centre holds capital and risk; the pods hold the ideas.**
@@ -96,8 +96,12 @@ in and out. The allocation, risk ladder, pitch and hiring ideas below are parts 
 Now: capital follows results (cycle 48): an eligible pitch earns a seed and its pod trades forward;
 an algorithm re-weighs capital every few days by a cost- and risk-adjusted score, cut for copying
 and for drawdown; the drawdown ladder halves at 5%, freezes buying at 7.5%, closes at 10%; a closed
-pod's place is filled by a newly hired real PM who pitches and can earn a seed (cycle 51). Not yet:
-several real pods living in the machine together for months (Next up 1c).
+pod's place is filled by a newly hired real PM who pitches and can earn a seed (cycle 51). Four
+real PMs lived a quarter on one market (cycle 54): the edge pod was raised to $2.9M, the noise pod
+never funded, the sinking and crashing pods closed and replaced by hires who earned seeds; the
+Human reads a quarter report (`fund-env quarter-report`). Not yet: firing a PM who never earns a
+seed; thinking cost charged during a real run (only after it); a manager mind; months beyond one
+quarter.
 
 ## The firm's people
 

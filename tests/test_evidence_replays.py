@@ -42,8 +42,7 @@ def test_every_recording_is_named_here() -> None:
 @pytest.mark.parametrize("name", sorted(KEYS))
 def test_a_kept_recording_replays_identical(name: str, tmp_path: Path) -> None:
     tape = EVIDENCE / name
-    if not tape.is_file():
-        pytest.skip(f"{name} is not recorded yet")
+    assert tape.is_file(), f"{name} is gone: a finished idea's proof is never deleted"
     lone = tmp_path / "run.cassette.json"
     lone.write_bytes(tape.read_bytes())
     (tmp_path / "vtmp").mkdir()

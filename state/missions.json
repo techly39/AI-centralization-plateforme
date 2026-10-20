@@ -8,7 +8,7 @@
       "idea": "The firm is a multi-manager hedge fund with high turnover",
       "acceptance": "acceptance/firm_quarter.py",
       "demo": "uv run python acceptance/firm_quarter.py \u2014 scripted: on one made-up market four pods (edge, noise, sink, crash) live a quarter; the edge pod is raised, the noise pod gets no seed, the sinking and crashing pods are closed and replaced by hires; a pod whose gross return beats another's but whose thinking cost eats it ranks lower (and the cheap one higher); rebuild from the ledger gives the same books. Recorded: four real Haiku PMs live the quarter, replay IDENTICAL for $0, and a quarter report prints capital per pod week by week, deaths, hires and P&L net of thinking",
-      "status": "active",
+      "status": "done",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [
@@ -17,7 +17,7 @@
         "pitch-gates"
       ],
       "branch": "idea/firm-quarter",
-      "notes": "Cycle 53 built: the quarter world (in-process A and hosted recipe B0), the 'tell PMs' switch in the capital law (a seeded pod's later pitch answered; the hiring law in every PM's capital view; off by default so old recordings replay), recipe 'laws' (capital, hiring) passed to the world's processes, the quarter report (app/capital/report.py, `fund-env quarter-report`). Demo fails only on B (no real recording yet). Next: list every consequence a PM's act has and check the scripted PM sees each through its tools; then record: `uv run python acceptance/firm_quarter.py --write-world DIR openrouter`, add model/budget to the 4 specs, `fund-runtime backtest --world world.json --specs specs --hire hire.yaml --input input.json --steps 30 --days-per-step 3 --cassette ...` (about 160 wakes, ~$1-1.5 at Haiku's ~$0.005 a wake; check the month's cap first); commit as evidence/firm-quarter/quarter.cassette.json; make the report print from the recording (load the cassette's ledger rows into a fresh database, market from the recipe); FINDINGS entry. Then red-team + auditor, merge."
+      "notes": "Done cycle 54: every consequence of a PM's act checked visible through its tools before spending; neutral names in the hosted world; the real quarter recorded (evidence/firm-quarter/, $0.672, two deaths, two hires, edge raised, noise never seeded) after a first trial stopped at step 26 on a provider timeout (kept). Red-team: agent cap on hires, closed pods' pitches in the gate, answer dating \u2014 fixed. Auditor: one block (old recordings diverged on the gate change) fixed; tests/test_evidence_replays.py replays every kept recording. ADR-051."
     },
     {
       "id": "pod-replacement",
