@@ -204,6 +204,7 @@ _EVERY_ROUTE = [
     # key; the clock key stays the narrowest key in the world.
     ("GET", "/mandate", None),
     ("GET", "/vacancies", None),
+    ("GET", "/library", None),
     ("GET", "/vacancies/1", None),
     ("POST", "/vacancies/1/fill", None),
     ("POST", "/vacancies/1/refuse", {"reason": "no"}),

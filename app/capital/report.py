@@ -166,7 +166,8 @@ def quarter_report(session: Session, *, provider: MarketDataProvider,
 def _money(x: float | None) -> str:
     if x is None:
         return "-"
-    return f"{'-' if x < 0 else ''}${abs(x) / 1e3:,.0f}k" if abs(x) >= 1e4 else f"${x:,.0f}"
+    return f"{'-' if x < 0 else ''}${abs(x) / 1e3:,.0f}k" if abs(x) >= 1e4 else (
+        f"{'-' if x < 0 else ''}${abs(x):,.0f}")
 
 
 def render(report: dict[str, Any]) -> str:
@@ -205,4 +206,63 @@ def render(report: dict[str, Any]) -> str:
     out.append("\nWhat happened:")
     for h in report["happened"]:
         out.append(f"  {h['on']}  {h['pod']}: {h['what']}")
+    return "\n".join(out)
+
+
+# --- the generation report (idea: every month is a generation) -----------------------------------
+
+def generation_report(session: Session) -> dict[str, Any]:
+    """Each month's generation as the ledger holds it: every pod's fitness (P&L that month minus
+    its thinking that month) and verdict, who was let go and why, who was hired in the month; then
+    the library of lessons. A pure function of the ledger (the numbers are physics' own, written
+    at each month's end); it moves nothing."""
+    from app.capital.generation import library
+
+    ended = _events(session, "generation_ended")
+    let_go = _events(session, "pm_let_go")
+    filled = _events(session, EVENT_VACANCY_FILLED)
+    out = []
+    for e in ended:
+        g = e.payload_json
+        first, last = date.fromisoformat(g["from"]), date.fromisoformat(g["to"])
+        gone = [{"on": x.ts.date().isoformat(), "pm": x.payload_json["agent_name"],
+                 "pod": x.payload_json["pod_name"], "why": x.payload_json["why"]}
+                for x in let_go if x.payload_json.get("generation") == g["generation"]
+                or (x.payload_json.get("generation") is None and first <= x.ts.date() <= last)]
+        hired = [{"on": x.ts.date().isoformat(), "pm": x.payload_json["agent_name"],
+                  "pod": x.payload_json["pod_name"]}
+                 for x in filled if first <= x.ts.date() <= last]
+        out.append({"generation": g["generation"], "month": g["month"], "from": g["from"],
+                    "to": g["to"], "pods": g["pods"], "let_go": gone, "hired": hired})
+    return {"generations": out, "library": library(session),
+            "today": ledger_now(session).date().isoformat()}
+
+
+def render_generations(report: dict[str, Any]) -> str:
+    """The generation report as text, for a person."""
+    if not report["generations"]:
+        return "No generation has ended: the generation law is off, or no month has turned."
+    out = [f"Generation report, to {report['today']}"]
+    for g in report["generations"]:
+        out.append(f"\nGeneration {g['generation']} ({g['month']}, {g['from']} to {g['to']}):")
+        out.append(f"  {'pod':<12}{'PM':<14}{'P&L':>10}{'thinking':>11}{'fitness':>10}  verdict")
+        for p in g["pods"]:
+            out.append(f"  {p['pod_name'][:11]:<12}{(', '.join(p['pms']) or '-')[:13]:<14}"
+                       f"{_money(p['pnl_usd']):>10}{_money(p['thinking_usd']):>11}"
+                       f"{_money(p['fitness_usd']):>10}  {p['verdict']}: {p['why']}")
+        for x in g["let_go"]:
+            out.append(f"  let go {x['on']}: {x['pm']} ({x['pod']}), {x['why']}")
+        for x in g["hired"]:
+            out.append(f"  hired {x['on']}: {x['pm']} into {x['pod']}")
+    out.append("\nThe library (every PM reads it):")
+    for item in report["library"]:
+        lesson = item["lesson"]
+        tried = "; ".join(
+            f"#{p['pitch_id']} {(p['rule'] or {}).get('signal')} "
+            f"{'eligible' if p['eligible'] else 'failed ' + ', '.join(p['failed_gates'])}"
+            for p in lesson["pitches"]) or "no pitch"
+        out.append(f"  {item['lesson_no']}. {item['on']} {', '.join(item['pms'])} "
+                   f"({item['pod_name']}): {item['why']}. Tried: {tried}. "
+                   f"{lesson['research_backtests']} research backtests, thinking "
+                   f"${lesson['thinking_cost_usd']:,.2f}.")
     return "\n".join(out)

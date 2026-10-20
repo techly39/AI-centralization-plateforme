@@ -215,7 +215,8 @@ def _window(session: Session) -> tuple[int, date, int | None] | None:
 
 
 def _measure(session: Session, *, pod: Pod, first: date, last: date, provider: MarketDataProvider,
-             costs_then: dict[int, int], costs_now: dict[int, int], now: datetime) -> dict[str, Any]:
+             costs_then: dict[int, int], costs_now: dict[int, int], now: datetime,
+             born: date | None) -> dict[str, Any]:
     curve = build_equity_curve(session, pod_id=pod.id, provider=provider, as_of=now,
                                live_price=False)
     before = [p for p in curve.points if p.on < first]
@@ -227,6 +228,9 @@ def _measure(session: Session, *, pod: Pod, first: date, last: date, provider: M
         for p in days:
             pnl += p.equity - prev - p.net_flow
             prev = p.equity
+    elif born is not None and born <= last:
+        pnl = 0.0       # it lived in the month and held nothing: it earned nothing (null is for
+        #                 a pod with no day in the month)
     thinking = (costs_now.get(pod.id, 0) - costs_then.get(pod.id, 0)) / 1e6
     return {"pod_id": pod.id, "pod_name": pod.name, "stage": pod.status,
             "seeded": pod.id in _seeded_pods(session), "days": len(days), "pnl_usd": pnl,
@@ -277,12 +281,16 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
     for pod in session.scalars(select(Pod).order_by(Pod.id)):
         if pod.status == "closed" and pod.id not in let_go_in | closed_in:
             continue    # it ended in an earlier generation
+        pms = list(session.scalars(select(Agent).where(
+            Agent.pod_id == pod.id, Agent.role == AgentRole.pm).order_by(Agent.id)))
+        # The pod's first day in the world: its row's, or its first agent's registration.
+        born = min([d for d in (pod.created_at.date() if pod.created_at else None,
+                                *(registered.get(a.id) for a in pms)) if d is not None],
+                   default=None)
         row = _measure(session, pod=pod, first=first, last=last, provider=provider,
-                       costs_then=costs_then, costs_now=costs_now, now=now)
-        staff = list(session.scalars(select(Agent).where(
-            Agent.pod_id == pod.id, Agent.status == AgentStatus.active,
-            Agent.role == AgentRole.pm).order_by(Agent.id)))
-        row["pms"] = [a.name for a in staff]
+                       costs_then=costs_then, costs_now=costs_now, now=now, born=born)
+        staff = [a for a in pms if a.status == AgentStatus.active]
+        row["pms"] = [a.name for a in pms]
         if pod.status == "closed":
             row["verdict"], row["why"] = "ended", (
                 "closed by the risk ladder" if pod.id in closed_in else "its PM was let go")
@@ -299,13 +307,15 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
                 row["verdict"], row["why"] = "too_new", (
                     f"{tenure} days in its pod, judged after {law.grace_days}")
         rows.append(row)
-    ended = append_event(session, type=EVENT_GENERATION_ENDED, actor_agent_id=system.id, payload={
-        "generation": number, "month": first.strftime("%Y-%m"), "from": first.isoformat(),
-        "to": last.isoformat(), "law": law.model_dump(mode="json"), "pods": rows})
     gone = []
     for pod_id in to_let_go:
         gone += _let_go(session, pod_id=pod_id, reason=LET_GO_NO_SEED, actor=system,
                         generation=number)
+    # Written last: every departure of this month's end comes before it, so the next generation
+    # (everything after this event) does not count them again.
+    ended = append_event(session, type=EVENT_GENERATION_ENDED, actor_agent_id=system.id, payload={
+        "generation": number, "month": first.strftime("%Y-%m"), "from": first.isoformat(),
+        "to": last.isoformat(), "law": law.model_dump(mode="json"), "pods": rows})
     logger.bind(generation=number).info("generation ended: {} pods, {} let go", len(rows), len(gone))
     return {"generation": number, "event_id": ended.id, "let_go": [e.payload_json["agent_id"]
                                                                  for e in gone]}

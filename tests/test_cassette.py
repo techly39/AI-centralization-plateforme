@@ -121,7 +121,7 @@ async def test_exchange_per_complete_call(fund_client, desk, scripts) -> None:
     assert all(e.usage == Usage() for e in rec.exchanges)
     assert len(rec.exchanges) == sum(m.role == "assistant" for m in rec.transcript)
     # The request is recoverable from the transcript, and the digest is of exactly that.
-    requests = _prefix_requests(rec, await native.published_tools(client))
+    requests = _prefix_requests(rec, native.shown_tools(await native.published_tools(client)))
     assert [request_sha256(r) for r in requests] == [e.request_sha256 for e in rec.exchanges]
 
 
@@ -132,7 +132,7 @@ async def test_every_v2_wake_carries_model_and_tools_sha256(fund_client, desk, s
     client = fund_client(pm_key)
     scripts(three=_calls("get_clock", turns=1))
     rec = await wake(_spec(script="three"), client, workflow_input={})
-    published = await native.published_tools(client)
+    published = native.shown_tools(await native.published_tools(client))
     # A scripted mind asks no model (the registry refuses scripted + a model): ``None`` is the
     # recorded fact; a model-bearing mind records ``spec.model`` here.
     assert (rec.model, rec.tools_sha256) == (None, cassette.tools_sha256(published))
@@ -151,7 +151,7 @@ async def test_tools_sha256_is_of_the_tools_in_the_request(fund_client, desk, sc
     client = fund_client(pm_key)
     scripts(three=_calls("get_clock", turns=1))
     rec = await wake(_spec(script="three"), client, workflow_input={})
-    tools = await native.published_tools(client)
+    tools = native.shown_tools(await native.published_tools(client))
     assert rec.tools_sha256 == cassette.tools_sha256(tools)
     # The digest is the request's: rebuilding the first request from the record reproduces
     # the hash only with these tools, not with a narrowed list.
@@ -190,7 +190,7 @@ async def test_the_hash_is_taken_before_the_mind_sees_the_request(
     scripts(tamper=tamper)
     rec = await wake(_spec(script="tamper"), client, workflow_input={})
     assert rec.ended == "done"
-    requests = _prefix_requests(rec, await native.published_tools(client))
+    requests = _prefix_requests(rec, native.shown_tools(await native.published_tools(client)))
     assert [request_sha256(r) for r in requests] == [e.request_sha256 for e in rec.exchanges]
 
 
