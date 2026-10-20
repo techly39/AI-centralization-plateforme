@@ -1,19 +1,23 @@
-Cycle 0052 · plan · next: the firm lives a quarter · branch: idea/firm-quarter (not yet made)
+Cycle 0053 · building: the firm lives a quarter · branch: idea/firm-quarter
 Done this session:
-- Looked back: since the last plan, one idea finished (a dead pod is replaced) in two build
-  sessions; all six finished ideas' demos still pass on main; no comments from the Human.
-- Made the book true: the multi-manager machine, the allocation algorithm, the risk ladder, the
-  workflows and the lessons ideas now say what cycle 51 added (the hire, the post-mortem,
-  Onboarding.exe, the first real pod in the machine).
-- Queued 1c, the firm lives a quarter (ready, about 3 sessions, money tier): four real PMs on one
-  made-up market with four fates, capital moving net of thinking cost, deaths and hires, a quarter
-  report for the Human. Plan in state/NOW.md.
-- Factory: before any paid real run, check a scripted mind can see every consequence of its acts
-  (cycle 51 lost a trial to an invisible refusal). Judged by: the next real recording is kept on
-  its first try.
-Next: a build session starts the idea: branch idea/firm-quarter, acceptance/firm_quarter.py,
-then the quarter world recipe and the two fixes (capital answer on a seeded pod's later pitches;
-the hiring law announced as a system event).
-Watch out: a quarter of four or more real minds may make a cassette of several MB, so check the
-size and pick days-per-step before spending. Keep the real run at about $3 of the cap or less.
-Demo: none yet for the new idea; every finished demo passes on main.
+- A scripted quarter on one made-up market (edge, noise, sink, crash; two free sectors for hires):
+  the edge pod is raised, the noise pod is never seeded, the sinking and crashing pods are closed
+  and replaced the same morning by hires who earn seeds; a costly mind ($400 a morning) scores
+  higher than a cheaper pod before thinking cost and lower after it; money adds up; the books
+  rebuild from the ledger.
+- PMs are now told what happened: a seeded pod's later pitch gets an answer ("your pod already
+  runs pitch #N"), and every PM's capital view carries the hiring law. This is a switch in the
+  run's capital law, off by default, so the cycle-51 recording still replays identically.
+- A world's recipe can now carry its own laws; the quarter is a hosted world, and a scripted
+  rehearsal through the Runtime gives the same deaths and hires and replays IDENTICAL.
+- The quarter report (week-by-week equity, P&L gross and net of thinking, re-weighings, deaths,
+  hires): `fund-env quarter-report`.
+Next: the real quarter. First list every consequence of a PM's act and check a scripted mind sees
+each through its tools. Then write the world (`acceptance/firm_quarter.py --write-world DIR
+openrouter`), give the specs a model and budget, check the month's cap, and record 30 steps of
+3 days (about 160 wakes, about $1-1.5). Make the report print from the recording; FINDINGS entry.
+Watch out: a new agent tool breaks replay of any recording whose mind had no tool list (the
+cycle-51 hire), which is why the report is an operator command. Real-sized thinking cost barely
+moves a score (cents against a $200k seed); the demo uses a stand-in price to show the law.
+Demo: fails only on B (the real quarter is not recorded yet); A and B0 pass; all earlier demos
+and the full suite pass.

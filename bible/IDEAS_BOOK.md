@@ -85,7 +85,7 @@ The notes in `bible/sources/REQUIREMENTS.md` were written fast and tidied by an 
 
 ### The firm is a multi-manager hedge fund with high turnover
 From: Human
-Status: working (first slice)
+Status: building (1c, the firm lives a quarter: scripted quarter and hosted rehearsal work; the real recorded quarter is next)
 Run *exactly like a multi-manager hedge fund* (Millennium / Citadel style), with a lot of turnover.
 Many independent pods, each a PM with a small team, each paid on its own results and meant to be
 uncorrelated with the others. **The centre holds capital and risk; the pods hold the ideas.**
@@ -443,6 +443,10 @@ show a cap refusal (tests do); a seeded pod's later pitches get no capital answe
 PM guessed right that its pod was already running its seeded pitch); empty pods (made by the
 operator, or emptied by management firing their PMs) still count toward the live-pod limit, so a
 management mind could fill the limit and block hiring (denies turnover, moves no money).
+From the firm lives a quarter (cycle 53): a recorded mind whose spec names no tools was shown the
+whole published tool list, so adding any tool makes that recording's replay diverge (the scripted
+doomed PM in the cycle-51 hire recording); new recordings name each mind's tools, and the quarter
+report stays an operator command (`fund-env quarter-report`) until replays pin the tool list.
 
 ### Paid to report holes
 From: Builder
