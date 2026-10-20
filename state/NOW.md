@@ -74,3 +74,5 @@ live-pod limit; the hire check lives in the router, not the permissions table.
   trading after a close, no key past its limit), and are shown to catch three forged records;
   the quarter report now prints from a recording alone. Real quarter recorded (see Progress).
   Found: a real run posts thinking cost only after its last step, so its re-weighings see none.
+- cycle 55: the cut-off session's recording committed; demo passes (A, B0, B: IDENTICAL, $0);
+  red-team done, auditor PASS on round 2 (cycle 54); full suite green; merged.
