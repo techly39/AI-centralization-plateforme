@@ -64,3 +64,22 @@ to stop. One run, one model: low confidence on the behaviour, high on the gates'
 Follow-up: a planted-signal world for real minds (can a PM find a real edge when one exists?);
 debate and the backtest operator (Next up 1b); memory across days (it read its own history from
 the tools, as its charter asked).
+
+## F-0005 — Four real PMs lived a quarter: the laws found the edge, killed the sink and the crash, and hired their replacements   [tags: firm]   (cycle 54)
+Setup: one made-up market, four sectors whose fates no mind was told (pod-1 an edge, pod-2 noise,
+pod-3 a slow sink, pod-4 a crash on day 40), two unheld sectors with an edge; four Haiku 5.5 PMs
+and every hire on its own $0.20 key; 30 steps of 3 days; at most 4 live pods.
+Result: pod-1 was seeded on day 6 (after a long-short refusal) and the algorithm raised it to
+$2.9M put in, +11%. pod-2 researched most of the founders (19 backtests, 4 mean-reversion
+pitches) and never had an eligible pitch: no money went to noise. pod-3 and pod-4 were seeded,
+then closed by the ladder (10.2%, 10.7% down); each was replaced the same morning by a hire who
+read the post-mortem. hire-2 found an edge in 15 backtests and was seeded and raised; hire-1 ran
+46 backtests and 23 pitches before its seed in the last week (a long-short refusal on the way).
+The firm ended $10.31M from $10.00M. Thinking: $0.672 for six minds, cents against $200k seeds.
+Evidence: `evidence/firm-quarter/quarter.cassette.json`; `acceptance/firm_quarter.py` (B).
+Interpretation: the machine's laws, not the minds' judgement of fates, decided who lived; the
+minds' part was finding an eligible rule. A first trial stopped at step 26 on one 408 from the
+provider (fail closed); the account reads now retry. Thinking cost reaches the ledger only after
+the run, so the real re-weighings ignored it (at these prices it changes no rank).
+Follow-up: per-step metering for real runs; firing a PM who never earns a seed (pod-2 thought for
+a quarter and was never funded); a closed pod's PM still wakes and spends until the run ends.

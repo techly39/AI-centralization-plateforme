@@ -22,6 +22,8 @@ This idea is the first firm-scale run:
   seeded; the sinking and crashing pods are closed and replaced by hires; a pod whose gross return
   beats another's, but whose thinking cost eats the difference, ranks below it (and the cheap one
   above it); the live-pod limit holds; rebuilding from the ledger gives the same books.
+- B0 (scripted, through the Runtime, in a hosted world built from the recipe): the same deaths and
+  hires; `replay --verify` IDENTICAL. (Built, cycle 53.)
 - B (recorded, four real PMs plus their hires): `replay --verify` says IDENTICAL; the quarter
   report prints from the recording; every seed, raise, cut, close and hire is consistent with the
   laws; each mind's cost, charged by the system, is shown against its key.
@@ -42,6 +44,16 @@ Cut: session 1 = steps 1-4; session 2 = steps 5-6; session 3 = step 7.
 Left out: a manager mind; PMs building their own teams; firing a PM who never earns a seed;
 the debate; the monthly generation.
 
+Changed while building (cycle 53):
+- The two fixes are switched on by the run's capital law ("tell PMs", off by default), because
+  the recorded hire of cycle 51 read its pitches and its capital every day: any new answer there
+  would make its replay diverge. A world turns it on in its recipe, which now carries the world's
+  own laws (capital, hiring) over config.yaml.
+- The hiring law is announced in each PM's capital view (every PM reads it every morning), not
+  as a ledger event no PM can read.
+- The quarter report is an operator command (`fund-env quarter-report`), not an agent tool: a
+  new tool changes the full tool list a recorded scripted mind was shown, and its replay breaks.
+
 ## Risk
 Money (seeds, re-weighing, the ladder), agent creation and key minting under the cap: red-team +
 auditor before merge. Holes left unless the run reaches them: empty pods count toward the
@@ -49,3 +61,18 @@ live-pod limit; the hire check lives in the router, not the permissions table.
 
 ## Progress
 - cycle 52: planned.
+- cycle 53: built steps 1-4 and the hosted rehearsal. Demo part A passes (scripted quarter: edge
+  raised, noise never seeded, sink and crash closed and replaced by hires that earn seeds, a
+  costly mind's rank turned by its thinking cost, money kept, report printed); B0 passes
+  (hosted, IDENTICAL). Fails only on B: the real quarter is not recorded yet.
+- cycle 54: before spending, the demo checks that each PM sees every consequence of its acts
+  through its own tools the next morning (judged, seeded, raised, cut, halved, reduce-only,
+  closed, hired); one gap found and closed: a closed pod's PM is now told "closed" on every
+  pitch. The hosted world's pods and sectors got neutral names (the old ones told the minds
+  each sector's fate). The real run's checks judge the laws, not the fates (a seed only for an
+  eligible pitch, the ladder at its thresholds, one vacancy a close, the live-pod limit, no
+  trading after a close, no key past its limit), and are shown to catch three forged records;
+  the quarter report now prints from a recording alone. Real quarter recorded (see Progress).
+  Found: a real run posts thinking cost only after its last step, so its re-weighings see none.
+- cycle 55: the cut-off session's recording committed; demo passes (A, B0, B: IDENTICAL, $0);
+  red-team done, auditor PASS on round 2 (cycle 54); full suite green; merged.

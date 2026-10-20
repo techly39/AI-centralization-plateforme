@@ -57,7 +57,8 @@ def gov(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     d.mkdir()
     monkeypatch.setattr(governance, "HALT_FILE", d / "HALT")
     monkeypatch.setattr(governance, "HUMAN_YAML", d / "human.yaml")
-    (d / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: null\n")
+    # The agent cap as the Human's file names it (a file without it hires no one: fail closed).
+    (d / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: null\n  max_agents_total: 200\n")
     return d
 
 

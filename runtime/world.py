@@ -45,7 +45,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from runtime.cassette import LEDGER_FORMAT, redact
-from runtime.governance import read_governance
+from runtime.governance import read_agents_cap, read_governance
 
 #: The environment variable that names the world's synthetic market (a throwaway secret).
 WORLD_KEY_ENV = "FUND_MARKETDATA__SYNTHETIC_KEY"
@@ -56,6 +56,8 @@ SUBCOMMANDS = frozenset({"init-db", "start-backtest", "seed-admin", "seed-runtim
 MAX_RECIPE_BYTES = 64 * 1024
 MAX_PODS = 16
 MAX_EXTRA_SYMBOLS = 50
+#: The ``config.yaml`` sections a recipe may set for its world.
+LAW_SECTIONS = frozenset({"capital", "hiring"})
 _NAME = r"^[a-z][a-z0-9-]{0,62}$"
 _KEY = re.compile(r"\bfk_\S+")
 _SERVE_WAIT_SECONDS = 60
@@ -93,6 +95,19 @@ class WorldRecipe(BaseModel):
     #: A made-up market with a planted law instead of the synthetic one (physics validates it:
     #: ``app/marketdata/made_up.py``), e.g. a sector that collapses so the ladder closes a pod.
     market: dict[str, Any] | None = None
+    #: The world's own laws, over ``config.yaml``: ``{"capital": {...}, "hiring": {...}}`` (e.g. the
+    #: hiring law's live-pod limit, or the capital law's ``tell_pms``). Physics validates them as it
+    #: starts; a recipe without them runs under the file's laws, as every older recording did.
+    laws: dict[str, dict[str, Any]] | None = None
+
+    @field_validator("laws")
+    @classmethod
+    def _laws_are_named_settings(cls, value: dict[str, dict[str, Any]] | None
+                                 ) -> dict[str, dict[str, Any]] | None:
+        if value is not None and not (set(value) <= LAW_SECTIONS and all(
+                re.fullmatch(r"[a-z][a-z0-9_]{0,40}", k) for law in value.values() for k in law)):
+            raise ValueError(f"laws: sections {sorted(LAW_SECTIONS)}, each of snake_case settings")
+        return value
 
     @field_validator("extra_symbols")
     @classmethod
@@ -116,9 +131,16 @@ class WorldRecipe(BaseModel):
 def parse_recipe(doc: Any) -> WorldRecipe:
     """``doc`` (parsed JSON) as a recipe, else :class:`WorldError`."""
     try:
-        return WorldRecipe.model_validate(doc)
+        recipe = WorldRecipe.model_validate(doc)
     except (ValidationError, TypeError, ValueError) as exc:
         raise WorldError(f"recipe_invalid:{type(exc).__name__}") from exc
+    # A world's laws never reach past the Human's: no more live pods than alive agents allowed.
+    pods = ((recipe.laws or {}).get("hiring") or {}).get("max_live_pods")
+    if pods is not None:
+        cap, problem = read_agents_cap()
+        if cap is None or problem is not None or type(pods) is not int or pods > cap:
+            raise WorldError("recipe_over_agent_cap")
+    return recipe
 
 
 def load_world(path: Path) -> dict[str, Any]:
@@ -154,10 +176,11 @@ def fund_env() -> Path:
 
 
 def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
-              market: dict[str, Any] | None = None) -> dict[str, str]:
+              market: dict[str, Any] | None = None,
+              laws: dict[str, dict[str, Any]] | None = None) -> dict[str, str]:
     """The environment of every child: the parent's, minus each ``FUND_*``, plus exactly the
     world's own database, its market (the synthetic one with the recipe's extra symbols, or the
-    recipe's made-up market) and its key."""
+    recipe's made-up market), its laws (the recipe's, over ``config.yaml``) and its key."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
     env["FUND_DATABASE_URL"] = f"sqlite:///{db}"
     env["FUND_MARKETDATA__PROVIDER"] = "synthetic" if market is None else "made_up"
@@ -166,6 +189,16 @@ def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
         env["FUND_MARKETDATA__SYNTHETIC_SYMBOLS"] = json.dumps(extra_symbols, sort_keys=True)
     if market is not None:
         env["FUND_MARKETDATA__MADE_UP"] = json.dumps(market, sort_keys=True)
+    if not laws:   # none, or an empty block: no laws named
+        # A recipe that names no laws lives by the laws as they were when such recipes were all
+        # there was: a closed pod's later pitches still count in the correlation gate, so every
+        # recording made before cycle 54 replays as recorded (auditor, the firm lives a quarter).
+        env["FUND_GATES__CLOSED_POD_PITCHES_BIND"] = "true"
+    for section, law in (laws or {}).items():
+        for name, value in law.items():
+            # A text as it is; a number, a flag or a list as JSON (how the settings read them).
+            env[f"FUND_{section.upper()}__{name.upper()}"] = (
+                value if isinstance(value, str) else json.dumps(value))
     return env
 
 
@@ -301,7 +334,7 @@ async def hosted(recipe_doc: dict[str, Any], key: str) -> AsyncIterator[World]:
     world: World | None = None
     try:
         db = tmp / "world.db"
-        env = child_env(db, key, recipe.extra_symbols, recipe.market)
+        env = child_env(db, key, recipe.extra_symbols, recipe.market, recipe.laws)
         registrar, clock = await asyncio.to_thread(_genesis, recipe, tmp, env)
         world = World(tmp, db, registrar, clock, env)
         yield world

@@ -85,7 +85,7 @@ The notes in `bible/sources/REQUIREMENTS.md` were written fast and tidied by an 
 
 ### The firm is a multi-manager hedge fund with high turnover
 From: Human
-Status: working (first slice)
+Status: working (1c done, cycle 54: four real PMs lived a quarter in the machine)
 Run *exactly like a multi-manager hedge fund* (Millennium / Citadel style), with a lot of turnover.
 Many independent pods, each a PM with a small team, each paid on its own results and meant to be
 uncorrelated with the others. **The centre holds capital and risk; the pods hold the ideas.**
@@ -96,8 +96,12 @@ in and out. The allocation, risk ladder, pitch and hiring ideas below are parts 
 Now: capital follows results (cycle 48): an eligible pitch earns a seed and its pod trades forward;
 an algorithm re-weighs capital every few days by a cost- and risk-adjusted score, cut for copying
 and for drawdown; the drawdown ladder halves at 5%, freezes buying at 7.5%, closes at 10%; a closed
-pod's place is filled by a newly hired real PM who pitches and can earn a seed (cycle 51). Not yet:
-several real pods living in the machine together for months (Next up 1c).
+pod's place is filled by a newly hired real PM who pitches and can earn a seed (cycle 51). Four
+real PMs lived a quarter on one market (cycle 54): the edge pod was raised to $2.9M, the noise pod
+never funded, the sinking and crashing pods closed and replaced by hires who earned seeds; the
+Human reads a quarter report (`fund-env quarter-report`). Not yet: firing a PM who never earns a
+seed; thinking cost charged during a real run (only after it); a manager mind; months beyond one
+quarter.
 
 ## The firm's people
 
@@ -443,6 +447,20 @@ show a cap refusal (tests do); a seeded pod's later pitches get no capital answe
 PM guessed right that its pod was already running its seeded pitch); empty pods (made by the
 operator, or emptied by management firing their PMs) still count toward the live-pod limit, so a
 management mind could fill the limit and block hiring (denies turnover, moves no money).
+From the firm lives a quarter (cycle 53): a recorded mind whose spec names no tools was shown the
+whole published tool list, so adding any tool makes that recording's replay diverge (the scripted
+doomed PM in the cycle-51 hire recording); new recordings name each mind's tools, and the quarter
+report stays an operator command (`fund-env quarter-report`) until replays pin the tool list.
+Cycle 54: a real (metered) run posts its minds' thinking cost to the ledger once, after its last
+step, so the capital machine re-weighs a real quarter with no thinking cost at all; only the
+scripted quarter (charged each morning) shows the law "capital net of thinking" acting. At real
+prices it is cents against a $200,000 seed, but the law is not yet lived by real minds.
+From the red-team and auditor (cycle 54; the high hole, the medium and low ones and the auditor's
+block are fixed): the Human's agent cap is the Runtime's check, not physics' (another registrar
+could fill past it); a replay re-reads the agent cap when it rebuilds a world with laws, so a cap
+lowered below 4 would make the quarter's recording refuse to verify (fails closed); a seeded pod's
+"already runs" answer on an eligible pitch made before the seed carries that pitch's date; a
+closed pod's PM stays an active agent and keeps waking (and spending) until the run ends.
 
 ### Paid to report holes
 From: Builder

@@ -50,3 +50,12 @@ researched, pitched long-short (refused: no shorting yet), read why, re-pitched 
 $200k and trades its mandate, for $0.07.  ·  Try: `uv run python acceptance/pod_replacement.py`  ·
 See: the close, the vacancy, the hire, each of the new PM's days in its own words, its pitches with
 the gates' verdict and the capital answer, all replayed identical for $0.
+
+## The firm lives a quarter (cycle 55, 2026-10-20)
+What: four real Haiku 5.5 PMs, each on one sector of a made-up market whose fates nobody inside knew
+(an edge, noise, a slow sink, a crash), competed for one pot for three months. The edge pod was
+raised to $2.9M (+11%), the noise pod was never funded, the sinking and crashing pods were closed by
+the ladder and replaced the same morning by hires who earned seeds; the firm ended $10.31M from
+$10.00M, for $0.67 of thinking.  ·  Try: `uv run python acceptance/firm_quarter.py`  ·  See: the
+quarter report (equity per pod week by week, each pod's P&L net of thinking, every seed, close and
+hire), replayed identical for $0; the Human can print it with `fund-env quarter-report`.

@@ -44,12 +44,36 @@ class Governance:
     monthly_llm_usd_cap: float | None
     #: Why the cap was read as ``None`` although the file did not say ``null``.
     cap_problem: str | None = None
+    #: ``firm.max_agents_total``: the alive agents the firm may hold. The Runtime hires no one
+    #: past it (red-team, the firm lives a quarter).
+    max_agents_total: int | None = None
+    #: Why ``max_agents_total`` could not be read (missing, malformed): then no hire at all.
+    agents_problem: str | None = None
 
 
 def read_governance() -> Governance:
     halted = _halted(HALT_FILE)  # first, and independent of the cap file's health
     cap, problem = _read_cap(HUMAN_YAML)
-    return Governance(halted=halted, monthly_llm_usd_cap=cap, cap_problem=problem)
+    agents, agents_problem = read_agents_cap()
+    return Governance(halted=halted, monthly_llm_usd_cap=cap, cap_problem=problem,
+                      max_agents_total=agents, agents_problem=agents_problem)
+
+
+def read_agents_cap() -> tuple[int | None, str | None]:
+    """``firm.max_agents_total`` as ``(cap, None)``, else ``(None, why)``: missing, not a positive
+    whole number, or the file unreadable. Fails closed, as the money cap does: the caller hires
+    no one and accepts no world that sets a live-pod limit."""
+    try:
+        doc = load_unique_yaml(HUMAN_YAML)
+    except Exception as exc:  # noqa: BLE001 - fail closed on any read or parse failure
+        return None, f"the Human's file is not readable: {exc.__class__.__name__}"
+    firm = doc.get("firm") if isinstance(doc, dict) else None
+    if not isinstance(firm, dict) or "max_agents_total" not in firm:
+        return None, "firm.max_agents_total is missing"
+    raw = firm["max_agents_total"]
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        return None, "firm.max_agents_total is not a positive whole number"
+    return raw, None
 
 
 def _halted(path: Path) -> bool:

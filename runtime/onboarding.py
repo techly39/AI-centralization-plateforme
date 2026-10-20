@@ -169,7 +169,7 @@ class Onboarding:
                 raise _Diverged()
             decision = (recorded.outcome, recorded.reason)
         else:
-            decision = self._decide(vid, base, hire, meters, law)
+            decision = await self._population(law) or self._decide(vid, base, hire, meters, law)
         outcome, reason = decision
 
         def record(spec_id: str, done: str, agent_id: int | None = None,
@@ -240,6 +240,26 @@ class Onboarding:
         self.minds.append(mind)
         self.inputs[spec_id] = {"post_mortem": vacancy.get("post_mortem"), "vacancy_id": vid}
         return done, mind
+
+    async def _population(self, law: Governance) -> tuple[str, str] | None:
+        """A refusal when one more agent would take the firm past the Human's
+        ``firm.max_agents_total`` (alive agents, every role, as physics' directory lists them),
+        or when that cap cannot be read; ``None``: the hire may be weighed."""
+        if law.agents_problem is not None or law.max_agents_total is None:
+            return ("refused:agents_cap_unreadable",
+                    f"the Human's agent cap cannot be read ({law.agents_problem})")
+        try:
+            listed = await self.registrar.get("/agents")
+        except FundAPIError as exc:
+            raise _Failed(f"directory_unreadable:{exc.status_code}") from exc
+        if not isinstance(listed, list):
+            raise _Failed("directory_malformed")
+        alive = sum(1 for a in listed if not isinstance(a, dict) or a.get("status") != "inactive")
+        if alive + 1 > law.max_agents_total:
+            return ("refused:agents_over_cap",
+                    f"the firm holds {alive} alive agents: one more passes the Human's cap "
+                    f"of {law.max_agents_total}")
+        return None
 
     def _decide(self, vid: int, base: str, hire: dict[str, Any], meters: Sequence[Meter],
                 law: Governance) -> tuple[str, str | None]:

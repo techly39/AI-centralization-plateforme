@@ -118,7 +118,8 @@ def test_a_vacancy_is_filled_the_next_morning_and_the_new_pm_wakes_with_its_post
 
 def test_a_budget_that_does_not_fit_the_cap_is_refused_in_the_ledger(
         SessionFactory, keys, specs, woke, tmp_path, capsys, gov):
-    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 0.25\n")   # < the $0.30 hire
+    (gov / "human.yaml").write_text(   # < the $0.30 hire
+        "firm:\n  monthly_llm_usd_cap: 0.25\n  max_agents_total: 200\n")
     vid = _stage_vacancy(SessionFactory)
     code, out, err = _run(SessionFactory, [
         "--specs", str(specs), "--steps", "2",
@@ -137,7 +138,7 @@ def test_a_budget_that_does_not_fit_the_cap_is_refused_in_the_ledger(
 
 def test_a_metered_hire_gets_its_own_key_inside_the_cap(SessionFactory, keys, specs, woke,
                                                         tmp_path, capsys, gov):
-    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n")
+    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n  max_agents_total: 200\n")
     _stage_vacancy(SessionFactory)
     code, out, err = _run(SessionFactory, [
         "--specs", str(specs), "--steps", "1",
@@ -250,7 +251,7 @@ def test_a_key_the_month_cannot_hold_deactivates_the_hire_and_is_not_retried(
     from runtime.metering import FakeProvisioner
     from runtime.openrouter import OverCap
 
-    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n")
+    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n  max_agents_total: 200\n")
 
     def full(self, agent_id, limit):
         raise OverCap("another run holds the month")
@@ -275,7 +276,7 @@ def test_a_key_the_month_cannot_hold_deactivates_the_hire_and_is_not_retried(
 
 def test_a_hire_that_fits_the_cap_alone_but_not_with_the_runs_keys_is_refused(
         SessionFactory, keys, tmp_path, woke, capsys, gov):
-    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n")
+    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n  max_agents_total: 200\n")
     metered = _write_specs(tmp_path / "metered", {
         "id": "a-pm", "name": "desk-2-pm", "role": "pm", "pod": 2, "provider": "fake-metered",
         "script": "read-a", "budget_usd": 0.8, "charter": "Read the clock."})

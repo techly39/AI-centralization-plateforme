@@ -2025,3 +2025,37 @@ across generations; shorting.
 **Proof.** `acceptance/pod_replacement.py` (A scripted, B0 hosted rehearsal, B a recorded real
 Haiku 5.5 hire: refused for long-short, re-pitched long-only, seeded, trading);
 `tests/test_hiring.py`, `tests/test_runtime_hiring.py`, `tests/test_redteam_pod_replacement.py`.
+
+## ADR-051 — A world names its own laws; PMs are told what the capital machine did; the Human's agent cap binds every hire (idea: the firm lives a quarter) — accepted (cycle 54, 2026-10-20)
+
+**Context.** Four real PMs on one made-up market for a quarter: pods compete for one pot, die and
+are replaced. A real mind acts only on what its tools show it (cycle 51 lost a paid trial to a
+refusal the PM could not see), and a recorded run must replay as recorded.
+
+**Decision.**
+1. A hosted world's recipe may carry its own laws (`laws.capital`, `laws.hiring` only), over
+   `config.yaml`. A recipe that names no laws (every recording before this) lives by the laws as
+   they were, so it replays as recorded.
+2. A run's capital law may say `tell_pms` (frozen into `capital_opened`; off by default and left
+   out of the frozen law while off): a seeded pod's later pitch is answered ("your pod already runs
+   pitch #N"), every pitch of a closed pod is answered "closed" (dated on the close), and every
+   capital view carries the hiring law. Before a paid run, the demo checks that a PM sees each
+   consequence of its acts through its own tools the next morning.
+3. A closed pod's later pitches no longer count in other pods' correlation gate (its traded rule
+   still does): a dead PM cannot block live pods at no cost. Worlds without laws keep the old rule.
+4. The Human's `firm.max_agents_total` binds every hire: the Runtime refuses a hire that would take
+   the firm past it, and fails closed (hires no one) when the file does not name it; a recipe may
+   not set more live pods than it.
+5. The OpenRouter account's reads are asked again after a passing failure (a timeout, 429, 5xx),
+   three times at most, then fail closed as before. Never a mint.
+6. The quarter report (`fund-env quarter-report`) is an operator command, a pure function of the
+   ledger; it also prints from a recording alone.
+
+**Not yet:** thinking cost reaches the ledger only after a real run's last step, so a real quarter
+is re-weighed without it; the agent cap is the Runtime's check, not physics'; firing a PM who
+never earns a seed; a manager mind.
+
+**Proof.** `acceptance/firm_quarter.py` (A scripted quarter with every consequence seen by its
+PM; B0 hosted rehearsal, its law checks shown to refuse three forged records; B the recorded real
+quarter, `evidence/firm-quarter/`); `tests/test_firm_quarter.py`,
+`tests/test_redteam_firm_quarter.py`, `tests/test_evidence_replays.py`.
