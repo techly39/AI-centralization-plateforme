@@ -264,7 +264,11 @@ def capital_answers(session: Session) -> dict[int, dict[str, Any]]:
                              .order_by(Event.id)):
         p = e.payload_json
         entry = pods.get(p.get("pod_id"))
-        if p.get("eligible") is not True or entry is None or p.get("pitch_id") in out:
+        if entry is None or p.get("pitch_id") in out:
+            continue
+        # A closed pod's every pitch is answered, eligible or not (cycle 54: a dead pod's PM read
+        # only "not eligible" and could have kept researching for capital that never comes).
+        if p.get("eligible") is not True and entry["stage"] != "closed":
             continue
         if entry["stage"] == "closed":
             reason = "your pod was closed by the risk ladder: a closed pod gets no capital"

@@ -53,7 +53,7 @@ sys.path.insert(0, str(REPO))
 
 from fastapi.testclient import TestClient  # noqa: E402
 from loguru import logger  # noqa: E402
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 
 from app.capital.allocation import PodTrack, reallocate  # noqa: E402
 from app.capital.report import quarter_report, render  # noqa: E402
@@ -144,6 +144,7 @@ class Firm:
         self.live_after_fill: list[int] = []
         self.hired: dict[int, dict] = {}
         self.seen: dict[str, object] = {}
+        self.views: dict[str, list[tuple[int, dict]]] = {}
 
     def pitch(self, name: str, family: str, top_n: int = 5) -> dict:
         r = self.client.post("/pitches", headers=h(self.pods[name]["key"]), json={
@@ -197,6 +198,11 @@ class Firm:
                     "/capital", headers=h(self.pods["edge"]["key"])).json()
             for name, p in self.pods.items():
                 self.think(name)
+                # What the PM reads of its own pod each morning, and where the ledger stood then.
+                with session_scope() as s:
+                    at = s.scalar(select(func.max(Event.id)))
+                view = self.client.get("/capital", headers=h(p["key"])).json()
+                self.views.setdefault(name, []).append((at, view))
                 r = self.client.get("/mandate", headers=h(p["key"]))
                 if r.status_code != 200:
                     continue
@@ -306,6 +312,8 @@ def checks(firm: Firm, founding: dict[str, dict]) -> dict:
           all(x and "new PM is hired" in x["law"] and x["max_live_pods"] == LIMIT
               for x in law_seen), (law_seen[0] or {}).get("law", "absent"))
 
+    consequences(firm, ids, seeded, stages, moves)
+
     # A7: the ledger is the truth
     with session_scope() as s:
         before = _snapshot(s)
@@ -315,6 +323,101 @@ def checks(firm: Firm, founding: dict[str, dict]) -> dict:
         s.rollback()
     check("A7: rebuilding from the ledger gives the same cash, positions, pods", before == after_)
     return {"names": names}
+
+
+def _first_view_after(firm: Firm, name: str, event_id: int) -> tuple[dict | None, dict | None]:
+    """The PM's own capital row on the last morning before ``event_id`` and the first after it."""
+    before = after = None
+    for at, view in firm.views.get(name, []):
+        row = (view.get("pods") or [None])[0]
+        if at < event_id:
+            before = row
+        elif after is None:
+            after = row
+    return before, after
+
+
+def consequences(firm: Firm, ids: dict, seeded: dict, stages: list, moves: list) -> None:
+    """A9: every consequence physics gives a PM's act, seen by that PM through its own tools only
+    (its key, the routes its tools call), the morning after: a real mind can act on nothing else.
+    (Cycle 51 spent a real trial on a refusal no PM could see.)"""
+    names = {v: k for k, v in ids.items()}
+    key = {n: firm.pods[n]["key"] for n in firm.pods}
+    own_pitches = {n: firm.client.get("/pitches", headers=h(key[n])).json() for n in key}
+
+    # Judged: a rule with no edge reads why it is not eligible.
+    noise = own_pitches["noise"][0]["verdict"]
+    failed = [g["gate"] for g in noise.get("gates") or [] if g["result"] == "fail"]
+    check("A9: the noise PM reads on its pitch that it is not eligible, and which gates failed",
+          noise["eligible"] is False and bool(failed), f"failed: {failed}")
+
+    # Seeded: the pitch says so, and the next morning's capital view holds the money.
+    seen = []
+    for pod_id, e in seeded.items():
+        n = names[pod_id]
+        pitch = next((p for p in own_pitches[n] if p["id"] == e["pitch_id"]), {})
+        _, row = _first_view_after(firm, n, e["_id"])
+        seen.append((n, (pitch.get("capital") or {}).get("outcome") == "seeded"
+                     and row is not None and row["allocated_usd"] > 0
+                     and row["pitch_id"] == e["pitch_id"]))
+    check("A9: every seeded PM reads 'seeded' on its pitch and the money in its capital view the "
+          "next morning", bool(seen) and all(ok for _, ok in seen),
+          ", ".join(f"{n} {'seen' if ok else 'UNSEEN'}" for n, ok in seen))
+
+    # Raised, cut, halved: every move of the centre's money shows in the PM's view next morning,
+    # in the direction it went.
+    unseen = []
+    for e in moves:
+        n = names.get(e["pod_id"])
+        if n is None or n not in firm.views:
+            continue
+        before, after = _first_view_after(firm, n, e["_id"])
+        if before is None or after is None:
+            continue   # the seed itself (no morning before), or a move on the last night
+        net = sum(m["delta"] for m in moves if m["pod_id"] == e["pod_id"]
+                  and _first_view_after(firm, n, m["_id"]) == (before, after))
+        diff = after["allocated_usd"] - before["allocated_usd"]
+        if net and not (abs(diff - net) < 1e-6 * max(1.0, abs(net))):
+            unseen.append(f"{n}: moved {net:+,.0f}, saw {diff:+,.0f}")
+    raised = [e for e in moves if e["delta"] > 0 and "raise" in e["reason"]]
+    cut = [e for e in moves if e["delta"] < 0]
+    check("A9: every raise and cut of a pod's capital shows, to the dollar, in its PM's capital "
+          "view the next morning", bool(raised) and bool(cut) and not unseen,
+          f"{len(raised)} raise(s), {len(cut)} cut(s); " + ("; ".join(unseen[:3]) or "all seen"))
+
+    # The ladder: every stage a pod reaches is in its PM's view the next morning.
+    unseen = []
+    for e in stages:
+        n = names[e["pod_id"]]
+        _, row = _first_view_after(firm, n, e["_id"])
+        if row is None or row["stage"] != e["to"]:
+            unseen.append(f"{n} {e['to']} (saw {row and row['stage']})")
+    check("A9: every step of the risk ladder (halved, reduce-only, closed) is in the PM's capital "
+          "view the next morning", bool(stages) and not unseen,
+          ", ".join(f"{names[e['pod_id']]} {e['to']}" for e in stages) + (
+              f"; UNSEEN {unseen}" if unseen else ""))
+
+    # Closed: the dead pod's PM is told why at every door it tries.
+    told = {}
+    for n in ("sink", "crash"):
+        mandate = firm.client.get("/mandate", headers=h(key[n]))
+        order = firm.client.post("/orders", headers=h(key[n]), json={
+            "ticker": f"{FOUNDING[n]}00", "side": "buy", "qty": 1, "price_type": "market",
+            "justification": "trying again"})
+        book_ = firm.client.get(f"/portfolio/{ids[n]}", headers=h(key[n])).json()
+        again = firm.pitch(n, FOUNDING[n])
+        told[n] = {"mandate": mandate.status_code == 409 and "closed" in mandate.json()["detail"],
+                   "order": order.status_code == 403 and "closed" in json.dumps(order.json()),
+                   "book": book_["positions"] == [],
+                   "pitch": "closed" in (again.get("capital") or {}).get("reason", "")}
+    check("A9: a closed pod's PM is told 'closed' by its mandate, its orders and its pitches, and "
+          "reads an empty book", all(all(t.values()) for t in told.values()),
+          "; ".join(f"{n}: " + ", ".join(f"{k} {'told' if v else 'NOT TOLD'}" for k, v in t.items())
+                    for n, t in told.items()))
+    capital_hire = [hire["capital"].get("hiring") for hire in firm.hired.values()]
+    check("A9: a hired PM reads the dead pod's post-mortem and the hiring law on its first morning",
+          bool(firm.hired) and all(hire["read"].get("post_mortem") for hire in firm.hired.values())
+          and all(capital_hire), f"{len(firm.hired)} hire(s)")
 
 
 def _snapshot(s) -> dict:

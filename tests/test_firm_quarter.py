@@ -87,6 +87,9 @@ def test_told_a_seeded_pods_later_pitch_is_answered(client, make_pod, pm_factory
                                     "drawdown": 0.11, "worst_drawdown": 0.11})
     late = _pitch(stage, 1)
     assert "closed" in client.get(f"/pitches/{late}", headers=h(key)).json()["capital"]["reason"]
+    # ... for every pitch the closed pod's PM sends, eligible or not: no capital ever comes
+    lost = _pitch(stage, 1, eligible=False)
+    assert "closed" in client.get(f"/pitches/{lost}", headers=h(key)).json()["capital"]["reason"]
 
 
 def test_told_the_capital_view_carries_the_hiring_law(client, make_pod, pm_factory, stage):
