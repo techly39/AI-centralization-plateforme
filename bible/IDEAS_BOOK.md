@@ -451,6 +451,12 @@ Cycle 54: a real (metered) run posts its minds' thinking cost to the ledger once
 step, so the capital machine re-weighs a real quarter with no thinking cost at all; only the
 scripted quarter (charged each morning) shows the law "capital net of thinking" acting. At real
 prices it is cents against a $200,000 seed, but the law is not yet lived by real minds.
+From the red-team and auditor (cycle 54; the high hole, the medium and low ones and the auditor's
+block are fixed): the Human's agent cap is the Runtime's check, not physics' (another registrar
+could fill past it); a replay re-reads the agent cap when it rebuilds a world with laws, so a cap
+lowered below 4 would make the quarter's recording refuse to verify (fails closed); a seeded pod's
+"already runs" answer on an eligible pitch made before the seed carries that pitch's date; a
+closed pod's PM stays an active agent and keeps waking (and spending) until the run ends.
 
 ### Paid to report holes
 From: Builder
