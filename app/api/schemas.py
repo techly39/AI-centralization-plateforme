@@ -67,6 +67,14 @@ class AgentRegisterRequest(BaseModel):
     charter_ref: str | None = Field(default=None, max_length=256)
     research_domains: list[str] | None = None
 
+    @model_validator(mode="after")
+    def _not_a_hire(self) -> AgentRegisterRequest:
+        # ``vacancy:<id>`` is physics' mark on a hired PM (app/capital/hiring.py): a registrar does
+        # not write it (auditor, pod replacement).
+        if (self.charter_ref or "").strip().casefold().startswith("vacancy:"):
+            raise ValueError("charter_ref 'vacancy:...' is physics' mark on a hire; choose another")
+        return self
+
 
 class AgentCreatedResponse(BaseModel):
     """Returned once at registration; carries the plaintext key exactly once."""

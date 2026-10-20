@@ -130,3 +130,72 @@ def test_redteam_a_name_squatted_in_advance_does_not_block_a_vacancy_forever(
     assert 201 in (first.status_code, second.status_code) and pms == 1, (
         f"a squatted name blocks the vacancy for good: {first.status_code}, "
         f"{second.status_code}: {first.json().get('detail')}")
+
+
+# --- AUDITOR (pod replacement): a hire is known from the ledger, never from charter_ref ----------
+
+def _forge(SessionFactory, *, name: str, pod_id: int, ref: str) -> int:
+    """A PM whose charter_ref claims a vacancy, made past the API's check (as any other path
+    could: the CLI, a future route)."""
+    from app.db.models import AgentRole
+    from app.registry.service import register_agent
+    with SessionFactory() as s:
+        agent, _ = register_agent(s, name=name, role=AgentRole.pm, pod_id=pod_id, charter_ref=ref)
+        s.commit()
+        return agent.id
+
+
+def test_auditor_a_registrar_cannot_write_physics_mark_on_a_hire(client, make_pod, admin_key):
+    make_pod(1)
+    r = client.post("/agents/register", headers=h(admin_key), json={
+        "name": "fake-hire", "role": "pm", "pod_id": 1, "charter_ref": "Vacancy:7"})
+    assert r.status_code == 422
+
+
+def test_auditor_no_forged_hire_breaks_the_vacancies_or_doubles_a_hire(
+        client, SessionFactory, make_pod, admin_key):
+    """Every path a forged or stale "this is a hire" claim could take, then the outcome itself:
+    the vacancy list reads, every deactivation goes through, and no vacancy has two live hires."""
+    make_pod(1)
+    vacancy_id = _close(SessionFactory, 1)
+    made = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key))
+    assert made.status_code == 201
+    real = made.json()["agent"]
+    for k, ref in enumerate([f"vacancy:{vacancy_id}", "vacancy:999999", "vacancy:abc",
+                             "vacancy:", f"vacancy:{vacancy_id}:x"], start=10):
+        make_pod(k)                                     # an empty, unseeded pod
+        forged = _forge(SessionFactory, name=f"forged-{k}", pod_id=k, ref=ref)
+        off = client.post(f"/agents/{forged}/deactivate", headers=h(admin_key))
+        assert off.status_code == 200, (ref, off.status_code, off.text[:200])
+        again = client.post(f"/agents/{forged}/deactivate", headers=h(admin_key))
+        assert again.status_code in (200, 409), again.text[:200]
+    listed = client.get("/vacancies", headers=h(admin_key))
+    assert listed.status_code == 200
+    v = next(x for x in listed.json() if x["id"] == vacancy_id)
+    assert v["status"] == "filled" and v["filled"]["agent_id"] == real["id"] and v["failed"] == []
+    assert client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key)).status_code == 409
+    with SessionFactory() as s:
+        from app.db.models import AgentStatus, Event
+        from app.ledger.events import EVENT_VACANCY_FILLED
+        hires = [e.payload_json for e in s.scalars(select(Event).where(
+            Event.type == EVENT_VACANCY_FILLED))]
+        live = [p for p in hires if s.get(Agent, p["agent_id"]).status == AgentStatus.active
+                and s.get(Pod, p["pod_id"]).status != "closed"]
+        assert len([p for p in live if p["vacancy_id"] == vacancy_id]) <= 1
+        assert all(s.get(Pod, k).status != "closed" for k in range(10, 15))  # none closed falsely
+
+
+def test_auditor_a_hired_pod_with_money_in_it_is_not_closed_as_a_failed_hire(
+        client, SessionFactory, make_pod, admin_key):
+    make_pod(1)
+    vacancy_id = _close(SessionFactory, 1)
+    hired = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key)).json()["agent"]
+    with SessionFactory() as s:                         # the operator funds the pod by hand
+        append_event(s, type="allocation_set", actor_agent_id=None, payload={
+            "pod_id": hired["pod_id"], "delta": 1000.0, "reason": "operator"})
+        s.commit()
+    assert client.post(f"/agents/{hired['id']}/deactivate", headers=h(admin_key)).status_code == 200
+    v = client.get(f"/vacancies/{vacancy_id}", headers=h(admin_key)).json()
+    assert v["status"] == "filled"
+    with SessionFactory() as s:
+        assert s.get(Pod, hired["pod_id"]).status != "closed"

@@ -271,3 +271,21 @@ def test_a_key_the_month_cannot_hold_deactivates_the_hire_and_is_not_retried(
             Event.type == "hire_failed"))]
         assert [f["vacancy_id"] for f in failed] == [vid]
     assert out["registered"] == ["a-pm"]
+
+
+def test_a_hire_that_fits_the_cap_alone_but_not_with_the_runs_keys_is_refused(
+        SessionFactory, keys, tmp_path, woke, capsys, gov):
+    (gov / "human.yaml").write_text("firm:\n  monthly_llm_usd_cap: 1\n")
+    metered = _write_specs(tmp_path / "metered", {
+        "id": "a-pm", "name": "desk-2-pm", "role": "pm", "pod": 2, "provider": "fake-metered",
+        "script": "read-a", "budget_usd": 0.8, "charter": "Read the clock."})
+    vid = _stage_vacancy(SessionFactory)
+    code, out, err = _run(SessionFactory, [
+        "--specs", str(metered), "--steps", "1",
+        "--hire", str(_template(tmp_path, provider="fake-metered"))], capsys)   # $0.30 alone fits
+    assert code == 0, err
+    assert [(h["vacancy_id"], h["outcome"]) for h in out["run"]["hires"]] == [
+        (vid, "refused:budget_over_cap")]
+    assert [k["spec_id"] for k in out["metering"]["keys"]] == ["a-pm"]     # no key for the hire
+    with SessionFactory() as s:
+        assert not s.scalars(select(Agent).where(Agent.name.like("hire-%"))).all()

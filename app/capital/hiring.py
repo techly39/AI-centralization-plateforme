@@ -147,6 +147,8 @@ def vacancies(session: Session) -> list[dict[str, Any]]:
     for event in _events(session, EVENT_VACANCY_OPENED, EVENT_VACANCY_FILLED, EVENT_HIRE_REFUSED,
                          EVENT_HIRE_FAILED):
         p = event.payload_json
+        if event.type != EVENT_VACANCY_OPENED and p.get("vacancy_id") not in out:
+            continue    # names no vacancy of this run: nothing to fold (never fails the read)
         if event.type == EVENT_VACANCY_OPENED:
             out[event.id] = {"id": event.id, "vacancy_no": p["vacancy_no"],
                              "opened_on": event.ts.date().isoformat(), "pod_id": p["pod_id"],
@@ -241,14 +243,26 @@ def hire_failed(session: Session, *, agent: Agent, actor: Agent | None) -> Event
     hire failed. Its empty pod is closed (it holds no money: nothing to recall, and it no longer
     holds a live-pod place) and the vacancy is open again for a new hire (red-team: a dead hire
     must not leave the dead pod unreplaced). The caller owns the transaction. ``None``: nothing to
-    do (not a hire, a seeded pod, or a colleague still active)."""
-    ref = agent.charter_ref or ""
-    if not ref.startswith("vacancy:") or agent.pod_id is None:
+    do (not the current hire of an open-for-business vacancy, money in the pod, or a colleague
+    still active).
+
+    A hire is known from the ledger only: the vacancy whose standing fill names this agent and
+    its pod. Never from ``charter_ref``, which any registrar writes (auditor: a forged
+    ``vacancy:<id>`` broke the vacancy list for good, made an agent no one could deactivate, and
+    reopened a filled vacancy for a second hire)."""
+    if agent.pod_id is None:
+        return None
+    current = next((v for v in vacancies(session) if v["status"] == "filled"
+                    and v["filled"]["agent_id"] == agent.id
+                    and v["filled"]["pod_id"] == agent.pod_id), None)
+    if current is None:
         return None
     pod = session.get(Pod, agent.pod_id)
     if pod is None or pod.status == "closed":
         return None
-    if any(e.payload_json["pod_id"] == pod.id for e in _events(session, EVENT_CAPITAL_SEEDED)):
+    # Money in the pod, from the machine or anyone: not an empty pod, so not this law's to close.
+    if any(e.payload_json.get("pod_id") == pod.id
+           for e in _events(session, EVENT_CAPITAL_SEEDED, EVENT_ALLOCATION_SET)):
         return None
     if session.scalar(select(func.count()).select_from(Agent).where(
             Agent.pod_id == pod.id, Agent.status == AgentStatus.active)):
@@ -256,7 +270,7 @@ def hire_failed(session: Session, *, agent: Agent, actor: Agent | None) -> Event
     pod.status = "closed"
     return append_event(session, type=EVENT_HIRE_FAILED,
                         actor_agent_id=actor.id if actor is not None else None, payload={
-                            "vacancy_id": int(ref.split(":", 1)[1]), "pod_id": pod.id,
+                            "vacancy_id": current["id"], "pod_id": pod.id,
                             "agent_id": agent.id,
                             "reason": "its hired PM was deactivated before any seed"})
 

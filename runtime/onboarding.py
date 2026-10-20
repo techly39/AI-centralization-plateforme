@@ -141,6 +141,8 @@ class Onboarding:
             except _Diverged:
                 return records, new, ("diverged", f"diverged:hire:{step}:0:hire")
             except _Failed as exc:
+                if not decide_batch().allowed:   # HALT landed mid-hire: physics refused it (423)
+                    return records, new, ("halted", "halted")
                 return records, new, ("error", exc.reason)
             records.append(record)
             if mind is not None:
