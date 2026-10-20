@@ -79,9 +79,16 @@ def hiring_law(session: Session) -> HiringConfig:
 
 
 def live_pods(session: Session) -> int:
-    """Pods that are not closed."""
-    return int(session.scalar(select(func.count()).select_from(Pod)
-                              .where(Pod.status != "closed")) or 0)
+    """Pods that are not closed and hold a place: an active agent works there, or the centre ever
+    put money in. An empty pod (made by the operator, or left when management deactivated its
+    PMs) holds none, so empty pods cannot fill the limit and stop the firm hiring (red-team,
+    a dead pod is replaced)."""
+    funded = {e.payload_json.get("pod_id") for e in _events(session, EVENT_CAPITAL_SEEDED,
+                                                            EVENT_ALLOCATION_SET)}
+    staffed = set(session.scalars(select(Agent.pod_id).where(Agent.status == AgentStatus.active,
+                                                              Agent.pod_id.is_not(None))))
+    return sum(1 for pod in session.scalars(select(Pod.id).where(Pod.status != "closed"))
+               if pod in staffed or pod in funded)
 
 
 # --- the post-mortem ----------------------------------------------------------------------------
@@ -125,9 +132,13 @@ def post_mortem(session: Session, *, pod_id: int, record: PodTrack) -> dict[str,
 
 # --- the vacancy --------------------------------------------------------------------------------
 
-def open_vacancy(session: Session, *, pod_id: int, record: PodTrack, actor: Agent) -> Event:
-    """Write the vacancy a closed pod leaves: its post-mortem and the hire the law names. Called by
-    the capital machine in the close's own transaction (under :data:`OMS_LOCK`)."""
+def open_vacancy(session: Session, *, pod_id: int, actor: Agent, record: PodTrack | None = None,
+                 lesson: dict[str, Any] | None = None) -> Event:
+    """Write the vacancy a closed pod leaves: its post-mortem (the ladder's, from ``record``, or the
+    lesson of a PM the generation law let go) and the hire the law names. Called in the close's
+    own transaction (under :data:`OMS_LOCK`)."""
+    if (record is None) == (lesson is None):
+        raise ValueError("a vacancy is opened from a ladder record or from a lesson")
     law = hiring_law(session)
     number = len(_events(session, EVENT_VACANCY_OPENED)) + 1
     hire = {"pod_name": f"hire-{number}", "pm_name": f"hire-{number}-pm", "role": "pm",
@@ -136,7 +147,8 @@ def open_vacancy(session: Session, *, pod_id: int, record: PodTrack, actor: Agen
     return append_event(session, type=EVENT_VACANCY_OPENED, actor_agent_id=actor.id, payload={
         "vacancy_no": number, "pod_id": pod_id,
         "pod_name": session.get(Pod, pod_id).name,
-        "post_mortem": post_mortem(session, pod_id=pod_id, record=record),
+        "post_mortem": (lesson if record is None
+                        else post_mortem(session, pod_id=pod_id, record=record)),
         "hire": hire, "law": law.model_dump(mode="json")})
 
 

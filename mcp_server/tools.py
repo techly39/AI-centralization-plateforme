@@ -406,6 +406,15 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         404 while your pod has no seed."""
         return await call("GET", "/mandate")
 
+    # --- Generations: the lessons the firm keeps --------------------------------
+
+    @api_tool(server, method="GET", path="/library")
+    async def read_library() -> Any:
+        """The firm's library of lessons, oldest first: every PM who was let go (its pod closed by
+        the risk ladder, or no seed earned in its month), why, and what the pod tried: its
+        pitches and the gates they failed, its research, its P&L, its thinking cost."""
+        return await call("GET", "/library")
+
     # --- Vacancies: a closed pod, and the hire that replaces it ----------------
 
     @api_tool(server, method="GET", path="/vacancies")

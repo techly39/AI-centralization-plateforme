@@ -99,16 +99,18 @@ def _valid(payload: object) -> tuple[int, int | None, str, int] | None:
     return agent_id, pod_id, key_ref, total
 
 
-def metered_by_agent(session: Session) -> MeteredLedger:
-    """Each agent's metered micro-dollars: per key the maximum total, summed over keys.
+def metered_by_agent(session: Session, *, upto_event_id: int | None = None) -> MeteredLedger:
+    """Each agent's metered micro-dollars: per key the maximum total, summed over keys
+    (``upto_event_id``: as the ledger stood at that event, e.g. a generation's start).
 
     The first event of a key binds it to an agent; a later event for another
     agent counts as a conflict and is ignored. An event whose payload is not a
     well-formed metering row counts as malformed and is ignored.
     """
-    rows = session.execute(
-        select(Event.payload_json).where(Event.type == EVENT_COST_METERED).order_by(Event.id)
-    ).scalars()
+    stmt = select(Event.payload_json).where(Event.type == EVENT_COST_METERED)
+    if upto_event_id is not None:
+        stmt = stmt.where(Event.id <= upto_event_id)
+    rows = session.execute(stmt.order_by(Event.id)).scalars()
     result = MeteredLedger()
     keys: dict[str, tuple[int, int | None, int]] = {}   # key_ref -> (agent, pod, max total)
     for payload in rows:

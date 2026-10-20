@@ -44,6 +44,7 @@ from app.capital.allocation import (
     reallocate,
     worst_drawdown,
 )
+from app.capital.generation import announcement, let_go_closed
 from app.capital.hiring import hiring_law, open_vacancy
 from app.config import CapitalConfig, get_settings
 from app.db.models import Agent, Event, Order, OrderSide, OrderStatus, Pod, Position
@@ -251,7 +252,10 @@ def _set_stage(session: Session, *, pod_id: int, old: str, new: str, record: Pod
                why=f"risk ladder: {worst:.1%} down from the high-water mark, the pod is closed")
         # The firm recruits (idea: a dead pod is replaced): the vacancy, its post-mortem and the
         # hire the law names, in the close's own transaction.
-        open_vacancy(session, pod_id=pod_id, record=record, actor=actor)
+        opened = open_vacancy(session, pod_id=pod_id, record=record, actor=actor)
+        # Under the generation law its PMs go now, the post-mortem their lesson in the library.
+        let_go_closed(session, pod_id=pod_id, post_mortem=opened.payload_json["post_mortem"],
+                      actor=actor)
         return
     if rank(old) < rank("halved") <= rank(new):
         recall(session, pod_id=pod_id, amount=stake / 2, actor=actor, provider=provider,
@@ -476,4 +480,7 @@ def capital_view(session: Session, *, pod_id: int | None, cross: bool) -> dict[s
                     "centre; a vacancy opens with the pod's post-mortem, and on a later morning a "
                     "new PM is hired into a new pod in its place. A closed pod never reopens."),
             "max_live_pods": hiring.max_live_pods, "new_pm_budget_usd": hiring.budget_usd}
+    generation = announcement(session)
+    if generation is not None:
+        view["generation"] = generation
     return view

@@ -332,7 +332,7 @@ of their own (pitch, post-mortem, generation turnover).
 
 ### Every month is a generation
 From: Human
-Status: not started
+Status: building
 The system resets every month: mark to market, measure every pod's fitness, the worst die, the
 best may reproduce, capital resets, lessons and the strategy registry persist.
 Now: the parts it stands on exist: the quarter (cycle 54) runs three months of pods with the

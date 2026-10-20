@@ -202,6 +202,21 @@ class HiringConfig(BaseModel):
         return value
 
 
+class GenerationConfig(BaseModel):
+    """The generation law (idea: every month is a generation): at each month's end physics measures
+    every pod's fitness (its P&L that month net of its thinking that month), lets go the PMs who
+    failed and keeps each one's lesson in a library every PM reads. Off by default, so a run
+    recorded before it existed replays as it was; a world turns it on (its recipe's ``laws``).
+    Frozen into the run's first ``generation_ended``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    on: bool = False
+    # A PM whose pod has no seed at a month's end is let go only after this many days in its pod:
+    # a PM hired late in a month is judged at the next month's end.
+    grace_days: int = Field(default=20, ge=0, le=366)
+
+
 class MCPConfig(BaseModel):
     """Settings for the MCP server (``mcp_server/``), not for the API itself.
 
@@ -294,6 +309,7 @@ class Settings(BaseSettings):
     gates: GatesConfig = Field(default_factory=GatesConfig)
     capital: CapitalConfig = Field(default_factory=CapitalConfig)
     hiring: HiringConfig = Field(default_factory=HiringConfig)
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

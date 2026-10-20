@@ -103,6 +103,11 @@ def test_the_pod_limit_refuses_the_hire_in_the_ledger(client, db, admin_key, mak
                         HiringConfig(max_live_pods=2))
     for pod_id in (1, 2, 3):
         make_pod(pod_id)
+    # Two live pods: each has a PM at work (an empty pod holds no place: the next test).
+    for pod_id in (2, 3):
+        r = client.post("/agents/register", headers=h(admin_key),
+                        json={"name": f"pm-{pod_id}", "role": "pm", "pod_id": pod_id})
+        assert r.status_code == 201, r.text
     vacancy_id = close(1)          # the law is frozen here: 2 live pods at most
     r = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key))
     assert r.status_code == 409 and "limit of 2 live pods" in r.json()["detail"]
@@ -114,6 +119,22 @@ def test_the_pod_limit_refuses_the_hire_in_the_ledger(client, db, admin_key, mak
     assert v["status"] == "open" and len(v["refusals"]) == 1
     close(2)                       # room: one live pod left
     assert client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key)).status_code == 201
+
+
+def test_empty_pods_hold_no_place_under_the_pod_limit(client, db, admin_key, make_pod, close,
+                                                      monkeypatch):
+    """Red-team (a dead pod is replaced): empty pods, made by the operator or emptied when their
+    PMs were deactivated, counted toward the live-pod limit and could stop the firm hiring."""
+    monkeypatch.setattr(get_settings(), "hiring", HiringConfig(max_live_pods=2))
+    for pod_id in (1, 2, 3, 4):
+        make_pod(pod_id)
+    r = client.post("/agents/register", headers=h(admin_key),
+                    json={"name": "pm-gone", "role": "pm", "pod_id": 4})
+    assert client.post(f"/agents/{r.json()['id']}/deactivate",
+                       headers=h(admin_key)).status_code == 200
+    vacancy_id = close(1)          # pods 2, 3 never staffed; pod 4's PM deactivated
+    r = client.post(f"/vacancies/{vacancy_id}/fill", headers=h(admin_key))
+    assert r.status_code == 201, r.text
 
 
 def test_the_law_is_frozen_at_the_first_vacancy_and_models_go_in_turn(db, make_pod, close,
