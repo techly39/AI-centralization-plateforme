@@ -3,6 +3,23 @@
   "standard": "protocol/CYCLE.md \u00a72 (ADR-046)",
   "missions": [
     {
+      "id": "firm-quarter",
+      "title": "The firm lives a quarter: four real PMs compete for the same capital for three simulated months, pods die and are replaced, and the Human gets a quarter report",
+      "idea": "The firm is a multi-manager hedge fund with high turnover",
+      "acceptance": "acceptance/firm_quarter.py",
+      "demo": "uv run python acceptance/firm_quarter.py \u2014 scripted: on one made-up market four pods (edge, noise, sink, crash) live a quarter; the edge pod is raised, the noise pod gets no seed, the sinking and crashing pods are closed and replaced by hires; a pod whose gross return beats another's but whose thinking cost eats it ranks lower (and the cheap one higher); rebuild from the ledger gives the same books. Recorded: four real Haiku PMs live the quarter, replay IDENTICAL for $0, and a quarter report prints capital per pod week by week, deaths, hires and P&L net of thinking",
+      "status": "ready",
+      "estimate_sessions": 3,
+      "physics": true,
+      "depends_on": [
+        "pod-replacement",
+        "capital-machine",
+        "pitch-gates"
+      ],
+      "branch": "idea/firm-quarter",
+      "notes": "Reuse: hosted world (runtime/world.py, up to 16 pods) + made-up market families (edge/noise/sink/crash), pitch desk charter, --hire template, the allocation score (already nets cost_usd since the seed: prove it with real metering). Fix inside (book, Known physics holes, cycle 51): a seeded pod's later pitches get no capital answer \u2014 several seeded PMs will pitch again and must read what happened; announce the hiring law to agents as a system event. Leave unless reached: empty pods counting toward the live-pod limit (no management mind here), the fill check living in the router. Budget the real run before spending: wakes = PMs x steps; pick days-per-step so the run costs at most about $3 of the cap, and check the cassette size (a quarter of 4+ minds may be several MB). Before the real run, check that a scripted mind reading only its tools can see every consequence of its acts (seed, refusal, raise, cut, close) \u2014 cycle 51 lost a trial to an invisible refusal. Add a FINDINGS entry for what the first firm-scale run showed. Cut: s1 = world recipe, fixes, scripted demo A + quarter report; s2 = the real recorded quarter; s3 = red-team, auditor, merge."
+    },
+    {
       "id": "pod-replacement",
       "title": "A dead pod is replaced: when the risk ladder closes a pod, the firm hires a new PM, a real mind, who researches, pitches and can earn a seed",
       "idea": "Hiring new PMs: turnover",

@@ -70,6 +70,11 @@ killed when the session ends).
   why in the commit.
 - Real LLM spend (firm agents) only through the metered path, inside the cap, and only for the run
   that produces the evidence. Record it (cassette) so every later check is free.
+  Before that run, list every consequence physics gives a mind's act (seeded, refused and why,
+  raised, cut, closed, hired) and check that a scripted mind reading only its tools sees each one;
+  fix any it cannot see first. (Cycle 52 plan, after cycle 51 spent a real trial on a refusal the
+  PM could not see; judged by: the next real recording is kept on its first try, no re-record for
+  a missing answer.)
 - Shell: the working directory is the repo, so never `cd "<repo>" && …`. Use Write/Edit for files.
   `git push origin <branch>` as a bare command.
 - Decisions: the prime rule (`bible/01_GENESIS.md` §4). A new rule of the world → an ADR in

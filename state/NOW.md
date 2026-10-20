@@ -1,69 +1,51 @@
-# A dead pod is replaced: when the risk ladder closes a pod, the firm hires a new PM, a real mind, who researches, pitches and can earn a seed
+# The firm lives a quarter: four real PMs compete for the same capital for three simulated months, pods die and are replaced, and the Human gets a quarter report
 
 ## How I understand it
-High turnover is the heart of a multi-manager fund: a pod that bleeds is shut fast and a new PM is
-hired to pitch in its place. Today the ladder closes a pod and that is the end of it. Now:
-- When a pod is closed, physics opens a **vacancy** (an event naming the dead pod, why it died, and
-  its record). A halved or frozen pod opens none.
-- The firm's **hiring law** (`config.yaml`, frozen for the run like the capital law) says how many
-  pods may live at once, the model pool a new PM is drawn from (in turn), its thinking budget and
-  its charter. The law decides, not the Builder; a management mind choosing who to hire comes later.
-- At the next morning, the onboarding program (the Runtime, "Onboarding.exe") fills the vacancy:
-  a new pod, a new PM made from the hiring template, its own capped key minted inside the $50 cap.
-  If the budget does not fit the cap, there is no hire, and the refusal is an event.
-- The new PM's first morning hands it the **post-mortem** of the pod it replaces: the dead rule,
-  its forward days, the drawdown that closed it. Then it lives like the pitch desk: researches
-  (every backtest counted), pitches; an eligible pitch earns a seed at the next capital sweep and
-  the new pod trades forward. An ineligible one earns nothing.
-- The hire is in the recording, so the whole run, hire included, replays IDENTICAL for $0.
+Every part of the multi-manager machine works on its own: pitch and gates, seed, the algorithm that
+re-weighs capital, the drawdown ladder, the hire that fills a dead pod's place. But each was shown
+with one mind or with scripted pods. A real multi-manager is many PMs pulling at one pot of money.
+This idea is the first firm-scale run:
+- One made-up market, four sectors with different fates: one has an edge that lasts, one is pure
+  noise, one slowly sinks, one crashes mid-quarter. Nobody inside knows which is which.
+- Four real PMs (Haiku 5.5, each with its own capped key), each given one sector. They research
+  (every backtest counted), pitch, and the gates judge. An eligible pitch gets a seed and its pod
+  trades its rule forward.
+- Every five days the algorithm moves capital by each pod's score, net of what its PM's thinking
+  cost. The ladder halves, freezes and closes what bleeds; each close opens a vacancy and the next
+  morning a new PM is hired, reads the post-mortem and pitches in its place.
+- Nobody arranges any of it: the laws and the minds decide. The Human gets a **quarter report**:
+  capital per pod week by week, who died and why, who was hired, each pod's P&L net of thinking.
 
 ## What done looks like
-`uv run python acceptance/pod_replacement.py` ($0, offline):
-- A (scripted, a made-up market): a pod's market collapses; it is closed at 10% and one vacancy
-  opens; a halved pod opens none. The vacancy is filled at the next morning by a new pod and PM;
-  with a budget that does not fit the cap the hire is refused (event, no agent, no key). A scripted
-  new PM that pitches the planted rule is seeded and trades; one that pitches noise is not. The
-  live-pod limit holds. Rebuilding state from the ledger gives the same pods, agents and capital.
-- B (recorded, a real Haiku 5.5 PM hired mid-run): `replay --verify` says IDENTICAL from the file;
-  the ledger shows close → vacancy → hire → the post-mortem in its first wake → research → pitch →
-  the gates' verdict → seed or no seed, consistent with the verdict. Its cost, charged by the
-  system, is shown against its key.
+`uv run python acceptance/firm_quarter.py` ($0, offline):
+- A (scripted minds, the same market): the edge pod is seeded and raised; the noise pod is not
+  seeded; the sinking and crashing pods are closed and replaced by hires; a pod whose gross return
+  beats another's, but whose thinking cost eats the difference, ranks below it (and the cheap one
+  above it); the live-pod limit holds; rebuilding from the ledger gives the same books.
+- B (recorded, four real PMs plus their hires): `replay --verify` says IDENTICAL; the quarter
+  report prints from the recording; every seed, raise, cut, close and hire is consistent with the
+  laws; each mind's cost, charged by the system, is shown against its key.
 
 ## Plan
-1. Law: `hiring:` in config (max live pods, model pool taken in turn, budget per hire, charter
-   text), frozen into the first vacancy of the run.
-2. Physics: on close the capital machine writes `vacancy_opened` with the post-mortem and the hire
-   the law names (pod and PM names, model, budget, charter). `GET /vacancies`, `GET /vacancies/{id}`
-   (management, or the PM hired into it), `POST /vacancies/{id}/fill` (a registrar: makes the pod
-   and the PM, returns its key once; refused, in the ledger, at the pod limit or if already
-   filled), `POST /vacancies/{id}/refuse` (the Runtime: "the budget does not fit the cap"). Each
-   with its MCP tool.
-3. The post-mortem: a pure function of the ledger at the close (the rule and its hypothesis, the
-   forward days, the ladder's steps with their drawdowns, the capital in and out), frozen in the
-   vacancy.
-4. Runtime ("Onboarding.exe"): before each step's wakes the conductor reads the open vacancies,
-   checks the hire's budget against the cap with every live key, fills, mints the key, adds the
-   mind from that step on, its first wake handed the post-mortem. The cassette records the hire;
-   replay rebuilds the same roster.
-5. Record one real run (a few cents of the cap), commit it under `evidence/pod-replacement/`.
-Cut: session 1 = steps 1-3 and demo part A through the API; session 2 = step 4 and a hosted world
-whose market can kill a pod; session 3 = the real run, red-team, auditor, merge.
-Left out: a manager mind who chooses the hire; firing a PM who never earns a seed (deadline);
-lessons library across generations; per-position and firm-level limits.
+1. A quarter world recipe: four sectors of the made-up market (edge, noise, sink, crash), four
+   pods, each PM's mandate naming its sector. Reuse the hosted world and the pitch desk charter.
+2. Fixes the run stands on: a seeded pod's later pitches get a capital answer ("already running
+   your seeded pitch" or what changed); the hiring law announced to agents as a system event.
+3. The quarter report: a pure function of the ledger (capital per pod per week, closes, hires,
+   P&L gross and net of thinking cost), printed by the demo, readable from the API.
+4. Demo part A with scripted minds; tests for the report and the fixes.
+5. Before spending: check a scripted mind reading only its tools sees every consequence of its
+   acts. Budget the real run (PMs × steps; at most about $3 of the cap), check cassette size.
+6. Record the real quarter, commit under `evidence/firm-quarter/`, a FINDINGS entry.
+7. Red-team, auditor, merge.
+Cut: session 1 = steps 1-4; session 2 = steps 5-6; session 3 = step 7.
+Left out: a manager mind; PMs building their own teams; firing a PM who never earns a seed;
+the debate; the monthly generation.
 
 ## Risk
-Money, agent creation, key minting under the cap, the Runtime's gate: red-team + auditor before
-merge. Holes it stands on (fix inside): a mid-run mint must hold the mint lock and fit the cap
-with every live key; a pod can read its correlation from its own score row (the new PM reads
-/capital: judge whether that matters once a real mind reads it).
+Money (seeds, re-weighing, the ladder), agent creation and key minting under the cap: red-team +
+auditor before merge. Holes left unless the run reaches them: empty pods count toward the
+live-pod limit; the hire check lives in the router, not the permissions table.
 
 ## Progress
-- cycle 49: planned.
-- cycle 50: built all of it but the real run: the vacancy, the hire, the post-mortem and the pod
-  limit (physics); `GET /mandate`; the Runtime hiring mid-run (`--hire`), recorded and replayed;
-  a made-up market a hosted world can be built from. Demo A and B0 pass ($0); next: red-team,
-  then the real recorded hire, then the auditor.
-- cycle 51: red-team's 3 holes fixed. First real hire found a gap: a refused seed was invisible
-  to the PM (it re-pitched 8 times); pitches now show the capital answer. Re-recorded: the PM read
-  the refusal, went long-only, was seeded and trades. Auditor blocked once (a hire known from a
-  free-text label), fixed; second pass PASS. Merged.
+- cycle 52: planned.

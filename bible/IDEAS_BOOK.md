@@ -95,8 +95,9 @@ pods are shut down quickly and new PMs are hired to pitch in their place, so pod
 in and out. The allocation, risk ladder, pitch and hiring ideas below are parts of this one machine.
 Now: capital follows results (cycle 48): an eligible pitch earns a seed and its pod trades forward;
 an algorithm re-weighs capital every few days by a cost- and risk-adjusted score, cut for copying
-and for drawdown; the drawdown ladder halves at 5%, freezes buying at 7.5%, closes at 10%. No hiring
-of a replacement PM yet, no real minds in the machine yet.
+and for drawdown; the drawdown ladder halves at 5%, freezes buying at 7.5%, closes at 10%; a closed
+pod's place is filled by a newly hired real PM who pitches and can earn a seed (cycle 51). Not yet:
+several real pods living in the machine together for months (Next up 1c).
 
 ## The firm's people
 
@@ -252,7 +253,9 @@ current drawdown. Example from the notes: Pod #1 high volatility, 10K → 3K; Po
 Now (cycle 48): every few days an algorithm re-weighs capital among the machine's pods by a cost-
 and risk-adjusted score of their forward days, cut for correlation with older pods and for drawdown,
 within limits per move (`app/capital/allocation.py`); every move is one event holding its inputs and
-redoes identically. Not yet: real minds' pods in the machine, the score fed real thinking costs.
+redoes identically. The score already nets the thinking cost metered to the pod since its seed.
+Cycle 51: the first real mind's pod entered the machine (a hired PM, seeded $200k). Not yet: several
+real pods ranked against each other by it, over enough days for a score (20 forward days).
 
 ### The central risk ladder
 From: Human
@@ -263,8 +266,8 @@ drawdown halves every pod's limits, then reduce-only), and per-position limits. 
 deterministic physics: no agent can talk its way past it.
 Now (cycle 48): the pod ladder is physics, checked at every clock advance from each pod's high-water
 mark: 5% halves its capital, 7.5% refuses its buys (403, logged), 10% sells everything and closes
-it. Not yet: the review after reduce-only, the post-mortem and the hire (Next up 1b), firm-level and
-per-position limits.
+it. Cycle 51: a close opens a vacancy with the dead pod's post-mortem and a new PM is hired. Not yet:
+the review after reduce-only, firm-level and per-position limits.
 
 ### Pod metrics
 From: Human
@@ -311,7 +314,10 @@ From: Human
 Status: not started
 An orchestration engine runs each pod's workflows as programs that wake the agents: onboarding a
 new PM, running a backtest, a pitch, a post-mortem, a generation turnover.
-Now: "Backtest.exe" exists as `fund-runtime backtest` (deterministic, wakes minds in order).
+Now: "Backtest.exe" exists as `fund-runtime backtest` (deterministic, wakes minds in order), and
+"Onboarding.exe" as the Runtime's morning hire (`runtime/onboarding.py`, cycle 51: fills a vacancy
+under the cap, mints the key, hands the new PM the post-mortem). Not yet: workflows as an engine
+of their own (pitch, post-mortem, generation turnover).
 
 ## Generations and evolution
 
@@ -333,6 +339,8 @@ From: Human
 Status: not started
 A dead pod writes (or gets) a post-mortem. Post-mortems and lessons go to a library every agent can
 read, so the firm learns across generations.
+Now (cycle 51): physics writes a dead pod's post-mortem (its rule, forward days, the ladder's steps)
+into the vacancy, and only its successor reads it. No library every agent can read yet.
 
 ## Society and civilisation
 
@@ -448,7 +456,15 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 
 (Done, cycle 43: the backtest with real AI agents is working. Done, cycle 46: a real PM researches
 a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
-results.)
+results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM.)
+
+Cycle 52 plan: order kept, 1c next. Why: every piece of the machine now works once, each proven
+with one mind or scripted pods; the firm has never had several real minds competing for the same
+capital. A quarter is the first run where the algorithm ranks real pods against each other (20
+forward days are needed before any score exists), where thinking cost decides a ranking, and where
+turnover happens without anyone arranging it. It is also the firm the debate (2) and the monthly
+generation (3) will stand on. Fixed inside it: a seeded pod's later pitches get no capital answer
+(several seeded PMs will pitch again); the hiring law announced to agents as a system event.
 
 Cycle 49 plan: order kept. 1b next, because the machine so far moves only scripted pods: hiring a
 real mind into a dead pod's place is the first time an agent, not a script, enters the machine, and
@@ -470,12 +486,14 @@ verdicts move capital.
       reduce-only, 10% closes it and returns its capital to the centre. Proven on made-up pods: a
       planted edge grows, noise stays small, a copy is penalised, a bleeder is halved, frozen, closed,
       and the good pod is never cut.
-   b. *A dead pod is replaced.* When a pod closes, the firm hires a new PM (a real mind, a new
-      charter) who researches and pitches; an eligible pitch enters the machine. Recorded, $0 replays.
-      Queued (cycle 49): a vacancy opens on close, the hiring law fills it at the next morning
-      under the cap, the new PM is handed the dead pod's post-mortem.
+   b. *A dead pod is replaced.* Done (cycle 51).
    c. *The firm lives a quarter.* Several real pods inside the machine for three simulated months:
-      capital moves, pods die and are replaced. The first firm-scale run.
+      capital moves, pods die and are replaced. The first firm-scale run. Queued (cycle 52): four
+      real PMs, each given a sector of one made-up market (one with an edge that lasts, one pure
+      noise, one that sinks, one that crashes mid-quarter); they research, pitch, get seeded or
+      not; the algorithm re-weighs every five days net of each pod's thinking cost; the ladder
+      kills what bleeds and hires replace them. The Human gets a quarter report: capital per pod
+      week by week, deaths, hires, P&L net of thinking. Recorded, replays for $0.
 2. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
    bear argue the pitch in a thread; the firm's process decides (and judges the hypothesis).
 3. **The monthly generation.** Reset, selection, lessons kept, the next generation starts.
