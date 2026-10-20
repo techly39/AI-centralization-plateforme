@@ -146,6 +146,38 @@ def test_a_run_never_mints_while_another_run_counts_the_month(account, monkeypat
     p.create_key(1, 1_000_000, spec_id="pm")        # the other run is done: the mint goes ahead
 
 
+def _flaky(account: Account, failures: list) -> httpx.MockTransport:
+    """The account, but the next account requests fail as listed (a status, or a dropped line)."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        if failures and request.url.path != "/api/v1/chat/completions":
+            failure = failures.pop(0)
+            if failure == "drop":
+                raise httpx.ConnectError("dropped", request=request)
+            return httpx.Response(failure)
+        return account.handler(request)
+    return httpx.MockTransport(handler)
+
+
+def test_an_account_read_survives_a_passing_failure_and_fails_closed_after_three(account) -> None:
+    # Cycle 54: one 408 listing the keys stopped a real quarter at step 26 and lost its cost row.
+    account.add("firm-old", limit=0.5)
+    waits: list[float] = []
+    for passing in ([408], ["drop"], [503, 429]):
+        p = OpenRouterProvisioner("prov-key", CAP, transport=_flaky(account, list(passing)),
+                                  run_tag="t1", settle_s=0, sleep=waits.append)
+        assert p.month_committed() == 500_000
+    assert waits, "a passing failure is asked again after a pause"
+    # Three failures in a row: the month is unreadable, so the run stops (fail closed), and a
+    # refusal is never asked again (a 403 is an answer, not a passing failure).
+    for failures in ([408, 408, 408], ["drop"] * 3, [403]):
+        left = list(failures) + [200]
+        p = OpenRouterProvisioner("prov-key", CAP, transport=_flaky(account, left),
+                                  run_tag="t1", settle_s=0, sleep=lambda s: None)
+        with pytest.raises(OpenRouterError):
+            p.month_committed()
+        assert left == [200], "asked at most three times, and a refusal only once"
+
+
 def test_an_unlimited_firm_key_makes_the_month_unbounded(account) -> None:
     account.add("firm-no-limit", limit=None)
     with pytest.raises(OverCap):

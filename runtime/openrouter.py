@@ -66,6 +66,10 @@ MAX_TURN_TOKENS = 4096
 MINT_LOCK = REPO_ROOT / ".openrouter-mint.lock"
 #: How long a run waits for another run's mint before it gives up.
 MINT_LOCK_WAIT_S = 60.0
+#: An account read is asked this many times in all before it counts as unreadable; the
+#: answers worth asking again (a timeout, too many requests, the provider's own failure).
+ATTEMPTS = 3
+PASSING = frozenset({408, 429, 500, 502, 503, 504})
 #: The secret's shape, for the secret scan (:func:`holds_secret`).
 SECRET_PATTERN = re.compile(r"sk-or-[A-Za-z0-9_-]{8,}")
 
@@ -143,6 +147,24 @@ class OpenRouterProvisioner:
         #: key_ref -> turns the provider may have billed without saying what (red-team 0025)
         self._unstated: dict[str, int] = {}
 
+    def _ask(self, method: str, path: str, what: str, **kwargs: Any) -> Any:
+        """One account request, asked again (up to :data:`ATTEMPTS` times in all) when the answer
+        is a passing failure: a dropped connection, a timeout, 408, 429 or 5xx. Still nothing
+        after that is an :class:`OpenRouterError`, so every caller fails closed as before (cycle
+        54: one 408 listing the keys stopped a real quarter at step 26 and lost its cost record).
+        Only reads and the idempotent disable come through here, never a mint."""
+        for attempt in range(1, ATTEMPTS + 1):
+            try:
+                response = self._http.request(method, path, **kwargs)
+            except httpx.TransportError as exc:
+                if attempt == ATTEMPTS:
+                    raise OpenRouterError(f"{what}: {type(exc).__name__}") from exc
+            else:
+                if response.status_code not in PASSING or attempt == ATTEMPTS:
+                    return _json(response, what)
+            self._sleep(2.0 * attempt)
+        raise AssertionError("unreachable")  # pragma: no cover
+
     @classmethod
     def from_env(cls, cap_usd_micros: int, **kwargs: Any) -> OpenRouterProvisioner:
         key = os.environ.get(PROVISIONING_KEY_ENV, "")
@@ -157,8 +179,8 @@ class OpenRouterProvisioner:
         found: list[dict[str, Any]] = []
         offset = 0
         while True:
-            page = _json(self._http.get("/keys", params={"offset": offset, "include_disabled": "true"}),
-                         "listing the account's keys")
+            page = self._ask("GET", "/keys", "listing the account's keys",
+                             params={"offset": offset, "include_disabled": "true"})
             rows = page.get("data") if isinstance(page, dict) else None
             if not isinstance(rows, list):
                 raise OpenRouterError("listing the account's keys: no `data` list")
@@ -283,7 +305,7 @@ class OpenRouterProvisioner:
             agent_id, _, digest, _, _ = self._keys[key_ref]
             floor, unstated = self._billed[key_ref], self._unstated[key_ref]
             while True:
-                row = _json(self._http.get(f"/keys/{digest}"), "reading a key's spend")
+                row = self._ask("GET", f"/keys/{digest}", "reading a key's spend")
                 data = row.get("data") if isinstance(row, dict) else None
                 if not isinstance(data, dict):
                     raise OpenRouterError("reading a key's spend: no `data`")
@@ -306,7 +328,7 @@ class OpenRouterProvisioner:
 
     def _disable(self, digest: str) -> bool:
         try:
-            _json(self._http.patch(f"/keys/{digest}", json={"disabled": True}), "disabling a key")
+            self._ask("PATCH", f"/keys/{digest}", "disabling a key", json={"disabled": True})
         except (OpenRouterError, httpx.HTTPError):
             return False
         return True

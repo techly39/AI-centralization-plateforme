@@ -657,10 +657,12 @@ def lawful(doc: dict, label: str, metered: bool = True) -> None:
     metering = (doc.get("outcome") or {}).get("metering") or {}
     keys = metering.get("keys") or []
     check(f"{label}: every mind's thinking was charged by the system, none past its key's limit",
-          bool(keys) and all(k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          bool(keys) and all(type(k["spent_usd_micros"]) is int
+                             and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
           and len(of("cost_metered")) == len(keys),
-          "; ".join(f"{k['spec_id']} ${k['spent_usd_micros'] / 1e6:.3f} of "
-                    f"${k['limit_usd_micros'] / 1e6:.2f}" for k in keys)
+          "; ".join(f"{k['spec_id']} " + (f"${k['spent_usd_micros'] / 1e6:.3f}"
+                                          if type(k["spent_usd_micros"]) is int else "UNREAD")
+                    + f" of ${k['limit_usd_micros'] / 1e6:.2f}" for k in keys)
           + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
 
 
