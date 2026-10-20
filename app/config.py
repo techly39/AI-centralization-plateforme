@@ -42,7 +42,7 @@ class OMSConfig(BaseModel):
 class MarketDataConfig(BaseModel):
     # "yfinance" for real delayed quotes, "static" for an offline fixed table,
     # "synthetic" for a keyed offline random walk (backtests, ADR-030).
-    provider: Literal["yfinance", "static", "synthetic"] = "yfinance"
+    provider: Literal["yfinance", "static", "synthetic", "made_up"] = "yfinance"
     # Reuse a quote while the clock has advanced less than this. 0 disables.
     cache_ttl_seconds: float = Field(default=60.0, ge=0.0)
     # Prices used when provider == "static" (ticker -> price).
@@ -52,6 +52,10 @@ class MarketDataConfig(BaseModel):
     # `secrets.token_hex(32)`. Environment only (FUND_MARKETDATA__SYNTHETIC_KEY),
     # never config.yaml: the file is committed. No default — no key, no world.
     synthetic_key: SecretStr | None = None
+    # provider == "made_up": a market with a planted law, described by a short recipe
+    # (app/marketdata/made_up.py, validated there). Like the key, it is the world: environment only
+    # (FUND_MARKETDATA__MADE_UP, JSON), set by whoever hosts the world.
+    made_up: dict[str, Any] | None = None
     # Each symbol's price on 2000-01-01.
     synthetic_symbols: dict[str, float] = Field(
         default_factory=lambda: {"SYNA": 100.0, "SYNB": 50.0, "SYNC": 20.0}
@@ -149,6 +153,43 @@ class CapitalConfig(BaseModel):
         return self
 
 
+class HiringConfig(BaseModel):
+    """The hiring law (idea: a dead pod is replaced): when the risk ladder closes a pod, a vacancy
+    opens and the firm hires a new PM into a new pod. Frozen into the run's first vacancy, as the
+    capital law is into ``capital_opened``. The law decides the hire; no Builder, no agent."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    # Pods that are not closed, at most, once a vacancy is filled: a fill beyond it is refused.
+    max_live_pods: int = Field(default=8, ge=1, le=1000)
+    # The models a new PM is drawn from, in turn: the n-th vacancy hires models[(n - 1) % len].
+    models: tuple[str, ...] = Field(default=("anthropic/claude-haiku-5.5",), min_length=1,
+                                    max_length=32)
+    # The new PM's thinking budget (its key's limit); the Runtime checks it against the cap.
+    budget_usd: float = Field(default=0.30, gt=0.0, le=50.0)
+    # The new PM's charter: who it is and what it must do. The post-mortem comes with the hire.
+    charter: str = Field(default=(
+        "You are the newly hired portfolio manager of a pod in a hedge fund that trades a simulated "
+        "market with fake money. The pod before you was closed by the risk ladder: its post-mortem "
+        "(its rule, its forward days, the drawdown that closed it) is in your input. Your pod gets "
+        "capital only after you pitch a strategy and it passes the fund's validation gates; an "
+        "eligible pitch earns a small seed and trades forward. Research with run_research_backtest "
+        "on past data (the most recent days are held out, and your pitch is judged on them; every "
+        "backtest is counted). Pitch once, with submit_pitch, when you believe in a rule. Once your "
+        "pod is seeded, each day read your mandate (get_mandate) and place its orders "
+        "(place_order): that is how your rule trades. You remember nothing between days: read "
+        "your research, pitches and capital first. Be brief: every word you think is paid from "
+        "your pod's P&L. When you are done for the day, stop."),
+        min_length=1, max_length=8000)
+
+    @field_validator("models")
+    @classmethod
+    def _models_are_named(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not all(isinstance(m, str) and re.fullmatch(r"[A-Za-z0-9._:/-]{1,100}", m) for m in value):
+            raise ValueError("models: plain model ids (letters, digits, . _ : / -)")
+        return value
+
+
 class MCPConfig(BaseModel):
     """Settings for the MCP server (``mcp_server/``), not for the API itself.
 
@@ -240,6 +281,7 @@ class Settings(BaseSettings):
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     gates: GatesConfig = Field(default_factory=GatesConfig)
     capital: CapitalConfig = Field(default_factory=CapitalConfig)
+    hiring: HiringConfig = Field(default_factory=HiringConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

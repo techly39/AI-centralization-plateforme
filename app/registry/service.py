@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.clock import get_clock
-from app.db.models import Agent, AgentRole, AgentStatus
+from app.db.models import Agent, AgentRole, AgentStatus, Event
 from app.ledger.events import (
     EVENT_AGENT_DEACTIVATED,
     EVENT_AGENT_KEY_ROTATED,
@@ -158,6 +158,18 @@ def deactivate_agent(
         payload={"agent_id": agent.id},
     )
     return agent
+
+
+def registered_by_operator(session: Session, agent: Agent) -> bool:
+    """Was ``agent`` made by the operator's own command (``fund-env seed-admin``, a genesis), not
+    by another agent over HTTP? Its ``agent_registered`` names no actor. A run's minds are always
+    registered by a registrar, so no mind is operator-made (red-team, pod replacement: hiring is
+    the Runtime's act, through the operator's registrar, never a firm mind's)."""
+    for event in session.scalars(select(Event).where(Event.type == EVENT_AGENT_REGISTERED)
+                                 .order_by(Event.id)):
+        if (event.payload_json or {}).get("agent_id") == agent.id:
+            return event.actor_agent_id is None
+    return False
 
 
 def get_or_create_system_agent(session: Session) -> Agent:

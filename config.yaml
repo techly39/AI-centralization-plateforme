@@ -64,6 +64,14 @@ capital:
   reduce_only_at: 0.075        # ... it may only sell
   close_at: 0.10               # ... closed: every position sold, all its money back
 
+# The hiring law (app/capital/hiring.py): a pod the ladder closes opens a vacancy; the firm fills
+# it with a new pod and a new PM. Frozen into the run's first vacancy. The charter is the default
+# in app/config.py (HiringConfig) unless set here.
+hiring:
+  max_live_pods: 8             # pods not closed, at most, after a hire
+  models: ["anthropic/claude-haiku-5.5"]   # a new PM's model, taken in turn
+  budget_usd: 0.30             # its thinking budget (its key's limit), checked against the cap
+
 # MCP server (mcp_server/). It is a CLIENT of the API above, in its own process.
 # Leave api_key null here and pass it in the environment — this file is
 # committed, and the key is the identity every action is attributed to:

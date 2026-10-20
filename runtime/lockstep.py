@@ -107,8 +107,11 @@ class RunRecord:
     retired_at: tuple[int, ...] = ()
     #: ``(spec id, App agent id)`` per mind, in spec-id order: who is who in the ledger's
     #: ``actor_agent_id`` (``replay --verify`` names the wake an event belongs to). Empty for a
-    #: run refused before its minds were read.
+    #: run refused before its minds were read. A mind hired mid-run is in it too.
     agents: tuple[tuple[str, int], ...] = ()
+    #: Every hiring decision of the run (``runtime.onboarding.HireRecord``), in order: who joined
+    #: at which morning, or why a vacancy was not filled.
+    hires: tuple[Any, ...] = ()
 
 
 async def run_backtest(
@@ -121,6 +124,7 @@ async def run_backtest(
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
     replay: Recording | None = None,
     package: str | None = None,
+    hiring: Any = None,
 ) -> RunRecord:
     """Live ``steps`` steps of a backtest with ``minds``, the clock in the Runtime's hand.
 
@@ -131,6 +135,11 @@ async def run_backtest(
 
     With ``package`` (a name in :data:`runtime.packages.PACKAGES`), every wake is handed that
     day's data package, built through the mind's own key at the step's now.
+
+    With ``hiring`` (a :class:`runtime.onboarding.Onboarding`), every morning before the wakes the
+    open vacancies are offered to it; a mind it hires joins the roster from that step on, in
+    spec-id order, handed its post-mortem beside the input. A replay's recording must hold the
+    same hires (``replay.hired_ids``), and the run must be given its hiring to replay them.
     """
     for value, top in ((steps, MAX_STEPS), (days_per_step, MAX_DAYS_PER_STEP)):
         if type(value) is not int or not 0 <= value <= top:
@@ -146,8 +155,10 @@ async def run_backtest(
             raise ValueError("replay is a Recording")
         if any(m.spec.provider != "cassette" for m in ordered):
             return RunRecord("refused", "replay_mixed", label)
-        if {m.spec.id for m in ordered} != replay.spec_ids:
+        if {m.spec.id for m in ordered} != replay.spec_ids - replay.hired_ids:
             return RunRecord("refused", "replay_minds", label)
+        if bool(replay.hires) != (hiring is not None):
+            return RunRecord("refused", "replay_hiring", label)
         if steps != replay.steps:
             return RunRecord("refused", "replay_steps", label)
     # The input is copied once, deeply, here: every wake of the run sees the same
@@ -187,10 +198,12 @@ async def run_backtest(
     done: list[StepRecord] = []
     retired: list[str] = []
     retired_at: list[int] = []
+    hires: list[Any] = []
 
     def end(ended: str, reason: str | None = None) -> RunRecord:
-        return RunRecord(ended, reason or ended, label, tuple(done), tuple(retired),
-                         tuple(retired_at), tuple(who_is))
+        woke = "+".join(sorted({m.spec.provider for m in ordered}))
+        return RunRecord(ended, reason or ended, woke, tuple(done), tuple(retired),
+                         tuple(retired_at), tuple(sorted(who_is)), tuple(hires))
 
     for step in range(steps):
         if not decide_batch().allowed:
@@ -209,6 +222,23 @@ async def run_backtest(
             # Red-team 0018 H1: the recording's calendar is part of what is replayed.
             done.append(StepRecord(step, at, (), None))
             return end("diverged", f"diverged:clock:{step}:0:calendar_at")
+        if hiring is not None:
+            # Onboarding.exe, before anyone wakes: a vacancy the ladder opened is filled (or
+            # refused) and the new PM wakes this very morning.
+            made, joined, stop_hiring = await hiring.morning(
+                step, taken={m.spec.id for m in ordered}, meters=meters)
+            hires.extend(made)
+            agent_of = {h.spec_id: h.agent_id for h in made if h.outcome == "hired"}
+            for mind in joined:
+                ordered.append(mind)
+                who_is.append((mind.spec.id, agent_of[mind.spec.id]))
+                agents.add(agent_of[mind.spec.id])
+                if mind.meter is not None:
+                    meters.append(mind.meter)
+            ordered.sort(key=lambda m: m.spec.id)
+            if stop_hiring is not None:
+                done.append(StepRecord(step, at, (), None))
+                return end(*stop_hiring)
         wakes: list[WakeRecord] = []
         stop: tuple[str, str] | None = None
         for mind in ordered:
@@ -226,7 +256,9 @@ async def run_backtest(
                 break
             day = (None if universe is None
                    else await packages.build(package, mind.client, at, universe))
-            record = await wake(mind.spec, mind.client, workflow_input=step_input,
+            given = step_input if hiring is None or mind.spec.id not in hiring.inputs else {
+                **step_input, **hiring.inputs[mind.spec.id]}
+            record = await wake(mind.spec, mind.client, workflow_input=given,
                                 max_tool_calls=budget, tape=tape, meter=mind.meter, package=day)
             wakes.append(record)
             if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):

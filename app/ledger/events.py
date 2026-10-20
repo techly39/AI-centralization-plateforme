@@ -62,6 +62,13 @@ EVENT_CAPITAL_REALLOCATED = "capital_reallocated"  # payload: {day, inputs: {cen
 EVENT_POD_STAGE_CHANGED = "pod_stage_changed"      # payload: {pod_id, from, to, drawdown, index, high_water}
 EVENT_CAPITAL_SWEEP_FAILED = "capital_sweep_failed"  # payload: {error}: the machine skipped this advance
 
+# Hiring (app/capital/hiring.py): a pod the ladder closed opens a vacancy; a registrar fills it
+# with a new pod and PM (the agent_registered follows), or the Runtime refuses the hire.
+EVENT_VACANCY_OPENED = "vacancy_opened"  # payload: {vacancy_no, pod_id, pod_name, post_mortem, hire, law}
+EVENT_VACANCY_FILLED = "vacancy_filled"  # payload: {vacancy_id, pod_id, pod_name, agent_id, agent_name, model, budget_usd}
+EVENT_HIRE_REFUSED = "hire_refused"      # payload: {vacancy_id, reason, by}
+EVENT_HIRE_FAILED = "hire_failed"        # payload: {vacancy_id, pod_id, agent_id, reason}: the hired pod is closed, the vacancy open again
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

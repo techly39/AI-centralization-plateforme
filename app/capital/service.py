@@ -10,7 +10,8 @@ advance holds, as the system identity; one transaction.
    ``pod_stage_changed``,
    mirrored on the pod's row (the order system reads it). Halved → half its equity goes back to the
    centre; reduce-only → its pending buys are cancelled; closed → every pending order cancelled,
-   every position sold, all its cash back to the centre.
+   every position sold, all its cash back to the centre, and a vacancy opens
+   (:mod:`app.capital.hiring`).
 3. **Seeds.** Each eligible pitch of a pod the machine has not seeded gets ``seed_usd`` from the
    centre (``capital_seeded``, then ``allocation_set``), if the centre holds it. A long-short rule
    is refused, once, in the ledger: the order system cannot short yet; so is a rule that fails the
@@ -43,6 +44,7 @@ from app.capital.allocation import (
     reallocate,
     worst_drawdown,
 )
+from app.capital.hiring import open_vacancy
 from app.config import CapitalConfig, get_settings
 from app.db.models import Agent, Event, Order, OrderSide, OrderStatus, Pod, Position
 from app.ledger.events import (
@@ -241,6 +243,9 @@ def _set_stage(session: Session, *, pod_id: int, old: str, new: str, record: Pod
                         why="the pod was closed by the risk ladder")
         recall(session, pod_id=pod_id, amount=None, actor=actor, provider=provider, stake=stake,
                why=f"risk ladder: {worst:.1%} down from the high-water mark, the pod is closed")
+        # The firm recruits (idea: a dead pod is replaced): the vacancy, its post-mortem and the
+        # hire the law names, in the close's own transaction.
+        open_vacancy(session, pod_id=pod_id, record=record, actor=actor)
         return
     if rank(old) < rank("halved") <= rank(new):
         recall(session, pod_id=pod_id, amount=stake / 2, actor=actor, provider=provider,

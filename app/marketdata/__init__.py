@@ -45,6 +45,13 @@ def _build_default_provider() -> MarketDataProvider:
             )
         key = bytes.fromhex(cfg.synthetic_key.get_secret_value())
         return SyntheticProvider(key, cfg.synthetic_symbols)
+    if cfg.provider == "made_up":
+        from app.marketdata.made_up import MadeUpMarket, bars
+
+        if cfg.made_up is None:
+            raise ValueError("marketdata.provider is 'made_up' but no recipe is set: put its JSON "
+                             "in FUND_MARKETDATA__MADE_UP")
+        return BarsProvider(bars(MadeUpMarket.model_validate(cfg.made_up)))
     return YFinanceProvider(cache_ttl_seconds=cfg.cache_ttl_seconds)
 
 

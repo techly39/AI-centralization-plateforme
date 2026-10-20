@@ -90,6 +90,9 @@ class WorldRecipe(BaseModel):
     #: Symbols that join the configured synthetic market (``config.yaml``), each with its price
     #: on the market's first day (ADR-048: a universe wide enough for many predictions).
     extra_symbols: dict[str, float] | None = Field(default=None, max_length=MAX_EXTRA_SYMBOLS)
+    #: A made-up market with a planted law instead of the synthetic one (physics validates it:
+    #: ``app/marketdata/made_up.py``), e.g. a sector that collapses so the ladder closes a pod.
+    market: dict[str, Any] | None = None
 
     @field_validator("extra_symbols")
     @classmethod
@@ -150,15 +153,19 @@ def fund_env() -> Path:
     return path
 
 
-def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None) -> dict[str, str]:
+def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
+              market: dict[str, Any] | None = None) -> dict[str, str]:
     """The environment of every child: the parent's, minus each ``FUND_*``, plus exactly the
-    world's own database, the synthetic market (with the recipe's extra symbols) and its key."""
+    world's own database, its market (the synthetic one with the recipe's extra symbols, or the
+    recipe's made-up market) and its key."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("FUND_")}
     env["FUND_DATABASE_URL"] = f"sqlite:///{db}"
-    env["FUND_MARKETDATA__PROVIDER"] = "synthetic"
+    env["FUND_MARKETDATA__PROVIDER"] = "synthetic" if market is None else "made_up"
     env[WORLD_KEY_ENV] = key
     if extra_symbols:
         env["FUND_MARKETDATA__SYNTHETIC_SYMBOLS"] = json.dumps(extra_symbols, sort_keys=True)
+    if market is not None:
+        env["FUND_MARKETDATA__MADE_UP"] = json.dumps(market, sort_keys=True)
     return env
 
 
@@ -294,7 +301,7 @@ async def hosted(recipe_doc: dict[str, Any], key: str) -> AsyncIterator[World]:
     world: World | None = None
     try:
         db = tmp / "world.db"
-        env = child_env(db, key, recipe.extra_symbols)
+        env = child_env(db, key, recipe.extra_symbols, recipe.market)
         registrar, clock = await asyncio.to_thread(_genesis, recipe, tmp, env)
         world = World(tmp, db, registrar, clock, env)
         yield world

@@ -67,6 +67,14 @@ class AgentRegisterRequest(BaseModel):
     charter_ref: str | None = Field(default=None, max_length=256)
     research_domains: list[str] | None = None
 
+    @model_validator(mode="after")
+    def _not_a_hire(self) -> AgentRegisterRequest:
+        # ``vacancy:<id>`` is physics' mark on a hired PM (app/capital/hiring.py): a registrar does
+        # not write it (auditor, pod replacement).
+        if (self.charter_ref or "").strip().casefold().startswith("vacancy:"):
+            raise ValueError("charter_ref 'vacancy:...' is physics' mark on a hire; choose another")
+        return self
+
 
 class AgentCreatedResponse(BaseModel):
     """Returned once at registration; carries the plaintext key exactly once."""
@@ -654,3 +662,10 @@ class PitchOut(BaseModel):
     verdict: dict[str, Any] | None = Field(
         description="The gates' verdict on the held-out window: eligible, each gate's number, "
                     "threshold and pass/fail/null, the attempts counted.")
+    # Absent until there is an answer, so a pitch reads as it did before the answer existed (a
+    # recorded run replays against the same words).
+    capital: dict[str, Any] | None = Field(
+        default=None, exclude_if=lambda v: v is None,
+        description="What the capital machine did with the pitch: absent = nothing yet (it looks "
+                    "at eligible pitches at the next advance); outcome 'seeded' with seed_usd, or "
+                    "'refused' with the reason (e.g. the order system cannot short yet).")

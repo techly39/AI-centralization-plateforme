@@ -11,7 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.models import CashBalance, Event, Pod, Position
-from app.ledger.events import EVENT_ALLOCATION_SET, EVENT_POD_STAGE_CHANGED
+from app.ledger.events import EVENT_ALLOCATION_SET, EVENT_HIRE_FAILED, EVENT_POD_STAGE_CHANGED
 from app.ledger.reducers import DerivedState, apply_event
 
 
@@ -38,6 +38,8 @@ def rebuild_state(session: Session) -> DerivedState:
             allocated[pod_id] = allocated.get(pod_id, 0.0) + float(payload["delta"])
         elif event.type == EVENT_POD_STAGE_CHANGED:
             stage[int(payload["pod_id"])] = str(payload["to"])
+        elif event.type == EVENT_HIRE_FAILED:   # a failed hire's empty pod is closed
+            stage[int(payload["pod_id"])] = "closed"
 
     # Wipe and repopulate the derived tables from the accumulator.
     session.execute(delete(Position))

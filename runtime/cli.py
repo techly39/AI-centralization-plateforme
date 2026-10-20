@@ -90,6 +90,7 @@ from runtime.lockstep import (
 from runtime.metering import FakeProvisioner, sync_costs, usd_to_micros_floor
 from runtime.native import DEFAULT_MAX_TOOL_CALLS
 from runtime.openrouter import OpenRouterError, OpenRouterProvisioner
+from runtime.onboarding import HIRE_PREFIX, HireTemplate, Onboarding, load_template, probe_spec, vet_template
 from runtime.provision import ProvisionError, provision, vet
 from runtime.registry import ProviderRefused, check_spec
 from runtime.replay import Recording, RecordingError, as_cassette
@@ -134,6 +135,9 @@ def main(argv: list[str] | None = None, *,
                          f"in ${world.WORLD_KEY_ENV}; the cassette then proves the run (ADR-045)")
     bt.add_argument("--cassette", type=Path, metavar="PATH",
                     help=f"write the run's record to a new PATH{cassette.SUFFIX} (never overwritten)")
+    bt.add_argument("--hire", type=Path, metavar="FILE",
+                    help="hire into every vacancy the risk ladder opens, with this template (YAML: "
+                         "provider, adapter, script, tools); the hiring law names the rest")
     rp = sub.add_parser("replay", help="replay a recorded run's minds from its cassette (no model, $0)")
     rp.add_argument("--cassette", type=Path, required=True, metavar="PATH",
                     help=f"the recorded run's {cassette.SUFFIX} (a completed run of scripted minds)")
@@ -217,7 +221,7 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
             specs = specs_from_cassette(cas.specs)
         except (CassetteError, RecordingError) as exc:
             raise _Usage(f"{args.cassette}: {exc}") from exc
-        if {s.id for s in specs} != rec.spec_ids:
+        if {s.id for s in specs} != rec.spec_ids - rec.hired_ids:
             raise _Usage("the cassette's specs are not the recording's minds: their ids differ")
         if cas.parameters["steps"] != rec.steps:
             raise _Usage("the cassette's parameters disagree with its recording (steps)")
@@ -226,6 +230,7 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
                 packages.check(package, cas.parameters["workflow_input"])
             except packages.PackageError as exc:
                 raise _Usage(f"{args.cassette}: {exc}") from exc
+        hiring = recorded_hiring(cas.parameters, rec)
         try:
             for spec in specs:  # the recorded spec itself must be one a mind is built from
                 check_spec(spec)
@@ -242,9 +247,26 @@ def _replay(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None
                                steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
                                workflow_input=cas.parameters["workflow_input"],
                                max_tool_calls=cas.parameters["max_tool_calls"], replay=rec,
-                               package=cas.parameters.get("package")))
+                               package=cas.parameters.get("package"), hiring=hiring))
     print(redact(json.dumps(out, indent=2, sort_keys=True)))
     return 0 if out["ended"] == "completed" else 1
+
+
+def recorded_hiring(parameters: dict[str, Any], rec: Recording) -> HireTemplate | None:
+    """The hiring template a recorded run hired with (``None``: it hired nobody), checked as a
+    mind can be built from it; else :class:`_Usage`."""
+    doc = parameters.get("hiring")
+    if doc is None:
+        if rec.hires:
+            raise _Usage("the recording hired, but the cassette holds no hiring template")
+        return None
+    try:
+        template = HireTemplate.model_validate(doc)
+        check_spec(probe_spec(template))
+        check_spec(as_cassette(probe_spec(template)))
+    except (ValueError, ProviderRefused) as exc:
+        raise _Usage(f"the cassette's hiring template cannot replay: {exc}") from exc
+    return template
 
 
 def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | None) -> int:
@@ -277,11 +299,12 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
                 cassette.check_path(args.cassette)
             except CassetteError as exc:
                 raise _Usage(str(exc)) from exc
+        hiring = load_template(args.hire) if args.hire is not None else None
     except (SpecError, _Usage) as exc:
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
     run = dict(steps=args.steps, days_per_step=args.days_per_step, workflow_input=workflow_input,
-               max_tool_calls=args.max_tool_calls, package=args.package)
+               max_tool_calls=args.max_tool_calls, package=args.package, hiring=hiring)
     ledger = None
     if hosting:
         try:
@@ -303,9 +326,10 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         try:
             redactions = cassette.write(
                 args.cassette, out,
-                parameters={k: run[k] for k in ("steps", "days_per_step", "max_tool_calls",
-                                                "workflow_input", "package")
-                            if k != "package" or run[k] is not None},
+                parameters={**{k: run[k] for k in ("steps", "days_per_step", "max_tool_calls",
+                                                   "workflow_input", "package")
+                               if k != "package" or run[k] is not None},
+                            **({"hiring": hiring.model_dump(mode="json")} if hiring else {})},
                 specs=[spec.model_dump(mode="json") for spec in specs],
                 world={"recipe": recipe} if ledger is not None else None, ledger=ledger)
         except CassetteError as exc:
@@ -335,7 +359,8 @@ async def _hosted(specs: list[AgentSpec], recipe: dict[str, Any], key: str,
 
 
 async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, clock_key: str,
-                   transport: httpx.AsyncBaseTransport | None, **run: Any) -> dict[str, Any]:
+                   transport: httpx.AsyncBaseTransport | None, *,
+                   hiring: HireTemplate | None = None, **run: Any) -> dict[str, Any]:
     def connect(key: str) -> FundClient:
         return FundClient(base_url=server, api_key=key, transport=transport)
 
@@ -352,6 +377,16 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
         return halted()
     if (problem := vet(specs, law)) is not None:
         return refused(f"provision:{problem}")
+    replaying = run.get("replay") is not None
+    if hiring is not None:
+        # A hire is a mind the run will make: judged before physics hears of the run.
+        for spec in sorted(specs, key=lambda s: s.id):
+            if spec.id.startswith(HIRE_PREFIX):
+                return refused(f"provision:hire_prefix:{spec.id}")
+        if not replaying and (problem := vet_template(hiring, law)) is not None:
+            return refused(f"provision:{problem}")
+    hire_kind = (None if hiring is None
+                 else as_cassette(probe_spec(hiring)) if replaying else probe_spec(hiring))
     if run.get("replay") is None:
         # Red-team 0020: outside a replay a cassette mind has no tape and could never wake.
         for spec in sorted(specs, key=lambda s: s.id):
@@ -362,14 +397,16 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
     try:
         # Both before anything is registered: physics takes the declaration only
         # while no firm agent has acted (ADR-032 (p)).
-        problem = await check_clock(clock) or await declare_minds(clock, specs)
+        problem = await check_clock(clock) or await declare_minds(
+            clock, [*specs, *([hire_kind] if hire_kind is not None else [])])
         if problem == "minds_refused:423":
             return halted()
         if problem is not None:
             return refused(problem)
         # Where the metered minds' keys live: the fake provisioner, in this process (ADR-044),
         # or the OpenRouter account (ADR-047). One kind per run.
-        metered = {s.provider for s in specs if s.provider in METERED_PROVIDERS}
+        metered = {s.provider for s in [*specs, *([hire_kind] if hire_kind is not None else [])]
+                   if s.provider in METERED_PROVIDERS}
         provisioner: FakeProvisioner | OpenRouterProvisioner | None = None
         if len(metered) > 1:
             return refused("provision:mixed_metered_providers")
@@ -398,9 +435,14 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
                 provisioner.close()
             raise
         metering = None
+        onboarding = None if hiring is None else Onboarding(
+            hiring, registrar, connect, provisioner=provisioner,
+            recorded=run["replay"].hires if replaying else None)
         try:
-            record = await run_backtest(minds, clock, **run)
+            record = await run_backtest(minds, clock, hiring=onboarding, **run)
         finally:
+            if onboarding is not None:
+                minds = [*minds, *onboarding.minds]   # the hired minds are metered and closed too
             if provisioner is not None:
                 # Once, after the run ends, whatever the end — a crash or SystemExit too
                 # (red-team 0021): the meter's totals reach the ledger.

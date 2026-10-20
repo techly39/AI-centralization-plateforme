@@ -30,15 +30,24 @@ hired to pitch in its place. Today the ladder closes a pod and that is the end o
   system, is shown against its key.
 
 ## Plan
-1. Law: `hiring:` in config (max live pods, model pool, budget per hire, charter template path).
-2. Physics: on close the capital machine writes `vacancy_opened`; `GET /vacancies` + MCP tool;
-   filling one (`POST /vacancies/{id}/fill`, management/registrar only) creates the pod and the
-   agent in one event chain; rebuild re-derives it.
-3. The post-mortem: a pure function of the ledger (rule, record, ladder steps), a data package.
-4. Runtime: the conductor reads the vacancies each morning, provisions a mind from the hiring
-   template (same checks as `provision`: cap, HALT, names), mints its key, adds it to the roster
-   from that step on. The cassette records the hire; replay rebuilds the same roster.
+1. Law: `hiring:` in config (max live pods, model pool taken in turn, budget per hire, charter
+   text), frozen into the first vacancy of the run.
+2. Physics: on close the capital machine writes `vacancy_opened` with the post-mortem and the hire
+   the law names (pod and PM names, model, budget, charter). `GET /vacancies`, `GET /vacancies/{id}`
+   (management, or the PM hired into it), `POST /vacancies/{id}/fill` (a registrar: makes the pod
+   and the PM, returns its key once; refused, in the ledger, at the pod limit or if already
+   filled), `POST /vacancies/{id}/refuse` (the Runtime: "the budget does not fit the cap"). Each
+   with its MCP tool.
+3. The post-mortem: a pure function of the ledger at the close (the rule and its hypothesis, the
+   forward days, the ladder's steps with their drawdowns, the capital in and out), frozen in the
+   vacancy.
+4. Runtime ("Onboarding.exe"): before each step's wakes the conductor reads the open vacancies,
+   checks the hire's budget against the cap with every live key, fills, mints the key, adds the
+   mind from that step on, its first wake handed the post-mortem. The cassette records the hire;
+   replay rebuilds the same roster.
 5. Record one real run (a few cents of the cap), commit it under `evidence/pod-replacement/`.
+Cut: session 1 = steps 1-3 and demo part A through the API; session 2 = step 4 and a hosted world
+whose market can kill a pod; session 3 = the real run, red-team, auditor, merge.
 Left out: a manager mind who chooses the hire; firing a PM who never earns a seed (deadline);
 lessons library across generations; per-position and firm-level limits.
 
@@ -50,3 +59,11 @@ with every live key; a pod can read its correlation from its own score row (the 
 
 ## Progress
 - cycle 49: planned.
+- cycle 50: built all of it but the real run: the vacancy, the hire, the post-mortem and the pod
+  limit (physics); `GET /mandate`; the Runtime hiring mid-run (`--hire`), recorded and replayed;
+  a made-up market a hosted world can be built from. Demo A and B0 pass ($0); next: red-team,
+  then the real recorded hire, then the auditor.
+- cycle 51: red-team's 3 holes fixed. First real hire found a gap: a refused seed was invisible
+  to the PM (it re-pitched 8 times); pitches now show the capital answer. Re-recorded: the PM read
+  the refusal, went long-only, was seeded and trades. Auditor blocked once (a hire known from a
+  free-text label), fixed; second pass PASS. Merged.

@@ -132,10 +132,16 @@ in a thread before the decision. The Human can read every pitch and comment; the
 
 ### Hiring new PMs: turnover
 From: Human
-Status: planned (Next up 1b)
+Status: working (cycle 51)
 (Matured from "a lot of turnover".) When a pod dies, the firm recruits: a new PM is created (new
 charter, maybe a different model, maybe inherited lessons) and must pitch to earn capital. The
 firm, not the Builder, decides how many pods it runs and who it hires, inside the agent caps.
+Now (cycle 51, ADR-050): a pod the ladder closes opens a vacancy with its post-mortem; the hiring
+law (live-pod limit, models in turn, budget, charter) names the hire; the Runtime fills it the
+next morning under the cap, and the new PM wakes with the post-mortem, researches and pitches.
+Recorded: a real Haiku 5.5 hire pitched long-short, read the refusal on its pitch, re-pitched
+long-only, was seeded $200k and trades. Not yet: a manager mind choosing the hire, firing a PM who
+never earns a seed, lessons across generations.
 
 ### The firm governs itself
 From: Human
@@ -421,6 +427,14 @@ older pod's (`corr_factor` is 1 − ρ), and which pod when there is only one; a
 price is valued at cost, so the ladder cannot see a loss on it (impossible on a made-up market,
 possible if a real ticker's history fails); the demo checks the centre's books by construction,
 not by an independent sum of every dollar.
+From a dead pod is replaced (cycle 51, red-team and auditor; their three holes and the auditor's
+three blocks are fixed): the "only the operator's registrar hires" check sits in the vacancies
+router, not in the permissions table, and the fill function does not enforce it itself; the
+hiring law is not announced to agents as a system event; the demo's scripted part does not itself
+show a cap refusal (tests do); a seeded pod's later pitches get no capital answer at all (the real
+PM guessed right that its pod was already running its seeded pitch); empty pods (made by the
+operator, or emptied by management firing their PMs) still count toward the live-pod limit, so a
+management mind could fill the limit and block hiring (denies turnover, moves no money).
 
 ### Paid to report holes
 From: Builder
