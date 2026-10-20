@@ -65,4 +65,12 @@ hiring under the cap, metering per step: red-team + auditor before merge.
   into physics; each PM sees its own judgement through its own key; a failed month's end retries.
 - cycle 58: the real run's part of the demo: a fuller charter, checks of the month's-end law that
   judge any recording (four forged records fail them), the report from a recording; the real
-  run recorded (three Haiku PMs and their hires); red-team, auditor.
+  run recorded ($0.575: pod-2 let go at September's end after 8 noise pitches, the crash's PM at
+  the close, both places hired and seeded; every law check passes, replay IDENTICAL). Red-team:
+  the high (agent cap at every registration) and two mediums (grace judged by the longest-serving
+  PM; a let-go PM's orders cancelled, a pod with money not closed) fixed, four lows filed.
+  The demo still fails one check, rightly: hire-1's key spent $0.200068 of $0.20 (the provider
+  finishes the turn that crosses a key's limit).
+- Next (cycle 59): make a key's limit hard: refuse or shorten a turn whose worst case (its
+  prompt so far + MAX_TURN_TOKENS at the model's price) would cross what the key has left, and
+  count that one-turn reserve in the monthly cap; re-record B (about $0.60); auditor; merge.
