@@ -383,31 +383,41 @@ FIRM = (
     "a strategy and it passes the fund's validation gates; an eligible pitch earns a small seed "
     "and trades forward. Every month is a generation: get_capital shows the laws, including who "
     "is let go at a month's end. Be brief: every word you think is paid from your pod's P&L.")
-WORLD = {"start": f"{START.isoformat()}T14:30:00Z", "admin": "generation-mgmt",
-         "pods": [{"name": HOSTED[name], "allocation": 0} for name in FOUNDING],
-         "market": MARKET.model_dump(mode="json"),
-         "laws": {"capital": {"tell_pms": True},
-                  "hiring": {"max_live_pods": LIMIT, "charter": "You are a newly hired PM. " + FIRM,
-                             "budget_usd": 0.20},
-                  "generation": {"on": True, "grace_days": GRACE}}}
+#: The rehearsal's minds are scripts on the fake metered provider: each model turn is billed to
+#: the mind's own key (a few cents a wake), so the per-step charge and the fitness net of thinking
+#: are exercised at $0. Each key's limit, and a hire's (the hiring law's), fits the cap.
+REHEARSAL_BUDGET_USD = 2.0
+
+
+def world(provider: str) -> dict:
+    return {"start": f"{START.isoformat()}T14:30:00Z", "admin": "generation-mgmt",
+            "pods": [{"name": HOSTED[name], "allocation": 0} for name in FOUNDING],
+            "market": MARKET.model_dump(mode="json"),
+            "laws": {"capital": {"tell_pms": True},
+                     "hiring": {"max_live_pods": LIMIT,
+                                "charter": "You are a newly hired PM. " + FIRM,
+                                "budget_usd": (REHEARSAL_BUDGET_USD if provider == "fake-metered"
+                                               else 0.20)},
+                     "generation": {"on": True, "grace_days": GRACE}}}
 
 
 def write_world(directory: Path, provider: str) -> None:
     """The hosted run's files: the world, the input, the three PMs, the hiring template."""
     (directory / "specs").mkdir(parents=True, exist_ok=True)
-    (directory / "world.json").write_text(json.dumps(WORLD))
+    (directory / "world.json").write_text(json.dumps(world(provider)))
     found = {f"{HOSTED[name]}-pm": FOUNDING[name] for name in FOUNDING}
     doc = {"sectors": {pm: [f"{fam}{k:02d}" for k in range(FAMILIES[fam][0])]
                        for pm, fam in found.items()}}
-    if provider == "scripted":   # each scripted PM pitches its sector once; each hire, its own
+    if provider == "fake-metered":   # each scripted PM pitches its sector once; each hire, its own
         doc["pitch_rules"] = {pm: rule(fam, 5) for pm, fam in {**found, **HIRED}.items()}
     (directory / "input.json").write_text(json.dumps(doc))
     for pod, pm in enumerate(found, start=1):
         spec = {"id": pm, "name": pm, "role": "pm", "pod": pod,
                 "charter": f"You are {pm}, the PM of pod-{pod}. " + FIRM,
-                "provider": "scripted", "script": "pitch-pm"}
+                "provider": "fake-metered", "script": "pitch-pm",
+                "budget_usd": REHEARSAL_BUDGET_USD}
         (directory / "specs" / f"{pm}.yaml").write_text(json.dumps(spec))
-    (directory / "hire.yaml").write_text(json.dumps({"provider": "scripted",
+    (directory / "hire.yaml").write_text(json.dumps({"provider": "fake-metered",
                                                      "script": "pitch-pm"}))
 
 
@@ -463,14 +473,35 @@ def turnover_chain(doc: dict, label: str) -> None:
           f"retired {retired}; hired {hired}")
 
 
+def charged(doc: dict, label: str) -> None:
+    """Thinking reached the ledger as the run lived: cost rows before each advance, each month's
+    fitness net of them, and the provider's own totals after the run no higher than the last."""
+    rows = [(r[0], r[2], r[3], json.loads(r[4])) for r in (doc.get("ledger") or {}).get("rows")
+            or []]
+    advances = [i for i, _, t, _ in rows if t == "clock_advanced"]
+    costs = [(i, p) for i, _, t, p in rows if t == "cost_metered"]
+    gens = [p for _, _, t, p in rows if t == "generation_ended"]
+    during = [i for i, _ in costs if advances and i < advances[-1]]
+    thinking = [round(sum(p["thinking_usd"] for p in g["pods"]), 4) for g in gens]
+    metering = (doc.get("outcome") or {}).get("metering") or {}
+    check(f"{label}: each mind's thinking is posted at every step's end, before the advance, and "
+          "each month's fitness is net of it",
+          len(during) > 2 * STEPS and all(t > 0 for t in thinking) and len(thinking) == 3,
+          f"{len(during)} cost rows during the run; thinking by month ${thinking}")
+    check(f"{label}: after the run, the meter's own totals are what the run already posted "
+          "(nothing left over)", (metering.get("sync") or {}).get("posted") == 0
+          and (metering.get("sync") or {}).get("refused") == [],
+          json.dumps(metering.get("sync")))
+
+
 def rehearsal() -> None:
     """B0, $0: the hosted months with scripted minds, recorded and verified now."""
     with tempfile.TemporaryDirectory(prefix="fund-generation-") as t:
         tmp = Path(t)
-        write_world(tmp, "scripted")
+        write_world(tmp, "fake-metered")
         r = fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
                           "hire.yaml", "--input", "input.json", "--steps", str(STEPS),
-                          "--days-per-step", str(DAYS_PER_STEP),
+                          "--days-per-step", str(DAYS_PER_STEP), "--charge-each-step",
                           "--cassette", "rehearsal.cassette.json"], tmp)
         tape = tmp / "rehearsal.cassette.json"
         if not check("B0: a scripted rehearsal of the hosted months completes and is recorded",
@@ -478,7 +509,9 @@ def rehearsal() -> None:
                      f"{r.stderr.strip()[-300:] if r.returncode else 'completed'}"):
             return
         text = tape.read_text(encoding="ascii")
-    turnover_chain(json.loads(text), "B0")
+    doc = json.loads(text)
+    turnover_chain(doc, "B0")
+    charged(doc, "B0")
     verify(text, "B0")
 
 

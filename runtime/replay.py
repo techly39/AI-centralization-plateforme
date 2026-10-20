@@ -36,6 +36,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import ROUND_FLOOR, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -171,7 +172,9 @@ class Recording:
     def __init__(self, steps: int, tapes: Mapping[tuple[int, str], Tape],
                  calendar: tuple[tuple[str, str], ...] = (),
                  hires: tuple[HireRecord, ...] = (),
-                 retired: Mapping[str, int] | None = None) -> None:
+                 retired: Mapping[str, int] | None = None,
+                 charged: Mapping[int, tuple[tuple[str, int, str, int], ...]] | None = None
+                 ) -> None:
         if type(steps) is not int or not all(
                 type(k) is tuple and len(k) == 2 and type(k[0]) is int and type(k[1]) is str
                 and type(t) is Tape for k, t in tapes.items()):
@@ -194,6 +197,28 @@ class Recording:
             if any(k[1] == spec_id and k[0] >= at for k in self._tapes):
                 raise RecordingError(f"{spec_id} wakes after it was retired")
         self.spec_ids = frozenset(spec_id for _, spec_id in self._tapes) | frozenset(self.retired)
+        #: step -> the thinking cost the recorded run posted at its end (``charge_each_step``):
+        #: ``(spec id, agent id, key_ref, total µ$)``. Each total is exactly what the spec's
+        #: recorded turns stated through that step, so a replay posts only what its tapes hold.
+        self._charged = dict(charged or {})
+        stated: dict[str, int] = {}
+        last: dict[str, int] = {}
+        for step in range(steps):
+            for spec_id in sorted(self.spec_ids):
+                stated[spec_id] = stated.get(spec_id, 0) + sum(
+                    _floor(t.response.usage.cost_usd) for t in self.tape(step, spec_id).turns
+                    if t.response is not None)
+            rows = self._charged.get(step, ())
+            if type(rows) is not tuple or len({r[0] for r in rows if type(r) is tuple}) != len(rows):
+                raise RecordingError(f"step {step}: the charges are malformed")
+            for row in rows:
+                if (type(row) is not tuple or len(row) != 4 or type(row[0]) is not str
+                        or type(row[1]) is not int or type(row[2]) is not str
+                        or type(row[3]) is not int or row[0] not in self.spec_ids
+                        or row[3] != stated[row[0]] or row[3] <= last.get(row[0], 0)):
+                    raise RecordingError(f"step {step}: a charge is not what the recorded turns "
+                                         "stated")
+                last[row[0]] = row[3]
         if type(hires) is not tuple or any(type(h) is not HireRecord for h in hires):
             raise RecordingError("hires are a tuple of HireRecords")
         #: Every hiring decision of the recorded run, and the minds it hired (their wakes are in
@@ -228,12 +253,18 @@ class Recording:
         tapes: dict[tuple[int, str], Tape] = {}
         calendar: list[tuple[str, str]] = []
         seen: set[tuple[str, int]] = set()
+        charges: dict[int, tuple[tuple[Any, ...], ...]] = {}
         for n, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("step") != n:
                 raise RecordingError(f"step {n} is out of order")
             if type(step.get("at")) is not str or type(step.get("advanced_to")) is not str:
                 raise RecordingError(f"step {n}: a completed step has a start and a landing time")
             calendar.append((step["at"], step["advanced_to"]))
+            if step.get("charged"):
+                if type(step["charged"]) is not list or any(type(r) is not list
+                                                            for r in step["charged"]):
+                    raise RecordingError(f"step {n}: the charges are malformed")
+                charges[n] = tuple(tuple(r) for r in step["charged"])
             for wake in step.get("wakes") or []:
                 try:
                     spec_id = wake["spec_id"]
@@ -262,7 +293,11 @@ class Recording:
             # Red-team 0018 H4: a retirement is the recorded refused wake and the run's word
             # together; either one alone is not a run that happened.
             raise RecordingError("a retired mind's refused wake and the run's word disagree")
-        return cls(len(steps), tapes, tuple(calendar), hires, retired_at)
+        return cls(len(steps), tapes, tuple(calendar), hires, retired_at, charges)
+
+    def charged(self, step: int) -> tuple[tuple[str, int, str, int], ...]:
+        """The thinking cost the recorded run posted at ``step``'s end (none: nothing)."""
+        return self._charged.get(step, ())
 
     def calendar(self, step: int) -> tuple[str, str] | None:
         """``(at, advanced_to)`` the recording had for ``step``; ``None`` for a hand-built one."""
@@ -334,6 +369,11 @@ def _tape(wake: Mapping[str, Any]) -> Tape:
             _SHA, tools_digest):
         raise RecordingError("a wake records its model and its tools' digest")
     return Tape(tuple(turns), ended, calls, model, tools_digest)
+
+
+def _floor(usd: float) -> int:
+    """``runtime.metering.usd_to_micros_floor``, here so this module reaches nothing."""
+    return int((Decimal(repr(float(usd))) * 1_000_000).to_integral_value(rounding=ROUND_FLOOR))
 
 
 def as_cassette(spec: Any) -> Any:

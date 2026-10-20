@@ -170,3 +170,27 @@ def test_a_recorded_retirement_replays_where_it_happened_and_nowhere_else():
                    _retired_run(["pm-gone"], [])):              # a word with no step
         with pytest.raises(RecordingError):
             Recording.from_outcome(forged)
+
+
+# --- thinking charged each step is part of the recording -------------------------------------------
+
+def test_a_recorded_charge_must_be_what_the_recorded_turns_stated():
+    from runtime.replay import Recording, RecordingError
+    from tests.test_cassette_replay import _wake_json
+
+    def run(*charges):
+        steps = [{"step": n, "at": f"d{n}", "wakes": [_wake_json("pm")], "advanced_to": f"d{n + 1}",
+                  **({"charged": c} if c is not None else {})} for n, c in enumerate(charges)]
+        return {"run": {"ended": "completed", "retired": [], "steps": steps}}
+
+    # each wake's one turn stated $0.50: 500000 µ$ after step 0, 1000000 after step 1
+    rec = Recording.from_outcome(run([["pm", 7, "key-pm", 500_000]], [["pm", 7, "key-pm", 1_000_000]]))
+    assert rec.charged(0) == (("pm", 7, "key-pm", 500_000),) and rec.charged(5) == ()
+    assert Recording.from_outcome(run(None, [["pm", 7, "key-pm", 1_000_000]])).charged(1)
+    for forged in (run([["pm", 7, "key-pm", 500_001]]),                 # more than was stated
+                   run([["pm", 7, "key-pm", 500_000]], [["pm", 7, "key-pm", 500_000]]),  # no growth
+                   run([["nobody", 7, "key-pm", 500_000]]),             # a mind not in the run
+                   run([["pm", 7, "key-pm", 500_000], ["pm", 7, "key-pm", 500_000]]),  # twice
+                   run([["pm", "7", "key-pm", 500_000]])):              # not an agent id
+        with pytest.raises(RecordingError):
+            Recording.from_outcome(forged)

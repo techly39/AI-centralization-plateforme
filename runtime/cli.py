@@ -127,6 +127,9 @@ def main(argv: list[str] | None = None, *,
     bt.add_argument("--package", default=None, metavar="NAME",
                     help="hand every wake its day's data package (known: "
                          f"{', '.join(sorted(packages.PACKAGES))}); needs a `universe` in --input")
+    bt.add_argument("--charge-each-step", action="store_true",
+                    help="post each metered mind's thinking cost to physics at every step's end "
+                         "(the capital machine and the month's end then see it as the run lives)")
     bt.add_argument("--server", default=None,
                     help=f"the App's URL, on this machine (default ${SERVER_ENV} or {DEFAULT_SERVER})")
     bt.add_argument("--world", type=Path, metavar="FILE",
@@ -304,7 +307,8 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
         print(f"fund-runtime: {exc}", file=sys.stderr)
         return 2
     run = dict(steps=args.steps, days_per_step=args.days_per_step, workflow_input=workflow_input,
-               max_tool_calls=args.max_tool_calls, package=args.package, hiring=hiring)
+               max_tool_calls=args.max_tool_calls, package=args.package, hiring=hiring,
+               charge_each_step=args.charge_each_step)
     ledger = None
     if hosting:
         try:
@@ -327,8 +331,8 @@ def _backtest(args: argparse.Namespace, transport: httpx.AsyncBaseTransport | No
             redactions = cassette.write(
                 args.cassette, out,
                 parameters={**{k: run[k] for k in ("steps", "days_per_step", "max_tool_calls",
-                                                   "workflow_input", "package")
-                               if k != "package" or run[k] is not None},
+                                                   "workflow_input", "package", "charge_each_step")
+                               if k not in ("package", "charge_each_step") or run[k]},
                             **({"hiring": hiring.model_dump(mode="json")} if hiring else {})},
                 specs=[spec.model_dump(mode="json") for spec in specs],
                 world={"recipe": recipe} if ledger is not None else None, ledger=ledger)
