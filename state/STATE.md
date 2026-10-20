@@ -100,7 +100,15 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
 - Headless: never `cd "<repo>" && …` (refused). Human-only files are drafted in `setup/files/` and
   installed by the Human with `bash setup/install.sh`.
 
+## The multi-manager machine (cycles 46–55, ADR-047…051)
+- Pitch + gates (cycle 46), capital follows results: seed, re-weighing by a cost- and risk-adjusted
+  score, drawdown ladder (cycle 48), a closed pod's place filled by a hired real PM under the
+  Human's agent cap (cycle 51), four real PMs living a quarter with deaths and hires (cycle 55).
+- A hosted world's recipe can name its own laws (capital, hiring; ADR-051); the operator's quarter
+  report: `fund-env quarter-report` (`app/capital/report.py`, a pure function of the ledger).
+- Every kept recording under `evidence/` replays IDENTICAL in the suite
+  (`tests/test_evidence_replays.py`); a missing one fails it.
+
 ## Next moves
-1. The pitch and the gates (Next up 2), or the richer data packages (company data, headlines).
-2. Then the multi-manager machine (allocation + drawdown ladder + hiring), the monthly generation,
-   the Observatory.
+1. Plan session: the book's Next up after 1c (the debate, the monthly generation), with the
+   quarter's follow-ups (per-step metering for real runs, firing a PM who never earns a seed).

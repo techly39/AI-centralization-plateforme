@@ -474,7 +474,8 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 
 (Done, cycle 43: the backtest with real AI agents is working. Done, cycle 46: a real PM researches
 a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
-results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM.)
+results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
+real PMs lived a quarter, two deaths and two hires, a quarter report.)
 
 Cycle 52 plan: order kept, 1c next. Why: every piece of the machine now works once, each proven
 with one mind or scripted pods; the firm has never had several real minds competing for the same
