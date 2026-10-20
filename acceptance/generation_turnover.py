@@ -20,16 +20,21 @@ Costs $0 and needs no network.
        hire-2 (into the noise pod's place, Oct 1) pitches noise twice → let go at October's end
        hire-3 (Nov 1) reads the library first, pitches the edge sector W → seeded → stays
      An empty pod the operator made at the start holds no place under the live-pod limit.
-  B0 the same run hosted, through the Runtime, recorded: the let-go minds retired, replay IDENTICAL
-     (not built yet: session 2)
-  B  real PMs (Haiku 5.5), three generations, recorded: IDENTICAL for $0 (session 3)
+  B0 the same run hosted, through the Runtime, with scripted minds billed per step, recorded now:
+     the let-go minds retired, the month's-end law held (and four forged records refused), the
+     generation report from the recording alone, replay IDENTICAL, $0
+  B  real PMs (Haiku 5.5) and their hires, three generations, recorded
+     (``evidence/generation-turnover/``): the law judged (not the fates the minds chose), the
+     generation report printed from the recording, IDENTICAL for $0
 
     uv run python acceptance/generation_turnover.py        # exit 0 = the idea works
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import subprocess
@@ -396,12 +401,38 @@ STEPS = 31                      # Sep 1 + 93 days: the clock lands on Dec 3
 HOSTED = {"edge": "pod-1", "noise": "pod-2", "crash": "pod-3"}
 #: what each hire pitches in the scripted rehearsal, by its PM's name
 HIRED = {"hire-1-pm": "T", "hire-2-pm": "M", "hire-3-pm": "W"}
+#: What every PM is told, the founders and the hires alike: the firm, its laws, its tools.
+#: (Nothing about any sector's fate: the minds find out, or do not.)
 FIRM = (
     "You work in a hedge fund that trades a simulated market with fake money. Several pods, each "
     "run by its own PM, compete for the same capital. A pod gets capital only after its PM pitches "
     "a strategy and it passes the fund's validation gates; an eligible pitch earns a small seed "
-    "and trades forward. Every month is a generation: get_capital shows the laws, including who "
-    "is let go at a month's end. Be brief: every word you think is paid from your pod's P&L.")
+    "and trades forward. Every five days the centre moves capital by each pod's forward results, "
+    "net of what its PM's thinking costs; the risk ladder halves, freezes and then closes a pod "
+    "that falls from its high. Every month is a generation: at a month's end a PM whose pod has "
+    "not earned a seed is let go, and a PM whose pod the ladder closes goes at the close; "
+    "get_capital shows these laws, your pod's stage and the month's end that will judge you. "
+    "What every PM let go before you learnt is in the library (read_library). Research with "
+    "run_research_backtest on past data (the most recent days are held out, and your pitch is "
+    "judged on them; every backtest is counted). Pitch with submit_pitch when you believe in a "
+    "rule. Once your pod is seeded, each day read your mandate (get_mandate) and place its orders "
+    "(place_order): that is how your rule trades. You remember nothing between days: read your "
+    "research, pitches and capital first. Be brief: every word you think is paid from your pod's "
+    "P&L. When you are done for the day, stop.")
+FOUNDER = "You are {name}, the portfolio manager of {pod}. Your sector is input.sectors[\"{name}\"]. "
+HIRE = ("You are the newly hired portfolio manager of a new pod, in the place of a pod that ended "
+        "(its PM was let go, or the risk ladder closed it). Its lesson is in your input "
+        "(post_mortem). The names no pod holds are input.unheld; you may pitch on any names. ")
+#: The sectors no founding pod holds (the real hires may look there; the scripted ones pitch T, M, W)
+UNHELD = ("T", "W")
+#: The real run: every founder and every hire a Haiku 5.5 on its own capped key (a hire's model
+#: is the hiring law's default, its key's limit the law's budget_usd). Each key fits the month's
+#: cap; the account held $10.22 of credit on 2026-10-20 (the quarter's six minds spent $0.67).
+MODEL, REAL_BUDGET_USD = "anthropic/claude-haiku-5.5", 0.20
+PM_TOOLS = ["whoami", "get_clock", "run_research_backtest", "list_research_backtests",
+            "submit_pitch", "list_pitches", "get_capital", "get_mandate", "place_order",
+            "get_portfolio", "read_library"]
+MAX_TOOL_CALLS = 24
 #: The rehearsal's minds are scripts on the fake metered provider: each model turn is billed to
 #: the mind's own key (a few cents a wake), so the per-step charge and the fitness net of thinking
 #: are exercised at $0. Each key's limit, and a hire's (the hiring law's), fits the cap.
@@ -413,10 +444,9 @@ def world(provider: str) -> dict:
             "pods": [{"name": HOSTED[name], "allocation": 0} for name in FOUNDING],
             "market": MARKET.model_dump(mode="json"),
             "laws": {"capital": {"tell_pms": True},
-                     "hiring": {"max_live_pods": LIMIT,
-                                "charter": "You are a newly hired PM. " + FIRM,
+                     "hiring": {"max_live_pods": LIMIT, "charter": HIRE + FIRM,
                                 "budget_usd": (REHEARSAL_BUDGET_USD if provider == "fake-metered"
-                                               else 0.20)},
+                                               else REAL_BUDGET_USD)},
                      "generation": {"on": True, "grace_days": GRACE}}}
 
 
@@ -426,18 +456,22 @@ def write_world(directory: Path, provider: str) -> None:
     (directory / "world.json").write_text(json.dumps(world(provider)))
     found = {f"{HOSTED[name]}-pm": FOUNDING[name] for name in FOUNDING}
     doc = {"sectors": {pm: [f"{fam}{k:02d}" for k in range(FAMILIES[fam][0])]
-                       for pm, fam in found.items()}}
+                       for pm, fam in found.items()},
+           "unheld": [f"{fam}{k:02d}" for fam in UNHELD for k in range(FAMILIES[fam][0])]}
     if provider == "fake-metered":   # each scripted PM pitches its sector once; each hire, its own
         doc["pitch_rules"] = {pm: rule(fam, 5) for pm, fam in {**found, **HIRED}.items()}
     (directory / "input.json").write_text(json.dumps(doc))
     for pod, pm in enumerate(found, start=1):
         spec = {"id": pm, "name": pm, "role": "pm", "pod": pod,
-                "charter": f"You are {pm}, the PM of pod-{pod}. " + FIRM,
-                "provider": "fake-metered", "script": "pitch-pm",
-                "budget_usd": REHEARSAL_BUDGET_USD}
+                "charter": FOUNDER.format(name=pm, pod=f"pod-{pod}") + FIRM}
+        spec |= ({"provider": "fake-metered", "script": "pitch-pm",
+                  "budget_usd": REHEARSAL_BUDGET_USD} if provider == "fake-metered"
+                 else {"provider": provider, "model": MODEL, "budget_usd": REAL_BUDGET_USD,
+                       "tools": PM_TOOLS})
         (directory / "specs" / f"{pm}.yaml").write_text(json.dumps(spec))
-    (directory / "hire.yaml").write_text(json.dumps({"provider": "fake-metered",
-                                                     "script": "pitch-pm"}))
+    hire = ({"provider": "fake-metered", "script": "pitch-pm"} if provider == "fake-metered"
+            else {"provider": provider, "tools": PM_TOOLS + ["get_vacancy"]})
+    (directory / "hire.yaml").write_text(json.dumps(hire))
 
 
 def fund_runtime(argv: list[str], cwd: Path) -> subprocess.CompletedProcess:
@@ -513,6 +547,186 @@ def charged(doc: dict, label: str) -> None:
           json.dumps(metering.get("sync")))
 
 
+def lawful(doc: dict, label: str) -> None:
+    """Whatever the minds did, the month's-end law held (written before the real run was seen):
+    three month's ends, each pod's thinking the meter's own for the month and its fitness its P&L
+    minus that; each verdict the law's (a seeded pod stays, an unseeded one past its grace days
+    goes with its pod closed and a vacancy opened, a newer one is spared); a ladder close lets its
+    PM go; a let-go PM acts no more; every hire inside the live-pod limit; the Runtime retired
+    every mind let go before the last morning, and woke none of them again."""
+    rows = [(r[0], date.fromisoformat(r[1][:10]), r[2], r[3], json.loads(r[4]))
+            for r in (doc.get("ledger") or {}).get("rows") or []]
+    of = lambda t: [(i, d, a, p) for i, d, a, t2, p in rows if t2 == t]  # noqa: E731
+    gens = of("generation_ended")
+    grace = (((doc.get("world") or {}).get("recipe") or {}).get("laws") or {}).get(
+        "generation", {}).get("grace_days")
+    reg = {p["agent_id"]: (i, d, p["pod_id"]) for i, d, _, p in of("agent_registered")
+           if p["role"] == "pm"}
+    gone = {p["agent_id"]: (i, p) for i, _, _, p in of("pm_let_go")}
+    off = {p["agent_id"]: i for i, _, _, p in of("agent_deactivated")}
+    ladder = [(i, p["pod_id"]) for i, _, _, p in of("pod_stage_changed") if p["to"] == "closed"]
+    seeded = {}
+    for i, _, _, p in of("capital_seeded"):
+        seeded.setdefault(p["pod_id"], i)
+    vacated = {p["pod_id"]: i for i, _, _, p in of("vacancy_opened")}
+
+    def cost_by_pod(upto: int | None) -> dict[int, int]:
+        keys: dict[str, tuple[int, int]] = {}
+        for i, _, _, p in of("cost_metered"):
+            if upto is None or i <= upto:
+                keys[p["key_ref"]] = (p["pod_id"], max(keys.get(p["key_ref"], (0, 0))[1],
+                                                       p["usd_micros_total"]))
+        out: dict[int, int] = {}
+        for pod, total in keys.values():
+            out[pod] = out.get(pod, 0) + total
+        return out
+
+    fit, verdicts, prev = [], [], None
+    for i, _, _, g in gens:
+        n, turn = g["generation"], date.fromisoformat(g["to"]) + timedelta(days=1)
+        then, now = ({} if prev is None else cost_by_pod(prev)), cost_by_pod(i)
+        for r in g["pods"]:
+            thinking = (now.get(r["pod_id"], 0) - then.get(r["pod_id"], 0)) / 1e6
+            if (abs(r["thinking_usd"] - thinking) > 1e-9
+                    or (r["pnl_usd"] is None) != (r["fitness_usd"] is None)
+                    or (r["pnl_usd"] is not None
+                        and abs(r["fitness_usd"] - (r["pnl_usd"] - r["thinking_usd"])) > 1e-6)):
+                fit.append(f"#{n} {r['pod_name']}")
+        prev = i
+        closed = ({pod for c, pod in ladder if c < i}
+                  | {p["pod_id"] for a, (j, p) in gone.items()
+                     if j < i and p["pod_closed"] and p["generation"] != n})
+        staffed: dict[int, list[int]] = {}
+        for a, (j, joined, pod) in reg.items():
+            left = gone.get(a)
+            if j < i and not (left and left[0] < i and left[1]["generation"] != n):
+                staffed.setdefault(pod, []).append(a)
+        judged = {r["pod_id"]: r["verdict"] for r in g["pods"]}
+        for pod in set(judged) | set(staffed):
+            if pod in closed:
+                expect = "ended"
+            elif pod not in staffed:
+                expect = "empty"
+            elif seeded.get(pod, i) < i:
+                expect = "stays"
+            else:
+                tenure = min((turn - reg[a][1]).days for a in staffed[pod])
+                expect = "let_go" if tenure >= grace else "too_new"
+            ok = judged.get(pod) == expect
+            if expect == "let_go":
+                ok = ok and pod in vacated and vacated[pod] < i and all(
+                    a in gone and gone[a][0] < i and gone[a][1]["generation"] == n
+                    and gone[a][1]["reason"] == "no_seed" and gone[a][1]["pod_closed"]
+                    for a in staffed[pod])
+            if not ok:
+                verdicts.append(f"#{n} pod {pod}: {judged.get(pod)}, the law says {expect}")
+    said = {(g["generation"], r["pod_id"]): r["verdict"] for _, _, _, g in gens for r in g["pods"]}
+    spared = [p["agent_name"] for _, p in gone.values() if p["reason"] == "no_seed"
+              and said.get((p["generation"], p["pod_id"])) != "let_go"]   # gone, not judged so
+    check(f"{label}: three month's ends; each pod's thinking is the meter's own for its month, "
+          "its fitness its P&L minus that", [g["month"] for _, _, _, g in gens]
+          == ["2024-09", "2024-10", "2024-11"] and not fit,
+          f"{sum(len(g['pods']) for _, _, _, g in gens)} pod-months" + (f"; BAD {fit}" if fit
+                                                                        else ""))
+    check(f"{label}: every verdict is the law's: a seeded pod stays, an unseeded one past "
+          f"{grace} days goes (its pod closed, a vacancy opened), a newer one is spared",
+          not verdicts and not spared, "; ".join(
+              f"#{g['generation']} " + ", ".join(f"{r['pod_name']} {r['verdict']}"
+                                                  for r in g["pods"]) for _, _, _, g in gens)
+          + (f"; BAD {verdicts + spared}" if verdicts or spared else ""))
+    unpaired = [pod for c, pod in ladder if not any(
+        p["reason"] == "closed" and p["pod_id"] == pod and j > c for j, p in gone.values())]
+    stray = [p["agent_name"] for j, p in gone.values() if p["reason"] == "closed" and not any(
+        pod == p["pod_id"] and c < j for c, pod in ladder)]
+    check(f"{label}: each ladder close lets its PM go at the close, and only a close does",
+          not unpaired and not stray, f"{len(ladder)} close(s)" + (
+              f"; BAD {unpaired + stray}" if unpaired or stray else ""))
+    acted = sorted({(a, t) for i, _, a, t, _ in rows if a in gone and i > gone[a][0]})
+    check(f"{label}: a let-go PM acts no more (no event of its own after it went)", not acted
+          and all(a in off and off[a] < gone[a][0] for a in gone),
+          f"{len(gone)} let go" + (f"; BAD {acted}" if acted else ""))
+    over = []
+    for f, _, _, p in of("vacancy_filled"):
+        live = {pod for a, (j, _, pod) in reg.items() if j < f and not (a in off and off[a] < f)}
+        live = (live | {p["pod_id"]}) - {pod for c, pod in ladder if c < f}
+        if len(live) > LIMIT:
+            over.append(f"{p['pod_name']}: {sorted(live)}")
+    check(f"{label}: every hire was inside the live-pod limit ({LIMIT}), empty pods not counted",
+          not over, f"{len(of('vacancy_filled'))} hire(s)" + (f"; BAD {over}" if over else ""))
+    run = (doc.get("outcome") or {}).get("run") or {}
+    agent_of = dict(run.get("agents") or [])
+    retired = dict(zip(run.get("retired") or [], run.get("retired_at") or []))
+    last = max((i for i, _, _, _ in of("clock_advanced")), default=0)
+    due = {a for a, (j, _) in gone.items() if j < last}
+    woke = [(w["spec_id"], s["step"]) for s in run.get("steps") or [] for w in s["wakes"]
+            if w["spec_id"] in retired and (s["step"] > retired[w["spec_id"]] or (
+                s["step"] == retired[w["spec_id"]] and w["exchanges"]))]   # refused: no turn
+    check(f"{label}: the Runtime retired every mind let go before the last morning, and woke none "
+          "of them again", {agent_of.get(sp) for sp in retired} == due and not woke,
+          f"retired {retired}" + (f"; BAD woke {woke}" if woke else ""))
+
+
+def forged_runs(doc: dict) -> None:
+    """The law checks can say no: the rehearsal's record, forged four ways, must fail each."""
+    rows = doc["ledger"]["rows"]
+
+    def gen_forge(verdict: str, change) -> dict:
+        k = next(k for k, r in enumerate(rows) if r[3] == "generation_ended" and any(
+            p["verdict"] == verdict for p in json.loads(r[4])["pods"]))
+        p = json.loads(rows[k][4])
+        change(next(r for r in p["pods"] if r["verdict"] == verdict))
+        return {**doc, "ledger": {**doc["ledger"], "rows": [
+            r if j != k else [*r[:4], json.dumps(p)] for j, r in enumerate(rows)]}}
+
+    gone = next(json.loads(r[4])["agent_id"] for r in rows if r[3] == "pm_let_go")
+    cases = {
+        "a seeded PM let go": gen_forge("stays", lambda r: r.update(verdict="let_go")),
+        "an unseeded PM past its grace spared": gen_forge("let_go",
+                                                          lambda r: r.update(verdict="stays")),
+        "a fitness that is not P&L minus thinking": gen_forge(
+            "stays", lambda r: r.update(fitness_usd=r["fitness_usd"] + 1000.0)),
+        "a let-go PM acting after it went": {**doc, "ledger": {**doc["ledger"], "rows": [
+            *rows, [rows[-1][0] + 1, rows[-1][1], gone, "order_placed", json.dumps({})]]}}}
+    caught = {}
+    for what, forged in cases.items():
+        before = len(FAILED)
+        with contextlib.redirect_stdout(io.StringIO()):
+            lawful(forged, "forged")
+        caught[what] = len(FAILED) > before
+        del FAILED[before:]
+    check("B0: the law checks say no to a forged record (each of four forgeries is caught)",
+          all(caught.values()), "; ".join(f"{w}: {'caught' if c else 'MISSED'}"
+                                         for w, c in caught.items()))
+
+
+def report_from(doc: dict) -> tuple[dict, str]:
+    """The generation report from a recording alone: its ledger rows into an empty database."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.clock import BacktestClock, get_clock, set_clock
+    from app.db.base import Base
+
+    rows = (doc.get("ledger") or {}).get("rows") or []
+    stamp = lambda ts: datetime.fromisoformat(ts).replace(tzinfo=UTC)  # noqa: E731
+    saved = get_clock()
+    with tempfile.TemporaryDirectory(prefix="fund-generation-") as t:
+        engine = create_engine(f"sqlite:///{Path(t) / 'report.db'}")
+        Base.metadata.create_all(engine)
+        try:
+            set_clock(BacktestClock(stamp(rows[-1][1])))
+            with Session(engine) as s:
+                for r in rows:
+                    s.add(Event(id=r[0], ts=stamp(r[1]), actor_agent_id=r[2], type=r[3],
+                                payload_json=json.loads(r[4])))
+                s.flush()
+                report = generation_report(s)
+                return report, render_generations(report)
+        finally:
+            set_clock(saved)
+            engine.dispose()
+
+
 def rehearsal() -> None:
     """B0, $0: the hosted months with scripted minds, recorded and verified now."""
     with tempfile.TemporaryDirectory(prefix="fund-generation-") as t:
@@ -531,7 +745,49 @@ def rehearsal() -> None:
     doc = json.loads(text)
     turnover_chain(doc, "B0")
     charged(doc, "B0")
+    lawful(doc, "B0")
+    forged_runs(doc)
+    report, _ = report_from(doc)
+    check("B0: the generation report prints from the recording alone",
+          len(report["generations"]) == 3 and len(report["library"]) == 3,
+          f"{len(report['generations'])} generations, {len(report['library'])} lessons")
     verify(text, "B0")
+
+
+EVIDENCE = REPO / "evidence" / "generation-turnover" / "generations.cassette.json"
+
+
+def recorded() -> None:
+    """B: the recorded real run (real PMs, metered, inside the cap). Real minds decide what they
+    pitch and trade: the checks judge the laws, not the fates."""
+    if not check("B: the recorded real run exists", EVIDENCE.is_file(),
+                 str(EVIDENCE.relative_to(REPO))):
+        return
+    text = EVIDENCE.read_text(encoding="ascii")
+    doc = json.loads(text)
+    lawful(doc, "B")
+    metering = (doc.get("outcome") or {}).get("metering") or {}
+    keys = metering.get("keys") or []
+    rows = [(r[0], r[3]) for r in doc["ledger"]["rows"]]
+    last = max(i for i, t in rows if t == "clock_advanced")
+    during = sum(1 for i, t in rows if t == "cost_metered" and i < last)
+    check("B: every mind's thinking was charged as the run lived, none past its key's limit",
+          during > STEPS and {f"{p}-pm" for p in HOSTED.values()} <= {k["spec_id"] for k in keys}
+          and all(type(k["spent_usd_micros"]) is int
+                  and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          and (metering.get("sync") or {}).get("refused") == [],
+          f"{during} cost rows during the run; " + "; ".join(
+              f"{k['spec_id']} " + (f"${k['spent_usd_micros'] / 1e6:.3f}"
+                                    if type(k["spent_usd_micros"]) is int else "UNREAD")
+              + f" of ${k['limit_usd_micros'] / 1e6:.2f}" for k in keys)
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
+    report, text_report = report_from(doc)
+    check("B: the generation report prints from the recording alone: three generations",
+          len(report["generations"]) == 3,
+          f"{sum(len(g['let_go']) for g in report['generations'])} let go, "
+          f"{len(report['library'])} lessons in the library")
+    print("\nThe recorded generations (real PMs):\n" + text_report)
+    verify(text, "B")
 
 
 def main() -> int:
@@ -546,11 +802,13 @@ def main() -> int:
     print("\nB0: the same months hosted, through the Runtime, replayed")
     rehearsal()
     print("\nB: real PMs, three generations, recorded")
-    check("B: real run recorded, replay IDENTICAL for $0, generation report", False,
-          "not recorded yet")
+    recorded()
     print(f"\n{'PASS' if not FAILED else 'FAIL'}: {len(FAILED)} check(s) failed")
     return 0 if not FAILED else 1
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--write-world"]:   # the files a recorded run is made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        raise SystemExit(0)
     raise SystemExit(main())
