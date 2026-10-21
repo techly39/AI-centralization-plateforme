@@ -27,6 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.capital.service import book as capital_book
+from app.capital.reproduction import inherited_attempts
 from app.capital.service import eligible_unseeded, run_law
 from app.config import GatesConfig
 from app.db.models import Agent, Event, Pod
@@ -98,12 +99,13 @@ def _evaluate(provider: MarketDataProvider, session: Session, rule: StrategyRule
 
 
 def pod_attempts(session: Session, pod_id: int) -> int:
-    """Every research backtest and every pitch the pod ever made (the deflated Sharpe's N)."""
+    """Every research backtest and every pitch the pod ever made, and, for a child under the
+    reproduction law, its family's before it was born (the deflated Sharpe's N)."""
     pod = func.json_extract(Event.payload_json, "$.pod_id")
-    return session.scalar(
+    return (session.scalar(
         select(func.count()).select_from(Event).where(
             Event.type.in_((EVENT_RESEARCH_BACKTEST_RUN, EVENT_PITCH_SUBMITTED)), pod == pod_id)
-    ) or 0
+    ) or 0) + inherited_attempts(session, pod_id)
 
 
 def _pod_of(actor: Agent) -> int:
@@ -223,11 +225,14 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
         "data_needed": data_needed, "team": team, "budget_usd": budget_usd,
         "rule": rule.model_dump()})
     verdict = judge(evaluation, attempts=attempts, others=others, law=law)
+    inherited = inherited_attempts(session, pod_id)
     judged = {
         "pitch_id": submitted.id,
         "pod_id": pod_id,
         "window": {"start": start.isoformat(), "end": today.isoformat()},
         "attempts": attempts,
+        # of which its family's before it was born (a child under the reproduction law)
+        **({"inherited_attempts": inherited} if inherited else {}),
         "eligible": verdict["eligible"],
         "gates": [*verdict["gates"], HYPOTHESIS_ROW],
         "performance": verdict["performance"],

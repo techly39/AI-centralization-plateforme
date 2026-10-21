@@ -238,9 +238,54 @@ def generation_report(session: Session) -> dict[str, Any]:
                   "pod": x.payload_json["pod_name"]}
                  for x in filled if first <= x.ts.date() <= last]
         out.append({"generation": g["generation"], "month": g["month"], "from": g["from"],
-                    "to": g["to"], "pods": g["pods"], "let_go": gone, "hired": hired})
+                    "to": g["to"], "pods": g["pods"], "let_go": gone, "hired": hired,
+                    **({"diversity": g["diversity"]} if "diversity" in g else {})})
     return {"generations": out, "library": library(session),
+            "family_tree": family_tree(session),
             "today": ledger_now(session).date().isoformat()}
+
+
+def family_tree(session: Session) -> list[dict[str, Any]]:
+    """Under the reproduction law, every pod with its children (the hires its design fathered),
+    each with its model and the one change it was born with; ``[]`` when no hire was made under
+    it. Founding pods and plain hires are roots. A pure function of the ledger."""
+    from app.capital.reproduction import design_of
+
+    opened = {e.id: e.payload_json for e in _events(session, EVENT_VACANCY_OPENED)}
+    if not any("design" in v["hire"] for v in opened.values()):
+        return []
+    born = {e.payload_json["pod_id"]: opened.get(e.payload_json["vacancy_id"], {}).get("hire", {})
+            for e in _events(session, EVENT_VACANCY_FILLED)}
+    nodes: dict[int, dict[str, Any]] = {}
+    for pod in session.scalars(select(Pod).order_by(Pod.id)):
+        design = design_of(session, pod.id)
+        if pod.id not in born and design["model"] is None and design["rule"] is None:
+            continue    # a pod no one ever ran (an operator's spare)
+        hire = born.get(pod.id, {})
+        nodes[pod.id] = {"pod_id": pod.id, "pod_name": pod.name, "stage": pod.status,
+                         "model": design["model"], "rule": design["rule"],
+                         "parent": (hire.get("parent") or {}).get("pod_id"),
+                         "change": hire.get("change"), "children": []}
+    roots = []
+    for node in nodes.values():
+        parent = nodes.get(node["parent"]) if node["parent"] is not None else None
+        (parent["children"] if parent is not None else roots).append(node)
+    return roots
+
+
+def _tree_lines(node: dict[str, Any], depth: int) -> list[str]:
+    rule = node["rule"] or {}
+    what = (f"lookback {rule.get('lookback')}, rebalance {rule.get('rebalance_every')}, "
+            f"top {rule.get('top_n')} of {(rule.get('universe') or ['?'])[0][:1]}..."
+            if rule else "no rule")
+    born = "" if not node["change"] else (f"born with {node['change']['what']} "
+                                          f"{node['change']['from']} -> {node['change']['to']}; "
+                                          f"its rule now: ")
+    lines = [f"  {'    ' * depth}{'└─ ' if depth else ''}{node['pod_name']} ({node['stage']}): "
+             f"{node['model'] or 'model not declared'}; {born}{what}"]
+    for child in node["children"]:
+        lines += _tree_lines(child, depth + 1)
+    return lines
 
 
 def render_generations(report: dict[str, Any]) -> str:
@@ -259,6 +304,15 @@ def render_generations(report: dict[str, Any]) -> str:
             out.append(f"  let go {x['on']}: {x['pm']} ({x['pod']}), {x['why']}")
         for x in g["hired"]:
             out.append(f"  hired {x['on']}: {x['pm']} into {x['pod']}")
+        if (d := g.get("diversity")) is not None:
+            share = "-" if d["largest_share"] is None else f"{d['largest_share']:.0%}"
+            out.append(f"  diversity: {d['live_pods']} live pods, {d['designs']} distinct designs, "
+                       f"largest family {d['largest_family'] or '-'} ({share})"
+                       + ("  FINDING: one family holds every live pod" if d["collapsed"] else ""))
+    if report.get("family_tree"):
+        out.append("\nThe family tree (a child is its parent's design with one change):")
+        for root in report["family_tree"]:
+            out += _tree_lines(root, 0)
     out.append("\nThe library (every PM reads it):")
     for item in report["library"]:
         lesson = item["lesson"]

@@ -176,7 +176,6 @@ def test_redteam_generation_an_unseeded_pod_with_money_closes_with_its_money_and
 
 # --- the month's table --------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="known physics hole (low, red-team cycle 58): one advance over two month ends makes one generation")
 def test_redteam_generation_one_advance_over_two_month_ends_makes_one_mislabelled_generation(
         client, db, september, law_on, make_pod, pm_factory, runtime_key):
     """SEVERITY: low (a mislabelled record; a buggy or coarse Runtime step reaches it).
@@ -201,7 +200,6 @@ def test_redteam_generation_one_advance_over_two_month_ends_makes_one_mislabelle
             f"{g['from']} to {g['to']}")
 
 
-@pytest.mark.xfail(strict=True, reason="known physics hole (low, red-team cycle 58): a pod closed by a failed hire is missing from its month's table")
 def test_redteam_generation_a_pod_closed_by_a_failed_hire_vanishes_from_the_months_table(
         client, db, SessionFactory, september, law_on, make_pod, admin_key, runtime_key):
     """SEVERITY: low (a wrong record: a pod that lived in the month, and its thinking, are in no

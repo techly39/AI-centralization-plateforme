@@ -353,7 +353,7 @@ next morning; `fund-env generation-report` prints it. Real Haiku PMs lived three
 
 ### Evolution: designs that work reproduce with variation
 From: Human
-Status: not started
+Status: building
 A pod's "genes" are its agents' specs (charter, role, model, tools) and its design (team, strategy
 family). Winners reproduce with variation (mutation, crossover); every agent knows its parent.
 If diversity collapses, that is a finding.

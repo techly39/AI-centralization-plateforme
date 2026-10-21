@@ -57,7 +57,7 @@ MAX_RECIPE_BYTES = 64 * 1024
 MAX_PODS = 16
 MAX_EXTRA_SYMBOLS = 50
 #: The ``config.yaml`` sections a recipe may set for its world.
-LAW_SECTIONS = frozenset({"capital", "hiring", "generation"})
+LAW_SECTIONS = frozenset({"capital", "hiring", "generation", "reproduction"})
 _NAME = r"^[a-z][a-z0-9-]{0,62}$"
 _KEY = re.compile(r"\bfk_\S+")
 _SERVE_WAIT_SECONDS = 60

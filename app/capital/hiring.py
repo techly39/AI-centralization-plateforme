@@ -137,10 +137,15 @@ def post_mortem(session: Session, *, pod_id: int, record: PodTrack) -> dict[str,
 # --- the vacancy --------------------------------------------------------------------------------
 
 def open_vacancy(session: Session, *, pod_id: int, actor: Agent, record: PodTrack | None = None,
-                 lesson: dict[str, Any] | None = None) -> Event:
+                 lesson: dict[str, Any] | None = None,
+                 measured: tuple[int, list[dict[str, Any]]] | None = None) -> Event:
     """Write the vacancy a closed pod leaves: its post-mortem (the ladder's, from ``record``, or the
-    lesson of a PM the generation law let go) and the hire the law names. Called in the close's
-    own transaction (under :data:`OMS_LOCK`)."""
+    lesson of a PM the generation law let go) and the hire the law names. Under the reproduction
+    law the hire is a child of the fittest pod (:func:`app.capital.reproduction.child_of`; at a
+    month's end, of the generation ``measured``). Called in the close's own transaction (under
+    :data:`OMS_LOCK`)."""
+    from app.capital.reproduction import child_of, reproduction_law
+
     if (record is None) == (lesson is None):
         raise ValueError("a vacancy is opened from a ladder record or from a lesson")
     law = hiring_law(session)
@@ -148,12 +153,19 @@ def open_vacancy(session: Session, *, pod_id: int, actor: Agent, record: PodTrac
     hire = {"pod_name": f"hire-{number}", "pm_name": f"hire-{number}-pm", "role": "pm",
             "model": law.models[(number - 1) % len(law.models)], "budget_usd": law.budget_usd,
             "charter": law.charter}
+    # Read before this vacancy is written: the first vacancy freezes the law.
+    reproduction = reproduction_law(session)
+    if reproduction.on:
+        child = child_of(session, number=number, hiring=law, measured=measured)
+        hire |= {"design": "plain"} if child is None else {
+            "design": "child", **child, "model": child["model"] or hire["model"]}
     return append_event(session, type=EVENT_VACANCY_OPENED, actor_agent_id=actor.id, payload={
         "vacancy_no": number, "pod_id": pod_id,
         "pod_name": session.get(Pod, pod_id).name,
         "post_mortem": (lesson if record is None
                         else post_mortem(session, pod_id=pod_id, record=record)),
-        "hire": hire, "law": law.model_dump(mode="json")})
+        "hire": hire, "law": law.model_dump(mode="json"),
+        **({"reproduction": reproduction.model_dump(mode="json")} if reproduction.on else {})})
 
 
 def vacancies(session: Session) -> list[dict[str, Any]]:

@@ -47,3 +47,7 @@ Hiring under the cap, the gates' count of attempts, a law of physics: red-team +
 
 ## Progress
 - cycle 60: planned.
+- cycle 61: physics built (founding model at registration, the reproduction law, the child's one
+  change, its family's attempts at its pitches, diversity and the collapse finding, the family
+  tree; both month-table holes fixed). Demo A passes in four worlds. Found: a child pitching its
+  inherited rule is refused by the correlation gate (a copy of its living parent). Next: B0.

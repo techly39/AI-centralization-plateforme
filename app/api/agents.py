@@ -49,6 +49,7 @@ def register(
                 charter_ref=body.charter_ref,
                 research_domains=body.research_domains,
                 actor_agent_id=actor.id,
+                model=body.model,
             )
             session.commit()
     except RegistryError as exc:
