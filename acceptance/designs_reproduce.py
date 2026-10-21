@@ -510,23 +510,63 @@ def rebuilt_report(rec: dict) -> dict:
             engine.dispose()
 
 
+def _gt():
+    sys.path.insert(0, str(REPO / "acceptance"))
+    import generation_turnover as gt
+    return gt
+
+
+#: The hosted world's law of reproduction (the generation-turnover world, the law on).
+LAW = {"on": True, "seed": REPRODUCTION_SEED}
+#: The real run (B) and its rehearsal (B0) are made with this very command, in the directory
+#: ``--write-world`` fills; only the cassette's name differs. (The world's key:
+#: FUND_MARKETDATA__SYNTHETIC_KEY = sha256('fund-generation-turnover/1'), the turnover world's.)
+MAX_TOOL_CALLS = 24
+
+
+def command(cassette: str) -> list[str]:
+    gt = _gt()
+    return ["backtest", "--world", "world.json", "--specs", "specs", "--hire", "hire.yaml",
+            "--input", "input.json", "--steps", str(gt.STEPS), "--days-per-step",
+            str(gt.DAYS_PER_STEP), "--charge-each-step", "--max-tool-calls", str(MAX_TOOL_CALLS),
+            "--cassette", cassette]
+
+
+def write_world(directory: Path, provider: str) -> None:
+    """The hosted run's files: the generation-turnover world with the reproduction law on."""
+    gt = _gt()
+    gt.write_world(directory, provider)
+    doc = json.loads((directory / "world.json").read_text())
+    doc["laws"]["reproduction"] = LAW
+    (directory / "world.json").write_text(json.dumps(doc))
+
+
+def settings(rec: dict, label: str) -> None:
+    """The run is the one this idea describes: written before the real run, passed first by the
+    rehearsal made with the very command."""
+    gt = _gt()
+    params = rec.get("parameters") or {}
+    laws = (((rec.get("world") or {}).get("recipe") or {}).get("laws") or {})
+    check(f"{label}: the run is the one this idea describes: {gt.STEPS} steps of "
+          f"{gt.DAYS_PER_STEP} days, thinking charged each step, {MAX_TOOL_CALLS} tool calls a "
+          "wake, the reproduction law on with its seed, the generation law on",
+          (params.get("steps"), params.get("days_per_step"), params.get("charge_each_step"),
+           params.get("max_tool_calls"), laws.get("reproduction"),
+           (laws.get("generation") or {}).get("on"))
+          == (gt.STEPS, gt.DAYS_PER_STEP, True, MAX_TOOL_CALLS, LAW, True),
+          f"{params.get('steps')} steps of {params.get('days_per_step')} days, charged "
+          f"{params.get('charge_each_step')}, {params.get('max_tool_calls')} tool calls a wake, "
+          f"reproduction {laws.get('reproduction')}")
+
+
 def rehearsal() -> None:
     """B0, $0: the generation-turnover world (the same market, minds and command) with the
     reproduction law on, scripted minds billed per step, recorded and verified now."""
-    sys.path.insert(0, str(REPO / "acceptance"))
-    import generation_turnover as gt
-
-    law = {"on": True, "seed": REPRODUCTION_SEED}
+    gt = _gt()
     with tempfile.TemporaryDirectory(prefix="fund-reproduce-") as t:
         tmp = Path(t)
-        gt.write_world(tmp, "fake-metered")
-        doc = json.loads((tmp / "world.json").read_text())
-        doc["laws"]["reproduction"] = law
-        (tmp / "world.json").write_text(json.dumps(doc))
-        r = gt.fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
-                             "hire.yaml", "--input", "input.json", "--steps", str(gt.STEPS),
-                             "--days-per-step", str(gt.DAYS_PER_STEP), "--charge-each-step",
-                             "--cassette", "rehearsal.cassette.json"], tmp)
+        write_world(tmp, "fake-metered")
+        r = gt.fund_runtime(command("rehearsal.cassette.json"), tmp)
         tape = tmp / "rehearsal.cassette.json"
         if not check("B0: a scripted rehearsal of the hosted months, the law on, completes and is "
                      "recorded", r.returncode == 0 and tape.is_file(),
@@ -535,11 +575,13 @@ def rehearsal() -> None:
             return
         text = tape.read_text(encoding="ascii")
     rec = json.loads(text)
+    settings(rec, "B0")
     ledger = [(row[0], row[1][:10], row[3], json.loads(row[4])) for row in rec["ledger"]["rows"]]
     before = len(gt.FAILED)
     gt.lawful(rec, "B0")         # the generation law still holds, children or not
     FAILED.extend(gt.FAILED[before:])
     kids = children(ledger, "B0")
+    plain_lawful(ledger, "B0")
     check("B0: the hosted firm hired at least one child, and every hire is named child or plain",
           bool(kids) and all(v["hire"].get("design") in ("child", "plain")
                              for v in of(ledger, "vacancy_opened")),
@@ -575,6 +617,77 @@ def rehearsal() -> None:
     FAILED.extend(gt.FAILED[before:])
 
 
+EVIDENCE = REPO / "evidence" / "designs-reproduce" / "reproduce.cassette.json"
+
+
+def plain_lawful(ledger, label: str) -> None:
+    """A plain hire is the law's only when no pod could be a parent: no month measured yet, or
+    the last month's fittest (fitness above zero, alive at its end) closed or let go since."""
+    gens = of(ledger, "generation_ended")
+    bad = []
+    for v in of(ledger, "vacancy_opened"):
+        if v["hire"].get("design") != "plain":
+            continue
+        last = [g for g in gens if g["_id"] <= v["_id"]]
+        best = fittest(last[-1]["pods"]) if last else None
+        if best is None:
+            continue
+        gone = any(p["pod_id"] == best["pod_id"] and p["_id"] < v["_id"]
+                   for t in ("pm_let_go", "pod_stage_changed") for p in of(ledger, t)
+                   if t == "pm_let_go" or p.get("to") == "closed")
+        if not gone:
+            bad.append(f"vacancy {v['vacancy_no']}: plain, though {best['pod_name']} was fit")
+    check(f"{label}: every plain hire had no living fit pod to descend from", not bad,
+          "; ".join(bad) or f"{sum(1 for v in of(ledger, 'vacancy_opened') if v['hire'].get('design') == 'plain')} plain hire(s), each lawful")
+
+
+def recorded() -> None:
+    """B: the recorded real run (real Haiku PMs on their own capped keys, metered, inside the
+    cap). Real minds decide what they pitch and trade: the checks judge the laws, not the fates;
+    the one fate required is that a design reproduced (a child was hired)."""
+    gt = _gt()
+    if not check("B: the recorded real run exists", EVIDENCE.is_file(),
+                 str(EVIDENCE.relative_to(REPO))):
+        return
+    text = EVIDENCE.read_text(encoding="ascii")
+    rec = json.loads(text)
+    settings(rec, "B")
+    ledger = [(row[0], row[1][:10], row[3], json.loads(row[4])) for row in rec["ledger"]["rows"]]
+    founders = {p["name"]: p.get("model") for p in of(ledger, "agent_registered")
+                if p["name"] in {f"{pod}-pm" for pod in gt.HOSTED.values()}}
+    check("B: each founding PM's model is on the record, as its registrar declared it",
+          len(founders) == 3 and set(founders.values()) == {gt.MODEL}, str(founders))
+    before = len(gt.FAILED)
+    gt.lawful(rec, "B")
+    FAILED.extend(gt.FAILED[before:])
+    kids = children(ledger, "B")
+    check("B: a design reproduced: at least one freed place went to a child of the fittest pod",
+          bool(kids), ", ".join(f"vacancy {v['vacancy_no']}: {v['hire'].get('design')}"
+                                for v in of(ledger, "vacancy_opened")))
+    plain_lawful(ledger, "B")
+    diversity_holds(ledger, "B")
+    metering = (rec.get("outcome") or {}).get("metering") or {}
+    keys = metering.get("keys") or []
+    check("B: no key spent past its limit, and the meter's sync refused nothing",
+          bool(keys) and all(type(k["spent_usd_micros"]) is int
+                             and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          and (metering.get("sync") or {}).get("refused") == [],
+          "; ".join(f"{k['spec_id']} ${k['spent_usd_micros'] / 1e6:.3f} of "
+                    f"${k['limit_usd_micros'] / 1e6:.2f}" for k in keys
+                    if type(k["spent_usd_micros"]) is int)
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
+    report = rebuilt_report(rec)
+    check("B: the generation report from the recording alone shows the family tree",
+          any(n["children"] for n in report["family_tree"]),
+          "; ".join(f"{n['pod_name']} -> {[c['pod_name'] for c in n['children']]}"
+                    for n in report["family_tree"]))
+    from app.capital.report import render_generations
+    print("\nThe recorded generations (real PMs):\n" + render_generations(report))
+    before = len(gt.FAILED)
+    gt.verify(text, "B")
+    FAILED.extend(gt.FAILED[before:])
+
+
 # --- the demo -----------------------------------------------------------------------------------
 
 def main() -> int:
@@ -590,6 +703,8 @@ def main() -> int:
                 print(r.stderr.strip()[-2000:])
     print("\nB0: the default months hosted, through the Runtime, replayed", flush=True)
     rehearsal()
+    print("\nB: real PMs, three generations under the reproduction law, recorded", flush=True)
+    recorded()
     print(f"\n{'PASS' if not FAILED else 'FAIL'}: {len(FAILED)} check(s) failed")
     return 0 if not FAILED else 1
 
@@ -597,4 +712,8 @@ def main() -> int:
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--world"]:
         raise SystemExit(live_world(sys.argv[2]))
+    if sys.argv[1:2] == ["--write-world"]:   # the files a recorded run is made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        print("fund-runtime " + " ".join(command("reproduce.cassette.json")))
+        raise SystemExit(0)
     raise SystemExit(main())
