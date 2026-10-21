@@ -217,6 +217,20 @@ class GenerationConfig(BaseModel):
     grace_days: int = Field(default=20, ge=0, le=366)
 
 
+class ReproductionConfig(BaseModel):
+    """The reproduction law (idea: designs that work reproduce with variation): a place freed in
+    the firm is filled by a child of the fittest pod of the generation last measured, its parent's
+    model and rule with exactly one change, drawn from ``seed``; each month's end measures the
+    firm's diversity. Off by default, so every run recorded before it replays as it was. Frozen
+    into the run's first vacancy."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    on: bool = False
+    # The draw of each child's one change: random.Random(f"{seed}:{vacancy number}").
+    seed: int = Field(default=0, ge=0, le=2**31)
+
+
 class MCPConfig(BaseModel):
     """Settings for the MCP server (``mcp_server/``), not for the API itself.
 
@@ -310,6 +324,7 @@ class Settings(BaseSettings):
     capital: CapitalConfig = Field(default_factory=CapitalConfig)
     hiring: HiringConfig = Field(default_factory=HiringConfig)
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
+    reproduction: ReproductionConfig = Field(default_factory=ReproductionConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

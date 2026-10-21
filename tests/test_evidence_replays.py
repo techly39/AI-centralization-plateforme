@@ -26,6 +26,7 @@ KEYS = {
     "real-agents-backtest/month.cassette.json": b"fund-real-agents-backtest/1",
     "firm-quarter/quarter.cassette.json": b"fund-firm-quarter/1",
     "generation-turnover/generations.cassette.json": b"fund-generation-turnover/1",
+    "designs-reproduce/reproduce.cassette.json": b"fund-generation-turnover/1",
 }
 #: kept trials that do not replay against today's code, and why (each has its README line)
 TRIALS = {

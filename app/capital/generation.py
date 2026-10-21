@@ -36,6 +36,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.capital.reproduction import diversity, hire_of, reproduction_law
 from app.config import GenerationConfig, get_settings
 from app.db.models import Agent, AgentRole, AgentStatus, Event, Pod
 from app.ledger.events import (
@@ -43,7 +44,9 @@ from app.ledger.events import (
     EVENT_ALLOCATION_SET,
     EVENT_CAPITAL_SEEDED,
     EVENT_CAPITAL_SWEEP_FAILED,
+    EVENT_DIVERSITY_COLLAPSED,
     EVENT_GENERATION_ENDED,
+    EVENT_HIRE_FAILED,
     EVENT_PITCH_JUDGED,
     EVENT_PITCH_SUBMITTED,
     EVENT_PM_LET_GO,
@@ -169,7 +172,8 @@ def _why(reason: str, lesson: dict[str, Any], law: GenerationConfig) -> str:
 # --- letting go ---------------------------------------------------------------------------------
 
 def _let_go(session: Session, *, pod_id: int, reason: str, actor: Agent, generation: int | None,
-            post_mortem: dict[str, Any] | None = None) -> list[Event]:
+            post_mortem: dict[str, Any] | None = None,
+            measured: tuple[int, list[dict[str, Any]]] | None = None) -> list[Event]:
     """Let every active agent of ``pod_id`` go, with the pod's lesson; an unseeded pod is closed
     and a vacancy opens in its place. The caller owns the transaction (and holds OMS_LOCK)."""
     from app.capital.hiring import open_vacancy   # hiring reads the capital machine, which reads us
@@ -200,7 +204,7 @@ def _let_go(session: Session, *, pod_id: int, reason: str, actor: Agent, generat
     if close and pod.status != "closed":
         pod.status = "closed"
         session.flush()
-        open_vacancy(session, pod_id=pod_id, actor=actor, lesson=lesson)
+        open_vacancy(session, pod_id=pod_id, actor=actor, lesson=lesson, measured=measured)
     return made
 
 
@@ -259,7 +263,12 @@ def turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, Any
         if is_halted():
             return None
         try:
-            done = _turnover(session, provider=provider)
+            # One generation per month: an advance over two month's ends ends both, in order
+            # (red-team, cycle 58: one advance made one generation spanning two months).
+            done = None
+            while (ended := _turnover(session, provider=provider)) is not None:
+                done = ended if done is None else {**ended,
+                                                   "let_go": done["let_go"] + ended["let_go"]}
             session.commit()
             return done
         except Exception:
@@ -276,9 +285,10 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
         return None
     number, first, since_id = window
     now = ledger_now(session)
-    month = _first_of_month(now.date())
-    if month <= first:
+    if _first_of_month(now.date()) <= first:
         return None     # the month has not turned since the generation began
+    # This generation ends with its own month, whatever day the clock now reads.
+    month = (_first_of_month(first) + timedelta(days=32)).replace(day=1)
     last = month - timedelta(days=1)
     system = get_or_create_system_agent(session)
     costs_then = {} if since_id is None else _cost_by_pod(session, since_id)
@@ -287,13 +297,16 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
                  if since_id is None or e.id > since_id}
     closed_in = {e.payload_json["pod_id"] for e in _events(session, EVENT_POD_STAGE_CHANGED)
                  if e.payload_json.get("to") == "closed" and (since_id is None or e.id > since_id)}
+    # A hired pod closed by its failed hire lived in the month too (red-team, cycle 58).
+    failed_in = {e.payload_json["pod_id"] for e in _events(session, EVENT_HIRE_FAILED)
+                 if since_id is None or e.id > since_id}
     registered = _registered_on(session)
     seeded = _seeded_pods(session)
 
     rows = []
     to_let_go: list[int] = []
     for pod in session.scalars(select(Pod).order_by(Pod.id)):
-        if pod.status == "closed" and pod.id not in let_go_in | closed_in:
+        if pod.status == "closed" and pod.id not in let_go_in | closed_in | failed_in:
             continue    # it ended in an earlier generation
         pms = list(session.scalars(select(Agent).where(
             Agent.pod_id == pod.id, Agent.role == AgentRole.pm).order_by(Agent.id)))
@@ -307,7 +320,8 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
         row["pms"] = [a.name for a in pms]
         if pod.status == "closed":
             row["verdict"], row["why"] = "ended", (
-                "closed by the risk ladder" if pod.id in closed_in else "its PM was let go")
+                "closed by the risk ladder" if pod.id in closed_in
+                else "its PM was let go" if pod.id in let_go_in else "its hire failed")
         elif not staff:
             row["verdict"], row["why"] = "empty", "no PM works there"
         elif pod.id in seeded:
@@ -325,13 +339,25 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
         rows.append(row)
     gone = []
     for pod_id in to_let_go:
+        # Under the reproduction law, each freed place's hire is a child of this month's fittest.
         gone += _let_go(session, pod_id=pod_id, reason=LET_GO_NO_SEED, actor=system,
-                        generation=number)
+                        generation=number, measured=(number, rows))
+    extra: dict[str, Any] = {}
+    if reproduction_law(session).on:
+        extra["diversity"] = diversity(session, rows)
     # Written last: every departure of this month's end comes before it, so the next generation
     # (everything after this event) does not count them again.
     ended = append_event(session, type=EVENT_GENERATION_ENDED, actor_agent_id=system.id, payload={
         "generation": number, "month": first.strftime("%Y-%m"), "from": first.isoformat(),
-        "to": last.isoformat(), "law": law.model_dump(mode="json"), "pods": rows})
+        "to": last.isoformat(), "law": law.model_dump(mode="json"), "pods": rows, **extra})
+    if extra.get("diversity", {}).get("collapsed"):
+        d = extra["diversity"]
+        append_event(session, type=EVENT_DIVERSITY_COLLAPSED, actor_agent_id=system.id, payload={
+            "generation": number, "month": first.strftime("%Y-%m"),
+            "family": d["largest_family"], "live_pods": d["live_pods"], "designs": d["designs"],
+            "finding": (f"diversity collapsed: at the end of {first.strftime('%Y-%m')} every one "
+                        f"of the {d['live_pods']} live pods descends from {d['largest_family']} "
+                        f"({d['designs']} distinct design{'s' if d['designs'] != 1 else ''})")})
     logger.bind(generation=number).info("generation ended: {} pods, {} let go", len(rows), len(gone))
     return {"generation": number, "event_id": ended.id, "let_go": [e.payload_json["agent_id"]
                                                                  for e in gone]}
@@ -400,7 +426,19 @@ def _your_pod(session: Session, pod_id: int, law: GenerationConfig,
                           .order_by(Event.id.desc()).limit(1))
     row = None if last is None else next(
         (p for p in last.payload_json["pods"] if p["pod_id"] == pod_id), None)
-    return {"seeded": seeded,
+    hire = hire_of(session, pod_id) or {}
+    family = None if hire.get("design") != "child" else {
+        "parent": hire["parent"], "family": hire["family"], "change": hire["change"],
+        "inherited_rule": hire["inherited_rule"],
+        "inherited_attempts": hire["lineage_attempts"],
+        "note": (f"Your pod is a child of {hire['parent']['pod_name']}, the fittest pod of "
+                 f"generation {hire['parent']['generation']}: its model and rule with one change "
+                 f"({hire['change']['what']} {hire['change']['from']} -> "
+                 f"{hire['change']['to']}). The inherited rule is your starting point: it earns "
+                 f"capital only through your own pitch and the gates, and every pitch counts the "
+                 f"{hire['lineage_attempts']} attempts your family made before you.")}
+    return {**({"family": family} if family is not None else {}),
+            "seeded": seeded,
             "judged_on": (None if seeded or not joined or pod.status == "closed"
                           else _judged_on(min(joined), today, law.grace_days).isoformat()),
             "last_generation": None if row is None else {
@@ -427,6 +465,11 @@ def announcement(session: Session, *, pod_id: int | None = None) -> dict[str, An
                 f"let go: its key stops working and its pod closes. A PM whose pod the risk "
                 f"ladder closes is let go at the close. Each departure's lesson goes to the "
                 f"library (read_library), which every PM can read; a new PM is hired into the "
-                f"freed place."),
+                f"freed place." + (
+                    " Designs that work reproduce: the hire into a freed place is a child of the "
+                    "fittest pod of the generation last measured (fitness above zero, still "
+                    "alive), its model and rule with exactly one change, its parent named; with no "
+                    "fit pod, the plain hire. Each month's end measures the firm's diversity."
+                    if reproduction_law(session).on else "")),
         "grace_days": law.grace_days, "generation": window[0] if window else None,
         "next_judged_on": nxt.isoformat()}

@@ -97,8 +97,11 @@ async def provision(
     connect: Callable[[str], FundClient],
     *,
     provisioner: FakeProvisioner | OpenRouterProvisioner | None = None,
+    declare_models: bool = False,
 ) -> list[Mind]:
     """Register one App agent per spec through ``registrar``; return the minds in id order.
+    With ``declare_models`` (a world under the reproduction law), each spec's model is declared
+    at registration: a founding PM's design goes on the record.
 
     ``connect(api_key)`` builds the client a mind will act through. ``provisioner`` is where the
     metered specs' keys are minted; a metered spec without one is refused.
@@ -136,7 +139,9 @@ async def provision(
             try:
                 made = await registrar.post("/agents/register", {
                     "name": spec.name, "role": spec.role, "pod_id": spec.pod,
-                    "charter_ref": f"spec:{spec.id}"})
+                    "charter_ref": f"spec:{spec.id}",
+                    **({"model": spec.model} if declare_models and spec.model
+                       and spec.role == "pm" else {})})
             except FundAPIError as exc:
                 # Only a refusal (4xx) proves nothing was made; a lost answer may hide one.
                 maybe = done if exc.status_code < 500 else [*done, spec.id]

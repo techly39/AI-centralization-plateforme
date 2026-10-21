@@ -66,6 +66,9 @@ class AgentRegisterRequest(BaseModel):
     pod_id: Id | None = None
     charter_ref: str | None = Field(default=None, max_length=256)
     research_domains: list[str] | None = None
+    # The model the registrar runs this agent on: a founding PM's design, on the record (idea:
+    # designs reproduce). A hire's is its vacancy's.
+    model: str | None = Field(default=None, pattern=r"^[A-Za-z0-9._:/-]{1,100}$")
 
     @model_validator(mode="after")
     def _not_a_hire(self) -> AgentRegisterRequest:

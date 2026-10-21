@@ -57,11 +57,18 @@ MAX_RECIPE_BYTES = 64 * 1024
 MAX_PODS = 16
 MAX_EXTRA_SYMBOLS = 50
 #: The ``config.yaml`` sections a recipe may set for its world.
-LAW_SECTIONS = frozenset({"capital", "hiring", "generation"})
+LAW_SECTIONS = frozenset({"capital", "hiring", "generation", "reproduction"})
 _NAME = r"^[a-z][a-z0-9-]{0,62}$"
 _KEY = re.compile(r"\bfk_\S+")
 _SERVE_WAIT_SECONDS = 60
 _COMMAND_TIMEOUT = 300
+
+
+def declares_models(recipe: dict[str, Any]) -> bool:
+    """Does this world's registrar declare each founding mind's model (idea: designs reproduce)?
+    Only under the reproduction law, so every world recorded before it is rebuilt as it was."""
+    laws = recipe.get("laws") or {}
+    return bool((laws.get("reproduction") or {}).get("on"))
 
 
 class WorldError(Exception):

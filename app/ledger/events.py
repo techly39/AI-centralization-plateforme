@@ -72,6 +72,7 @@ EVENT_HIRE_FAILED = "hire_failed"        # payload: {vacancy_id, pod_id, agent_i
 # Generations (app/capital/generation.py): at each month's end every pod's fitness; a PM who failed
 # is let go (its agent deactivated; an unseeded pod closed, a vacancy opened) and its lesson kept.
 EVENT_GENERATION_ENDED = "generation_ended"  # payload: {generation, month, from, to, law, pods: [...]}
+EVENT_DIVERSITY_COLLAPSED = "diversity_collapsed"  # payload: {generation, month, family, live_pods, designs, finding}
 EVENT_PM_LET_GO = "pm_let_go"            # payload: {lesson_no, agent_id, agent_name, pod_id, pod_name, reason, why, pod_closed, generation, lesson}
 
 # OMS lifecycle events (audit only — no effect on derived state):

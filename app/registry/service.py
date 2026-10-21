@@ -80,6 +80,7 @@ def register_agent(
     charter_ref: str | None = None,
     research_domains: list[str] | None = None,
     actor_agent_id: int | None = None,
+    model: str | None = None,
 ) -> tuple[Agent, str]:
     """Create an agent and return it together with its plaintext API key.
 
@@ -102,7 +103,7 @@ def register_agent(
         raise AgentCapError(over)
     return _create_agent(session, name=name, role=role, pod_id=pod_id,
                          charter_ref=charter_ref, research_domains=research_domains,
-                         actor_agent_id=actor_agent_id)
+                         actor_agent_id=actor_agent_id, model=model)
 
 
 def _create_agent(
@@ -114,6 +115,7 @@ def _create_agent(
     charter_ref: str | None,
     research_domains: list[str] | None,
     actor_agent_id: int | None,
+    model: str | None = None,
 ) -> tuple[Agent, str]:
     if session.scalar(select(Agent).where(Agent.name == name)) is not None:
         raise RegistryError(f"an agent named {name!r} already exists")
@@ -141,6 +143,8 @@ def _create_agent(
             "name": name,
             "role": role.value,
             "pod_id": pod_id,
+            # the model it runs on, when its registrar declares it (a founding PM's design)
+            **({"model": model} if model is not None else {}),
         },
     )
     return agent, api_key

@@ -348,7 +348,8 @@ async def verify(path: Path) -> tuple[int, str, str]:
                     steps=rec.steps, days_per_step=cas.parameters["days_per_step"],
                     workflow_input=cas.parameters["workflow_input"],
                     max_tool_calls=cas.parameters["max_tool_calls"], replay=rec,
-                    package=cas.parameters.get("package"), hiring=hiring)
+                    package=cas.parameters.get("package"), hiring=hiring,
+                    declare_models=world.declares_models(recipe))
             finally:
                 hosted_world.stop()
             if outcome.get("ended") == "completed":
