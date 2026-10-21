@@ -16,6 +16,7 @@ from app.api.schemas import MessageOut, MessageSendRequest
 from app.limits import MAX_ID
 from app.bus import (
     BusAccessError,
+    QuotaExceededError,
     ConflictingCursorsError,
     InvalidRecipientError,
     UnknownRecipientError,
@@ -59,6 +60,9 @@ def post_message(
     except UnknownRecipientError as exc:
         session.rollback()
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=exc.message)
+    except QuotaExceededError as exc:
+        session.rollback()
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.message)
     except BusAccessError as exc:
         session.rollback()
         # Logged as a permission_denied event, like every other 403 (TRD §6).

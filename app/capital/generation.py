@@ -177,10 +177,14 @@ def _let_go(session: Session, *, pod_id: int, reason: str, actor: Agent, generat
     """Let every active agent of ``pod_id`` go, with the pod's lesson; an unseeded pod is closed
     and a vacancy opens in its place. The caller owns the transaction (and holds OMS_LOCK)."""
     from app.capital.hiring import open_vacancy   # hiring reads the capital machine, which reads us
+    from app.capital.team import team_follows, team_members
 
     law = generation_law(session)
-    staff = list(session.scalars(select(Agent).where(
-        Agent.pod_id == pod_id, Agent.status == AgentStatus.active).order_by(Agent.id)))
+    # The pod's PMs (and any agent the operator put there); the analysts its PM hired go with it.
+    team = team_members(session, pod_id)
+    staff = [a for a in session.scalars(select(Agent).where(
+        Agent.pod_id == pod_id, Agent.status == AgentStatus.active).order_by(Agent.id))
+        if a.id not in team]
     if not staff:
         return []
     from app.oms.service import cancel_pending
@@ -201,6 +205,7 @@ def _let_go(session: Session, *, pod_id: int, reason: str, actor: Agent, generat
             "lesson_no": len(_events(session, EVENT_PM_LET_GO)) + 1, "agent_id": agent.id,
             "agent_name": agent.name, "pod_id": pod_id, "pod_name": pod.name, "reason": reason,
             "why": why, "pod_closed": close, "generation": generation, "lesson": lesson}))
+    team_follows(session, pod_id=pod_id, reason="its PM was let go", actor=actor)
     if close and pod.status != "closed":
         pod.status = "closed"
         session.flush()
@@ -213,10 +218,15 @@ def let_go_closed(session: Session, *, pod_id: int, post_mortem: dict[str, Any],
     """The risk ladder closed ``pod_id``: under the generation law its PMs go now, with the
     post-mortem as their lesson (cycle 54: a closed pod's PM kept waking, and spending, until the
     run ended). Called by the capital machine in the close's own transaction."""
+    from app.capital.team import team_follows
+
+    # The pod's team goes with its pod, under any law (the team law makes teams; off, none exist).
+    gone = team_follows(session, pod_id=pod_id, reason="its pod was closed by the risk ladder",
+                        actor=actor, force=True)
     if not generation_law(session).on:
-        return []
-    return _let_go(session, pod_id=pod_id, reason=LET_GO_CLOSED, actor=actor, generation=None,
-                   post_mortem=post_mortem)
+        return gone
+    return gone + _let_go(session, pod_id=pod_id, reason=LET_GO_CLOSED, actor=actor,
+                          generation=None, post_mortem=post_mortem)
 
 
 # --- the month's end ----------------------------------------------------------------------------

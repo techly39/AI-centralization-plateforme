@@ -108,7 +108,7 @@ manager mind; a PM's own team.
 
 ### Pods: a PM and a small team
 From: Human
-Status: not started
+Status: building
 A pod = PM + Analyst + Analyst (+ Engineer). The PM builds their own pod: chooses the people,
 creates agents (picks role, charter, model), builds their own strategy, within the rules the
 manager and the firm's laws set. Every agent the PM creates is paid from the pod's budget.

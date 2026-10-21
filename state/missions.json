@@ -8,7 +8,7 @@
       "idea": "Pods: a PM and a small team",
       "acceptance": "acceptance/pm_builds_team.py",
       "demo": "uv run python acceptance/pm_builds_team.py — scripted: a PM requests an analyst (charter, model from the pool, budget); physics grants it and the Runtime hires it the next morning with a key carved from the pod's budget; the analyst runs backtests (counted as the pod's attempts at the PM's next pitch), reads the library and messages its PM; it is refused (403, logged) when it pitches or trades; a request past the team limit, past the pod's budget or past the agent cap is refused by name (the 'no' cases), the first request granted (the 'yes' case); the analyst's thinking lowers the pod's fitness and capital score; the PM lets it go and it stops waking; a flood of messages cannot drain the PM's key; with the law off nothing changes; rebuild from the ledger gives the same books. B0: the same hosted through the Runtime, replay IDENTICAL. B: real Haiku PMs offered a team, recorded; physics' answers to whatever they chose are checked; replay IDENTICAL for $0; the report shows each pod's team and what it cost.",
-      "status": "ready",
+      "status": "active",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [

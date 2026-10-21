@@ -75,6 +75,15 @@ EVENT_GENERATION_ENDED = "generation_ended"  # payload: {generation, month, from
 EVENT_DIVERSITY_COLLAPSED = "diversity_collapsed"  # payload: {generation, month, family, live_pods, designs, finding}
 EVENT_PM_LET_GO = "pm_let_go"            # payload: {lesson_no, agent_id, agent_name, pod_id, pod_name, reason, why, pod_closed, generation, lesson}
 
+# Teams (app/capital/team.py): a PM asks for an analyst; physics grants a team place or refuses;
+# a registrar fills the place (the agent_registered follows) the next morning; the PM lets it go.
+EVENT_TEAM_PLACE_OPENED = "team_place_opened"  # payload: {place_no, pod_id, pod_name, asked_by, asked_by_name, name, role, model, budget_usd, charter, law}
+EVENT_TEAM_REQUEST_REFUSED = "team_request_refused"  # payload: {pod_id, agent_id, reason, asked}
+EVENT_TEAM_PLACE_FILLED = "team_place_filled"  # payload: {place_id, pod_id, agent_id, agent_name, model, budget_usd}
+EVENT_TEAM_HIRE_REFUSED = "team_hire_refused"  # payload: {place_id, reason, by}: the place stays open
+EVENT_TEAM_PLACE_CLOSED = "team_place_closed"  # payload: {place_id, pod_id, reason}: never filled
+EVENT_TEAM_MEMBER_LET_GO = "team_member_let_go"  # payload: {place_id, pod_id, agent_id, agent_name, reason, by}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

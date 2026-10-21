@@ -231,6 +231,34 @@ class ReproductionConfig(BaseModel):
     seed: int = Field(default=0, ge=0, le=2**31)
 
 
+class TeamConfig(BaseModel):
+    """The team law (idea: pods, a PM and a small team; first slice, a PM builds its team): a PM
+    asks physics for an analyst it describes (a charter in its own words, a model from the pool,
+    a thinking budget); physics grants or refuses it by name, and the Runtime hires the analyst
+    the next morning into the PM's own pod, with a key whose limit is the granted budget. The
+    analyst's research and thinking are the pod's. Off by default, so every run recorded before it
+    replays as it was. Frozen into the run's first granted request."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    on: bool = False
+    # Analysts a pod may hold at once: working, or granted and waiting for the morning's hire.
+    max_analysts: int = Field(default=2, ge=1, le=8)
+    # The pod's team budget, USD: every analyst key's limit together (a let-go analyst counts what
+    # it spent). Its PM's own key is the hiring law's; every dollar of both is the pod's fitness.
+    budget_usd: float = Field(default=0.40, gt=0.0, le=50.0)
+    # The models an analyst may be asked for.
+    models: tuple[str, ...] = Field(default=("anthropic/claude-haiku-5.5",), min_length=1,
+                                    max_length=32)
+
+    @field_validator("models")
+    @classmethod
+    def _models_are_named(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not all(isinstance(m, str) and re.fullmatch(r"[A-Za-z0-9._:/-]{1,100}", m) for m in value):
+            raise ValueError("models: plain model ids (letters, digits, . _ : / -)")
+        return value
+
+
 class MCPConfig(BaseModel):
     """Settings for the MCP server (``mcp_server/``), not for the API itself.
 
@@ -325,6 +353,7 @@ class Settings(BaseSettings):
     hiring: HiringConfig = Field(default_factory=HiringConfig)
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     reproduction: ReproductionConfig = Field(default_factory=ReproductionConfig)
+    team: TeamConfig = Field(default_factory=TeamConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
