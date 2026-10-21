@@ -487,10 +487,12 @@ one advance across two month ends makes one generation spanning both; a hired po
 failed hire is missing from its month's table, with its thinking; an empty pod restaffed by a
 registration passes the live-pod limit; a recording's charges are checked for amount, not for the
 agent they name (needs a forged recording). Strict-xfail tests in
-`tests/test_redteam_generation_turnover.py`. From the real run (cycle 58): a key's limit is soft by
-one turn: the provider lets the request that crosses it finish (hire-1 spent $0.200068 of $0.20),
-and the monthly cap counts a live key at its limit, so many keys at once could pass the Human's cap
-by one small turn each. Being fixed inside the idea before it merges.
+`tests/test_redteam_generation_turnover.py`. From the real run (cycle 58): a key's limit was soft
+by one turn (hire-1 spent $0.200068 of $0.20); fixed in cycle 59: no turn is sent whose worst
+case could cross what the key has left (red-team 0031: Unicode-normalized text, the dearest host,
+timeouts, unreadable answers and price fields fixed). Left (low): the provider's own prompt count
+for the turn before is trusted as a bound; a provider that understates it can bill one turn past
+the limit, and the key stops after it. Strict-xfail in `tests/test_redteam_0031.py`.
 
 ### Paid to report holes
 From: Builder

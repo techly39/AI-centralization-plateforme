@@ -33,6 +33,7 @@ import os
 import re
 import secrets
 import time
+import unicodedata
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from decimal import ROUND_CEILING, ROUND_HALF_EVEN, Decimal
@@ -63,20 +64,24 @@ SETTLE_S = 30.0
 MAX_TURN_TOKENS = 4096
 #: A key's limit is hard (cycle 59): the provider finishes the turn that crosses a limit (a
 #: real hire's key spent $0.200068 of $0.20), so no turn is sent whose worst case could cross
-#: what the key has left. The worst case is priced from the provider's own model list; the
-#: prompt is bounded by its bytes (a token is at least one byte), plus these tokens for each
+#: what the key has left. The worst case is priced at the dearest host the provider may route the
+#: model to (its endpoints list); the prompt is bounded by its bytes (a token is at least one byte
+#: of the text, read as sent or normalized NFKC, whichever is longer), plus these tokens for each
 #: message's framing and for the provider's own tool instructions.
 MESSAGE_TOKENS = 16
 TOOLS_TOKENS = 1024
 #: Price fields (USD per token, or per request) that can raise a turn's cost: the most of each
 #: group is taken, across every price tier the prompt could reach.
-_PROMPT_PRICES = ("prompt", "input_cache_write", "input_cache_write_1h")
+_PROMPT_PRICES = ("prompt", "input_cache_read", "input_cache_write", "input_cache_write_1h")
 _WRITING_PRICES = ("completion", "internal_reasoning")
 _REQUEST_PRICES = ("request",)
-#: Fields a turn of this firm never buys (it sends no image, audio or web search) or that only
-#: lower a cost. Any other field fails closed: a price the guard does not know is not bounded.
-_UNBOUGHT_PRICES = frozenset({"input_cache_read", "web_search", "image", "input_image", "audio",
-                              "input_audio", "input_audio_cache", "discount"})
+#: Fields a turn of this firm never buys (it sends no image, audio, or web search plugin). A
+#: ``discount`` only lowers a cost, so it is checked to be one and not counted. Any other field
+#: fails closed: a price the guard does not know is not bounded.
+_UNBOUGHT_PRICES = frozenset({"web_search", "image", "input_image", "audio", "input_audio",
+                              "input_audio_cache"})
+#: A model id, as a path segment pair (it is put in the endpoints URL).
+_MODEL_ID = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+")
 #: Held from the month's count to the mint, so two runs never both fit in the same room under
 #: the cap (red-team 0022). One per repo: every run of this firm passes through it.
 MINT_LOCK = REPO_ROOT / ".openrouter-mint.lock"
@@ -135,6 +140,10 @@ def _tier(row: Mapping[str, Any], what: str) -> tuple[Decimal, Decimal, Decimal]
     for field, value in row.items():
         if field in ("overrides", "min_prompt_tokens") or field in _UNBOUGHT_PRICES:
             continue
+        if field == "discount":
+            if not _price(value, what) <= 1:
+                raise OpenRouterError(f"{what}: a discount of {value!r} is a surcharge")
+            continue
         group = ("prompt" if field in _PROMPT_PRICES else "writing" if field in _WRITING_PRICES
                  else "request" if field in _REQUEST_PRICES else None)
         if group is None:
@@ -147,27 +156,32 @@ def _tier(row: Mapping[str, Any], what: str) -> tuple[Decimal, Decimal, Decimal]
 
 
 class Prices:
-    """A model's prices, as the provider's model list states them: a base tier and the tiers a
-    long prompt reaches (``overrides`` with ``min_prompt_tokens``)."""
+    """A model's prices at every host that may serve it, as the provider states them: per host,
+    a base tier and the tiers a long prompt reaches (``overrides`` with ``min_prompt_tokens``).
+    The provider routes a turn to any of them, so a turn is priced at the dearest."""
 
-    def __init__(self, model: str, pricing: object) -> None:
+    def __init__(self, model: str, pricings: object) -> None:
         what = f"pricing {model}"
-        if not isinstance(pricing, Mapping):
-            raise OpenRouterError(f"{what}: the model list holds no prices for it")
-        overrides = pricing.get("overrides") or []
-        if not isinstance(overrides, list) or not all(isinstance(o, Mapping) for o in overrides):
-            raise OpenRouterError(f"{what}: its price overrides are not a list of tiers")
-        self._tiers = [(0, _tier(pricing, what))]
-        for o in overrides:
-            start = o.get("min_prompt_tokens")
-            if type(start) is not int or start < 0:
-                raise OpenRouterError(f"{what}: a price tier names no min_prompt_tokens")
-            # A tier states only what it changes: the rest is the base tier's.
-            self._tiers.append((start, _tier({**pricing, **o}, what)))
+        if not isinstance(pricings, list) or not pricings:
+            raise OpenRouterError(f"{what}: the provider names no host serving it")
+        self._tiers: list[tuple[int, tuple[Decimal, Decimal, Decimal]]] = []
+        for pricing in pricings:
+            if not isinstance(pricing, Mapping):
+                raise OpenRouterError(f"{what}: a host states no prices")
+            overrides = pricing.get("overrides") or []
+            if not isinstance(overrides, list) or not all(isinstance(o, Mapping) for o in overrides):
+                raise OpenRouterError(f"{what}: its price overrides are not a list of tiers")
+            self._tiers.append((0, _tier(pricing, what)))
+            for o in overrides:
+                start = o.get("min_prompt_tokens")
+                if type(start) is not int or start < 0:
+                    raise OpenRouterError(f"{what}: a price tier names no min_prompt_tokens")
+                # A tier states only what it changes: the rest is the base tier's.
+                self._tiers.append((start, _tier({**pricing, **o}, what)))
 
     def worst_case(self, prompt_tokens: int) -> int:
         """Micro-dollars, rounded up, a turn of at most ``prompt_tokens`` in and
-        :data:`MAX_TURN_TOKENS` out can cost, at every tier that prompt could reach."""
+        :data:`MAX_TURN_TOKENS` out can cost, at every host and tier that prompt could reach."""
         reached = [t for start, t in self._tiers if start <= prompt_tokens]
         usd = max(fixed + prompt_tokens * per_in + MAX_TURN_TOKENS * per_out
                   for per_in, per_out, fixed in reached)
@@ -175,7 +189,11 @@ class Prices:
 
 
 def _wire_bytes(value: object) -> int:
-    return len(json.dumps(value, sort_keys=True).encode())
+    """Most tokens ``value`` can be to a tokenizer that sees at least one byte a token: its bytes
+    escaped, or as text normalized NFKC (one ligature can be 18 letters), whichever is more."""
+    text = json.dumps(value, sort_keys=True, ensure_ascii=False)
+    return max(len(json.dumps(value, sort_keys=True).encode()),
+               len(unicodedata.normalize("NFKC", text).encode()))
 
 
 def _client(key: str, transport: httpx.BaseTransport | None, timeout: float) -> httpx.Client:
@@ -190,7 +208,7 @@ def _json(response: httpx.Response, what: str) -> Any:
         raise OpenRouterError(what, response.status_code)
     try:
         return response.json()
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         raise OpenRouterError(f"{what}: the answer is not JSON", response.status_code) from exc
 
 
@@ -388,16 +406,18 @@ class OpenRouterProvisioner:
         return max(0, self._keys[key_ref][1] - self._billed[key_ref] - self._reserved[key_ref])
 
     def prices(self, model: str) -> Prices:
-        """The model's prices, from the provider's model list (read once per run)."""
+        """The model's prices at every host serving it, from the provider's endpoints list
+        (read once per run)."""
         if model not in self._prices:
-            listing = self._ask("GET", "/models", "reading the model list")
-            rows = listing.get("data") if isinstance(listing, dict) else None
-            if not isinstance(rows, list):
-                raise OpenRouterError("reading the model list: no `data` list")
-            found = [r for r in rows if isinstance(r, dict) and r.get("id") == model]
-            if len(found) != 1:
-                raise OpenRouterError(f"reading the model list: {len(found)} models named {model!r}")
-            self._prices[model] = Prices(model, found[0].get("pricing"))
+            if not _MODEL_ID.fullmatch(model):
+                raise OpenRouterError(f"pricing {model!r}: not a model id")
+            listing = self._ask("GET", f"/models/{model}/endpoints", "reading the model's hosts")
+            data = listing.get("data") if isinstance(listing, dict) else None
+            hosts = data.get("endpoints") if isinstance(data, dict) else None
+            if not isinstance(data, dict) or data.get("id") != model or not isinstance(hosts, list):
+                raise OpenRouterError(f"reading the model's hosts: no endpoints list for {model!r}")
+            self._prices[model] = Prices(model, [h.get("pricing") if isinstance(h, dict) else None
+                                                 for h in hosts])
         return self._prices[model]
 
     def chat_client(self, key_ref: str) -> httpx.Client:
@@ -533,9 +553,10 @@ class OpenRouterProvider:
         try:
             answer = _json(self._http.post("/chat/completions", json=body), "a model turn")
         except (OpenRouterError, httpx.HTTPError) as exc:
-            # Sent and maybe billed (a timeout after the model ran): the spend is unstated.
-            # A refusal the provider names (4xx) billed nothing.
-            if not (isinstance(exc, OpenRouterError) and 400 <= exc.status < 500):
+            # Sent and maybe billed (a timeout after the model ran, a 408 too): the spend is
+            # unstated. A refusal the provider names (any other 4xx) billed nothing.
+            if not (isinstance(exc, OpenRouterError) and 400 <= exc.status < 500
+                    and exc.status != 408):
                 provisioner.billed(key_ref, None, worst)
             raise
         usage = answer.get("usage") if isinstance(answer, dict) else None

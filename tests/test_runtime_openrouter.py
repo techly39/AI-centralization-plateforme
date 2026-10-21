@@ -59,8 +59,12 @@ class Account:
             self.keys[digest]["usage"] += answer.get("usage", {}).get("cost", 0)
             return httpx.Response(200, json=answer)
         assert auth == "Bearer prov-key", "account calls carry the provisioning key"
-        if path == "/models" and request.method == "GET":
-            return httpx.Response(200, json={"data": self.models})
+        if path.startswith("/models/") and path.endswith("/endpoints") and request.method == "GET":
+            model = path.removeprefix("/models/").removesuffix("/endpoints")
+            hosts = [{"provider_name": "host", "pricing": m["pricing"]}
+                     for m in self.models if m["id"] == model]
+            return (httpx.Response(200, json={"data": {"id": model, "endpoints": hosts}}) if hosts
+                    else httpx.Response(404, json={"error": "no such model"}))
         if path == "/keys" and request.method == "GET":
             offset = int(request.url.params.get("offset", 0))
             rows = list(self.keys.values())[offset:offset + 2]   # pages of two
@@ -484,7 +488,7 @@ def test_a_price_the_guard_cannot_bound_refuses_the_turn_unsent(account, pricing
 def test_a_model_missing_from_the_list_is_refused(account) -> None:
     account.models.clear()
     _, _, mind = _mind(account, 1_000_000)
-    with pytest.raises(OpenRouterError, match="0 models"):
+    with pytest.raises(OpenRouterError, match="HTTP 404"):
         mind.complete(request())
     assert account.chats == []
 
