@@ -390,7 +390,7 @@ TEAM_PM = "pod-1-pm"
 #: The rehearsal's team law and ask (the real run's are in ``write_world``).
 REHEARSAL_LAW = {"on": True, "max_analysts": 2, "budget_usd": 2.0, "models": [HAIKU]}
 LET_GO_ON = "2024-09-25"
-PM_TEAM_TOOLS = ["get_team", "request_analyst", "let_go_analyst"]
+PM_TEAM_TOOLS = ["get_team", "request_analyst", "let_go_analyst", "get_messages", "send_message"]
 #: What every PM of the hosted firm is told of the team law (the law itself is in get_team).
 TEAM = (" Your pod may build a team: you may ask for an analyst (request_analyst) with a charter "
         "in your own words, a model from the firm's pool and a thinking budget; get_team shows the "
