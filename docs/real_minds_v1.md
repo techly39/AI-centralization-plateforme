@@ -8,6 +8,13 @@ What shipped (cycles 42-43; hardened by red-team 0022-0030):
 - Monthly accounting across runs: before each key is minted, every `firm-` key on the account counts
   against `firm.monthly_llm_usd_cap` (enabled = its whole limit, disabled = its spend this month).
   The Human's own keys (any other name) are never counted or changed.
+- A key's limit is hard on our side too (cycle 59): the provider lets the turn that crosses a
+  limit finish, so the Runtime sends no turn whose worst case could cross what the key has left.
+  The worst case is the prompt bounded by its bytes (or the provider's count for the turn before
+  plus the bytes added), plus 4096 written tokens, at the dearest host and price tier
+  (`GET /models/{id}/endpoints`). Over a real run's 394 turns it was at least 2.4x the real cost, so
+  a mind stops a cent or so short of its limit. It assumes `max_tokens` bounds reasoning too
+  (true for the models used; no reasoning is asked for) and trusts the provider's prompt count.
 - Each morning each mind gets its data package (`--package prices-v1`, `runtime/packages.py`).
 - A metered run records a cassette like any other; `replay --verify` judges its trailing cost rows
   apart (`runtime.verify.metered_block`) and replays at $0.

@@ -71,6 +71,9 @@ hiring under the cap, metering per step: red-team + auditor before merge.
   PM; a let-go PM's orders cancelled, a pod with money not closed) fixed, four lows filed.
   The demo still fails one check, rightly: hire-1's key spent $0.200068 of $0.20 (the provider
   finishes the turn that crosses a key's limit).
-- Next (cycle 59): make a key's limit hard: refuse or shorten a turn whose worst case (its
-  prompt so far + MAX_TURN_TOKENS at the model's price) would cross what the key has left, and
-  count that one-turn reserve in the monthly cap; re-record B (about $0.60); auditor; merge.
+- cycle 59: a key's limit made hard: no turn is sent whose worst case (prompt bounded by its
+  bytes, or by the provider's count for the turn before plus what was added; full writing; the
+  dearest host and price tier) could cross what the key has left. Over the 394 real turns of
+  cycle 58 the bound always held (2.4x slack) and would have stopped hire-1 at $0.193. No
+  reserve in the monthly cap is needed: a key cannot pass its limit, and the cap counts it at its
+  limit. Red-team 0031: 6 holes (2 medium), 5 fixed, 1 low filed. Re-recording B.
