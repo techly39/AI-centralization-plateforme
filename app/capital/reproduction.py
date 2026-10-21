@@ -39,7 +39,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import HiringConfig, ReproductionConfig, get_settings
-from app.db.models import Agent, AgentStatus, Event, Pod
+from app.db.models import Agent, AgentRole, AgentStatus, Event, Pod
 from app.ledger.events import (
     EVENT_AGENT_REGISTERED,
     EVENT_CAPITAL_SEEDED,
@@ -105,9 +105,10 @@ def design_of(session: Session, pod_id: int) -> dict[str, Any]:
     hire = hire_of(session, pod_id)
     if hire is not None:
         model = hire.get("model")
-    else:   # a founding PM's, as registered (an agent never changes pod)
+    else:   # a founding PM's, as registered (an agent never changes pod; only a PM's counts)
         model = next((e.payload_json["model"] for e in _events(session, EVENT_AGENT_REGISTERED)
-                      if e.payload_json.get("pod_id") == pod_id and e.payload_json.get("model")),
+                      if e.payload_json.get("pod_id") == pod_id
+                      and e.payload_json.get("role") == "pm" and e.payload_json.get("model")),
                      None)
     family = (hire or {}).get("family") or {"pod_id": pod_id,
                                              "pod_name": pod.name if pod else None}
@@ -124,7 +125,8 @@ def _signature(design: dict[str, Any]) -> str:
 def _alive(session: Session, pod_id: int) -> bool:
     pod = session.get(Pod, pod_id)
     return pod is not None and pod.status != "closed" and session.scalar(
-        select(Agent.id).where(Agent.pod_id == pod_id, Agent.status == AgentStatus.active)
+        select(Agent.id).where(Agent.pod_id == pod_id, Agent.status == AgentStatus.active,
+                               Agent.role == AgentRole.pm)
         .limit(1)) is not None
 
 

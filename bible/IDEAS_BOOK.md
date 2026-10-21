@@ -508,6 +508,12 @@ case could cross what the key has left (red-team 0031: Unicode-normalized text, 
 timeouts, unreadable answers and price fields fixed). Left (low): the provider's own prompt count
 for the turn before is trusted as a bound; a provider that understates it can bill one turn past
 the limit, and the key stops after it. Strict-xfail in `tests/test_redteam_0031.py`.
+From designs reproduce (cycle 62, red-team; fixed: only the operator's registrar declares a
+model, and only a PM's; a pod's design reads only its PM's model; a parent needs a working PM):
+(medium) a sibling's attempts on the family's design are not counted in the next child's
+deflated Sharpe (only the parent's own and inherited ones are frozen in the vacancy); (low) a
+parent with no declared model gives its child a second, unrecorded difference (its model from
+the hiring pool). Strict-xfail tests in `tests/test_redteam_designs_reproduce.py`.
 
 ### Paid to report holes
 From: Builder

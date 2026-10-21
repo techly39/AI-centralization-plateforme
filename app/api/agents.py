@@ -17,7 +17,7 @@ from app.db.base import get_session
 from app.db.models import Agent, AgentRole
 from app.oms.service import OMS_LOCK
 from app.registry.auth import deny, get_current_agent, require
-from app.registry.permissions import Action
+from app.registry.permissions import Action, may_declare_model
 from app.registry.service import (
     RegistryError,
     ReservedIdentityError,
@@ -39,6 +39,10 @@ def register(
     actor: Agent = Depends(require(Action.REGISTER_AGENTS)),
     session: Session = Depends(get_session),
 ) -> AgentCreatedResponse:
+    if body.model is not None and not may_declare_model(session, actor, AgentRole(body.role)):
+        raise deny(session, actor, Action.REGISTER_AGENTS,
+                   detail="only the operator's registrar declares a model, and only a PM's",
+                   context={"name": body.name, "role": body.role})
     try:
         with OMS_LOCK:  # the cap is counted and the agent committed with no other maker between
             agent, api_key = register_agent(

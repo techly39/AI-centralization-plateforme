@@ -140,7 +140,8 @@ async def provision(
                 made = await registrar.post("/agents/register", {
                     "name": spec.name, "role": spec.role, "pod_id": spec.pod,
                     "charter_ref": f"spec:{spec.id}",
-                    **({"model": spec.model} if declare_models and spec.model else {})})
+                    **({"model": spec.model} if declare_models and spec.model
+                       and spec.role == "pm" else {})})
             except FundAPIError as exc:
                 # Only a refusal (4xx) proves nothing was made; a lost answer may hide one.
                 maybe = done if exc.status_code < 500 else [*done, spec.id]

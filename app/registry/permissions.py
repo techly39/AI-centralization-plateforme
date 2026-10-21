@@ -136,3 +136,10 @@ def may_hire(session: Any, actor: Any) -> bool:
 
     return (has_permission(actor.role, Action.REGISTER_AGENTS)
             and registered_by_operator(session, actor))
+
+
+def may_declare_model(session: Any, actor: Any, role: AgentRole) -> bool:
+    """Declaring the model an agent runs on (a founding PM's design, which a child inherits under
+    the reproduction law) is the operator's registrar's act, and only for a PM: a firm mind that
+    registers agents does not put a model on the record (red-team, designs reproduce)."""
+    return role == AgentRole.pm and may_hire(session, actor)
