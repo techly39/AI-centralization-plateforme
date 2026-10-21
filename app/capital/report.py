@@ -170,6 +170,11 @@ def _money(x: float | None) -> str:
         f"{'-' if x < 0 else ''}${abs(x):,.0f}")
 
 
+def _cents(x: float | None) -> str:
+    """Thinking costs cents: a whole-dollar figure would show every pod's as $0."""
+    return "-" if x is None else f"{'-' if x < 0 else ''}${abs(x):,.2f}"
+
+
 def render(report: dict[str, Any]) -> str:
     """The report as text, for a person."""
     if report["opened_on"] is None:
@@ -248,7 +253,7 @@ def render_generations(report: dict[str, Any]) -> str:
         out.append(f"  {'pod':<12}{'PM':<14}{'P&L':>10}{'thinking':>11}{'fitness':>10}  verdict")
         for p in g["pods"]:
             out.append(f"  {p['pod_name'][:11]:<12}{(', '.join(p['pms']) or '-')[:13]:<14}"
-                       f"{_money(p['pnl_usd']):>10}{_money(p['thinking_usd']):>11}"
+                       f"{_money(p['pnl_usd']):>10}{_cents(p['thinking_usd']):>11}"
                        f"{_money(p['fitness_usd']):>10}  {p['verdict']}: {p['why']}")
         for x in g["let_go"]:
             out.append(f"  let go {x['on']}: {x['pm']} ({x['pod']}), {x['why']}")
