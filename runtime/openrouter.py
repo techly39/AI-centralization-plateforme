@@ -61,6 +61,22 @@ TURN_TIMEOUT_S = 120.0
 SETTLE_S = 30.0
 #: Most a model may write in one turn: a turn admitted under a key's limit stays a small turn.
 MAX_TURN_TOKENS = 4096
+#: A key's limit is hard (cycle 59): the provider finishes the turn that crosses a limit (a
+#: real hire's key spent $0.200068 of $0.20), so no turn is sent whose worst case could cross
+#: what the key has left. The worst case is priced from the provider's own model list; the
+#: prompt is bounded by its bytes (a token is at least one byte), plus these tokens for each
+#: message's framing and for the provider's own tool instructions.
+MESSAGE_TOKENS = 16
+TOOLS_TOKENS = 1024
+#: Price fields (USD per token, or per request) that can raise a turn's cost: the most of each
+#: group is taken, across every price tier the prompt could reach.
+_PROMPT_PRICES = ("prompt", "input_cache_write", "input_cache_write_1h")
+_WRITING_PRICES = ("completion", "internal_reasoning")
+_REQUEST_PRICES = ("request",)
+#: Fields a turn of this firm never buys (it sends no image, audio or web search) or that only
+#: lower a cost. Any other field fails closed: a price the guard does not know is not bounded.
+_UNBOUGHT_PRICES = frozenset({"input_cache_read", "web_search", "image", "input_image", "audio",
+                              "input_audio", "input_audio_cache", "discount"})
 #: Held from the month's count to the mint, so two runs never both fit in the same room under
 #: the cap (red-team 0022). One per repo: every run of this firm passes through it.
 MINT_LOCK = REPO_ROOT / ".openrouter-mint.lock"
@@ -100,6 +116,66 @@ def usd_to_micros_ceil(usd: object) -> int:
         raise OpenRouterError(f"the provider reported a spend that is not a dollar amount: {usd!r}")
     nanos = (Decimal(repr(float(usd))) * 1_000_000_000).to_integral_value(rounding=ROUND_HALF_EVEN)
     return int((nanos / 1000).to_integral_value(rounding=ROUND_CEILING))
+
+
+def _price(value: object, what: str) -> Decimal:
+    """One price from the provider's list: a non-negative decimal (the list writes strings)."""
+    try:
+        price = Decimal(str(value)) if type(value) in (str, int, float) else None
+    except ArithmeticError:
+        price = None
+    if price is None or not price.is_finite() or price < 0:
+        raise OpenRouterError(f"{what}: the price list holds {value!r}, not a price")
+    return price
+
+
+def _tier(row: Mapping[str, Any], what: str) -> tuple[Decimal, Decimal, Decimal]:
+    """(per prompt token, per written token, per request) of one price tier, the most of each."""
+    groups: dict[str, list[Decimal]] = {"prompt": [], "writing": [], "request": []}
+    for field, value in row.items():
+        if field in ("overrides", "min_prompt_tokens") or field in _UNBOUGHT_PRICES:
+            continue
+        group = ("prompt" if field in _PROMPT_PRICES else "writing" if field in _WRITING_PRICES
+                 else "request" if field in _REQUEST_PRICES else None)
+        if group is None:
+            raise OpenRouterError(f"{what}: the price list names {field!r}, which no turn is bounded by")
+        groups[group].append(_price(value, what))
+    if not groups["prompt"] or not groups["writing"]:
+        raise OpenRouterError(f"{what}: the price list gives no prompt or completion price")
+    return (max(groups["prompt"]), max(groups["writing"]),
+            max(groups["request"], default=Decimal(0)))
+
+
+class Prices:
+    """A model's prices, as the provider's model list states them: a base tier and the tiers a
+    long prompt reaches (``overrides`` with ``min_prompt_tokens``)."""
+
+    def __init__(self, model: str, pricing: object) -> None:
+        what = f"pricing {model}"
+        if not isinstance(pricing, Mapping):
+            raise OpenRouterError(f"{what}: the model list holds no prices for it")
+        overrides = pricing.get("overrides") or []
+        if not isinstance(overrides, list) or not all(isinstance(o, Mapping) for o in overrides):
+            raise OpenRouterError(f"{what}: its price overrides are not a list of tiers")
+        self._tiers = [(0, _tier(pricing, what))]
+        for o in overrides:
+            start = o.get("min_prompt_tokens")
+            if type(start) is not int or start < 0:
+                raise OpenRouterError(f"{what}: a price tier names no min_prompt_tokens")
+            # A tier states only what it changes: the rest is the base tier's.
+            self._tiers.append((start, _tier({**pricing, **o}, what)))
+
+    def worst_case(self, prompt_tokens: int) -> int:
+        """Micro-dollars, rounded up, a turn of at most ``prompt_tokens`` in and
+        :data:`MAX_TURN_TOKENS` out can cost, at every tier that prompt could reach."""
+        reached = [t for start, t in self._tiers if start <= prompt_tokens]
+        usd = max(fixed + prompt_tokens * per_in + MAX_TURN_TOKENS * per_out
+                  for per_in, per_out, fixed in reached)
+        return int((usd * 1_000_000).to_integral_value(rounding=ROUND_CEILING))
+
+
+def _wire_bytes(value: object) -> int:
+    return len(json.dumps(value, sort_keys=True).encode())
 
 
 def _client(key: str, transport: httpx.BaseTransport | None, timeout: float) -> httpx.Client:
@@ -146,6 +222,11 @@ class OpenRouterProvisioner:
         self._turns: dict[str, int] = {}
         #: key_ref -> turns the provider may have billed without saying what (red-team 0025)
         self._unstated: dict[str, int] = {}
+        #: key_ref -> µ$ those unstated turns could have cost at most (their worst cases)
+        self._reserved: dict[str, int] = {}
+        #: keys a turn billed more than its worst case: the price list is not to be trusted
+        self._unbounded: set[str] = set()
+        self._prices: dict[str, Prices] = {}
 
     def _ask(self, method: str, path: str, what: str, **kwargs: Any) -> Any:
         """One account request, asked again (up to :data:`ATTEMPTS` times in all) when the answer
@@ -257,6 +338,7 @@ class OpenRouterProvisioner:
             self._billed[key_ref] = 0
             self._turns[key_ref] = 0
             self._unstated[key_ref] = 0
+            self._reserved[key_ref] = 0
         limit = data.get("limit")
         if type(limit) not in (int, float) or usd_to_micros_ceil(limit) != limit_usd_micros \
                 or data.get("limit_reset") is not None:   # a limit that resets is no hard limit
@@ -278,18 +360,45 @@ class OpenRouterProvisioner:
         """Model turns the key answered (for the run's report)."""
         return self._turns[key_ref]
 
-    def billed(self, key_ref: str, usd_micros: int | None) -> None:
+    def billed(self, key_ref: str, usd_micros: int | None, worst_case: int | None = None) -> None:
         """A turn on ``key_ref`` cost this, by the provider's own answer (``None``: the turn
-        reached the provider but its answer did not say what it cost)."""
+        reached the provider but its answer did not say what it cost). ``worst_case`` is the
+        most the turn could cost, as priced before it was sent (``None``: not priced, so the
+        key is spent out)."""
         if usd_micros is None:
             self._unstated[key_ref] += 1
+            self._reserved[key_ref] += (self._keys[key_ref][1] if worst_case is None
+                                        else worst_case)
         else:
             self._billed[key_ref] += usd_micros
+            if worst_case is not None and usd_micros > worst_case:
+                self._unbounded.add(key_ref)
         self._turns[key_ref] += 1
 
     def spent_out(self, key_ref: str) -> bool:
         """Have the key's turns, by their own answers, used its whole limit? (red-team 0024)"""
         return self._billed[key_ref] >= self._keys[key_ref][1]
+
+    def left(self, key_ref: str) -> int:
+        """Micro-dollars the key may still spend: its limit less what its turns billed and the
+        worst cases of the turns that did not say. 0 once a turn billed past its own worst
+        case (the prices the guard read are not the prices charged)."""
+        if key_ref in self._unbounded:
+            return 0
+        return max(0, self._keys[key_ref][1] - self._billed[key_ref] - self._reserved[key_ref])
+
+    def prices(self, model: str) -> Prices:
+        """The model's prices, from the provider's model list (read once per run)."""
+        if model not in self._prices:
+            listing = self._ask("GET", "/models", "reading the model list")
+            rows = listing.get("data") if isinstance(listing, dict) else None
+            if not isinstance(rows, list):
+                raise OpenRouterError("reading the model list: no `data` list")
+            found = [r for r in rows if isinstance(r, dict) and r.get("id") == model]
+            if len(found) != 1:
+                raise OpenRouterError(f"reading the model list: {len(found)} models named {model!r}")
+            self._prices[model] = Prices(model, found[0].get("pricing"))
+        return self._prices[model]
 
     def chat_client(self, key_ref: str) -> httpx.Client:
         """The HTTP client one mind's turns go through: its own key, nothing else."""
@@ -385,6 +494,20 @@ class OpenRouterProvider:
         self._model = model
         self._meter = meter
         self._http = meter.provisioner.chat_client(meter.key_ref)
+        #: The last answered turn: (its messages, its tools, the prompt tokens the provider counted)
+        self._last: tuple[list[dict[str, Any]], object, int] | None = None
+
+    def _prompt_bound(self, body: Mapping[str, Any]) -> int:
+        """Most prompt tokens this turn can hold. A wake's transcript only grows: when this turn
+        extends the last answered one, the bound is what the provider counted then plus the bytes
+        added since; otherwise every byte of the messages and tools."""
+        messages, tools = body["messages"], body.get("tools")
+        start, base = 0, (_wire_bytes(tools) + TOOLS_TOKENS) if tools else 0
+        if self._last is not None:
+            before, before_tools, counted = self._last
+            if before_tools == tools and messages[:len(before)] == before:
+                start, base = len(before), counted
+        return base + sum(_wire_bytes(m) + MESSAGE_TOKENS for m in messages[start:])
 
     def complete(self, request: CompletionRequest) -> CompletionResponse:
         provisioner, key_ref = self._meter.provisioner, self._meter.key_ref
@@ -401,19 +524,29 @@ class OpenRouterProvider:
                               "function": {"name": t.name, "description": t.description,
                                            "parameters": t.input_schema or {"type": "object"}}}
                              for t in request.tools]
+        # The hard limit: a turn is sent only if its worst case fits what the key has left.
+        worst = provisioner.prices(self._model).worst_case(self._prompt_bound(body))
+        left = provisioner.left(key_ref)
+        if worst > left:
+            raise OpenRouterError(f"a model turn: it could cost up to {worst} µ$ and the key "
+                                  f"has {left} µ$ left of its limit")
         try:
             answer = _json(self._http.post("/chat/completions", json=body), "a model turn")
         except (OpenRouterError, httpx.HTTPError) as exc:
             # Sent and maybe billed (a timeout after the model ran): the spend is unstated.
             # A refusal the provider names (4xx) billed nothing.
             if not (isinstance(exc, OpenRouterError) and 400 <= exc.status < 500):
-                provisioner.billed(key_ref, None)
+                provisioner.billed(key_ref, None, worst)
             raise
         usage = answer.get("usage") if isinstance(answer, dict) else None
         usage = usage if isinstance(usage, Mapping) else {}
         stated = usage.get("cost")
-        micros = usd_to_micros_ceil(stated)
-        provisioner.billed(key_ref, None if stated is None else micros)
+        try:
+            micros = usd_to_micros_ceil(stated)
+        except OpenRouterError:
+            provisioner.billed(key_ref, None, worst)   # billed, but not said how much
+            raise
+        provisioner.billed(key_ref, None if stated is None else micros, worst)
         if isinstance(answer, dict) and answer.get("error"):
             raise OpenRouterError(f"a model turn: {str(answer['error'])[:200]}")
         choices = answer.get("choices") if isinstance(answer, dict) else None
@@ -427,6 +560,8 @@ class OpenRouterProvider:
                           arguments=_arguments((c.get("function") or {}).get("arguments")))
                  for i, c in enumerate(message.get("tool_calls") or []) if isinstance(c, dict)]
         tokens_in, tokens_out = usage.get("prompt_tokens"), usage.get("completion_tokens")
+        self._last = ((body["messages"], body.get("tools"), tokens_in)
+                      if type(tokens_in) is int and tokens_in >= 0 else None)
         return CompletionResponse(
             content=message.get("content") if isinstance(message.get("content"), str) else "",
             tool_calls=calls,

@@ -62,6 +62,9 @@ def test_hole_a_key_minted_without_its_limit_is_accepted() -> None:
 
 def test_hole_a_mind_keeps_calling_after_its_turns_billed_past_its_limit() -> None:
     account = Account()   # like the test account, it does not stop a key at its limit
+    # Priced so the first turn's worst case fits the $0.001 key (cycle 59: else the hard limit
+    # refuses even the first); the answer then bills past both the limit and that worst case.
+    account.models[0]["pricing"] = {"prompt": "0.0000000001", "completion": "0.0000001"}
     p = _prov(account)
     meter = Meter(p, p.create_key(7, 1_000, spec_id="pm"))        # a $0.001 key
     mind = build_provider(spec(), meter=meter)
