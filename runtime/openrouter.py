@@ -81,7 +81,7 @@ _REQUEST_PRICES = ("request",)
 _UNBOUGHT_PRICES = frozenset({"web_search", "image", "input_image", "audio", "input_audio",
                               "input_audio_cache"})
 #: A model id, as a path segment pair (it is put in the endpoints URL).
-_MODEL_ID = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+")
+_MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*")
 #: Held from the month's count to the mint, so two runs never both fit in the same room under
 #: the cap (red-team 0022). One per repo: every run of this firm passes through it.
 MINT_LOCK = REPO_ROOT / ".openrouter-mint.lock"

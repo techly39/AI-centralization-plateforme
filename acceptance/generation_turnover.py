@@ -610,7 +610,8 @@ def lawful(doc: dict, label: str) -> None:
             elif seeded.get(pod, i) < i:
                 expect = "stays"
             else:
-                tenure = min((turn - reg[a][1]).days for a in staffed[pod])
+                # judged by its longest-serving PM, as the law is (red-team, cycle 58)
+                tenure = max((turn - reg[a][1]).days for a in staffed[pod])
                 expect = "let_go" if tenure >= grace else "too_new"
             ok = judged.get(pod) == expect
             if expect == "let_go":
@@ -765,6 +766,13 @@ def recorded() -> None:
         return
     text = EVIDENCE.read_text(encoding="ascii")
     doc = json.loads(text)
+    params = doc.get("parameters") or {}
+    check("B: the run is the one this idea describes: 31 steps of 3 days, thinking charged each "
+          f"step, {MAX_TOOL_CALLS} tool calls a wake",
+          (params.get("steps"), params.get("days_per_step"), params.get("charge_each_step"),
+           params.get("max_tool_calls")) == (STEPS, DAYS_PER_STEP, True, MAX_TOOL_CALLS),
+          f"{params.get('steps')} steps of {params.get('days_per_step')} days, "
+          f"{params.get('max_tool_calls')} tool calls a wake")
     lawful(doc, "B")
     metering = (doc.get("outcome") or {}).get("metering") or {}
     keys = metering.get("keys") or []

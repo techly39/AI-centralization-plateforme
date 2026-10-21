@@ -75,5 +75,6 @@ hiring under the cap, metering per step: red-team + auditor before merge.
   bytes, or by the provider's count for the turn before plus what was added; full writing; the
   dearest host and price tier) could cross what the key has left. Over the 394 real turns of
   cycle 58 the bound always held (2.4x slack) and would have stopped hire-1 at $0.193. No
-  reserve in the monthly cap is needed: a key cannot pass its limit, and the cap counts it at its
+  reserve in the monthly cap: a key cannot pass its limit (save one filed low hole: a provider that
+  understates its prompt count), and the cap counts it at its
   limit. Red-team 0031: 6 holes (2 medium), 5 fixed, 1 low filed. Re-recording B.
