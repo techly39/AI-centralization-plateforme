@@ -325,7 +325,7 @@ class Settings(BaseSettings):
     hiring: HiringConfig = Field(default_factory=HiringConfig)
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     reproduction: ReproductionConfig = Field(default_factory=ReproductionConfig)
-    mcp:MCPConfig = Field(default_factory=MCPConfig)
+    mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
 

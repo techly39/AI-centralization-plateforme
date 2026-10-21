@@ -2059,3 +2059,33 @@ never earns a seed; a manager mind.
 PM; B0 hosted rehearsal, its law checks shown to refuse three forged records; B the recorded real
 quarter, `evidence/firm-quarter/`); `tests/test_firm_quarter.py`,
 `tests/test_redteam_firm_quarter.py`, `tests/test_evidence_replays.py`.
+
+## ADR-052 — Designs reproduce: a freed place goes to a child of the month's fittest pod, with one change; the firm measures its own diversity (idea: designs that work reproduce with variation) — accepted (cycle 62, 2026-10-21)
+
+**Context.** Each month's end lets go the PMs who failed and hires into their places, but every
+hire was the same fixed design: selection removed what failed and nothing carried forward what
+worked. Physics did not know a founding PM's model (only the Runtime's specs did).
+
+**Decision.**
+1. A law, `reproduction:` (`on`, `seed`; `config.yaml` or a world's recipe), off by default and
+   frozen into a run's first vacancy, so every run recorded before it replays as recorded.
+2. A pod's design is its PM's model and its rule (seeded, else last eligible, else last pitch).
+   Under the law the operator's registrar declares each founding PM's model at registration; only
+   it may, and only for a PM (`may_declare_model`; anyone else: 403, logged).
+3. When a place is freed, the parent is the fittest pod of the last measured month (fitness above
+   zero, a PM still working there); the vacancy names the child: its parent's model and rule with
+   exactly one change one step away, drawn by `random.Random(f"{seed}:{vacancy number}")`. No such
+   pod: the plain hire. The child is told its parent, change and rule; the rule is only a starting
+   point (it still pitches and passes the gates), and its pitches count its parent's line's
+   attempts in the deflated Sharpe's N.
+4. Each month's end writes the live pods, distinct designs and the largest family's share;
+   `diversity_collapsed` when one family holds every live pod (two or more).
+5. One advance across two month ends ends both months; a failed hire's pod stays in its table.
+
+**Known holes.** A sibling's attempts are not in the next child's N (medium); a parent without a
+declared model gives its child a second, unrecorded difference (low). Strict-xfail tests.
+
+**Proof.** `acceptance/designs_reproduce.py` (A four scripted worlds: child and plain hire, collapse
+and none, the law off; B0 hosted rehearsal; B the recorded real run, `evidence/designs-reproduce/`);
+`tests/test_reproduction.py`, `tests/test_redteam_designs_reproduce.py`,
+`tests/test_evidence_replays.py`.

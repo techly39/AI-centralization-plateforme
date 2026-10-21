@@ -333,14 +333,31 @@ def diversity_holds(ledger, label: str) -> list[dict]:
     def family(pod_id: int, name: str) -> str:
         return (born.get(pod_id, {}).get("family") or {}).get("pod_name") or name
 
+    def design(pod_id: int, before: int) -> str:
+        """The pod's model and rule as the ledger stood: a hire's model from its vacancy, a
+        founder's as its PM registered it; its seeded rule, else last eligible, else last pitch."""
+        model = born[pod_id].get("model") if pod_id in born else next(
+            (p.get("model") for p in of(ledger, "agent_registered")
+             if p.get("pod_id") == pod_id and p.get("role") == "pm" and p.get("model")), None)
+        seed = next((p["rule"] for p in of(ledger, "capital_seeded")
+                     if p["pod_id"] == pod_id and p["_id"] < before), None)
+        ok = {p["pitch_id"] for p in of(ledger, "pitch_judged") if p.get("eligible") is True}
+        pitches = [p for p in of(ledger, "pitch_submitted")
+                   if p["pod_id"] == pod_id and p["_id"] < before]
+        best = [p for p in pitches if p["_id"] in ok] or pitches
+        rule = seed if seed is not None else (best[-1]["rule"] if best else None)
+        return json.dumps([model, rule], sort_keys=True)
+
     bad, lines = [], []
     for g in of(ledger, "generation_ended"):
         live = [r for r in g["pods"] if r["verdict"] in ("stays", "too_new")]
         fams = {family(r["pod_id"], r["pod_name"]) for r in live}
+        designs = len({design(r["pod_id"], g["_id"]) for r in live})
         d = g.get("diversity") or {}
         share = (max(sum(1 for r in live if family(r["pod_id"], r["pod_name"]) == f)
                      for f in fams) / len(live)) if live else None
         if (d.get("live_pods") != len(live) or len(d.get("families") or {}) != len(fams)
+                or d.get("designs") != designs
                 or d.get("largest_share") != share
                 or d.get("collapsed") != (len(live) >= 2 and len(fams) == 1)):
             bad.append(g["month"])

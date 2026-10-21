@@ -20,7 +20,8 @@ a world's recipe), so every run recorded before it replays as it was.
 4. **The family's attempts.** A rule chosen as the best of a family has been tried by the family:
    the vacancy freezes the parent's attempts as they stood (its own research and pitches, plus
    what it inherited), and every pitch of the child counts them in the deflated Sharpe's N
-   (:func:`inherited_attempts`).
+   (:func:`inherited_attempts`). Only the parent's line: a sibling's attempts are not counted
+   (a known hole, ``tests/test_redteam_designs_reproduce.py``).
 5. **Diversity.** Each month's end (:func:`diversity`) counts the distinct designs alive and the
    largest family's share of the live pods; when one family holds every live pod (two or more),
    that is written as a finding (``diversity_collapsed``).
