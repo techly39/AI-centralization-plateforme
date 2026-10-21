@@ -19,7 +19,9 @@ Costs $0 and needs no network.
        nofit     two noise pods, both let go at September's end: no pod earned more than it
                  thought, so both places get the plain hire
        off       the default world with the law off: the hires are the hiring law's, as before
-  B0 (next session) the same months hosted, through the Runtime, replay IDENTICAL
+  B0 the generation-turnover months hosted, through the Runtime, the law on, scripted minds:
+     the hires are the fittest pod's children, each handed its parent, change and rule; the
+     family tree from the recording alone; replay --verify IDENTICAL
   B  (next session) real Haiku PMs, recorded; the hires are the fittest pod's children
 
     uv run python acceptance/designs_reproduce.py        # exit 0 = the idea works
@@ -464,6 +466,50 @@ def rebuilt_and_reported() -> None:
 
 # --- B0: the default months hosted, lived by the Runtime ----------------------------------------
 
+def first_input(wake: dict | None) -> dict | None:
+    """The ``input`` a mind was handed in its first message of a wake (a JSON document)."""
+    for m in (wake or {}).get("transcript") or []:
+        if m.get("role") == "user":
+            try:
+                return (json.loads(m["content"]) or {}).get("input")
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def rebuilt_report(rec: dict) -> dict:
+    """The generation report from a recording alone: its ledger rows into an empty database, the
+    derived tables rebuilt from them (the family tree reads pods), then the report."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.capital.report import generation_report
+    from app.clock import BacktestClock, get_clock, set_clock
+    from app.db.base import Base
+    from app.db.models import Event
+    from app.ledger.rebuild import rebuild_state
+
+    rows = (rec.get("ledger") or {}).get("rows") or []
+    stamp = lambda ts: datetime.fromisoformat(ts).replace(tzinfo=UTC)  # noqa: E731
+    saved = get_clock()
+    with tempfile.TemporaryDirectory(prefix="fund-reproduce-report-") as t:
+        engine = create_engine(f"sqlite:///{Path(t) / 'report.db'}")
+        Base.metadata.create_all(engine)
+        try:
+            set_clock(BacktestClock(stamp(rows[-1][1])))
+            with Session(engine) as s:
+                for r in rows:
+                    s.add(Event(id=r[0], ts=stamp(r[1]), actor_agent_id=r[2], type=r[3],
+                                payload_json=json.loads(r[4])))
+                s.flush()
+                rebuild_state(s)
+                s.flush()
+                return generation_report(s)
+        finally:
+            set_clock(saved)
+            engine.dispose()
+
+
 def rehearsal() -> None:
     """B0, $0: the generation-turnover world (the same market, minds and command) with the
     reproduction law on, scripted minds billed per step, recorded and verified now."""
@@ -508,13 +554,18 @@ def rehearsal() -> None:
                                    if p["vacancy_id"] == v["_id"]), None)), None)
         first = next((w for st in rec["outcome"]["run"]["steps"] for w in st["wakes"]
                       if w["spec_id"] == spec and w.get("transcript")), None)
-        said = json.dumps((first or {}).get("transcript"))
-        told.append(filled.get(v["_id"], "?") if first is not None and "inherited_rule" in said
-                    and json.dumps(v["hire"]["parent"]["pod_name"]) in said else None)
+        given = first_input(first)
+        hire = v["hire"]
+        told.append(filled.get(v["_id"], "?") if given is not None
+                    and (given.get("parent") or {}).get("pod_id") == hire["parent"]["pod_id"]
+                    and given.get("change") == hire["change"]
+                    and given.get("inherited_rule") == hire["inherited_rule"]
+                    and given.get("vacancy_id") == v["_id"] else None)
     check("B0: each hosted child's first wake is handed its parent, its change and its inherited "
-          "rule", bool(told) and None not in told, f"told: {told}")
+          "rule (the very ones its vacancy holds)", bool(told) and None not in told,
+          f"told: {told}")
     diversity_holds(ledger, "B0")
-    report, text_report = gt.report_from(rec)
+    report = rebuilt_report(rec)
     check("B0: the generation report from the recording alone shows the family tree",
           any(n["children"] for n in report["family_tree"]),
           "; ".join(f"{n['pod_name']} -> {[c['pod_name'] for c in n['children']]}"

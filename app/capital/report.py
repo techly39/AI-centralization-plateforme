@@ -248,21 +248,35 @@ def generation_report(session: Session) -> dict[str, Any]:
 def family_tree(session: Session) -> list[dict[str, Any]]:
     """Under the reproduction law, every pod with its children (the hires its design fathered),
     each with its model and the one change it was born with; ``[]`` when no hire was made under
-    it. Founding pods and plain hires are roots. A pure function of the ledger."""
+    it. Founding pods and plain hires are roots. A pure function of the ledger: a pod's name and
+    stage are the events' (a pod row is not an event), so a recording alone draws the same tree."""
     from app.capital.reproduction import design_of
+    from app.ledger.rebuild import stage_from
 
     opened = {e.id: e.payload_json for e in _events(session, EVENT_VACANCY_OPENED)}
     if not any("design" in v["hire"] for v in opened.values()):
         return []
     born = {e.payload_json["pod_id"]: opened.get(e.payload_json["vacancy_id"], {}).get("hire", {})
             for e in _events(session, EVENT_VACANCY_FILLED)}
+    names: dict[int, str | None] = {}
+    stages: dict[int, str] = {}
+    for e in _events(session, "agent_registered", "generation_ended", "pm_let_go",
+                     EVENT_VACANCY_FILLED, EVENT_POD_STAGE_CHANGED, "hire_failed"):
+        p = e.payload_json
+        rows = p["pods"] if e.type == "generation_ended" else [p]
+        for row in rows:
+            if row.get("pod_id") is not None:
+                names[row["pod_id"]] = row.get("pod_name") or names.get(row["pod_id"])
+        if (staged := stage_from(e)) is not None:
+            stages[staged[0]] = staged[1]
     nodes: dict[int, dict[str, Any]] = {}
-    for pod in session.scalars(select(Pod).order_by(Pod.id)):
-        design = design_of(session, pod.id)
-        if pod.id not in born and design["model"] is None and design["rule"] is None:
+    for pod_id in sorted(names):
+        design = design_of(session, pod_id)
+        if pod_id not in born and design["model"] is None and design["rule"] is None:
             continue    # a pod no one ever ran (an operator's spare)
-        hire = born.get(pod.id, {})
-        nodes[pod.id] = {"pod_id": pod.id, "pod_name": pod.name, "stage": pod.status,
+        hire = born.get(pod_id, {})
+        name = names[pod_id] or design["pod_name"] or f"pod {pod_id}"
+        nodes[pod_id] = {"pod_id": pod_id, "pod_name": name, "stage": stages.get(pod_id, "active"),
                          "model": design["model"], "rule": design["rule"],
                          "parent": (hire.get("parent") or {}).get("pod_id"),
                          "change": hire.get("change"), "children": []}

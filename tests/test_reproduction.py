@@ -89,3 +89,34 @@ def test_the_law_is_frozen_into_the_first_vacancy(db, monkeypatch):
     db.flush()
     # a run whose first vacancy was opened with the law off stays off
     assert reproduction_law(db).on is False
+
+
+def test_the_family_tree_is_drawn_from_the_ledger_alone(db):
+    """A recording holds events, not pod rows: the tree's pods, names, stages and models are the
+    events' (pods 41-43 have no row here)."""
+    from app.capital.report import family_tree
+
+    def add(type_: str, payload: dict) -> Event:
+        return append_event(db, type=type_, actor_agent_id=None, payload=payload)
+
+    add("agent_registered", {"agent_id": 901, "name": "pm-41", "role": "pm", "pod_id": 41,
+                             "model": HAIKU})
+    add("agent_registered", {"agent_id": 902, "name": "pm-42", "role": "pm", "pod_id": 42})
+    add("capital_seeded", {"pod_id": 41, "pitch_id": 1, "seed_usd": 1.0, "rule": RULE})
+    add("generation_ended", {"generation": 1, "pods": [
+        {"pod_id": 41, "pod_name": "edge"}, {"pod_id": 42, "pod_name": "noise"}]})
+    add("pm_let_go", {"pod_id": 42, "pod_name": "noise", "pod_closed": True})
+    child = {**RULE, "lookback": 40}
+    opened = add(EVENT_VACANCY_OPENED, {"hire": {
+        "design": "child", "model": HAIKU, "inherited_rule": child,
+        "parent": {"pod_id": 41, "pod_name": "edge"}, "family": {"pod_id": 41, "pod_name": "edge"},
+        "change": {"what": "lookback", "from": 20, "to": 40}}})
+    add("vacancy_filled", {"vacancy_id": opened.id, "pod_id": 43, "pod_name": "hire-1"})
+    db.flush()
+    assert db.scalar(select(Pod).where(Pod.id.in_([41, 42, 43]))) is None
+    tree = {n["pod_name"]: n for n in family_tree(db)}
+    assert set(tree) == {"edge"}       # noise ran nothing (no model, no rule): a spare, left out
+    edge = tree["edge"]
+    assert (edge["model"], edge["stage"], edge["rule"]) == (HAIKU, "active", RULE)
+    assert [(c["pod_name"], c["model"], c["change"]["to"]) for c in edge["children"]] == [
+        ("hire-1", HAIKU, 40)]

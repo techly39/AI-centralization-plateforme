@@ -20,6 +20,18 @@ from app.ledger.events import (
 from app.ledger.reducers import DerivedState, apply_event
 
 
+def stage_from(event: Event) -> tuple[int, str] | None:
+    """The pod stage an event sets, ``(pod_id, stage)``, or ``None``: the risk ladder's latest
+    ``pod_stage_changed``; a failed hire's empty pod and a let-go PM's empty pod are closed."""
+    payload = event.payload_json or {}
+    if event.type == EVENT_POD_STAGE_CHANGED:
+        return int(payload["pod_id"]), str(payload["to"])
+    if event.type == EVENT_HIRE_FAILED or (event.type == EVENT_PM_LET_GO
+                                           and payload.get("pod_closed")):
+        return int(payload["pod_id"]), "closed"
+    return None
+
+
 def rebuild_state(session: Session) -> DerivedState:
     """Drop and rebuild derived tables from the full event history.
 
@@ -41,12 +53,8 @@ def rebuild_state(session: Session) -> DerivedState:
         if event.type == EVENT_ALLOCATION_SET:
             pod_id = int(payload["pod_id"])
             allocated[pod_id] = allocated.get(pod_id, 0.0) + float(payload["delta"])
-        elif event.type == EVENT_POD_STAGE_CHANGED:
-            stage[int(payload["pod_id"])] = str(payload["to"])
-        elif event.type == EVENT_HIRE_FAILED:   # a failed hire's empty pod is closed
-            stage[int(payload["pod_id"])] = "closed"
-        elif event.type == EVENT_PM_LET_GO and payload.get("pod_closed"):  # a let-go PM's empty pod
-            stage[int(payload["pod_id"])] = "closed"
+        elif (staged := stage_from(event)) is not None:
+            stage[staged[0]] = staged[1]
 
     # Wipe and repopulate the derived tables from the accumulator.
     session.execute(delete(Position))

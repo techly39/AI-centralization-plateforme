@@ -105,10 +105,9 @@ def design_of(session: Session, pod_id: int) -> dict[str, Any]:
     hire = hire_of(session, pod_id)
     if hire is not None:
         model = hire.get("model")
-    else:
-        pms = set(session.scalars(select(Agent.id).where(Agent.pod_id == pod_id)))
+    else:   # a founding PM's, as registered (an agent never changes pod)
         model = next((e.payload_json["model"] for e in _events(session, EVENT_AGENT_REGISTERED)
-                      if e.payload_json.get("agent_id") in pms and e.payload_json.get("model")),
+                      if e.payload_json.get("pod_id") == pod_id and e.payload_json.get("model")),
                      None)
     family = (hire or {}).get("family") or {"pod_id": pod_id,
                                              "pod_name": pod.name if pod else None}
