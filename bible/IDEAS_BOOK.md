@@ -353,7 +353,12 @@ next morning; `fund-env generation-report` prints it. Real Haiku PMs lived three
 
 ### Evolution: designs that work reproduce with variation
 From: Human
-Status: building
+Status: working (cycle 62)
+Now: a place freed at a month's end goes to a child of the month's fittest pod (its model and
+rule with one change, its parent named); each month's end writes the firm's diversity and a
+finding if one family holds every live pod. Real Haiku PMs: the noise PM's place went to the edge
+pod's child, which took its own sector and kept a seed. Not yet: crossover, charter changes, a
+sibling's attempts counted, a family's capital reset.
 A pod's "genes" are its agents' specs (charter, role, model, tools) and its design (team, strategy
 family). Winners reproduce with variation (mutation, crossover); every agent knows its parent.
 If diversity collapses, that is a finding.

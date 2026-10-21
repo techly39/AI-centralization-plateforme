@@ -1,19 +1,17 @@
-Cycle 0062 · building: designs reproduce (a freed place goes to a child of the month's fittest pod) · branch: idea/designs-reproduce
+Cycle 0062 · merged: designs reproduce (a freed place goes to a child of the month's fittest pod) · branch: idea/designs-reproduce
 Done this session:
-- Recovered cycle 61's cut-off work (the hosted rehearsal, founding models declared at registration).
-- The hosted rehearsal (B0) passes: through the Runtime, both hires into places freed at a month's
-  end are children of pod-1, each one's first wake is handed its parent, its one change and the
-  rule it inherits; replay IDENTICAL. Plain hires are checked lawful (no living fit pod).
-- The family tree is now drawn from the ledger alone, so a recording draws the same tree (a pod
-  row is not an event); the founding model is read from its registration event.
-- The real run's settings check is written and passed first by a rehearsal made with the very
-  command the real run uses (24 tool calls a wake). Real Haiku run started (about $0.5 expected).
-- Red-team done: 5 holes, none high; 3 fixed (only the operator's registrar declares a model,
-  only a PM's; a design reads only its PM's model; a parent needs a working PM), 2 filed in the book.
-Next: if the real run finished, copy `$TMPDIR/real-reproduce/reproduce.cassette.json` to
-evidence/designs-reproduce/ with a README, run the demo (B must pass; the red-team fixes do not
-change what the run records); then auditor, full suite, merge.
-If the run was lost: redo it with the command in the queue notes (`--write-world DIR` first).
-Watch out: scripted minds cannot carry a model, so only the real run shows founding models on the
-record; the hiring pool is Haiku only, so a child's change is always a rule setting.
-Demo: A and B0 pass; B fails until the real recording is in evidence/.
+- Recovered cycle 61's cut-off work; the hosted rehearsal passes (children hired through the
+  Runtime, each told its parent, change and rule; replay IDENTICAL); the family tree is drawn from
+  the ledger alone, so a recording draws it.
+- Real Haiku PMs recorded with the very command the rehearsal used ($0.547, every key under its
+  limit): pod-3 closed mid-September (plain hire, nothing measured yet); pod-2 let go at
+  September's end and its place went to pod-1's child (rebalance 10 -> 5 days), which took the
+  unheld W names and kept a seed; no diversity collapse. Replay IDENTICAL.
+- Red-team: 5 holes, none high; fixed: only the operator's registrar declares a model, only a
+  PM's; a design reads only its PM's model; a parent needs a working PM. Filed: a sibling's
+  attempts not in the next child's count (medium); a parent with no declared model (low).
+- Auditor: BLOCK round 1 (the new recording missing from the suite's replay test), PASS round 2.
+  ADR-052 written. Merged; suite green on main.
+Next: plan session (three ideas finished since the last plan, or none ready in the queue).
+Watch out: the sibling-attempts hole sits under any idea that lets a family grow; fix it inside it.
+Demo: passes (A four scripted worlds, B0 rehearsal, B the real recording).

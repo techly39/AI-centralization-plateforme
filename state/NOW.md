@@ -54,4 +54,5 @@ Hiring under the cap, the gates' count of attempts, a law of physics: red-team +
 - cycle 62: B0 passes (the hosted months through the Runtime, the law on: both hires into freed
   places are children of pod-1, each handed its parent, change and rule; IDENTICAL). The family
   tree now reads only the ledger, so a recording draws it. Rehearsal made with the real run's very
-  command; real run recording.
+  command; real Haiku run recorded ($0.547: the noise PM's place went to
+  pod-1's child); red-team 3 of 5 fixed, 2 filed; auditor PASS; merged.

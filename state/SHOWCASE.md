@@ -13,6 +13,9 @@ What: <one or two lines>  ·  Try: `<demo command>`  ·  See: <what appears>
 
 ---
 
+## Designs that work reproduce: a freed place goes to a child of the month's fittest pod (cycle 62, 2026-10-21)
+What: at a month's end the fittest living pod becomes the parent of every hire into a freed place: the child gets its model and rule with one change, knows its parent, and must still pitch; each month the firm counts its distinct designs and flags a collapse  ·  Try: `uv run python acceptance/designs_reproduce.py`  ·  See: a family tree (edge -> its children, each with its one change), each month's diversity line, and real Haiku PMs where the edge pod's child found its own sector and made $169k in November
+
 ## Capital follows results: the centre funds what works and the drawdown ladder cuts what bleeds (cycle 48, 2026-10-19)
 What: an eligible pitch earns a seed and trades forward; an algorithm moves capital toward the pods that earn it, net of thinking cost and cut for copying; a pod that falls 5% is halved, 7.5% may only sell, 10% is closed and its money goes back  ·  Try: `uv run python acceptance/capital_machine.py`  ·  See: 100 days of an allocation table, the planted edge growing from $200k to about $3.4M, the copy staying small, the bleeder halved, frozen and closed, its refused buys
 
