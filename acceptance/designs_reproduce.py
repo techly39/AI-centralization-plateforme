@@ -251,10 +251,12 @@ def fittest(rows: list[dict]) -> dict | None:
     return max(fit, key=lambda r: (r["fitness_usd"], -r["pod_id"])) if fit else None
 
 
-def children(ledger, pods: dict, seen: dict, label: str) -> list[dict]:
+def children(ledger, label: str, pods: dict | None = None, seen: dict | None = None
+             ) -> list[dict]:
     """Every child vacancy, checked against the ledger: its parent the fittest living pod of the
     generation measured before it, exactly one change one step away, the parent's attempts
-    frozen, the child's own key showing it all, and each pitch counting its family's attempts."""
+    frozen; in process (``pods``, ``seen``), the child's own key showing it all and its first
+    pitch counting its family's attempts."""
     gens = of(ledger, "generation_ended")
     filled = {p["vacancy_id"]: p for p in of(ledger, "vacancy_filled")}
     kids = [v for v in of(ledger, "vacancy_opened") if v["hire"].get("design") == "child"]
@@ -274,7 +276,8 @@ def children(ledger, pods: dict, seen: dict, label: str) -> list[dict]:
         child = (hire["model"], hire["inherited_rule"])
         diffs = [k for k in ("lookback", "rebalance_every", "top_n", "universe", "signal",
                              "side", "gross") if (seeded or {}).get(k) != (child[1] or {}).get(k)]
-        diffs += ["model"] if model != child[0] else []
+        # an undeclared parent model is no design to inherit: the child's is the hiring law's
+        diffs += ["model"] if model is not None and model != child[0] else []
         ch = hire["change"]
         tries = sum(1 for t in ("research_backtest_run", "pitch_submitted") for p in of(ledger, t)
                     if p["pod_id"] == parent["pod_id"] and p["_id"] < v["_id"])
@@ -292,7 +295,7 @@ def children(ledger, pods: dict, seen: dict, label: str) -> list[dict]:
               "and pitches, counted apart)", hire["lineage_attempts"] == tries,
               f"{hire['lineage_attempts']} in the vacancy, {tries} in the ledger before it")
         pod = filled.get(v["_id"], {}).get("pod_name")
-        if pod is None:
+        if pod is None or pods is None:
             continue
         read = seen.get(pod, {})
         fam = (((read.get("capital") or {}).get("generation") or {}).get("your_pod") or {}).get(
@@ -362,7 +365,7 @@ def check_default(ledger, pods: dict, seen: dict) -> None:
           and first.get("hire", {}).get("design") == "plain" and gens
           and first["_id"] < gens[0]["_id"] and "parent" not in first.get("hire", {}),
           f"vacancy 1 opened {first.get('_on')}: {first.get('hire', {}).get('design')}")
-    kids = children(ledger, pods, seen, "default")
+    kids = children(ledger, "default", pods, seen)
     second = opened[1] if len(opened) > 1 else {}
     check("default: the noise pod's place, freed at September's end, gets a child of edge (the "
           "'yes' case; nofit is the 'no')", second.get("pod_name") == "noise"
@@ -382,7 +385,7 @@ def check_default(ledger, pods: dict, seen: dict) -> None:
 
 
 def check_collapse(ledger, pods: dict, seen: dict) -> None:
-    children(ledger, pods, seen, "collapse")
+    children(ledger, "collapse", pods, seen)
     collapsed = diversity_holds(ledger, "collapse")
     check("collapse: at October's end one family (edge's) holds every live pod: the finding is "
           "written", len(collapsed) == 1 and collapsed[0]["month"] == "2024-10"
@@ -459,6 +462,68 @@ def rebuilt_and_reported() -> None:
           f"roots and their children: {tree}")
 
 
+# --- B0: the default months hosted, lived by the Runtime ----------------------------------------
+
+def rehearsal() -> None:
+    """B0, $0: the generation-turnover world (the same market, minds and command) with the
+    reproduction law on, scripted minds billed per step, recorded and verified now."""
+    sys.path.insert(0, str(REPO / "acceptance"))
+    import generation_turnover as gt
+
+    law = {"on": True, "seed": REPRODUCTION_SEED}
+    with tempfile.TemporaryDirectory(prefix="fund-reproduce-") as t:
+        tmp = Path(t)
+        gt.write_world(tmp, "fake-metered")
+        doc = json.loads((tmp / "world.json").read_text())
+        doc["laws"]["reproduction"] = law
+        (tmp / "world.json").write_text(json.dumps(doc))
+        r = gt.fund_runtime(["backtest", "--world", "world.json", "--specs", "specs", "--hire",
+                             "hire.yaml", "--input", "input.json", "--steps", str(gt.STEPS),
+                             "--days-per-step", str(gt.DAYS_PER_STEP), "--charge-each-step",
+                             "--cassette", "rehearsal.cassette.json"], tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted months, the law on, completes and is "
+                     "recorded", r.returncode == 0 and tape.is_file(),
+                     f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-300:] if r.returncode else 'completed'}"):
+            return
+        text = tape.read_text(encoding="ascii")
+    rec = json.loads(text)
+    ledger = [(row[0], row[1][:10], row[3], json.loads(row[4])) for row in rec["ledger"]["rows"]]
+    before = len(gt.FAILED)
+    gt.lawful(rec, "B0")         # the generation law still holds, children or not
+    FAILED.extend(gt.FAILED[before:])
+    kids = children(ledger, "B0")
+    check("B0: the hosted firm hired at least one child, and every hire is named child or plain",
+          bool(kids) and all(v["hire"].get("design") in ("child", "plain")
+                             for v in of(ledger, "vacancy_opened")),
+          ", ".join(f"vacancy {v['vacancy_no']}: {v['hire'].get('design')}"
+                    for v in of(ledger, "vacancy_opened")))
+    filled = {p["vacancy_id"]: p["agent_name"] for p in of(ledger, "vacancy_filled")}
+    agents = dict((rec["outcome"]["run"] or {}).get("agents") or [])
+    told = []
+    for v in kids:
+        spec = next((sp for sp, a in agents.items()
+                     if a == next((p["agent_id"] for p in of(ledger, "vacancy_filled")
+                                   if p["vacancy_id"] == v["_id"]), None)), None)
+        first = next((w for st in rec["outcome"]["run"]["steps"] for w in st["wakes"]
+                      if w["spec_id"] == spec and w.get("transcript")), None)
+        said = json.dumps((first or {}).get("transcript"))
+        told.append(filled.get(v["_id"], "?") if first is not None and "inherited_rule" in said
+                    and json.dumps(v["hire"]["parent"]["pod_name"]) in said else None)
+    check("B0: each hosted child's first wake is handed its parent, its change and its inherited "
+          "rule", bool(told) and None not in told, f"told: {told}")
+    diversity_holds(ledger, "B0")
+    report, text_report = gt.report_from(rec)
+    check("B0: the generation report from the recording alone shows the family tree",
+          any(n["children"] for n in report["family_tree"]),
+          "; ".join(f"{n['pod_name']} -> {[c['pod_name'] for c in n['children']]}"
+                    for n in report["family_tree"]))
+    before = len(gt.FAILED)
+    gt.verify(text, "B0")
+    FAILED.extend(gt.FAILED[before:])
+
+
 # --- the demo -----------------------------------------------------------------------------------
 
 def main() -> int:
@@ -472,6 +537,8 @@ def main() -> int:
             FAILED.extend(fails or [f"world {name}: exit {r.returncode}"])
             if not fails:
                 print(r.stderr.strip()[-2000:])
+    print("\nB0: the default months hosted, through the Runtime, replayed", flush=True)
+    rehearsal()
     print(f"\n{'PASS' if not FAILED else 'FAIL'}: {len(FAILED)} check(s) failed")
     return 0 if not FAILED else 1
 

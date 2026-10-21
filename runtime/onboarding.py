@@ -239,6 +239,10 @@ class Onboarding:
         mind = Mind(spec, client, meter)
         self.minds.append(mind)
         self.inputs[spec_id] = {"post_mortem": vacancy.get("post_mortem"), "vacancy_id": vid}
+        hire = vacancy.get("hire") or {}
+        if hire.get("design") == "child":   # the reproduction law: the child knows its parent
+            self.inputs[spec_id] |= {k: hire.get(k) for k in (
+                "parent", "family", "change", "inherited_rule", "lineage_attempts")}
         return done, mind
 
     async def _population(self, law: Governance) -> tuple[str, str] | None:

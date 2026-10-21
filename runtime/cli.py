@@ -353,7 +353,7 @@ async def _hosted(specs: list[AgentSpec], recipe: dict[str, Any], key: str,
         url = await hosted_world.serve()
         try:
             out = await _conduct(specs, url, hosted_world.registrar_key, hosted_world.clock_key,
-                                 None, **run)
+                                 None, declare_models=world.declares_models(recipe), **run)
         finally:
             hosted_world.stop()
         try:
@@ -364,7 +364,8 @@ async def _hosted(specs: list[AgentSpec], recipe: dict[str, Any], key: str,
 
 async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, clock_key: str,
                    transport: httpx.AsyncBaseTransport | None, *,
-                   hiring: HireTemplate | None = None, **run: Any) -> dict[str, Any]:
+                   hiring: HireTemplate | None = None, declare_models: bool = False,
+                   **run: Any) -> dict[str, Any]:
     def connect(key: str) -> FundClient:
         return FundClient(base_url=server, api_key=key, transport=transport)
 
@@ -423,7 +424,8 @@ async def _conduct(specs: list[AgentSpec], server: str, registrar_key: str, cloc
             except OpenRouterError as exc:
                 return refused(f"provision:openrouter_unavailable:{exc.status}")
         try:
-            minds = await provision(specs, registrar, connect, provisioner=provisioner)
+            minds = await provision(specs, registrar, connect, provisioner=provisioner,
+                                    declare_models=declare_models)
         except ProvisionError as exc:
             # Nothing has woken, so no key has spent anything: there is nothing to sync. Keys
             # already minted are disabled all the same.

@@ -64,6 +64,13 @@ _SERVE_WAIT_SECONDS = 60
 _COMMAND_TIMEOUT = 300
 
 
+def declares_models(recipe: dict[str, Any]) -> bool:
+    """Does this world's registrar declare each founding mind's model (idea: designs reproduce)?
+    Only under the reproduction law, so every world recorded before it is rebuilt as it was."""
+    laws = recipe.get("laws") or {}
+    return bool((laws.get("reproduction") or {}).get("on"))
+
+
 class WorldError(Exception):
     """The world could not be built, served, read or compared. ``reason`` is a short code; it
     never holds output of a child (which can hold a key)."""
