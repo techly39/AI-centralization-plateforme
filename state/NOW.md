@@ -1,81 +1,49 @@
-# A generation turns over: at each month's end the firm measures every pod net of its thinking, lets go the PMs who failed, keeps their lessons in a library every PM reads, and hires into the freed places
+# Designs reproduce: a freed place is filled by a child of the month's fittest pod, its parent's model and rule with one change, its parent named, and the firm watches its own diversity
 
 ## How I understand it
-The quarter showed the firm cannot live on its own past a few months: a PM who never earns a seed
-thinks (and spends) forever, a closed pod's PM keeps waking, and a dead pod's lesson reaches only
-its successor. A real multi-manager runs on turnover: every month the book is marked, and the
-managers who did not earn their place go. Here:
-- **The month's end is a law of physics** (the "generation" law, named in a world's recipe, off by
-  default so every older run replays as it was). At the first advance into a new month, physics
-  measures every pod: its P&L that month and its thinking cost that month (from the meter), the
-  difference being its **fitness**. One ledger event holds the whole generation's table.
-- **Who goes.** A PM whose pod the risk ladder closed goes at the close. A PM whose pod never
-  earned a seed goes at the month's end, once it has had a fair time (the law's grace days: a PM
-  hired on the 25th is judged next month). A PM who earned a seed and kept it stays.
-- **Letting go** is physics: the agent is deactivated (its key answers 401, the Runtime retires its
-  mind and it spends nothing more), an unseeded pod is closed (empty, it holds no live-pod place),
-  and a vacancy opens in its place. The next morning the Runtime hires into it, as it does today.
-- **Lessons are kept.** Each departure writes its lesson (a pure function of the ledger: what the
-  pod tried, the gates' verdicts, what it earned, what its thinking cost, why it went) into a
-  **library** every PM reads (`read_library`). The firm learns across generations.
-- The Human gets a **generation report** (operator command): per month, each pod's fitness, who
-  stayed, who went and why, who was hired, and the lessons.
+Every month the firm now lets its failures go and hires into their places, but every hire is the
+same fixed design (the law's one charter, models in turn). Selection removes what fails; nothing
+carries what works forward. Evolution needs both. Here:
+- **A pod's design is on the record**: its PM's model and charter, and the rule it pitched. Today
+  the founding PMs' models live only in the Runtime's files, so the registrar declares them.
+- **The parent.** At a month's end, the fittest pod of that generation (P&L net of thinking,
+  above zero, still alive) becomes the parent of every hire into a place freed that month.
+- **The child** gets the parent's model and rule with **exactly one change**, drawn by the law
+  from a seed (another model of the pool, or one setting of the rule moved one step: its lookback,
+  rebalance or number of names). It knows its parent and is handed the inherited rule as a
+  starting point; it still has to pitch and pass the gates, and its pitch counts its family's
+  research attempts (the best of a family has been tried by the family).
+- **No fit pod** (nobody earned more than they thought) → the plain hire, as today.
+- **Diversity.** Each month's end counts the distinct designs alive and the biggest family's share
+  of live pods; if one family holds every live pod, that is written as a finding.
+- The generation report shows the family tree.
 
 ## What done looks like
-`uv run python acceptance/generation_turnover.py` ($0, offline):
-- A (scripted minds, in process, three months of one made-up market): at each month's end a
-  generation event with every pod's fitness (P&L net of thinking charged each morning); the
-  PM of a never-seeded pod is let go (deactivated, a refusal if it tries, its pod closed, its
-  lesson in the library, its place hired the next morning); a ladder-closed pod's PM is let go at
-  the close; a seeded PM stays; a hire reads the library; a hire made late in a month is not
-  judged that month; the live-pod limit does not count a let-go PM's empty pod; with the law off,
-  nothing of this happens; rebuild from the ledger gives the same books.
-- B0 (scripted, hosted, through the Runtime): the same turnover, the let-go minds retired,
-  `replay --verify` IDENTICAL.
-- B (recorded, real Haiku PMs, three generations): IDENTICAL for $0, the generation report prints.
+`uv run python acceptance/designs_reproduce.py` ($0, offline):
+- A (scripted, three months of one made-up market): the edge pod is the fittest; the hires into
+  the freed places are its children, each with one change, parent named in the ledger and in the
+  child's own tools; a child's pitch counts its lineage's attempts; a month with no fit pod hires
+  the plain design; a world built to collapse writes the diversity finding and the default world
+  does not; with the law off nothing changes; rebuild from the ledger gives the same books.
+- B0 (scripted, hosted, through the Runtime): the same, `replay --verify` IDENTICAL.
+- B (recorded, real Haiku PMs): the hires are the edge pod's children; IDENTICAL for $0; the
+  report prints the family tree.
 
 ## Plan
-1. Physics: the generation law (`generation:` section, recipe-nameable), the month's-end
-   measurement, the let-go law, the lesson, the library (`GET /library` + MCP tool), a vacancy for
-   an unseeded pod, the PM of a ladder-closed pod let go at the close. Rebuild handles closes.
-2. A tool added must not change the tools older recordings were shown: a spec naming no tools
-   gets the list as it was before this idea (new tools are named).
-3. The generation report (pure function of the ledger, `fund-env generation-report`).
-4. Demo part A + tests. (Session 1.)
-5. Runtime: a let-go mind is retired in a replay too; thinking cost charged each step in a real run
-   (from the turns' stated cost, so a replay posts the same rows), switched on per run; the hire
-   check and the agent cap move into physics. B0 hosted rehearsal. (Session 2.)
-6. Before spending: every consequence visible through the PM's own tools. Record the real run
-   (≤ about $3), FINDINGS, red-team, auditor, merge. (Session 3.)
-Left out: reproduction (2b), capital reset (2c), "the worst fitness dies" (this slice lets go only
-the closed and the never-seeded), a manager mind.
+1. The founding design on the record: the registrar declares each PM's model and charter.
+2. The reproduction law (`reproduction:` section, recipe-nameable, off by default so every
+   older recording replays as it was): parent choice, the one change from a seed, written in the
+   vacancy; the parent named; the child's tools show its parent and inherited rule.
+3. Lineage attempts counted at a child's pitch (the deflated Sharpe's number of tries).
+4. Diversity at each month's end, the finding on collapse; the family tree in the report.
+5. Fix inside: one advance across two month ends makes one generation; a pod closed by a failed
+   hire missing from its month's table.
+6. Demo A + B0 (session 1-2). Visibility check, the real run with the command the demo checks,
+   red-team, auditor, merge (session 3).
+Left out: crossover, rewriting charters, capital reset (2c), a manager mind.
 
 ## Risk
-Money (the closes, the fitness the capital machine may later read), agents deactivated by physics,
-hiring under the cap, metering per step: red-team + auditor before merge.
+Hiring under the cap, the gates' count of attempts, a law of physics: red-team + auditor before merge.
 
 ## Progress
-- cycle 56: planned.
-- cycle 57: steps 1-5 mostly built. Demo A passes (three scripted months: three generations,
-  two PMs let go for no seed, one at its ladder close, a late hire spared, a hire reads the
-  library, the limit ignores empty pods, the report prints). B0 passes (hosted, billed stand-in
-  minds charged each step, let-go minds retired, IDENTICAL). Left: the hire check and the agent
-  cap into physics; the visibility check; the real run (B); red-team, auditor, merge.
-- cycle 57 (cut by the usage limit, its work committed): the agent cap and the hire check moved
-  into physics; each PM sees its own judgement through its own key; a failed month's end retries.
-- cycle 58: the real run's part of the demo: a fuller charter, checks of the month's-end law that
-  judge any recording (four forged records fail them), the report from a recording; the real
-  run recorded ($0.575: pod-2 let go at September's end after 8 noise pitches, the crash's PM at
-  the close, both places hired and seeded; every law check passes, replay IDENTICAL). Red-team:
-  the high (agent cap at every registration) and two mediums (grace judged by the longest-serving
-  PM; a let-go PM's orders cancelled, a pod with money not closed) fixed, four lows filed.
-  The demo still fails one check, rightly: hire-1's key spent $0.200068 of $0.20 (the provider
-  finishes the turn that crosses a key's limit).
-- cycle 59: a key's limit made hard: no turn is sent whose worst case (prompt bounded by its
-  bytes, or by the provider's count for the turn before plus what was added; full writing; the
-  dearest host and price tier) could cross what the key has left. Over the 394 real turns of
-  cycle 58 the bound always held (2.4x slack) and would have stopped hire-1 at $0.193. No
-  reserve in the monthly cap: a key cannot pass its limit (save one filed low hole: a provider that
-  understates its prompt count), and the cap counts it at its
-  limit. Red-team 0031: 6 holes (2 medium), 5 fixed, 1 low filed. Auditor PASS. B re-recorded
-  with 24 tool calls a wake ($0.506; hire-1 stopped by the guard at $0.195): demo passes. Merged.
+- cycle 60: planned.

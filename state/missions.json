@@ -3,6 +3,21 @@
   "standard": "protocol/CYCLE.md §2 (ADR-046)",
   "missions": [
     {
+      "id": "designs-reproduce",
+      "title": "Designs reproduce: a freed place is filled by a child of the month's fittest pod, its parent's model and rule with one change, its parent named, and the firm watches its own diversity",
+      "idea": "Evolution: designs that work reproduce with variation",
+      "acceptance": "acceptance/designs_reproduce.py",
+      "demo": "uv run python acceptance/designs_reproduce.py — scripted: three months on one made-up market; at a month's end the fittest living pod (positive fitness) becomes the parent of every hire into a freed place: the child's model and starting rule are the parent's with exactly one change drawn from the law's seed, its parent named in the ledger and in its own tools, its pitch's attempts counting its lineage's; a month with no fit pod hires the law's plain design (the 'no' case); each month's end reports diversity (distinct designs, the largest lineage's share) and writes a finding when one lineage holds every live pod (a world built to collapse: yes; the default world: no); rebuild from the ledger gives the same books; with the law off nothing changes. Recorded: real Haiku PMs, the hires are the edge pod's children; replay IDENTICAL for $0; the generation report shows the family tree",
+      "status": "ready",
+      "estimate_sessions": 3,
+      "physics": true,
+      "depends_on": [
+        "generation-turnover"
+      ],
+      "branch": "idea/designs-reproduce",
+      "notes": "Plan cycle 60. Physics today does not know a founding PM's model (it lives in the Runtime's specs): the founding design must enter the ledger (the registrar declares each PM's model and charter at registration) before a child can inherit it; a hire's design is already in its vacancy. Design = model + charter + the pod's pitched rule (its last eligible, else last, pitch). Variation is a law ('reproduction:' section, recipe-nameable, off by default so old recordings replay): one change per child drawn from a seed + the vacancy number (another model of the pool, or one rule parameter moved one step: lookback, rebalance, top_n); deterministic, in the vacancy event. The inherited rule is handed to the child as a starting point; it must still pitch and pass the gates; its deflated Sharpe counts its ancestors' research attempts (selection of the best of a family is a trial). Holes it stands on, fix inside it: one advance across two month ends makes one generation (the parent is chosen from that table); a hired pod closed by a failed hire is missing from its month's table. Reuse: the generation turnover world and recipe, runtime/onboarding.py, the generation report (add the family tree). Before spending: every consequence (who my parent is, my inherited rule, my lineage's attempts at my pitch) visible through the child's own tools; record with the exact command the demo checks (see protocol/CYCLE.md, cycle 60 rule). Left out: crossover, charter text mutation, capital reset (2c), a manager mind."
+    },
+    {
       "id": "generation-turnover",
       "title": "A generation turns over: at each month's end the firm measures every pod net of its thinking, lets go the PMs who failed, keeps their lessons in a library every PM reads, and hires into the freed places",
       "idea": "Every month is a generation",

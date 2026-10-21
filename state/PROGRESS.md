@@ -1,15 +1,20 @@
-Cycle 0059 · merged: a generation turns over · branch: idea/generation-turnover (merged to main)
+Cycle 0060 · plan · next: designs reproduce · branch: idea/designs-reproduce (not yet made)
 Done this session:
-- A key's limit is hard: no turn is sent whose worst case (prompt bounded by its bytes, or by the
-  provider's count for the turn before plus what was added; 4096 written tokens; the dearest host
-  and price tier) could cross what the key has left. Red-team 0031: 6 holes, 5 fixed (Unicode-
-  normalized text, dearer hosts, 408s, unreadable answers, price fields), 1 low filed.
-- Auditor on the whole idea: PASS, no BLOCK; its notes on the demo's tenure rule and model ids fixed.
-- Real PMs re-recorded with 24 tool calls a wake ($0.506): the noise PM let go at September's end,
-  the crash's PM at its close, both hires seeded and kept; hire-1 stopped by the guard at $0.195 of
-  $0.20 (four turns refused unsent). The demo now checks the run's settings; report shows cents.
-Next: plan session: take the next idea from the book's "Next up" (the next slice of "every month
-is a generation" is reproduction: a winner's design copied with variation).
-Watch out: real runs need --max-tool-calls 24 (default 64); the demo checks it. The suite prints
-no summary line: read the exit code.
-Demo: passes.
+- Looked back: since the last plan one idea merged (a generation turns over), 4 build sessions,
+  about $33 of Builder spend, one session cut by the usage limit, no false "done"; every finished
+  idea's demo still passes on main. No new comments from the Human.
+- The book made true: firing a PM who never earns a seed, thinking charged during a real run, and
+  the lessons library are done (status lines updated; "Lessons are kept" is working).
+- Next up: 2b "designs reproduce" queued (ready): a freed place is filled by a child of the month's
+  fittest pod (its model and rule with one change from a seed, its parent named, its family's
+  research attempts counted at its pitch); no fit pod -> the plain hire; diversity measured each
+  month, a finding when one family holds every live pod. Plan in state/NOW.md.
+- Process: the demo's check of a real run's settings is written first and passed by a scripted
+  rehearsal using the very command the real run will use (cycle 59 spent a real run twice).
+Next: build session: branch idea/designs-reproduce from main, write acceptance/designs_reproduce.py,
+then step 1 of NOW.md (the founding PMs' model and charter on the record).
+Watch out: physics does not know a founding PM's model today (only the Runtime's specs do); the
+law must be off by default so every kept recording replays; two red-team lows sit right under this
+idea (one advance across two month ends = one generation; a failed hire's pod missing from its
+month's table): fix them inside it.
+Demo: none yet (planned).

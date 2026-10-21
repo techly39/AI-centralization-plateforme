@@ -79,6 +79,11 @@ killed when the session ends).
   fix any it cannot see first. (Cycle 52 plan, after cycle 51 spent a real trial on a refusal the
   PM could not see; judged by: the next real recording is kept on its first try, no re-record for
   a missing answer.)
+  The demo's check of the run's settings (steps, days per step, tool calls a wake, charging, the
+  world's key) is written before the real run and passed by a scripted rehearsal made with the very
+  command the real run will use, kept in the queue `notes`. (Cycle 60 plan, after cycle 59
+  recorded a real run with the default 64 tool calls a wake instead of 24 and spent it again;
+  judged by: the next real recording is kept on its first try.)
 - Shell: the working directory is the repo, so never `cd "<repo>" && …`. Use Write/Edit for files.
   `git push origin <branch>` as a bare command.
 - Decisions: the prime rule (`bible/01_GENESIS.md` §4). A new rule of the world → an ADR in

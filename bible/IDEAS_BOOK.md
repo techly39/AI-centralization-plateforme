@@ -99,9 +99,9 @@ and for drawdown; the drawdown ladder halves at 5%, freezes buying at 7.5%, clos
 pod's place is filled by a newly hired real PM who pitches and can earn a seed (cycle 51). Four
 real PMs lived a quarter on one market (cycle 54): the edge pod was raised to $2.9M, the noise pod
 never funded, the sinking and crashing pods closed and replaced by hires who earned seeds; the
-Human reads a quarter report (`fund-env quarter-report`). Not yet: firing a PM who never earns a
-seed; thinking cost charged during a real run (only after it); a manager mind; months beyond one
-quarter.
+Human reads a quarter report (`fund-env quarter-report`). Cycle 59: the firm turns over by
+itself every month (a PM who never earns a seed is let go, thinking is charged at every step of a
+real run). Not yet: a manager mind; hires that inherit a winner's design.
 
 ## The firm's people
 
@@ -145,8 +145,9 @@ Now (cycle 51, ADR-050): a pod the ladder closes opens a vacancy with its post-m
 law (live-pod limit, models in turn, budget, charter) names the hire; the Runtime fills it the
 next morning under the cap, and the new PM wakes with the post-mortem, researches and pitches.
 Recorded: a real Haiku 5.5 hire pitched long-short, read the refusal on its pitch, re-pitched
-long-only, was seeded $200k and trades. Not yet: a manager mind choosing the hire, firing a PM who
-never earns a seed, lessons across generations.
+long-only, was seeded $200k and trades. Cycle 59: a PM who never earns a seed in a month is let go
+and hired over; every departure's lesson is in a library all PMs read. Not yet: a manager mind
+choosing the hire; a hire that inherits the fittest pod's design (Next up 2b).
 
 ### The firm governs itself
 From: Human
@@ -260,8 +261,8 @@ within limits per move (`app/capital/allocation.py`); every move is one event ho
 redoes identically. The score already nets the thinking cost metered to the pod since its seed.
 Cycle 51: the first real mind's pod entered the machine (a hired PM, seeded $200k). Cycle 54: it
 ranked four real pods and their hires against each other for a quarter (the edge pod raised to
-$2.9M). Not yet: the real minds' thinking cost in the score while the run is live (see "Thinking
-costs money").
+$2.9M). Cycle 59: a real run charges its minds' thinking at every step, so the score sees it
+while the run is live.
 
 ### The central risk ladder
 From: Human
@@ -291,9 +292,8 @@ Now: true for real dollars since cycle 43: each real agent has its own capped Op
 system charges what the provider bills, all runs of a month stay inside the $50 cap
 (`acceptance/M-001.py` with a fake provider, `acceptance/real_agents_backtest.py` with the real one).
 Cycle 48: the allocation score ranks pods net of their thinking cost; the scripted quarter (cycle
-53) shows a costly pod ranked below a cheaper one it beat gross. Not yet: a real run charges its
-minds' cost only after its last step, so real re-weighings do not see it (the monthly generation
-fixes this: fitness is measured net of thinking).
+53) shows a costly pod ranked below a cheaper one it beat gross. Cycle 59: a real run charges its
+minds' thinking at every step, and each month's fitness is P&L net of it; a key's limit is hard.
 
 ## Communication and orchestration
 
@@ -325,8 +325,8 @@ An orchestration engine runs each pod's workflows as programs that wake the agen
 new PM, running a backtest, a pitch, a post-mortem, a generation turnover.
 Now: "Backtest.exe" exists as `fund-runtime backtest` (deterministic, wakes minds in order), and
 "Onboarding.exe" as the Runtime's morning hire (`runtime/onboarding.py`, cycle 51: fills a vacancy
-under the cap, mints the key, hands the new PM the post-mortem). Not yet: workflows as an engine
-of their own (pitch, post-mortem, generation turnover).
+under the cap, mints the key, hands the new PM the post-mortem). Cycle 59: the month's-end
+turnover runs as physics at the clock's advance. Not yet: workflows as an engine of their own.
 
 ## Generations and evolution
 
@@ -357,15 +357,25 @@ Status: not started
 A pod's "genes" are its agents' specs (charter, role, model, tools) and its design (team, strategy
 family). Winners reproduce with variation (mutation, crossover); every agent knows its parent.
 If diversity collapses, that is a finding.
+Matured (cycle 60 plan), first slice "designs reproduce" (Next up 2b): a pod's design is in the
+ledger (its PM's model and charter, its pitched rule). When a place is freed, the hire is a child
+of the fittest pod of the generation just measured (positive fitness, still alive): its parent's
+model and rule, with exactly one change drawn by the law from a seed (another model of the pool,
+or one parameter of the rule moved a step), the parent named, the inherited rule handed to the
+child as a starting point it must still pitch. The child's attempts count its lineage's (a rule
+chosen as the best of a family has been tried by the family). No fit pod → the law's plain hire.
+Each month's end measures diversity (distinct designs and the largest lineage's share of live
+pods); a collapse is written as a finding.
 
 ### Lessons are kept
 From: Human
-Status: not started
+Status: working (cycle 59)
 A dead pod writes (or gets) a post-mortem. Post-mortems and lessons go to a library every agent can
 read, so the firm learns across generations.
 Now (cycle 51): physics writes a dead pod's post-mortem (its rule, forward days, the ladder's steps)
-into the vacancy, and only its successor reads it. No library every agent can read yet: the
-monthly generation's first slice (Next up 2) builds it.
+into the vacancy, and only its successor reads it. Cycle 59: every departure's lesson (what the
+pod tried, the gates' verdicts, what it earned and what its thinking cost, why it went) is kept in
+a library every PM reads (`read_library`); real hires read it before pitching.
 
 ## Society and civilisation
 
@@ -512,7 +522,18 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 (Done, cycle 43: the backtest with real AI agents is working. Done, cycle 46: a real PM researches
 a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
 results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
-real PMs lived a quarter, two deaths and two hires, a quarter report.)
+real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycle 59: 2a, a
+generation turns over every month.)
+
+Cycle 60 plan: order kept, 2b next. Why: the firm now runs past a quarter on its own, but every
+hire is the same fixed design (the law's one charter, models in turn): selection removes the
+failures and nothing carries the successes forward. Reproduction makes what the fittest pod is
+(its model, its rule) decide who is hired, which is the first step where the firm's own results,
+not the Builder's law, shape its people, and the heart of the Human's "every month is a
+generation". The debate (3) is one step inside a pitch; it waits. Holes it stands on, fixed inside
+it: one advance across two month ends makes one generation (the parent is chosen from that
+table); a hired pod closed by a failed hire is missing from its month's table. Capital reset (2c)
+is folded behind 2b and kept small.
 
 Cycle 56 plan: the monthly generation moves ahead of the pitch's part two. Why: the quarter showed
 the firm cannot yet live past a quarter without someone touching it: a PM who never earns a seed
@@ -567,8 +588,10 @@ verdicts move capital.
       never earned a seed that month (they stop waking and spending), writes each one's lesson to a
       library every PM reads, and hires into the freed places. Three generations in one run; the
       Human gets a generation report (who lived, who went and why, the lessons). Recorded, $0 replay.
-   b. *Designs reproduce.* A freed place is filled by a child of the fittest pod: its charter and
-      model, varied (one change), its parent named; a finding if diversity collapses.
+   b. *Designs reproduce.* Queued (cycle 60). A freed place is filled by a child of the fittest
+      pod: its model and rule, varied (one change, from a seed), its parent named, its lineage's
+      attempts counted at its pitch; no fit pod → the plain hire; a diversity measure at each
+      month's end, a finding if it collapses. Real PMs: the hires are the edge pod's children.
    c. *Capital resets* at the month's turn, the strategy registry persists.
 3. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
    bear argue the pitch in a thread; the firm's process decides (and judges the hypothesis).
