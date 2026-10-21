@@ -1,14 +1,17 @@
-Cycle 0064 · building: a PM builds its own team · branch: idea/pm-builds-team
+Cycle 0064 · merged: a PM builds its own team · branch: idea/pm-builds-team (merged to main)
 Done this session:
-- Physics: the team law (off by default), a PM's request for an analyst granted or refused by
-  name (pool, team budget, two-analyst limit, the Human's agent cap), the morning's fill into the
-  PM's pod, letting go, the team following its PM and its pod out; the analyst's research and
-  thinking are its pod's. Two holes fixed: a message flood (a daily quota per sender) and a firm
-  mind staffing an empty pod past the live-pod limit.
-- The Runtime hires granted analysts each morning (key = granted budget) and retires them.
-- Demo: A (scripted) and B0 (rehearsal through the Runtime, replay IDENTICAL) pass.
-Next: red-team on the physics diff, fix highs; then the real run (B) with the very command
-(`uv run python acceptance/pm_builds_team.py --write-world <dir>` prints it); then the auditor.
-Watch out: the new team tools are hidden from minds that name no tools (older recordings replay);
-B's checks are physics' answers only, never that a PM chose to hire.
-Demo: fails only on B (not recorded yet).
+- A PM asks for an analyst it describes (charter, model, budget); the team law grants or refuses
+  by name (pool, team budget where a hired analyst's budget stays spent, two analysts, three asks
+  a day, the Human's agent cap); the Runtime hires it the next morning with a key of the granted
+  budget; its research is the pod's attempts, its thinking the pod's fitness; the PM lets it go,
+  and a team leaves with its PM or its pod. Decision written (ADR-053).
+- Fixed inside it: a message flood draining a reader's key (daily quota, counted as billed) and
+  a firm mind restaffing an empty pod past the live-pod limit.
+- Real run recorded ($0.264): five Haiku PMs offered a team, three read it, none asked. pod-2:
+  "more attempts would only make the next deflated-Sharpe test harder".
+- Red-team: 7 holes, 5 fixed, 2 low filed in the book. Auditor: PASS, first round.
+Next: plan session. The finding suggests the next question: when does a team pay for itself? (an
+analyst's attempts count against its PM's pitch, so a lone PM is rational today).
+Watch out: new tools must go in runtime/native.py NAMED_ONLY_TOOLS (older recordings replay);
+`timeout` does not exist on this Mac; the provisioning key is read from the repo's `.env`.
+Demo: passes (43 checks, A + B0 + B).
