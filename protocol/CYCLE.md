@@ -47,8 +47,7 @@ killed when the session ends).
    real minds replays a recorded run (cassette + `replay --verify`) or reads recorded artifacts.
    If the idea *measures or judges* something (a gate, a score, a detector), the demo feeds it a
    case whose answer must be "yes" and one whose answer must be "no": a check that always says no
-   passes a no-only demo. (Cycle 44 plan; judged by: no auditor BLOCK of the kind "this check
-   cannot fail" on the next measuring idea.)
+   passes a no-only demo.
 4. Add the entry to `state/missions.json` (fields below), set it `active`; mark the idea
    `Status: building` in the book. Commit "start: <goal>" and push the branch.
 
@@ -68,28 +67,20 @@ killed when the session ends).
   suite (`uv run pytest -q -p no:warnings 2>&1 | tail -5`, ~100 s) runs once before merge.
 - The suite runs on a scratch database (`tests/conftest.py` sets `FUND_DATABASE_URL` before any
   app import), as the runner's clean checkout does: never let a test read the local `fund.db` or
-  any file that is not committed. (Cycle 56 plan, after cycle 55's merge turned `main` red only in
-  the runner's checkout; judged by: no `main_red` flag on the next three merges.)
+  any file that is not committed.
 - Tests proportionate to the code. Never weaken or delete a test to pass; if a test is wrong, say
   why in the commit.
 - Real LLM spend (firm agents) only through the metered path, inside the cap, and only for the run
   that produces the evidence. Record it (cassette) so every later check is free.
-  Before that run, list every consequence physics gives a mind's act (seeded, refused and why,
-  raised, cut, closed, hired) and check that a scripted mind reading only its tools sees each one;
-  fix any it cannot see first. (Cycle 52 plan, after cycle 51 spent a real trial on a refusal the
-  PM could not see; judged by: the next real recording is kept on its first try, no re-record for
-  a missing answer.)
-  The demo's check of the run's settings (steps, days per step, tool calls a wake, charging, the
-  world's key) is written before the real run and passed by a scripted rehearsal made with the very
-  command the real run will use, kept in the queue `notes`. (Cycle 60 plan, after cycle 59
-  recorded a real run with the default 64 tool calls a wake instead of 24 and spent it again;
-  judged by: the next real recording is kept on its first try.)
-  A real recording's checks assert physics' answer to whatever the minds chose (granted, refused,
-  charged, counted) and report the choices themselves as the finding; a check that needs a mind to
-  choose one thing makes the recording a gamble. What physics must do in each case is proven by
-  the scripted parts (A, B0), where the choice is forced. (Cycle 63 plan, before the first idea
-  whose point is a mind's own choice; judged by: its real recording is kept on its first try and
-  no check of B is loosened after the run was seen.)
+  Before that run (each rule cost one wasted real run when missing):
+  - every consequence physics gives a mind's act (seeded, refused and why, raised, cut, closed,
+    hired) is seen by a scripted mind reading only its tools; fix any it cannot see first;
+  - the demo's check of the run's settings (steps, days per step, tool calls a wake, charging, the
+    world's key) is written first and passed by a scripted rehearsal made with the very command the
+    real run will use, kept in the queue `notes`;
+  - the real recording's checks assert physics' answer to whatever the minds chose (granted,
+    refused, charged, counted) and report the choices as the finding, never that a mind chose one
+    thing; what physics must do in each case is proven by the scripted parts (A, B0).
 - Shell: the working directory is the repo, so never `cd "<repo>" && …`. Use Write/Edit for files.
   `git push origin <branch>` as a bare command.
 - Decisions: the prime rule (`bible/01_GENESIS.md` §4). A new rule of the world → an ADR in
@@ -105,9 +96,7 @@ When the acceptance demo passes:
    BLOCK; lower findings → one line each under "Known physics holes" in the book.
    A BLOCK names one path to a wrong outcome; before re-running the auditor, list every other path
    to that same outcome (other orderings, two at once, closed or older objects) and add one test
-   that asserts the outcome itself never happens, not just the named path. (Cycle 49 plan, after
-   cycle 48 needed three auditor passes for one class of flaw; judged by: the next physics idea
-   passes the auditor in at most two rounds.)
+   that asserts the outcome itself never happens, not just the named path.
 3. Merge: `git switch main && git merge --no-ff idea/<slug>`, suite on `main`, set the entry `done`,
    mark the idea `Status: working` in the book (update its "Now:" line), add one entry to
    `state/SHOWCASE.md`:

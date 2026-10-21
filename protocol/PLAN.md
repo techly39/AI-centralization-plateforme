@@ -34,7 +34,8 @@ reason in `notes`.
 ## 5. Improve the factory (one change)
 From §1's numbers, one change to your own process with the number that will judge it. Builder-owned
 (`protocol/`, `CLAUDE.md`) → make it now. Human-owned → a draft in `setup/files/` + a line in
-`state/PROPOSALS.md`. If an earlier change made the numbers worse, revert it.
+`state/PROPOSALS.md`. If an earlier change made the numbers worse, revert it. A rule whose
+"judged by" was met keeps its words and loses its dated note (every session re-reads `protocol/`).
 
 ## 6. Record
 `state/PROGRESS.md` (next: the ready idea), one journal line, `state/loop_status.json`

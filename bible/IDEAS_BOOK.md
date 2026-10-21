@@ -101,8 +101,8 @@ real PMs lived a quarter on one market (cycle 54): the edge pod was raised to $2
 never funded, the sinking and crashing pods closed and replaced by hires who earned seeds; the
 Human reads a quarter report (`fund-env quarter-report`). Cycle 59: the firm turns over by
 itself every month (a PM who never earns a seed is let go, thinking is charged at every step of a
-real run). Cycle 62: a freed place goes to a child of the month's fittest pod. Not yet: a
-manager mind; a PM's own team.
+real run). Cycle 62: a freed place goes to a child of the month's fittest pod. Cycle 64: a PM
+can hire its own analysts (real PMs chose not to). Not yet: a manager mind.
 
 ## The firm's people
 
@@ -135,7 +135,17 @@ Status: not started
 A manager sits above pods #1, #2, #3. Management (the CEO, the firm's vision) sees the basic data
 of every pod: cash, positions (size and amount), exposures, costs. The CEO sets the firm's
 direction; the algorithm (not the CEO) moves the capital.
-Now: a `management` role and the leaderboard / pod metrics endpoints exist.
+Now: a `management` role and the leaderboard / pod metrics endpoints exist; no manager mind has
+ever woken. The role's rights are the old TRD table's: a management agent the operator makes counts
+as the operator's registrar, so it could fill vacancies, register and deactivate agents directly.
+Matured (cycle 65 plan), first slice "a manager chooses the hires" (Next up 1): one real manager
+mind wakes each morning and reads the firm board (every pod's cash, positions, exposures, capital,
+drawdown, thinking cost, fitness). When a place is freed, physics lists the candidates the law
+allows (the fittest pod's child, a child of another fit pod, a plain hire on each model of the
+pool) with the law's default marked; the manager may pick one and write the new PM's brief before
+the morning hire, else the default stands (a silent manager never blocks turnover). It writes the
+firm's direction, which every PM reads. It never moves capital, never hires or fires by itself:
+the Runtime's registrar still does both. Its thinking is the centre's cost, against the firm's P&L.
 
 ### The pitch, then a full report
 From: Human
@@ -556,7 +566,22 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
 results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
 real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycle 59: 2a, a
-generation turns over every month. Done, cycle 62: 2b, designs reproduce.)
+generation turns over every month. Done, cycle 62: 2b, designs reproduce. Done, cycle 64: a PM
+builds its team.)
+
+Cycle 65 plan: a manager chooses the hires moves first. Why: the firm now selects, reproduces and
+lets PMs hire, but every decision above the pods is still a law: who fills a freed place is the
+Builder's formula. The Human's firm has management above the pods that sees every pod and sets the
+direction while the algorithm moves the money; a manager mind choosing among the hires the law
+allows is the first decision about the firm (not one pod) taken by an agent, and its choices can be
+compared with the law's default on the same history. It is also the first step of "the firm
+governs itself". Rich data (2) comes next because it gives an analyst work a PM cannot do alone
+(the cycle-64 finding: a lone PM is rational on prices alone) and it is what behaviour tests need.
+Holes it stands on, fixed inside it: a management mind the operator makes counts as the operator's
+registrar (it could hire, register and deactivate directly); a sibling's attempts are not counted
+in the next child's deflated Sharpe (a manager could pick the same family again and again); a
+parent with no declared model gives its child a second, unrecorded difference (the candidate list
+must say exactly what each hire is).
 
 Cycle 63 plan: a PM builds its own team moves first. Why: since cycle 43 the only minds in the
 firm are PMs, and every decision about people is a law (who is hired, with what model). The
@@ -609,11 +634,21 @@ days are readable; a forward trial with small capital on days that have not happ
 how a multi-manager really works and the cure for that hole. A debate's verdict matters once
 verdicts move capital.
 
-1. **A PM builds its team.** Queued (cycle 63). A PM requests an analyst (charter, model from
-   the pool); physics grants it inside the pod's team limit, the agent cap and the pod's thinking
-   budget; the Runtime hires it the next morning; its research counts as the pod's attempts and its
-   thinking as the pod's cost; the PM can let it go. Real PMs are offered it: whether they hire, and
-   whether it pays, is the finding. Later slices: an engineer, a PM choosing its analyst's tools.
+1. **A manager chooses the hires.** Queued (cycle 65). One real manager mind reads the firm board
+   each morning (every pod's cash, positions, exposures, capital, drawdown, thinking, fitness);
+   for each freed place physics lists the hires the law allows, the default marked; the manager
+   picks one and writes the new PM's brief, or the default stands; it writes the firm's direction
+   every PM reads. It cannot move capital, hire or fire by itself. Proven scripted (a pick, a
+   silence, refusals by name); real: a Haiku manager over a generation run, its picks the finding.
+   Later slices: a manager who lets a PM go early (with its reason, inside a law), who opens pods.
+2. **Data packages: headlines and company data.** Versioned packages beyond prices (fake company
+   data, fake headlines with a planted cause), handed by role, so an analyst can see what its PM
+   does not; the base of "known expected outcomes" (a fraud headline → the PM cuts within 2 days).
+3. **Capital resets** at the month's turn (the monthly generation's c, below), small.
+(Done, cycle 64) **A PM builds its team.** A PM requests an analyst (charter, model, budget);
+   physics grants it inside the team limit, the cap and the pod's budget; the Runtime hires it;
+   its research and thinking are the pod's. Real PMs offered it worked alone. Later slices: an
+   engineer, a PM choosing its analyst's tools, a team that pays (needs 2).
 (Done) **The multi-manager machine.** The centre holds the capital, the pods hold the ideas. Cut in three:
    a. *Capital follows results.* An eligible pitch gets a small seed of capital and its pod trades
       its rule forward, through the order system, on days that have not happened yet. An algorithm
@@ -631,7 +666,7 @@ verdicts move capital.
       not; the algorithm re-weighs every five days net of each pod's thinking cost; the ladder
       kills what bleeds and hires replace them. The Human gets a quarter report: capital per pod
       week by week, deaths, hires, P&L net of thinking. Recorded, replays for $0. Done (cycle 55).
-2. **The monthly generation.** Reset, selection, lessons kept, the next generation starts. Cut:
+(Done: a, b; c is 3 above) **The monthly generation.** Reset, selection, lessons kept, the next generation starts. Cut:
    a. *A generation turns over.* Done (cycle 59). At each month's end physics measures every
       pod's fitness net of its thinking (charged each step), lets go the PMs whose pods closed or
       never earned a seed that month (they stop waking and spending), writes each one's lesson to a
@@ -642,7 +677,7 @@ verdicts move capital.
       attempts counted at its pitch; no fit pod → the plain hire; a diversity measure at each
       month's end, a finding if it collapses. Real PMs: the hires are the edge pod's children.
    c. *Capital resets* at the month's turn, the strategy registry persists.
-3. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
+4. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
    bear argue the pitch in a thread; the firm's process decides (and judges the hypothesis).
-4. **The Observatory.** "What's new" and the agents in action, for the Human.
-5. **Strategies as agent-written code**, run in a sandboxed subprocess (seal work).
+5. **The Observatory.** "What's new" and the agents in action, for the Human.
+6. **Strategies as agent-written code**, run in a sandboxed subprocess (seal work).

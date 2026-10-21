@@ -3,6 +3,21 @@
   "standard": "protocol/CYCLE.md §2 (ADR-046)",
   "missions": [
     {
+      "id": "manager-chooses-hires",
+      "title": "A manager chooses the hires: one real manager mind reads every pod, picks who fills each freed place among the hires the law allows, briefs the new PM and sets the firm's direction; it never moves capital, hires or fires by itself",
+      "idea": "Management above the pods",
+      "acceptance": "acceptance/manager_chooses_hires.py",
+      "demo": "uv run python acceptance/manager_chooses_hires.py — A (scripted): a manager reads the firm board (each pod's cash, positions, exposures, capital, drawdown, thinking cost, fitness); a place is freed and physics lists the candidates (the fittest's child as default, a child of another fit pod, a plain hire per model of the pool), each saying exactly what the hire would be; the manager picks a non-default one with a brief and the Runtime hires exactly that the next morning, the new PM reading the brief and the firm's direction (the 'yes' case); a silent manager leaves the default (the 'no' case); refused by name (403, logged): a pick not on the list, a pick after the hire, a PM or analyst reading the board or picking, the manager filling a vacancy, registering, deactivating or moving capital itself; the manager's thinking is charged to the centre, not to any pod's fitness; with the law off nothing changes; rebuild from the ledger gives the same books. B0: the same hosted through the Runtime with the very command of the real run, replay IDENTICAL. B: a real Haiku manager over a generation run (real PMs), recorded; physics' answers to whatever it chose are checked; replay IDENTICAL for $0; its picks against the law's default are the finding.",
+      "status": "ready",
+      "estimate_sessions": 3,
+      "physics": true,
+      "depends_on": [
+        "pm-builds-team"
+      ],
+      "branch": "idea/manager-chooses-hires",
+      "notes": "Plan cycle 65. Reuse: app/capital/hiring.py (vacancy, fill), app/capital/reproduction.py (choose_parent, child_of, changes, inherited_attempts), app/capital/generation.py (turnover, announcement, library), runtime/onboarding.py (the morning hire), the generation run's specs and the pm-builds-team rehearsal/recording pattern. Holes fixed inside it: (1) a management agent the operator makes counts as the operator's registrar (permissions.may_hire uses registered_by_operator + REGISTER_AGENTS; DEACTIVATE_AGENTS on app/api/agents.py; SET_ALLOCATION is unused today but must stay unreachable): a manager MIND must hold only read-board / pick / write-direction, the registrar stays the Runtime's own identity; (2) a sibling's attempts are not counted in the next child's deflated Sharpe (strict-xfail in tests/test_redteam_designs_reproduce.py): count the whole family's; (3) a parent with no declared model gives its child an unrecorded second difference: the candidate shows the exact model. The board shows other pods' positions to the manager only (READ_CROSS_POD); a PM never sees it. The default when the manager is silent is today's law, so every older recording replays unchanged (new tools into runtime/native.py NAMED_ONLY_TOOLS). Manager's key from the Human's cap like any firm agent; its cost is the centre's. Left out: firing early, opening pods, departments, a manager moving capital (never)."
+    },
+    {
       "id": "pm-builds-team",
       "title": "A PM builds its own team: it hires an analyst it describes (charter, model), paid from its pod's thinking budget, whose research and cost count as the pod's",
       "idea": "Pods: a PM and a small team",

@@ -1,17 +1,19 @@
-Cycle 0064 · merged: a PM builds its own team · branch: idea/pm-builds-team (merged to main)
+Cycle 0065 · plan · next: a manager chooses the hires · branch: idea/manager-chooses-hires (to create)
 Done this session:
-- A PM asks for an analyst it describes (charter, model, budget); the team law grants or refuses
-  by name (pool, team budget where a hired analyst's budget stays spent, two analysts, three asks
-  a day, the Human's agent cap); the Runtime hires it the next morning with a key of the granted
-  budget; its research is the pod's attempts, its thinking the pod's fitness; the PM lets it go,
-  and a team leaves with its PM or its pod. Decision written (ADR-053).
-- Fixed inside it: a message flood draining a reader's key (daily quota, counted as billed) and
-  a firm mind restaffing an empty pod past the live-pod limit.
-- Real run recorded ($0.264): five Haiku PMs offered a team, three read it, none asked. pod-2:
-  "more attempts would only make the next deflated-Sharpe test harder".
-- Red-team: 7 holes, 5 fixed, 2 low filed in the book. Auditor: PASS, first round.
-Next: plan session. The finding suggests the next question: when does a team pay for itself? (an
-analyst's attempts count against its PM's pitch, so a lone PM is rational today).
-Watch out: new tools must go in runtime/native.py NAMED_ONLY_TOOLS (older recordings replay);
-`timeout` does not exist on this Mac; the provisioning key is read from the repo's `.env`.
-Demo: passes (43 checks, A + B0 + B).
+- Looked back: since the last plan one idea merged in one session ($14.69), auditor PASS on round
+  one, the real recording kept on its first try; every finished idea's demo passes on main. No
+  comments from the Human.
+- The book made true (a PM's team is built; real PMs chose to work alone) and Next up re-ordered:
+  1 a manager chooses the hires, 2 data packages (headlines, company data), 3 capital resets,
+  4 the pitch's debate, 5 the Observatory, 6 strategies as code.
+- Queued "a manager chooses the hires": one real manager mind reads every pod, picks who fills a
+  freed place among the hires the law allows (silence keeps the law's default), briefs the new
+  PM, writes the firm's direction; it cannot move capital, hire or fire by itself.
+- Process: the build protocol's met "judged by" notes folded into plain rules (shorter to read).
+Next: build session. Branch idea/manager-chooses-hires, write NOW.md and the demo. First fix the
+hole it stands on: a management agent the operator makes counts as the operator's registrar
+(may_hire, deactivate in app/api/agents.py), so a manager mind must get only read-board / pick /
+write-direction. Then the sibling-attempts and undeclared-model holes (queue notes).
+Watch out: the silent-manager default must be today's law exactly, so older recordings replay;
+new tools go in runtime/native.py NAMED_ONLY_TOOLS. Physics idea: red-team + auditor before merge.
+Demo: not written yet (plan session).
