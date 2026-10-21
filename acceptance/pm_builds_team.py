@@ -626,6 +626,17 @@ def recorded() -> None:
     text = EVIDENCE.read_text(encoding="ascii")
     rec = json.loads(text)
     settings(rec, "B", REAL_LAW)
+    founders = [x.get("spec") or {} for x in rec.get("specs") or []]
+    hire = (rec.get("parameters") or {}).get("hiring") or {}
+    offered = [sp.get("id") for sp in founders if sp.get("role") == "pm"
+               and {*PM_TEAM_TOOLS} <= set(sp.get("tools") or []) and TEAM in sp.get("charter", "")]
+    check("B: every PM was offered a team: each founder's and the hiring template's tools hold the "
+          "team tools, and each charter tells it so (the finding depends on it)",
+          len(offered) == 3 and {*PM_TEAM_TOOLS} <= set(hire.get("tools") or [])
+          and TEAM in ((((rec.get("world") or {}).get("recipe") or {}).get("laws") or {})
+                       .get("hiring") or {}).get("charter", ""),
+          f"founders offered: {offered}; the hire's tools hold them: "
+          f"{set(PM_TEAM_TOOLS) <= set(hire.get('tools') or [])}")
     found = physics_answers(rec, "B")
     metering = (rec.get("outcome") or {}).get("metering") or {}
     keys = metering.get("keys") or []

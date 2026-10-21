@@ -51,3 +51,5 @@ Agents created by an agent, keys and budgets, the cap, permissions: red-team + a
 - cycle 64: physics built (the law, request, fill, letting go, the team following its PM
   and its pod out, the two holes fixed); demo part A passes in full; next: the Runtime hires
   team places each morning (B0), then the real run (B).
+- cycle 64 (later): Runtime and rehearsal done; red-team 7 holes, 5 fixed (2 low filed); real run
+  recorded ($0.264, no PM chose to hire); auditor PASS; merged.

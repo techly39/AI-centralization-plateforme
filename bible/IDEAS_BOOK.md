@@ -108,7 +108,7 @@ manager mind; a PM's own team.
 
 ### Pods: a PM and a small team
 From: Human
-Status: building
+Status: working (first slice)
 A pod = PM + Analyst + Analyst (+ Engineer). The PM builds their own pod: chooses the people,
 creates agents (picks role, charter, model), builds their own strategy, within the rules the
 manager and the firm's laws set. Every agent the PM creates is paid from the pod's budget.
@@ -121,6 +121,13 @@ next morning (Onboarding, reused), with a key whose limit is carved from the pod
 analyst researches (its backtests are the pod's attempts at the pitch), reads the library and
 messages its PM; it cannot pitch or trade. Its thinking is the pod's: it lowers the pod's fitness
 and the capital score. The PM can let it go. The team becomes part of the pod's design.
+Now (cycle 64, ADR-053): built. A PM asks for an analyst (charter, model, budget); physics grants
+or refuses by name (pool, a $ team budget a pod where a hired analyst's budget stays spent, two
+analysts, three asks a day, the agent cap); the Runtime hires it the next morning with a key of the
+granted budget; its research is the pod's attempts, its thinking the pod's fitness; the PM lets it
+go, and a team goes with its PM or its pod. Real Haiku PMs offered a team for twelve steps: three
+read it, none asked (one: more attempts only make the deflated-Sharpe test harder). Not yet:
+engineers, a PM choosing its analyst's tools, the team as an inherited gene, a team that pays.
 
 ### Management above the pods
 From: Human
@@ -465,7 +472,13 @@ From: Builder
 Status: not started
 About a dozen known small holes (tests marked strict-xfail, e.g. registering into a missing pod
 answers 500, a flood of messages can drain a metered agent's key). Fix each when real agents get
-near it. The inbox flood matters as soon as real keys exist.
+near it. The inbox flood is fixed (cycle 64: a daily quota per sender, counted as readers are
+billed).
+From a PM builds its team (cycle 64, red-team; the high, two mediums and two lows are fixed): each
+analyst a PM hires brings its own daily message quota, so a pod can send a rival (1 + analysts)
+times the quota (low); after a backwards clock step the quota's day misses earlier messages (low,
+not an agent's lever). Auditor notes: an analyst hire the cap refuses is retried every morning
+(one ledger row each); the team endpoints answer untyped dicts.
 From the real-model month (cycle 43, ADR-047 known limits): the mint lock is one file per copy of
 the repo, so two clones minting at the same moment do not share it, and a lagging key list can hide
 a fresh mint; a turn whose cost went unstated is waited for 30 s, after which the ledger may record

@@ -141,3 +141,23 @@ def test_only_a_pm_asks_and_management_reads_every_team(
     assert client.get("/team", headers=h(other), params={"pod_id": 1}).status_code == 403
     assert client.get("/team", headers=h(admin_key), params={"pod_id": 1}).status_code == 200
     assert client.get("/team", headers=h(pm)).json()["law_on"] is True
+
+
+def test_the_runtime_refuses_an_analyst_whose_key_does_not_fit_the_monthly_cap():
+    """The Runtime's own check before the fill: the analyst's budget must fit the Human's monthly
+    cap with every key the firm already holds ('yes' and 'no' cases)."""
+    from runtime.governance import Governance
+    from runtime.metering import FakeProvisioner, Meter
+    from runtime.onboarding import HireTemplate, Onboarding
+
+    prov = FakeProvisioner()
+    held = [Meter(prov, prov.create_key(1, 900_000))]          # $0.90 of a $1.00 cap held
+    hiring = Onboarding(HireTemplate(provider="fake-metered", analyst_script="research-analyst"),
+                        registrar=None, connect=None, provisioner=prov)
+    place = {"pod_name": "alpha", "asked_by_name": "pm-1", "asked_by": 1, "charter": "c",
+             "model": HAIKU}
+    law = Governance(False, 1.0, max_agents_total=10)
+    over = hiring._decide_analyst(7, {**place, "budget_usd": 0.20}, held, law)
+    fits = hiring._decide_analyst(7, {**place, "budget_usd": 0.05}, held, law)
+    assert over[0] == "refused:budget_over_cap" and "$0.20" in over[1]
+    assert fits == ("hired", None)
