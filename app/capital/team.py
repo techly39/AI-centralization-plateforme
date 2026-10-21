@@ -365,6 +365,19 @@ def let_go(session: Session, *, place_id: int, actor: Agent) -> dict[str, Any]:
         return place(session, place_id)
 
 
+def member_deactivated(session: Session, *, agent: Agent, actor: Agent) -> Event | None:
+    """An analyst deactivated by another hand (management, or the Runtime when its key could not
+    be minted) leaves its place: ``team_member_let_go``, so the place and the pod's team budget
+    read true. The caller owns the transaction."""
+    if agent.pod_id is None or agent.role != AgentRole.analyst:
+        return None
+    x = next((x for x in places(session, agent.pod_id) if x["status"] == "working"
+              and x["member"]["agent_id"] == agent.id), None)
+    if x is None:
+        return None
+    return _end(session, x, reason=f"deactivated by {actor.name}", actor=actor)
+
+
 def team_follows(session: Session, *, pod_id: int, reason: str, actor: Agent | None,
                  force: bool = False) -> list[Event]:
     """The pod's team goes when its last PM goes (``force``: when the pod itself closes): every

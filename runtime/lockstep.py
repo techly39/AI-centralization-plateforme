@@ -450,7 +450,8 @@ def record_json(record: Any) -> Any:
     they came, so it may hold a key a tool returned (``register_agent``): whoever
     prints or stores it redacts (``runtime.cassette.redact``)."""
     if dataclasses.is_dataclass(record) and not isinstance(record, type):
-        return {f.name: record_json(getattr(record, f.name)) for f in dataclasses.fields(record)}
+        return {f.name: record_json(getattr(record, f.name)) for f in dataclasses.fields(record)
+                if not (f.metadata.get("omit_if_default") and getattr(record, f.name) == f.default)}
     if isinstance(record, BaseModel):
         return record.model_dump(mode="json")
     if isinstance(record, (list, tuple)):

@@ -13,7 +13,7 @@ from app.api.schemas import (
     DirectoryEntry,
 )
 from app.capital.hiring import hire_failed, staffing_problem
-from app.capital.team import team_follows
+from app.capital.team import member_deactivated, team_follows
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
 from app.oms.service import OMS_LOCK
@@ -112,6 +112,7 @@ def deactivate(
         if agent.role == AgentRole.pm and agent.pod_id is not None:
             team_follows(session, pod_id=agent.pod_id, reason="its PM was deactivated",
                          actor=actor)
+        member_deactivated(session, agent=agent, actor=actor)
         # A hired PM gone before its pod's seed is a failed hire: its empty pod closes and the
         # vacancy opens again (app/capital/hiring.py).
         hire_failed(session, agent=agent, actor=actor)

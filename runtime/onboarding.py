@@ -59,6 +59,10 @@ class HireTemplate(BaseModel):
     adapter: Literal["native", "openclaw"] = "native"
     script: str | None = None
     tools: tuple[str, ...] | None = None
+    #: An analyst's plumbing, when a PM's team place is filled (idea: a PM builds its team): its
+    #: script (a scripted provider) and its tools; the place names the rest.
+    analyst_script: str | None = None
+    analyst_tools: tuple[str, ...] | None = None
 
 
 def load_template(path: Path) -> HireTemplate:
@@ -78,6 +82,32 @@ def spec_for(template: HireTemplate, hire: Mapping[str, Any], *, spec_id: str,
         model=None if provider in _NO_MODEL else hire["model"], charter=hire["charter"],
         tools=template.tools,
         budget_usd=float(hire["budget_usd"]) if provider in METERED_PROVIDERS else 0.0)
+
+
+#: What every analyst a PM hires is told before its PM's own words (its charter in the place).
+ANALYST_BRIEF = (
+    "You are {name}, an analyst in pod {pod} of a hedge fund that trades a simulated market with "
+    "fake money. Your PM, {pm}, asked for you and pays for you: every word you think is paid "
+    "from your pod. You research (run_research_backtest: every backtest counts as one of your "
+    "pod's attempts when your PM pitches), read the firm's library and message your PM (its id "
+    "is {pm_id}); you cannot pitch, trade or hire. You remember nothing between days: read your "
+    "messages and your pod's research first. When you are done for the day, stop.\n"
+    "Your PM's charter for you:\n{charter}")
+
+
+def analyst_spec(template: HireTemplate, place: Mapping[str, Any], *, name: str,
+                 pod_id: int) -> AgentSpec:
+    """A hired analyst's spec: the template's analyst plumbing, the place's charter, model and
+    budget. Its spec id is its name (physics names it once)."""
+    provider = template.provider
+    return AgentSpec(
+        id=name, name=name, role="analyst", pod=pod_id, provider=provider,
+        script=template.analyst_script, adapter=template.adapter,
+        model=None if provider in _NO_MODEL else place["model"],
+        charter=ANALYST_BRIEF.format(name=name, pod=place["pod_name"], pm=place["asked_by_name"],
+                                     pm_id=place["asked_by"], charter=place["charter"]),
+        tools=template.analyst_tools,
+        budget_usd=float(place["budget_usd"]) if provider in METERED_PROVIDERS else 0.0)
 
 
 def probe_spec(template: HireTemplate) -> AgentSpec:
@@ -112,9 +142,9 @@ class Onboarding:
         self.registrar = registrar
         self.connect = connect
         self.provisioner = provisioner
-        #: A replay's decisions, by (step, vacancy id); ``None`` live.
+        #: A replay's decisions, by (step, kind, vacancy or place id); ``None`` live.
         self.recorded = (None if recorded is None
-                         else {(r.step, r.vacancy_id): r for r in recorded})
+                         else {(r.step, r.kind, r.vacancy_id): r for r in recorded})
         self.minds: list[Mind] = []
         self.inputs: dict[str, dict[str, Any]] = {}
         #: Vacancies whose key the month could not hold: refused, not retried, this run.
@@ -149,8 +179,15 @@ class Onboarding:
                 new.append(mind)
                 taken.add(mind.spec.id)
                 meters = [*meters, *([mind.meter] if mind.meter is not None else [])]
+        team, stop = await self._team_morning(step, taken, meters, law)
+        for record, mind in team:
+            records.append(record)
+            if mind is not None:
+                new.append(mind)
+        if stop is not None:
+            return records, new, stop
         if self.recorded is not None:
-            acted = {(r.step, r.vacancy_id) for r in records}
+            acted = {(r.step, r.kind, r.vacancy_id) for r in records}
             if any(key[0] == step and key not in acted for key in self.recorded):
                 return records, new, ("diverged", f"diverged:hire:{step}:0:hire")
         return records, new, None
@@ -164,7 +201,7 @@ class Onboarding:
         base = f"{HIRE_PREFIX}{vacancy['vacancy_no']}"
         recorded = None
         if self.recorded is not None:
-            recorded = self.recorded.get((step, vid))
+            recorded = self.recorded.get((step, "pm", vid))
             if recorded is None:
                 raise _Diverged()
             decision = (recorded.outcome, recorded.reason)
@@ -244,6 +281,138 @@ class Onboarding:
             self.inputs[spec_id] |= {k: hire.get(k) for k in (
                 "parent", "family", "change", "inherited_rule", "lineage_attempts")}
         return done, mind
+
+    async def _team_morning(self, step: int, taken: set[str], meters: Sequence[Meter],
+                            law: Governance
+                            ) -> tuple[list[tuple[HireRecord, Mind | None]], tuple[str, str] | None]:
+        """Act on every open team place a PM was granted (idea: a PM builds its team), oldest
+        first, after the vacancies: ``([(record, mind)], stop)``."""
+        try:
+            listed = await self.registrar.get("/team/places")
+        except FundAPIError as exc:
+            return [], ("error", f"hiring_unreadable:{exc.status_code}")
+        if not isinstance(listed, list):
+            return [], ("error", "hiring_malformed")
+        done: list[tuple[HireRecord, Mind | None]] = []
+        meters = list(meters)
+        for place in sorted((p for p in listed if isinstance(p, dict) and p.get("status") == "open"),
+                            key=lambda p: p.get("id", 0)):
+            if not decide_batch().allowed:
+                return done, ("halted", "halted")
+            try:
+                record, mind = await self._one_team(step, place, taken, meters, law)
+            except _Diverged:
+                return done, ("diverged", f"diverged:hire:{step}:0:hire")
+            except _Failed as exc:
+                if not decide_batch().allowed:
+                    return done, ("halted", "halted")
+                return done, ("error", exc.reason)
+            done.append((record, mind))
+            if mind is not None:
+                taken.add(mind.spec.id)
+                meters += [mind.meter] if mind.meter is not None else []
+        return done, None
+
+    async def _one_team(self, step: int, place: dict[str, Any], taken: set[str],
+                        meters: Sequence[Meter], law: Governance
+                        ) -> tuple[HireRecord, Mind | None]:
+        pid, base = place.get("id"), place.get("name")
+        if (type(pid) is not int or type(base) is not str or type(place.get("pod_id")) is not int
+                or type(place.get("asked_by")) is not int):
+            raise _Failed("hiring_malformed")
+        recorded = None
+        if self.recorded is not None:
+            recorded = self.recorded.get((step, "analyst", pid))
+            if recorded is None:
+                raise _Diverged()
+            outcome, reason = recorded.outcome, recorded.reason
+        else:
+            outcome, reason = (await self._population(law)
+                               or self._decide_analyst(pid, place, meters, law))
+
+        def record(spec_id: str, done: str, agent_id: int | None = None,
+                   why: str | None = None) -> HireRecord:
+            made = HireRecord(step, pid, spec_id, done, agent_id, why, kind="analyst")
+            if recorded is not None and made != recorded:
+                raise _Diverged()
+            return made
+
+        if outcome not in ("hired", "refused:physics:409", "refused:key_over_cap"):
+            try:
+                await self.registrar.post(f"/team/places/{pid}/refuse", {"reason": reason})
+            except FundAPIError as exc:
+                raise _Failed(f"hire_refusal_failed:{pid}:{exc.status_code}") from exc
+            return record(base, outcome, None, reason), None
+        try:
+            made = await self.registrar.post(f"/team/places/{pid}/fill", {})
+        except FundAPIError as exc:
+            if exc.status_code == 409:   # physics refused (the cap) or closed the place: written
+                return record(base, "refused:physics:409"), None
+            raise _Failed(f"hire_failed:{pid}:{exc.status_code}") from exc
+        agent = made.get("agent") if isinstance(made, dict) else None
+        name = agent.get("name") if isinstance(agent, dict) else None
+        if not (isinstance(agent, dict) and type(agent.get("id")) is int
+                and agent.get("pod_id") == place["pod_id"] and type(name) is str
+                and (name == base or name.startswith(base + "-"))
+                and agent.get("role") == "analyst" and type(agent.get("api_key")) is str
+                and agent["api_key"]):
+            raise _Failed(f"hire_wrong_agent:{pid}")
+        if name in taken:
+            raise _Failed(f"hire_spec_taken:{name}")
+        spec = analyst_spec(self.template, place, name=name, pod_id=place["pod_id"])
+        if self.recorded is not None:
+            spec = as_cassette(spec)
+        client = self.connect(agent["api_key"])
+        try:
+            who = await client.get("/me")
+            if not isinstance(who, dict) or (who.get("id"), who.get("name"), who.get("role"),
+                                             who.get("pod_id")) != (agent["id"], name, "analyst",
+                                                                    place["pod_id"]):
+                raise _Failed(f"hire_wrong_agent:{pid}")
+            meter: Meter | None = None
+            if self.recorded is not None:
+                over_cap = outcome == "refused:key_over_cap"
+            elif spec.provider in METERED_PROVIDERS:
+                meter = await self._mint(spec, agent["id"])
+                over_cap = meter is None
+            else:
+                over_cap = False
+            if over_cap:
+                # No analyst lives without a mind: deactivated (physics lets it go from its place).
+                await client.aclose()
+                await self._deactivate(agent["id"])
+                return record(name, "refused:key_over_cap", agent["id"]), None
+            done = record(name, "hired", agent["id"])
+        except BaseException:
+            await client.aclose()
+            raise
+        mind = Mind(spec, client, meter)
+        self.minds.append(mind)
+        self.inputs[name] = {"team_place_id": pid, "hired_by": place["asked_by_name"],
+                             "hired_by_id": place["asked_by"]}
+        return done, mind
+
+    def _decide_analyst(self, pid: int, place: dict[str, Any], meters: Sequence[Meter],
+                        law: Governance) -> tuple[str, str | None]:
+        probe = analyst_spec(self.template, place, name="probe-analyst-1", pod_id=1)
+        metered = probe.provider in METERED_PROVIDERS
+        gate = decide_wake_under(probe.provider, probe.adapter, law, metered=metered)
+        if not gate.allowed:
+            return (f"refused:wake_gate:{gate.reason}",
+                    f"the analyst's mind could not wake under the Human's law ({gate.reason})")
+        try:
+            check_spec(probe)
+        except ProviderRefused as exc:
+            raise _Failed(f"hire_template:provider_refused:{exc.reason}") from exc
+        if metered:
+            cap = usd_to_micros_floor(law.monthly_llm_usd_cap)
+            limit = usd_to_micros_floor(probe.budget_usd)
+            held = self._held(meters)
+            if held is None or held + limit > cap:
+                return ("refused:budget_over_cap",
+                        f"the analyst's thinking budget (${probe.budget_usd:.2f}) does not fit the "
+                        f"monthly cap (${cap / 1e6:.2f}) with the keys the firm already holds")
+        return "hired", None
 
     async def _population(self, law: Governance) -> tuple[str, str] | None:
         """A refusal when one more agent would take the firm past the Human's

@@ -35,7 +35,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import ROUND_FLOOR, Decimal
 from pathlib import Path
 from typing import Any
@@ -150,10 +150,17 @@ class HireRecord:
     agent_id: int | None = None
     #: The reason the Runtime posted to physics, word for word (a replay posts the same).
     reason: str | None = None
+    #: ``pm`` (a vacancy: ``vacancy_id`` is its id) or ``analyst`` (a team place a PM asked for:
+    #: ``vacancy_id`` is the place's id, ``spec_id`` the analyst's name). Left out of the record
+    #: when ``pm``, so every recording made before teams reads and replays as it was.
+    kind: str = field(default="pm", metadata={"omit_if_default": True})
 
     def __post_init__(self) -> None:
+        names = (r"hire-[0-9]{1,6}(-[0-9]{1,4})?" if self.kind == "pm"
+                 else r"[a-z][a-z0-9-]{0,62}-analyst-[0-9]{1,4}(-[0-9]{1,4})?")
         if (type(self.step) is not int or self.step < 0 or type(self.vacancy_id) is not int
-                or type(self.spec_id) is not str or not re.fullmatch(r"hire-[0-9]{1,6}(-[0-9]{1,4})?", self.spec_id)
+                or self.kind not in ("pm", "analyst")
+                or type(self.spec_id) is not str or not re.fullmatch(names, self.spec_id)
                 or type(self.outcome) is not str
                 or not re.fullmatch(r"hired|refused:[a-z_]+(:[a-z0-9_]+)?", self.outcome)
                 or not (self.agent_id is None or type(self.agent_id) is int)
