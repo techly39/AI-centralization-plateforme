@@ -55,7 +55,7 @@ from app.bus.errors import (
 from app.bus.refs import BROADCAST, Recipient, agent_ref, parse_ref, pod_ref
 from app.clock import get_clock
 from app.db.models import Agent, AgentRole, Message, Pod
-from app.ledger.events import EVENT_MESSAGE_SENT, append_event
+from app.ledger.events import EVENT_MESSAGE_SENT, append_event, ledger_now
 from app.registry.permissions import PHYSICS_ROLES, Action, has_permission
 
 #: Cap on a single ``GET /messages`` page. Agents poll in a loop; an unbounded
@@ -133,7 +133,7 @@ def _size(body: str, structured_payload: dict | None) -> int:
 
 def sent_today(session: Session, sender: Agent) -> int:
     """Characters ``sender`` has sent since the start of the fund's day."""
-    now = get_clock().now()
+    now = ledger_now(session)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return sum(_size(m.body, m.structured_payload_json) for m in session.scalars(
         select(Message).where(Message.from_agent == sender.id, Message.ts >= start)))

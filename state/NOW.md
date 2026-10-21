@@ -6,8 +6,9 @@ with what model, with what charter. The Human's pod is a PM *with a small team i
 for*. This first slice lets a PM create one kind of teammate, an analyst:
 - **The request.** A PM asks for an analyst: what it should do (a charter in the PM's words), a
   model from the firm's pool, and a thinking budget.
-- **Physics decides.** The pod's team limit, the Human's agent cap and the pod's own thinking
-  budget (the PM's key and its analysts' keys together) grant it or refuse it by name.
+- **Physics decides.** The pod's team limit, the Human's agent cap and the pod's team budget
+  (its analysts' keys together; the PM's own key stays the hiring law's, and every dollar of both
+  is the pod's fitness) grant it or refuse it by name.
 - **The hire.** A granted request opens a place in the PM's living pod; the Runtime fills it the
   next morning (the same Onboarding as a PM hire), with a key carved from the pod's budget.
 - **The analyst works.** It researches rules (its backtests are the pod's attempts, so the gates'
@@ -47,3 +48,6 @@ Agents created by an agent, keys and budgets, the cap, permissions: red-team + a
 
 ## Progress
 - cycle 63: planned.
+- cycle 64: physics built (the law, request, fill, letting go, the team following its PM
+  and its pod out, the two holes fixed); demo part A passes in full; next: the Runtime hires
+  team places each morning (B0), then the real run (B).
