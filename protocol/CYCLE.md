@@ -84,6 +84,12 @@ killed when the session ends).
   command the real run will use, kept in the queue `notes`. (Cycle 60 plan, after cycle 59
   recorded a real run with the default 64 tool calls a wake instead of 24 and spent it again;
   judged by: the next real recording is kept on its first try.)
+  A real recording's checks assert physics' answer to whatever the minds chose (granted, refused,
+  charged, counted) and report the choices themselves as the finding; a check that needs a mind to
+  choose one thing makes the recording a gamble. What physics must do in each case is proven by
+  the scripted parts (A, B0), where the choice is forced. (Cycle 63 plan, before the first idea
+  whose point is a mind's own choice; judged by: its real recording is kept on its first try and
+  no check of B is loosened after the run was seen.)
 - Shell: the working directory is the repo, so never `cd "<repo>" && …`. Use Write/Edit for files.
   `git push origin <branch>` as a bare command.
 - Decisions: the prime rule (`bible/01_GENESIS.md` §4). A new rule of the world → an ADR in

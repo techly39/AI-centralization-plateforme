@@ -1,58 +1,49 @@
-# Designs reproduce: a freed place is filled by a child of the month's fittest pod, its parent's model and rule with one change, its parent named, and the firm watches its own diversity
+# A PM builds its own team: it hires an analyst it describes, paid from its pod's thinking budget, and the analyst's research and cost count as the pod's
 
 ## How I understand it
-Every month the firm now lets its failures go and hires into their places, but every hire is the
-same fixed design (the law's one charter, models in turn). Selection removes what fails; nothing
-carries what works forward. Evolution needs both. Here:
-- **A pod's design is on the record**: its PM's model and charter, and the rule it pitched. Today
-  the founding PMs' models live only in the Runtime's files, so the registrar declares them.
-- **The parent.** At a month's end, the fittest pod of that generation (P&L net of thinking,
-  above zero, still alive) becomes the parent of every hire into a place freed that month.
-- **The child** gets the parent's model and rule with **exactly one change**, drawn by the law
-  from a seed (another model of the pool, or one setting of the rule moved one step: its lookback,
-  rebalance or number of names). It knows its parent and is handed the inherited rule as a
-  starting point; it still has to pitch and pass the gates, and its pitch counts its family's
-  research attempts (the best of a family has been tried by the family).
-- **No fit pod** (nobody earned more than they thought) → the plain hire, as today.
-- **Diversity.** Each month's end counts the distinct designs alive and the biggest family's share
-  of live pods; if one family holds every live pod, that is written as a finding.
-- The generation report shows the family tree.
+Today every mind in the firm is a PM, and every decision about people is a law: who is hired,
+with what model, with what charter. The Human's pod is a PM *with a small team it builds and pays
+for*. This first slice lets a PM create one kind of teammate, an analyst:
+- **The request.** A PM asks for an analyst: what it should do (a charter in the PM's words), a
+  model from the firm's pool, and a thinking budget.
+- **Physics decides.** The pod's team limit, the Human's agent cap and the pod's own thinking
+  budget (the PM's key and its analysts' keys together) grant it or refuse it by name.
+- **The hire.** A granted request opens a place in the PM's living pod; the Runtime fills it the
+  next morning (the same Onboarding as a PM hire), with a key carved from the pod's budget.
+- **The analyst works.** It researches rules (its backtests are the pod's attempts, so the gates'
+  deflated Sharpe counts them at the PM's next pitch), reads the library and messages its PM. It
+  cannot pitch, trade or hire.
+- **It costs the pod.** Its thinking lowers the pod's fitness and capital score. The PM can let it
+  go; when the PM is let go or the pod closes, the analyst stops too.
+Whether real PMs choose to hire, and whether a team pays for itself, is the finding.
 
 ## What done looks like
-`uv run python acceptance/designs_reproduce.py` ($0, offline):
-- A (scripted, three months of one made-up market): the edge pod is the fittest; the hires into
-  the freed places are its children, each with one change, parent named in the ledger and in the
-  child's own tools; a child's pitch counts its lineage's attempts; a month with no fit pod hires
-  the plain design; a world built to collapse writes the diversity finding and the default world
-  does not; with the law off nothing changes; rebuild from the ledger gives the same books.
-- B0 (scripted, hosted, through the Runtime): the same, `replay --verify` IDENTICAL.
-- B (recorded, real Haiku PMs): the hires are the edge pod's children; IDENTICAL for $0; the
-  report prints the family tree.
+`uv run python acceptance/pm_builds_team.py` ($0, offline):
+- A (scripted): a PM's first request is granted and its analyst wakes the next morning; requests
+  past the team limit, the pod's budget or the agent cap are refused by name; the analyst is
+  refused when it pitches or trades; its backtests raise the pod's count of attempts; its thinking
+  lowers the pod's fitness; let go, it stops waking; a flood of messages cannot drain the PM's key;
+  law off → nothing changes; rebuild from the ledger gives the same books.
+- B0: the same through the Runtime, replay IDENTICAL.
+- B (recorded, real Haiku PMs offered a team): physics' answers to whatever they chose are
+  checked; IDENTICAL for $0; the report shows each pod's team and what it cost.
 
 ## Plan
-1. The founding design on the record: the registrar declares each PM's model and charter.
-2. The reproduction law (`reproduction:` section, recipe-nameable, off by default so every
-   older recording replays as it was): parent choice, the one change from a seed, written in the
-   vacancy; the parent named; the child's tools show its parent and inherited rule.
-3. Lineage attempts counted at a child's pitch (the deflated Sharpe's number of tries).
-4. Diversity at each month's end, the finding on collapse; the family tree in the report.
-5. Fix inside: one advance across two month ends makes one generation; a pod closed by a failed
-   hire missing from its month's table.
-6. Demo A + B0 (session 1-2). Visibility check, the real run with the command the demo checks,
-   red-team, auditor, merge (session 3).
-Left out: crossover, rewriting charters, capital reset (2c), a manager mind.
+1. A `team:` law (off by default, so every older recording replays as it was): analysts per pod,
+   the pod's thinking budget, the models allowed.
+2. The request: a PM-only endpoint + MCP tool; physics names the hire in a vacancy of role analyst
+   into the PM's living pod; refusals logged.
+3. Onboarding reused for the analyst; its key carved from the pod's budget, under the cap.
+4. Permissions: an analyst researches, reads, messages; never pitches, orders or hires.
+5. Attempts and cost: check the pod (not the agent) is what both are counted on.
+6. Letting go: by its PM; with its PM; with its pod.
+7. Holes fixed inside: a message flood draining a metered key; a registration restaffing an empty
+   pod past the live-pod limit.
+8. Demo A, B0 rehearsal with the real run's very command, the real run, red-team, auditor, merge.
+Left out: engineers, a PM choosing its analyst's tools, a manager mind, the team as an inherited gene.
 
 ## Risk
-Hiring under the cap, the gates' count of attempts, a law of physics: red-team + auditor before merge.
+Agents created by an agent, keys and budgets, the cap, permissions: red-team + auditor before merge.
 
 ## Progress
-- cycle 60: planned.
-- cycle 61: physics built (founding model at registration, the reproduction law, the child's one
-  change, its family's attempts at its pitches, diversity and the collapse finding, the family
-  tree; both month-table holes fixed). Demo A passes in four worlds. Found: a child pitching its
-  inherited rule is refused by the correlation gate (a copy of its living parent). Next: B0.
-- cycle 62: B0 passes (the hosted months through the Runtime, the law on: both hires into freed
-  places are children of pod-1, each handed its parent, change and rule; IDENTICAL). The family
-  tree now reads only the ledger, so a recording draws it. Rehearsal made with the real run's very
-  command; real Haiku run recorded ($0.547: the noise PM's place went to
-  pod-1's child); red-team 3 of 5 fixed, 2 filed; auditor PASS; merged.
+- cycle 63: planned.

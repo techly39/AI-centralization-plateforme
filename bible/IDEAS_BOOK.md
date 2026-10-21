@@ -101,7 +101,8 @@ real PMs lived a quarter on one market (cycle 54): the edge pod was raised to $2
 never funded, the sinking and crashing pods closed and replaced by hires who earned seeds; the
 Human reads a quarter report (`fund-env quarter-report`). Cycle 59: the firm turns over by
 itself every month (a PM who never earns a seed is let go, thinking is charged at every step of a
-real run). Not yet: a manager mind; hires that inherit a winner's design.
+real run). Cycle 62: a freed place goes to a child of the month's fittest pod. Not yet: a
+manager mind; a PM's own team.
 
 ## The firm's people
 
@@ -113,6 +114,13 @@ creates agents (picks role, charter, model), builds their own strategy, within t
 manager and the firm's laws set. Every agent the PM creates is paid from the pod's budget.
 Now (cycle 43): a real AI pod exists: a PM and two analysts (Haiku 5.5) lived a 31-day month
 (`specs/real-desk/`). Its team is fixed by its specs: a PM cannot yet create agents.
+Matured (cycle 63 plan), first slice "a PM builds its team" (Next up 1): a PM asks physics for an
+analyst (its charter, and a model from the firm's pool); the pod's team limit, the agent cap and
+the pod's thinking budget decide; a granted request opens a team place that the Runtime fills the
+next morning (Onboarding, reused), with a key whose limit is carved from the pod's budget. The
+analyst researches (its backtests are the pod's attempts at the pitch), reads the library and
+messages its PM; it cannot pitch or trade. Its thinking is the pod's: it lowers the pod's fitness
+and the capital score. The PM can let it go. The team becomes part of the pod's design.
 
 ### Management above the pods
 From: Human
@@ -146,8 +154,8 @@ law (live-pod limit, models in turn, budget, charter) names the hire; the Runtim
 next morning under the cap, and the new PM wakes with the post-mortem, researches and pitches.
 Recorded: a real Haiku 5.5 hire pitched long-short, read the refusal on its pitch, re-pitched
 long-only, was seeded $200k and trades. Cycle 59: a PM who never earns a seed in a month is let go
-and hired over; every departure's lesson is in a library all PMs read. Not yet: a manager mind
-choosing the hire; a hire that inherits the fittest pod's design (Next up 2b).
+and hired over; every departure's lesson is in a library all PMs read. Cycle 62: the hire into a
+freed place is a child of the month's fittest pod. Not yet: a manager mind choosing the hire.
 
 ### The firm governs itself
 From: Human
@@ -349,7 +357,8 @@ Now (cycle 59, first slice working): at each month's end physics measures every 
 (P&L minus its thinking), lets go the PMs whose pod the ladder closed or that earned no seed in
 the month, keeps their lessons in a library every PM reads, and the freed places are hired the
 next morning; `fund-env generation-report` prints it. Real Haiku PMs lived three generations
-($0.51 of thinking, every key under its hard limit). Next slices: reproduction, capital reset.
+($0.51 of thinking, every key under its hard limit). Cycle 62: reproduction works (see Evolution).
+Next slice: capital reset.
 
 ### Evolution: designs that work reproduce with variation
 From: Human
@@ -534,7 +543,18 @@ The order the Builder builds in. The Builder may reorder it and says why in one 
 a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a, capital follows
 results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
 real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycle 59: 2a, a
-generation turns over every month.)
+generation turns over every month. Done, cycle 62: 2b, designs reproduce.)
+
+Cycle 63 plan: a PM builds its own team moves first. Why: since cycle 43 the only minds in the
+firm are PMs, and every decision about people is a law (who is hired, with what model). The
+Human's pod is a PM *with a team it builds and pays for*. Letting a PM create an analyst is the
+first time an agent, not physics, decides that another agent exists, what it is told and what it
+costs; its cost falls on the pod's own fitness, so whether a team pays is measured, and the team
+joins the design that reproduces. Capital reset (2c) stays small and waits; the debate (3) adds
+minds that decide nothing yet. Holes it stands on, fixed inside it: a flood of messages can drain
+a metered agent's key (an analyst writes to its PM every day; with real keys a flood drains the
+PM); an empty pod restaffed by a registration passes the live-pod limit (a team hire is a
+registration into a pod: it must only ever join a living pod).
 
 Cycle 60 plan: order kept, 2b next. Why: the firm now runs past a quarter on its own, but every
 hire is the same fixed design (the law's one charter, models in turn): selection removes the
@@ -576,7 +596,12 @@ days are readable; a forward trial with small capital on days that have not happ
 how a multi-manager really works and the cure for that hole. A debate's verdict matters once
 verdicts move capital.
 
-1. **The multi-manager machine.** The centre holds the capital, the pods hold the ideas. Cut in three:
+1. **A PM builds its team.** Queued (cycle 63). A PM requests an analyst (charter, model from
+   the pool); physics grants it inside the pod's team limit, the agent cap and the pod's thinking
+   budget; the Runtime hires it the next morning; its research counts as the pod's attempts and its
+   thinking as the pod's cost; the PM can let it go. Real PMs are offered it: whether they hire, and
+   whether it pays, is the finding. Later slices: an engineer, a PM choosing its analyst's tools.
+(Done) **The multi-manager machine.** The centre holds the capital, the pods hold the ideas. Cut in three:
    a. *Capital follows results.* An eligible pitch gets a small seed of capital and its pod trades
       its rule forward, through the order system, on days that have not happened yet. An algorithm
       (not an agent) re-weighs capital every few days by a cost- and risk-adjusted score, penalised
@@ -594,12 +619,12 @@ verdicts move capital.
       kills what bleeds and hires replace them. The Human gets a quarter report: capital per pod
       week by week, deaths, hires, P&L net of thinking. Recorded, replays for $0. Done (cycle 55).
 2. **The monthly generation.** Reset, selection, lessons kept, the next generation starts. Cut:
-   a. *A generation turns over.* Queued (cycle 56). At each month's end physics measures every
+   a. *A generation turns over.* Done (cycle 59). At each month's end physics measures every
       pod's fitness net of its thinking (charged each step), lets go the PMs whose pods closed or
       never earned a seed that month (they stop waking and spending), writes each one's lesson to a
       library every PM reads, and hires into the freed places. Three generations in one run; the
       Human gets a generation report (who lived, who went and why, the lessons). Recorded, $0 replay.
-   b. *Designs reproduce.* Queued (cycle 60). A freed place is filled by a child of the fittest
+   b. *Designs reproduce.* Done (cycle 62). A freed place is filled by a child of the fittest
       pod: its model and rule, varied (one change, from a seed), its parent named, its lineage's
       attempts counted at its pitch; no fit pod → the plain hire; a diversity measure at each
       month's end, a finding if it collapses. Real PMs: the hires are the edge pod's children.

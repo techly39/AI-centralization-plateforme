@@ -1,17 +1,17 @@
-Cycle 0062 · merged: designs reproduce (a freed place goes to a child of the month's fittest pod) · branch: idea/designs-reproduce
+Cycle 0063 · plan · next: a PM builds its own team (idea/pm-builds-team, ready)
 Done this session:
-- Recovered cycle 61's cut-off work; the hosted rehearsal passes (children hired through the
-  Runtime, each told its parent, change and rule; replay IDENTICAL); the family tree is drawn from
-  the ledger alone, so a recording draws it.
-- Real Haiku PMs recorded with the very command the rehearsal used ($0.547, every key under its
-  limit): pod-3 closed mid-September (plain hire, nothing measured yet); pod-2 let go at
-  September's end and its place went to pod-1's child (rebalance 10 -> 5 days), which took the
-  unheld W names and kept a seed; no diversity collapse. Replay IDENTICAL.
-- Red-team: 5 holes, none high; fixed: only the operator's registrar declares a model, only a
-  PM's; a design reads only its PM's model; a parent needs a working PM. Filed: a sibling's
-  attempts not in the next child's count (medium); a parent with no declared model (low).
-- Auditor: BLOCK round 1 (the new recording missing from the suite's replay test), PASS round 2.
-  ADR-052 written. Merged; suite green on main.
-Next: plan session (three ideas finished since the last plan, or none ready in the queue).
-Watch out: the sibling-attempts hole sits under any idea that lets a family grow; fix it inside it.
-Demo: passes (A four scripted worlds, B0 rehearsal, B the real recording).
+- Looked back: since the last plan one idea merged (designs reproduce) in two sessions (one cut by
+  the usage limit, its work recovered); every finished idea's demo passes on main; the two process
+  rules judged this time held (real recording kept on its first try; auditor PASS in two rounds).
+- The book made true: reproduction done in the firm, hiring, generation and Next up lines.
+- Next up re-ordered: "a PM builds its team" first. Why: every mind is still a PM and every
+  decision about people is a law; letting a PM create and pay for an analyst is the first time an
+  agent decides another agent exists, and its cost lands on the pod's own fitness.
+- Queued with the two holes it stands on (message flood draining a key; a registration restaffing
+  an empty pod) to be fixed inside it. No Human comments to answer.
+- Process: a real recording's checks assert physics' answers to whatever minds chose, never that a
+  mind chose one thing (protocol/CYCLE.md §3).
+Next: build session — branch idea/pm-builds-team, write acceptance/pm_builds_team.py, the team law.
+Watch out: an analyst's backtests must count toward the pod's attempts (check the count is per pod);
+the reproduction law copies model + rule only, so a child does not inherit a team (left out, say so).
+Demo: not written yet.
