@@ -120,15 +120,24 @@ def resolve_audience(session: Session, *, sender: Agent, to: str) -> Recipient:
     return recipient
 
 
-#: Characters (body and structured payload) one agent may send in one day of the fund's clock. A
-#: reader is billed for every character it reads, so without it a sender that pays nothing (a
-#: scripted mind, or an analyst on its own key) could drain a metered reader's key (red-team 0021).
+#: Characters (body and structured payload) one agent may send in one day of the fund's clock,
+#: counted as a reader is billed for them (:func:`_size`). A reader is billed for every character
+#: it reads, so without it a sender that pays nothing (a scripted mind, or an analyst on its own
+#: key) could drain a metered reader's key (red-team 0021).
 MAX_CHARS_PER_DAY = 20_000
 
 
+def _billed(text: str) -> int:
+    """Characters a reader is billed for ``text``: escaped as a tool result is (ASCII JSON), then
+    escaped again inside the request's own JSON. Plain letters count one each; an emoji, a quote
+    or a control character counts what its escapes cost (red-team: a quota of code points let
+    20 000 emoji bill a reader like 280 000 letters)."""
+    return len(json.dumps(json.dumps(text))) - 6
+
+
 def _size(body: str, structured_payload: dict | None) -> int:
-    return len(body) + (0 if structured_payload is None
-                        else len(json.dumps(structured_payload, separators=(",", ":"))))
+    return _billed(body) + (0 if structured_payload is None else _billed(
+        json.dumps(structured_payload, separators=(",", ":"))))
 
 
 def sent_today(session: Session, sender: Agent) -> int:

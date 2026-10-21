@@ -24,8 +24,12 @@ agent exists: it asks for an analyst it describes, and pays for it from its pod.
    risk ladder closes the pod, its team goes too (:func:`team_follows`): ``team_member_let_go``
    for each analyst, ``team_place_closed`` for each place still waiting.
 
-A pod's team budget counts each analyst's key limit while it works or waits, and what it spent
-once it is gone (the rest of a dead key is never spent, so it is not counted). Nothing here moves
+A pod's team budget counts each analyst's whole key limit from the moment it is granted, for good
+once the place is filled (the key is minted: its limit is held in the firm's month whatever the
+analyst spends, and its last spending may not be posted yet when it goes); only a place withdrawn
+or closed before its fill gives its budget back (red-team: counting a let-go analyst's posted
+spending re-granted its unposted spending, and churn minted keys past the team budget). A pod asks
+at most ``MAX_ASKS_PER_DAY`` times a fund day and ``MAX_PLACES`` times a run. Nothing here moves
 money.
 """
 
@@ -46,6 +50,7 @@ from app.ledger.events import (
     EVENT_TEAM_PLACE_OPENED,
     EVENT_TEAM_REQUEST_REFUSED,
     append_event,
+    ledger_now,
 )
 from app.metrics.metering import metered_by_agent
 from app.oms.service import OMS_LOCK
@@ -58,6 +63,13 @@ MAX_CHARTER = 2000
 #: The longest refusal reason the Runtime may write.
 MAX_REASON = 200
 MAX_NAME_TRIES = 100
+#: Requests (granted or refused) one pod makes in one day of the fund's clock, at most (red-team:
+#: ask-and-withdraw flooded what management reads, outside the message quota).
+MAX_ASKS_PER_DAY = 3
+#: Places one pod is granted in a run, at most: an analyst's name and record stay bounded.
+MAX_PLACES = 100
+#: The part of a pod's name an analyst's name carries (a spec id is at most 63 characters).
+NAME_STEM = 40
 _TYPES = (EVENT_TEAM_PLACE_OPENED, EVENT_TEAM_PLACE_FILLED, EVENT_TEAM_HIRE_REFUSED,
           EVENT_TEAM_PLACE_CLOSED, EVENT_TEAM_MEMBER_LET_GO)
 
@@ -140,16 +152,10 @@ def _spent(session: Session) -> dict[int, int]:
 
 
 def budget_used(session: Session, pod_id: int, held: list[dict[str, Any]] | None = None) -> float:
-    """USD of the pod's team budget taken: a waiting or working analyst's key limit, a gone one's
-    spending."""
-    spent = _spent(session)
-    used = 0.0
-    for x in places(session, pod_id) if held is None else held:
-        if x["status"] in ("open", "working"):
-            used += float(x["budget_usd"])
-        elif x["member"] is not None:
-            used += min(float(x["budget_usd"]), spent.get(x["member"]["agent_id"], 0) / 1e6)
-    return used
+    """USD of the pod's team budget taken: every place's key limit, waiting or filled (a filled
+    place's for good); a place withdrawn or closed before its fill takes nothing."""
+    return sum(float(x["budget_usd"]) for x in (places(session, pod_id) if held is None else held)
+               if x["status"] == "open" or x["member"] is not None)
 
 
 def team_of(session: Session, pod_id: int) -> dict[str, Any]:
@@ -170,8 +176,10 @@ def team_of(session: Session, pod_id: int) -> dict[str, Any]:
         "pod_id": pod_id, "law_on": law.on,
         "law": (f"A PM may ask for an analyst (request_analyst): a charter in its own words, a "
                 f"model from {list(law.models)}, a thinking budget. The pod holds at most "
-                f"{law.max_analysts} analysts (working or waiting); all its analysts' keys "
-                f"together may hold ${law.budget_usd:.2f} (a let-go analyst counts what it spent). "
+                f"{law.max_analysts} analysts (working or waiting); all the keys of the analysts "
+                f"it was ever given together may hold ${law.budget_usd:.2f} (a hired analyst's "
+                f"whole budget stays spent when it goes; a request withdrawn before the hire gives "
+                f"it back). At most {MAX_ASKS_PER_DAY} requests a day. "
                 f"A granted analyst is hired the next morning into your pod. It researches (its "
                 f"backtests are your pod's attempts at your next pitch), reads the library and "
                 f"messages; it cannot pitch, trade or ask for analysts. Its thinking is your "
@@ -182,6 +190,12 @@ def team_of(session: Session, pod_id: int) -> dict[str, Any]:
         "budget_left_usd": max(0.0, law.budget_usd - used),
         "analysts_held": sum(1 for x in held if x["status"] in ("open", "working")),
         "places": held, "refused": refused}
+
+
+def _asked_today(session: Session, pod_id: int) -> int:
+    start = ledger_now(session).replace(hour=0, minute=0, second=0, microsecond=0)
+    return sum(1 for e in _events(session, EVENT_TEAM_PLACE_OPENED, EVENT_TEAM_REQUEST_REFUSED)
+               if e.payload_json.get("pod_id") == pod_id and e.ts >= start)
 
 
 # --- the request --------------------------------------------------------------------------------
@@ -214,6 +228,10 @@ def request_analyst(session: Session, *, actor: Agent, charter: str, model: str,
                 reason = "only an active PM of a pod asks for analysts"
             elif pod.status == "closed":
                 reason = "your pod is closed: a closed pod hires no one"
+            elif _asked_today(session, pod.id) >= MAX_ASKS_PER_DAY:
+                reason = f"your pod has asked {MAX_ASKS_PER_DAY} times today: ask again tomorrow"
+            elif len(held) >= MAX_PLACES:
+                reason = f"your pod has been granted {MAX_PLACES} analysts in this run: no more"
             elif model not in law.models:
                 reason = f"the model {model!r} is not in the team law's pool {list(law.models)}"
             elif sum(1 for x in held if x["status"] in ("open", "working")) >= law.max_analysts:
@@ -232,7 +250,8 @@ def request_analyst(session: Session, *, actor: Agent, charter: str, model: str,
                                  payload={
                                      "place_no": number, "pod_id": pod.id, "pod_name": pod.name,
                                      "asked_by": actor.id, "asked_by_name": actor.name,
-                                     "name": f"{pod.name}-analyst-{number}", "role": "analyst",
+                                     "name": f"{pod.name[:NAME_STEM].rstrip('-')}-analyst-{number}",
+                                     "role": "analyst",
                                      "model": model, "budget_usd": budget_usd,
                                      "charter": charter, "law": law.model_dump(mode="json")})
             session.commit()

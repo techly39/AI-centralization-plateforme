@@ -287,8 +287,8 @@ def run_default(client, h, keys, agents, ask, morning, think, advance, cap, admi
     check("A: alpha's PM sees its whole team through its own tool: each place's status, charter, "
           "budget and spending, the budget left, the refusals with their reasons",
           [x["status"] for x in team["places"]] == ["working", "let_go"]
-          and abs(team["budget_used_usd"] - 0.15) < 1e-9
-          and abs(team["budget_left_usd"] - 0.25) < 1e-9
+          and abs(team["budget_used_usd"] - 0.25) < 1e-9     # a hired analyst's budget stays
+          and abs(team["budget_left_usd"] - 0.15) < 1e-9     # spent when it goes
           and abs(team["places"][0]["spent_usd"] - 0.05) < 1e-9
           and len(team["refused"]) == 3 and all(r["reason"] for r in team["refused"]),
           f"places {[(x['name'], x['status']) for x in team['places']]}, used "
