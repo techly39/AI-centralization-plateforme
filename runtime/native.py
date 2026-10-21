@@ -110,6 +110,20 @@ class WakeRecord:
     tools_sha256: str | None = None
 
 
+#: Tools published after recorded minds that name no tools were made: shown only to a spec that
+#: names them (``spec.tools``). Every tool added from now on is listed here.
+NAMED_ONLY_TOOLS = frozenset({"read_library"})
+
+
+def shown_tools(tools: list[ToolSpec], named: tuple[str, ...] | None = None) -> list[ToolSpec]:
+    """The tools a mind is shown: those its spec names, or, for a spec that names none, the list
+    as it stood before :data:`NAMED_ONLY_TOOLS` were added (cycle 53: a new tool changed what a
+    recorded mind was shown, and its replay broke). A mind that needs a newer tool names it."""
+    if named is not None:
+        return [t for t in tools if t.name in named]
+    return [t for t in tools if t.name not in NAMED_ONLY_TOOLS]
+
+
 async def published_tools(client: FundClient) -> list[ToolSpec]:
     """The tool list ``build_server`` publishes, as the provider sees it."""
     return _tool_specs(await build_server(client).list_tools())
@@ -152,11 +166,9 @@ async def wake(
 
     server = build_server(client)
     tools = _tool_specs(await server.list_tools())
-    if spec.tools is not None:
-        published = {t.name for t in tools}
-        if not set(spec.tools) <= published:
-            return WakeRecord(spec.id, "refused", "unknown_tool", 0)
-        tools = [t for t in tools if t.name in spec.tools]
+    if spec.tools is not None and not set(spec.tools) <= {t.name for t in tools}:
+        return WakeRecord(spec.id, "refused", "unknown_tool", 0)
+    tools = shown_tools(tools, spec.tools)
     visible = frozenset(t.name for t in tools)
     tools_digest = tools_sha256(tools)
 

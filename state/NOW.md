@@ -1,78 +1,81 @@
-# The firm lives a quarter: four real PMs compete for the same capital for three simulated months, pods die and are replaced, and the Human gets a quarter report
+# A generation turns over: at each month's end the firm measures every pod net of its thinking, lets go the PMs who failed, keeps their lessons in a library every PM reads, and hires into the freed places
 
 ## How I understand it
-Every part of the multi-manager machine works on its own: pitch and gates, seed, the algorithm that
-re-weighs capital, the drawdown ladder, the hire that fills a dead pod's place. But each was shown
-with one mind or with scripted pods. A real multi-manager is many PMs pulling at one pot of money.
-This idea is the first firm-scale run:
-- One made-up market, four sectors with different fates: one has an edge that lasts, one is pure
-  noise, one slowly sinks, one crashes mid-quarter. Nobody inside knows which is which.
-- Four real PMs (Haiku 5.5, each with its own capped key), each given one sector. They research
-  (every backtest counted), pitch, and the gates judge. An eligible pitch gets a seed and its pod
-  trades its rule forward.
-- Every five days the algorithm moves capital by each pod's score, net of what its PM's thinking
-  cost. The ladder halves, freezes and closes what bleeds; each close opens a vacancy and the next
-  morning a new PM is hired, reads the post-mortem and pitches in its place.
-- Nobody arranges any of it: the laws and the minds decide. The Human gets a **quarter report**:
-  capital per pod week by week, who died and why, who was hired, each pod's P&L net of thinking.
+The quarter showed the firm cannot live on its own past a few months: a PM who never earns a seed
+thinks (and spends) forever, a closed pod's PM keeps waking, and a dead pod's lesson reaches only
+its successor. A real multi-manager runs on turnover: every month the book is marked, and the
+managers who did not earn their place go. Here:
+- **The month's end is a law of physics** (the "generation" law, named in a world's recipe, off by
+  default so every older run replays as it was). At the first advance into a new month, physics
+  measures every pod: its P&L that month and its thinking cost that month (from the meter), the
+  difference being its **fitness**. One ledger event holds the whole generation's table.
+- **Who goes.** A PM whose pod the risk ladder closed goes at the close. A PM whose pod never
+  earned a seed goes at the month's end, once it has had a fair time (the law's grace days: a PM
+  hired on the 25th is judged next month). A PM who earned a seed and kept it stays.
+- **Letting go** is physics: the agent is deactivated (its key answers 401, the Runtime retires its
+  mind and it spends nothing more), an unseeded pod is closed (empty, it holds no live-pod place),
+  and a vacancy opens in its place. The next morning the Runtime hires into it, as it does today.
+- **Lessons are kept.** Each departure writes its lesson (a pure function of the ledger: what the
+  pod tried, the gates' verdicts, what it earned, what its thinking cost, why it went) into a
+  **library** every PM reads (`read_library`). The firm learns across generations.
+- The Human gets a **generation report** (operator command): per month, each pod's fitness, who
+  stayed, who went and why, who was hired, and the lessons.
 
 ## What done looks like
-`uv run python acceptance/firm_quarter.py` ($0, offline):
-- A (scripted minds, the same market): the edge pod is seeded and raised; the noise pod is not
-  seeded; the sinking and crashing pods are closed and replaced by hires; a pod whose gross return
-  beats another's, but whose thinking cost eats the difference, ranks below it (and the cheap one
-  above it); the live-pod limit holds; rebuilding from the ledger gives the same books.
-- B0 (scripted, through the Runtime, in a hosted world built from the recipe): the same deaths and
-  hires; `replay --verify` IDENTICAL. (Built, cycle 53.)
-- B (recorded, four real PMs plus their hires): `replay --verify` says IDENTICAL; the quarter
-  report prints from the recording; every seed, raise, cut, close and hire is consistent with the
-  laws; each mind's cost, charged by the system, is shown against its key.
+`uv run python acceptance/generation_turnover.py` ($0, offline):
+- A (scripted minds, in process, three months of one made-up market): at each month's end a
+  generation event with every pod's fitness (P&L net of thinking charged each morning); the
+  PM of a never-seeded pod is let go (deactivated, a refusal if it tries, its pod closed, its
+  lesson in the library, its place hired the next morning); a ladder-closed pod's PM is let go at
+  the close; a seeded PM stays; a hire reads the library; a hire made late in a month is not
+  judged that month; the live-pod limit does not count a let-go PM's empty pod; with the law off,
+  nothing of this happens; rebuild from the ledger gives the same books.
+- B0 (scripted, hosted, through the Runtime): the same turnover, the let-go minds retired,
+  `replay --verify` IDENTICAL.
+- B (recorded, real Haiku PMs, three generations): IDENTICAL for $0, the generation report prints.
 
 ## Plan
-1. A quarter world recipe: four sectors of the made-up market (edge, noise, sink, crash), four
-   pods, each PM's mandate naming its sector. Reuse the hosted world and the pitch desk charter.
-2. Fixes the run stands on: a seeded pod's later pitches get a capital answer ("already running
-   your seeded pitch" or what changed); the hiring law announced to agents as a system event.
-3. The quarter report: a pure function of the ledger (capital per pod per week, closes, hires,
-   P&L gross and net of thinking cost), printed by the demo, readable from the API.
-4. Demo part A with scripted minds; tests for the report and the fixes.
-5. Before spending: check a scripted mind reading only its tools sees every consequence of its
-   acts. Budget the real run (PMs × steps; at most about $3 of the cap), check cassette size.
-6. Record the real quarter, commit under `evidence/firm-quarter/`, a FINDINGS entry.
-7. Red-team, auditor, merge.
-Cut: session 1 = steps 1-4; session 2 = steps 5-6; session 3 = step 7.
-Left out: a manager mind; PMs building their own teams; firing a PM who never earns a seed;
-the debate; the monthly generation.
-
-Changed while building (cycle 53):
-- The two fixes are switched on by the run's capital law ("tell PMs", off by default), because
-  the recorded hire of cycle 51 read its pitches and its capital every day: any new answer there
-  would make its replay diverge. A world turns it on in its recipe, which now carries the world's
-  own laws (capital, hiring) over config.yaml.
-- The hiring law is announced in each PM's capital view (every PM reads it every morning), not
-  as a ledger event no PM can read.
-- The quarter report is an operator command (`fund-env quarter-report`), not an agent tool: a
-  new tool changes the full tool list a recorded scripted mind was shown, and its replay breaks.
+1. Physics: the generation law (`generation:` section, recipe-nameable), the month's-end
+   measurement, the let-go law, the lesson, the library (`GET /library` + MCP tool), a vacancy for
+   an unseeded pod, the PM of a ladder-closed pod let go at the close. Rebuild handles closes.
+2. A tool added must not change the tools older recordings were shown: a spec naming no tools
+   gets the list as it was before this idea (new tools are named).
+3. The generation report (pure function of the ledger, `fund-env generation-report`).
+4. Demo part A + tests. (Session 1.)
+5. Runtime: a let-go mind is retired in a replay too; thinking cost charged each step in a real run
+   (from the turns' stated cost, so a replay posts the same rows), switched on per run; the hire
+   check and the agent cap move into physics. B0 hosted rehearsal. (Session 2.)
+6. Before spending: every consequence visible through the PM's own tools. Record the real run
+   (≤ about $3), FINDINGS, red-team, auditor, merge. (Session 3.)
+Left out: reproduction (2b), capital reset (2c), "the worst fitness dies" (this slice lets go only
+the closed and the never-seeded), a manager mind.
 
 ## Risk
-Money (seeds, re-weighing, the ladder), agent creation and key minting under the cap: red-team +
-auditor before merge. Holes left unless the run reaches them: empty pods count toward the
-live-pod limit; the hire check lives in the router, not the permissions table.
+Money (the closes, the fitness the capital machine may later read), agents deactivated by physics,
+hiring under the cap, metering per step: red-team + auditor before merge.
 
 ## Progress
-- cycle 52: planned.
-- cycle 53: built steps 1-4 and the hosted rehearsal. Demo part A passes (scripted quarter: edge
-  raised, noise never seeded, sink and crash closed and replaced by hires that earn seeds, a
-  costly mind's rank turned by its thinking cost, money kept, report printed); B0 passes
-  (hosted, IDENTICAL). Fails only on B: the real quarter is not recorded yet.
-- cycle 54: before spending, the demo checks that each PM sees every consequence of its acts
-  through its own tools the next morning (judged, seeded, raised, cut, halved, reduce-only,
-  closed, hired); one gap found and closed: a closed pod's PM is now told "closed" on every
-  pitch. The hosted world's pods and sectors got neutral names (the old ones told the minds
-  each sector's fate). The real run's checks judge the laws, not the fates (a seed only for an
-  eligible pitch, the ladder at its thresholds, one vacancy a close, the live-pod limit, no
-  trading after a close, no key past its limit), and are shown to catch three forged records;
-  the quarter report now prints from a recording alone. Real quarter recorded (see Progress).
-  Found: a real run posts thinking cost only after its last step, so its re-weighings see none.
-- cycle 55: the cut-off session's recording committed; demo passes (A, B0, B: IDENTICAL, $0);
-  red-team done, auditor PASS on round 2 (cycle 54); full suite green; merged.
+- cycle 56: planned.
+- cycle 57: steps 1-5 mostly built. Demo A passes (three scripted months: three generations,
+  two PMs let go for no seed, one at its ladder close, a late hire spared, a hire reads the
+  library, the limit ignores empty pods, the report prints). B0 passes (hosted, billed stand-in
+  minds charged each step, let-go minds retired, IDENTICAL). Left: the hire check and the agent
+  cap into physics; the visibility check; the real run (B); red-team, auditor, merge.
+- cycle 57 (cut by the usage limit, its work committed): the agent cap and the hire check moved
+  into physics; each PM sees its own judgement through its own key; a failed month's end retries.
+- cycle 58: the real run's part of the demo: a fuller charter, checks of the month's-end law that
+  judge any recording (four forged records fail them), the report from a recording; the real
+  run recorded ($0.575: pod-2 let go at September's end after 8 noise pitches, the crash's PM at
+  the close, both places hired and seeded; every law check passes, replay IDENTICAL). Red-team:
+  the high (agent cap at every registration) and two mediums (grace judged by the longest-serving
+  PM; a let-go PM's orders cancelled, a pod with money not closed) fixed, four lows filed.
+  The demo still fails one check, rightly: hire-1's key spent $0.200068 of $0.20 (the provider
+  finishes the turn that crosses a key's limit).
+- cycle 59: a key's limit made hard: no turn is sent whose worst case (prompt bounded by its
+  bytes, or by the provider's count for the turn before plus what was added; full writing; the
+  dearest host and price tier) could cross what the key has left. Over the 394 real turns of
+  cycle 58 the bound always held (2.4x slack) and would have stopped hire-1 at $0.193. No
+  reserve in the monthly cap: a key cannot pass its limit (save one filed low hole: a provider that
+  understates its prompt count), and the cap counts it at its
+  limit. Red-team 0031: 6 holes (2 medium), 5 fixed, 1 low filed. Auditor PASS. B re-recorded
+  with 24 tool calls a wake ($0.506; hire-1 stopped by the guard at $0.195): demo passes. Merged.

@@ -332,7 +332,7 @@ of their own (pitch, post-mortem, generation turnover).
 
 ### Every month is a generation
 From: Human
-Status: not started
+Status: working
 The system resets every month: mark to market, measure every pod's fitness, the worst die, the
 best may reproduce, capital resets, lessons and the strategy registry persist.
 Now: the parts it stands on exist: the quarter (cycle 54) runs three months of pods with the
@@ -345,6 +345,11 @@ lets go the PMs whose pods are closed or never earned a seed in the month (they 
 keys stop), writes each departure's lesson into a library every PM can read, and the freed places
 are hired into the next morning. Reproduction (a winner's design copied with variation) is the
 next slice, then capital reset.
+Now (cycle 59, first slice working): at each month's end physics measures every pod's fitness
+(P&L minus its thinking), lets go the PMs whose pod the ladder closed or that earned no seed in
+the month, keeps their lessons in a library every PM reads, and the freed places are hired the
+next morning; `fund-env generation-report` prints it. Real Haiku PMs lived three generations
+($0.51 of thinking, every key under its hard limit). Next slices: reproduction, capital reset.
 
 ### Evolution: designs that work reproduce with variation
 From: Human
@@ -477,6 +482,22 @@ could fill past it); a replay re-reads the agent cap when it rebuilds a world wi
 lowered below 4 would make the quarter's recording refuse to verify (fails closed); a seeded pod's
 "already runs" answer on an eligible pitch made before the seed carries that pitch's date; a
 closed pod's PM stays an active agent and keeps waking (and spending) until the run ends.
+(Fixed by "a generation turns over", cycles 57-58: thinking charged at every step in real runs;
+closed and let-go PMs stop waking; empty pods hold no live-pod place; the agent cap and the
+"only the operator's registrar hires" check live in physics.)
+From a generation turns over (cycle 58, red-team; the high hole, two mediums and one low are
+fixed: the agent cap now binds every registration, a pod is judged by its longest-serving PM, a
+let-go PM's pending orders are cancelled and a pod with money is not closed by the let-go):
+one advance across two month ends makes one generation spanning both; a hired pod closed by a
+failed hire is missing from its month's table, with its thinking; an empty pod restaffed by a
+registration passes the live-pod limit; a recording's charges are checked for amount, not for the
+agent they name (needs a forged recording). Strict-xfail tests in
+`tests/test_redteam_generation_turnover.py`. From the real run (cycle 58): a key's limit was soft
+by one turn (hire-1 spent $0.200068 of $0.20); fixed in cycle 59: no turn is sent whose worst
+case could cross what the key has left (red-team 0031: Unicode-normalized text, the dearest host,
+timeouts, unreadable answers and price fields fixed). Left (low): the provider's own prompt count
+for the turn before is trusted as a bound; a provider that understates it can bill one turn past
+the limit, and the key stops after it. Strict-xfail in `tests/test_redteam_0031.py`.
 
 ### Paid to report holes
 From: Builder

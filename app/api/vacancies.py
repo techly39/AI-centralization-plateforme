@@ -17,8 +17,7 @@ from app.capital.hiring import MAX_REASON, HiringError, fill, refuse, vacancies,
 from app.db.base import get_session
 from app.db.models import Agent
 from app.registry.auth import deny, get_current_agent, require
-from app.registry.permissions import Action, has_permission
-from app.registry.service import registered_by_operator
+from app.registry.permissions import Action, has_permission, may_hire
 
 router = APIRouter(tags=["vacancies"])
 
@@ -38,7 +37,7 @@ def _operator_only(session: Session, actor: Agent, vacancy_id: int) -> None:
     """Hiring is the Runtime's act through the operator's registrar: a management agent another
     agent registered (a firm mind) is refused, logged (red-team: else a mind takes a hire the
     Runtime refused for the cap, and holds a second identity)."""
-    if not registered_by_operator(session, actor):
+    if not may_hire(session, actor):
         raise deny(session, actor, Action.REGISTER_AGENTS,
                    detail="only the operator's registrar hires: a firm mind does not fill or "
                           "refuse a vacancy", context={"vacancy_id": vacancy_id})

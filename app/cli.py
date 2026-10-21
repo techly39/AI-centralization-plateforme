@@ -284,6 +284,18 @@ def cmd_rebuild_state(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generation_report(args: argparse.Namespace) -> int:
+    """Print the generation report of the run in the configured database: each month's fitness
+    table, who was let go and why, who was hired, and the library of lessons. Read-only."""
+    from app.capital.report import generation_report, render_generations
+
+    with session_scope() as session:
+        report = generation_report(session)
+        session.rollback()
+    print(json.dumps(report, sort_keys=True) if args.json else render_generations(report))
+    return 0
+
+
 def cmd_quarter_report(args: argparse.Namespace) -> int:
     """Print the quarter report of the run in the configured database: each pod's equity week by
     week, its P&L gross and net of thinking, the re-weighings, the deaths and the hires. Read-only.
@@ -405,6 +417,10 @@ def build_parser() -> argparse.ArgumentParser:
                       metavar="N", help="days between two columns (default 7)")
     p_qr.add_argument("--json", action="store_true", help="the report as JSON")
     p_qr.set_defaults(func=cmd_quarter_report)
+
+    p_gr = sub.add_parser("generation-report", help="print each month's generation and the library")
+    p_gr.add_argument("--json", action="store_true", help="the report as JSON")
+    p_gr.set_defaults(func=cmd_generation_report)
 
     p_serve = sub.add_parser("serve", help="run the API server")
     p_serve.add_argument("--host", default=None)

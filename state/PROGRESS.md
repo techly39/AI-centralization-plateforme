@@ -1,20 +1,15 @@
-Cycle 0056 · plan · next: a generation turns over (queued, ready) · branch: main
+Cycle 0059 · merged: a generation turns over · branch: idea/generation-turnover (merged to main)
 Done this session:
-- Fixed a red main: the quarter report's test read the operator's own `fund.db`, so it passed
-  here and failed in the runner's clean checkout (cycle 55 was counted failed for it). The test
-  now uses its own empty database, and the whole suite now runs on a scratch database, so no test
-  can lean on the local one again.
-- Book made true after the quarter (allocation, thinking cost, lessons). Next up re-ordered: the
-  monthly generation moves ahead of the pitch's part two, cut in three (turnover, reproduction,
-  capital reset). Its first slice is queued: at each month's end physics measures every pod net
-  of its thinking, lets go the PMs whose pods closed or never earned a seed, keeps each one's
-  lesson in a library every PM reads, and hires into the freed places; three generations, real
-  minds recorded, a generation report.
-- Factory: the suite runs on a scratch database, judged by no "main red" on the next three merges.
-Next: build session: branch `idea/generation-turnover`, write NOW.md and
-`acceptance/generation_turnover.py`. Fix first the holes it stands on (in the queue notes):
-thinking cost charged each step in real runs, closed or let-go PMs stop waking, empty pods do not
-count toward the live-pod limit, the agent cap and the hire check move into physics.
-Watch out: a new agent tool changes the tool list older recordings were shown (their replays
-diverge): name each new mind's tools, switch new behaviour on through the world's laws.
-Demo: none yet (planning).
+- A key's limit is hard: no turn is sent whose worst case (prompt bounded by its bytes, or by the
+  provider's count for the turn before plus what was added; 4096 written tokens; the dearest host
+  and price tier) could cross what the key has left. Red-team 0031: 6 holes, 5 fixed (Unicode-
+  normalized text, dearer hosts, 408s, unreadable answers, price fields), 1 low filed.
+- Auditor on the whole idea: PASS, no BLOCK; its notes on the demo's tenure rule and model ids fixed.
+- Real PMs re-recorded with 24 tool calls a wake ($0.506): the noise PM let go at September's end,
+  the crash's PM at its close, both hires seeded and kept; hire-1 stopped by the guard at $0.195 of
+  $0.20 (four turns refused unsent). The demo now checks the run's settings; report shows cents.
+Next: plan session: take the next idea from the book's "Next up" (the next slice of "every month
+is a generation" is reproduction: a winner's design copied with variation).
+Watch out: real runs need --max-tool-calls 24 (default 64); the demo checks it. The suite prints
+no summary line: read the exit code.
+Demo: passes.

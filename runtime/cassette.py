@@ -164,8 +164,9 @@ def _validate(doc: Any) -> Cassette:
         raise CassetteError("redactions is a non-negative int and the outcome an object")
     params = doc["parameters"]
     if (type(params) is not dict
-            or set(params) - {"package", "hiring"} != {"steps", "days_per_step", "max_tool_calls",
-                                                        "workflow_input"}
+            or set(params) - {"package", "hiring", "charge_each_step"} != {
+                "steps", "days_per_step", "max_tool_calls", "workflow_input"}
+            or params.get("charge_each_step", True) is not True
             or ("package" in params and not (type(params["package"]) is str
                                              and _PACKAGE.fullmatch(params["package"])))
             or ("hiring" in params and type(params["hiring"]) is not dict)
@@ -174,8 +175,8 @@ def _validate(doc: Any) -> Cassette:
             or not _in_range(params["max_tool_calls"], MAX_TOOL_CALLS_RANGE)
             or type(params["workflow_input"]) is not dict):
         raise CassetteError("parameters are steps, days_per_step and max_tool_calls (ints in "
-                            "range), a workflow_input object, and an optional package name and "
-                            "hiring template")
+                            "range), a workflow_input object, and an optional package name, "
+                            "hiring template and charge_each_step: true")
     specs = doc["specs"]
     if type(specs) is not list or not all(
             type(e) is dict and set(e) == {"sha256", "spec"} and type(e["spec"]) is dict

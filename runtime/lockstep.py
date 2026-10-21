@@ -67,6 +67,9 @@ from runtime.native import DEFAULT_MAX_TOOL_CALLS, WakeRecord, wake
 from runtime.replay import Recording
 from runtime.spec import AgentSpec
 
+#: A day package that could not be built because the mind's key is dead.
+_DEAD = object()
+
 #: The longest run one call may ask for, and the longest step: a decade of days.
 MAX_STEPS = 3660
 MAX_DAYS_PER_STEP = 366
@@ -90,6 +93,10 @@ class StepRecord:
     wakes: tuple[WakeRecord, ...]
     #: The world's now after the advance; ``None`` if the step ended the run first.
     advanced_to: str | None
+    #: The thinking cost posted to physics at the step's end, before the advance (a run that
+    #: charges each step): ``(spec id, agent id, key_ref, the key's total in µ$)`` per metered
+    #: mind whose total grew, from the cost its turns stated. A replay posts the same rows.
+    charged: tuple[tuple[str, int, str, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -125,6 +132,7 @@ async def run_backtest(
     replay: Recording | None = None,
     package: str | None = None,
     hiring: Any = None,
+    charge_each_step: bool = False,
 ) -> RunRecord:
     """Live ``steps`` steps of a backtest with ``minds``, the clock in the Runtime's hand.
 
@@ -140,6 +148,13 @@ async def run_backtest(
     open vacancies are offered to it; a mind it hires joins the roster from that step on, in
     spec-id order, handed its post-mortem beside the input. A replay's recording must hold the
     same hires (``replay.hired_ids``), and the run must be given its hiring to replay them.
+
+    With ``charge_each_step`` (idea: a generation turns over), at each step's end, before the
+    advance, every metered mind's thinking so far (the cost its turns stated, rounded down) is
+    posted to physics as the Runtime (``POST /metering/usage``), so the capital machine and the
+    month's end judge a real run's pods net of their thinking as they live, not after the run.
+    The provider's own totals still reach physics once, after the run (they are never lower).
+    A replay posts the recorded charges at the same place.
     """
     for value, top in ((steps, MAX_STEPS), (days_per_step, MAX_DAYS_PER_STEP)):
         if type(value) is not int or not 0 <= value <= top:
@@ -199,6 +214,9 @@ async def run_backtest(
     retired: list[str] = []
     retired_at: list[int] = []
     hires: list[Any] = []
+    #: spec id -> µ$ its turns have stated so far, and what was last posted (charge_each_step)
+    stated: dict[str, int] = {}
+    posted: dict[str, int] = {}
 
     def end(ended: str, reason: str | None = None) -> RunRecord:
         woke = "+".join(sorted({m.spec.provider for m in ordered}))
@@ -254,12 +272,19 @@ async def run_backtest(
                 # next step. (A mind's own later turns are still billed within its key.)
                 stop = ("refused", "metered_over_cap")
                 break
-            day = (None if universe is None
-                   else await packages.build(package, mind.client, at, universe))
+            try:
+                day = (None if universe is None
+                       else await packages.build(package, mind.client, at, universe))
+            except FundAPIError as exc:
+                if exc.status_code != 401:
+                    raise
+                day = _DEAD     # its key died (a PM let go): the wake below is refused at /me
             given = step_input if hiring is None or mind.spec.id not in hiring.inputs else {
                 **step_input, **hiring.inputs[mind.spec.id]}
-            record = await wake(mind.spec, mind.client, workflow_input=given,
-                                max_tool_calls=budget, tape=tape, meter=mind.meter, package=day)
+            record = (WakeRecord(mind.spec.id, "refused", "no_identity", 0) if day is _DEAD
+                      else await wake(mind.spec, mind.client, workflow_input=given,
+                                      max_tool_calls=budget, tape=tape, meter=mind.meter,
+                                      package=day))
             wakes.append(record)
             if record.ended == "halted" or (record.ended, record.reason) == ("refused", "halted"):
                 # B-054: a HALT that lands between two wakes refuses the next one at the gate;
@@ -270,9 +295,9 @@ async def run_backtest(
                     # Red-team 0015 H1: the agent was deactivated by an act inside the
                     # world (e.g. management firing it). That is data, not a reason for
                     # the world's time to stop: the mind is retired and the run goes on.
-                    # A replay cannot go on: a recorded run woke every mind, so a mind
-                    # that no longer wakes left the recording (ADR-038 (a), ADR-040 (2)).
-                    if replay is not None:
+                    # A replay retires it only where the recording did (a PM physics let
+                    # go): any other retirement left the recording (ADR-038 (a), ADR-040 (2)).
+                    if replay is not None and replay.retired.get(mind.spec.id) != step:
                         where = replay.divergence(step, record) or "0:ended"
                         stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
                     else:
@@ -285,10 +310,31 @@ async def run_backtest(
                 stop = ("diverged", f"diverged:{mind.spec.id}:{step}:{where}")
             if stop:
                 break
+        charged: list[tuple[str, int, str, int]] = []
+        if stop is None and (charge_each_step or (replay is not None and replay.charged(step))):
+            if replay is not None:
+                due = list(replay.charged(step))
+            else:
+                for record in wakes:
+                    stated[record.spec_id] = stated.get(record.spec_id, 0) + stated_micros(record)
+                agent_of = dict(who_is)
+                due = [(m.spec.id, agent_of[m.spec.id], m.meter.key_ref, stated[m.spec.id])
+                       for m in ordered if m.meter is not None
+                       and stated.get(m.spec.id, 0) > posted.get(m.spec.id, 0)]
+            for row in due:
+                try:
+                    await clock.post("/metering/usage", {"agent_id": row[1], "key_ref": row[2],
+                                                         "usd_micros_total": row[3]})
+                except FundAPIError as exc:
+                    stop = (("halted", "halted") if exc.status_code == 423
+                            else ("error", f"charge_failed:{row[0]}:{exc.status_code}"))
+                    break
+                posted[row[0]] = row[3]
+                charged.append(row)
         if stop is None and not decide_batch().allowed:
             stop = ("halted", "halted")
         if stop is not None:
-            done.append(StepRecord(step, at, tuple(wakes), None))
+            done.append(StepRecord(step, at, tuple(wakes), None, tuple(charged)))
             return end(*stop)
         try:
             moved = await clock.post("/clock/advance", {"days": days_per_step})
@@ -296,22 +342,29 @@ async def run_backtest(
             if exc.status_code == 423:
                 # B-054: a HALT after the last gate read. Physics refuses before the
                 # handler runs (``app.registry.halt``), so the clock did not move.
-                done.append(StepRecord(step, at, tuple(wakes), None))
+                done.append(StepRecord(step, at, tuple(wakes), None, tuple(charged)))
                 return end("halted")
             # Red-team 0015 H3: physics may have committed the advance and failed
             # after it (the sweep, the connection). Ask physics where the clock is,
             # so the record says what the ledger says; if physics cannot say either,
             # the reason says the record does not know (audit c24 WARN 1).
             known, now = await _moved_from(clock, at)
-            done.append(StepRecord(step, at, tuple(wakes), now))
+            done.append(StepRecord(step, at, tuple(wakes), now, tuple(charged)))
             return end("error", f"advance_failed:{exc.status_code}"
                        + ("" if known else ":clock_unknown"))
-        done.append(StepRecord(step, at, tuple(wakes), _now_of(moved)))
+        done.append(StepRecord(step, at, tuple(wakes), _now_of(moved), tuple(charged)))
         if done[-1].advanced_to is None:  # it moved, but the record cannot say where
             return end("error", "clock_malformed")
         if replay is not None and (stamp := replay.calendar(step)) and stamp[1] != done[-1].advanced_to:
             return end("diverged", f"diverged:clock:{step}:0:calendar_landed")
     return end("completed")
+
+
+def stated_micros(record: WakeRecord) -> int:
+    """Whole micro-dollars a wake's turns said they cost, each rounded down (never more than the
+    provider bills: its total is read after the run and is never lower)."""
+    return sum(usd_to_micros_floor(e.usage.cost_usd) for e in record.exchanges
+               if e.usage is not None and e.usage.cost_usd > 0)
 
 
 async def check_clock(clock: FundClient) -> str | None:

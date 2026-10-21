@@ -69,6 +69,11 @@ EVENT_VACANCY_FILLED = "vacancy_filled"  # payload: {vacancy_id, pod_id, pod_nam
 EVENT_HIRE_REFUSED = "hire_refused"      # payload: {vacancy_id, reason, by}
 EVENT_HIRE_FAILED = "hire_failed"        # payload: {vacancy_id, pod_id, agent_id, reason}: the hired pod is closed, the vacancy open again
 
+# Generations (app/capital/generation.py): at each month's end every pod's fitness; a PM who failed
+# is let go (its agent deactivated; an unseeded pod closed, a vacancy opened) and its lesson kept.
+EVENT_GENERATION_ENDED = "generation_ended"  # payload: {generation, month, from, to, law, pods: [...]}
+EVENT_PM_LET_GO = "pm_let_go"            # payload: {lesson_no, agent_id, agent_name, pod_id, pod_name, reason, why, pod_closed, generation, lesson}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

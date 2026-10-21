@@ -25,6 +25,7 @@ from app.api.schemas import (
     RunMindsIn,
     RunMindsOut,
 )
+from app.capital.generation import safe_turnover
 from app.capital.service import safe_sweep
 from app.clock import get_clock
 from app.db.base import get_session
@@ -70,6 +71,9 @@ def advance_clock(
         # eligible. Before the order sweep, so a pod the ladder freezes now has its buys cancelled
         # before any of them can fill at this now.
         safe_sweep(session, provider=get_provider())
+        # Then the month's end, if the month has turned (idea: every month is a generation): the
+        # generation's fitness table, the PMs who failed let go. A no-op unless the law is on.
+        safe_turnover(session, provider=get_provider())
         # Pending limit orders are checked on every advance, by the same sweep the
         # live scheduler runs on a timer (TRD §9): one code path for both modes.
         sweep = check_pending_orders(session)

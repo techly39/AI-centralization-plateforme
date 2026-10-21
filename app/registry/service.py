@@ -32,6 +32,10 @@ class ReservedIdentityError(RegistryError):
     """An act on one of physics' own identities that no caller may do (ADR-033)."""
 
 
+class AgentCapError(RegistryError):
+    """One more agent would pass the Human's cap (``firm.max_agents_total``)."""
+
+
 #: Name of the built-in identity the app itself acts under (rejection notices,
 #: scheduled fills). It is a real row so that foreign keys and the audit trail
 #: work, but it is never handed an API key anyone can use.
@@ -83,12 +87,19 @@ def register_agent(
     the caller must surface it to the operator immediately and once.
 
     Physics' identities (``system``, ``runtime``) are not registered here, and
-    no agent may take their names (ADR-033, B-000f).
+    no agent may take their names (ADR-033, B-000f). No agent is registered past the
+    Human's cap (``firm.max_agents_total``; an unreadable cap registers no one): every
+    path that makes an agent (the register route, a hire) passes here (red-team: the cap
+    bound the hire only). A caller that commits later holds ``OMS_LOCK`` until it does.
     """
+    from app.registry.population import over_cap
+
     if role in PHYSICS_ROLES:
         raise ReservedIdentityError(f"role {role.value!r} is physics' own; it is not registered")
     if is_reserved_name(name):
         raise ReservedIdentityError(f"the name {name!r} is reserved")
+    if (over := over_cap(session)) is not None:
+        raise AgentCapError(over)
     return _create_agent(session, name=name, role=role, pod_id=pod_id,
                          charter_ref=charter_ref, research_domains=research_domains,
                          actor_agent_id=actor_agent_id)

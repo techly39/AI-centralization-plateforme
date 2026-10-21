@@ -377,8 +377,9 @@ async def test_provisioning_refuses_every_contradiction_of_a_cassette_spec(
 
 def test_the_replay_module_has_no_reach() -> None:
     from tests.test_runtime_native import _imports
-    may = {"__future__", "json", "re", "collections.abc", "dataclasses", "pathlib", "typing",
-           "pydantic", "runtime", "runtime.providers"}
+    # ``decimal``: exact micro-dollar arithmetic for the recorded charges (no I/O, no reach).
+    may = {"__future__", "json", "re", "collections.abc", "dataclasses", "decimal", "pathlib",
+           "typing", "pydantic", "runtime", "runtime.providers"}
     found = _imports((REPO / "runtime" / "replay.py").read_text())
     assert "runtime.providers" in found and found <= may, found - may
     for planted in ("import httpx\n", "import socket\n", "from mcp_server import FundClient\n",

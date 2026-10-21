@@ -251,8 +251,8 @@ async def test_context_is_charter_then_me_and_input(fund_client, desk, scripts) 
     ctx = json.loads(user.content)
     assert ctx["input"] == {"day": 3}
     assert (ctx["me"]["id"], ctx["me"]["pod_id"], ctx["me"]["role"]) == (pm_id, pod_id, "pm")
-    assert {t.name for t in seen[0].tools} == {t.name for t in await native.published_tools(
-        fund_client(pm_key))}
+    assert {t.name for t in seen[0].tools} == {t.name for t in native.shown_tools(
+        await native.published_tools(fund_client(pm_key)))}
     assert seen[0].model is None
 
 

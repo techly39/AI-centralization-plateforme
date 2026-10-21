@@ -33,6 +33,11 @@ class Account:
         self.chats: list[dict] = []
         self.answers: list[dict] = []
         self.patched: list[str] = []
+        #: The provider's model list: the test model priced like a small real one ($ per token)
+        self.models: list[dict] = [{"id": "vendor/cheap", "pricing": {
+            "prompt": "0.0000001", "completion": "0.0000005", "input_cache_read": "0.00000001",
+            "overrides": [{"min_prompt_tokens": 100000, "prompt": "0.0000005",
+                           "completion": "0.0000025"}]}}]
         self.add("the-humans-own", limit=None, usage=8.1, disabled=False)
 
     def add(self, name: str, *, limit, usage=0.0, usage_monthly=None, disabled=False) -> str:
@@ -54,6 +59,12 @@ class Account:
             self.keys[digest]["usage"] += answer.get("usage", {}).get("cost", 0)
             return httpx.Response(200, json=answer)
         assert auth == "Bearer prov-key", "account calls carry the provisioning key"
+        if path.startswith("/models/") and path.endswith("/endpoints") and request.method == "GET":
+            model = path.removeprefix("/models/").removesuffix("/endpoints")
+            hosts = [{"provider_name": "host", "pricing": m["pricing"]}
+                     for m in self.models if m["id"] == model]
+            return (httpx.Response(200, json={"data": {"id": model, "endpoints": hosts}}) if hosts
+                    else httpx.Response(404, json={"error": "no such model"}))
         if path == "/keys" and request.method == "GET":
             offset = int(request.url.params.get("offset", 0))
             rows = list(self.keys.values())[offset:offset + 2]   # pages of two
@@ -414,3 +425,90 @@ def test_a_ctrl_c_while_minting_still_disables_the_keys_made(
         _run(SessionFactory, ["--specs", str(specs), "--steps", "1"], capsys)
     made = [k for k in faked.keys.values() if k["name"].startswith("firm-t1-")]
     assert [k["name"] for k in made] == ["firm-t1-a-pm"] and made[0]["disabled"] is True
+
+
+# -- the hard limit (cycle 59: the provider finishes the turn that crosses a key's limit) -------
+
+def _mind(account, limit: int):
+    p = provisioner(account)
+    meter = Meter(p, p.create_key(7, limit))
+    return p, meter, build_provider(spec(), meter=meter)
+
+
+def test_a_turn_that_could_cross_the_keys_limit_is_never_sent(account) -> None:
+    p, meter, mind = _mind(account, 5_000)
+    account.answers += [chat("one", cost=0.002), chat("two", cost=0.002)]
+    mind.complete(request())                       # worst case ~$0.0022 fits $0.005
+    assert p.left(meter.key_ref) == 3_000
+    mind.complete(request())                       # ~$0.0022 fits the $0.003 left
+    with pytest.raises(OpenRouterError, match="could cost up to"):
+        mind.complete(request())                   # ~$0.0022 does not fit the $0.001 left
+    assert len(account.chats) == 2                 # refused before it was sent
+    assert p.usage()[0].usd_micros_total <= 5_000
+
+
+def test_the_worst_case_is_the_prompt_bound_and_the_full_writing_at_the_dearest_tier(account) -> None:
+    p, _, mind = _mind(account, 1_000_000)
+    prices = p.prices("vendor/cheap")
+    assert prices.worst_case(1_000) == 100 + 2048        # 0.1 µ$ a token in, 0.5 out (4096)
+    # past 100k prompt tokens the dearer tier binds: 5x the prompt and the writing
+    assert prices.worst_case(100_000) == 50_000 + 10_240
+    # the bound counts every byte of a first turn, and only what a later turn added after it
+    first = request(Message(role="system", content="x" * 4000), Message(role="user", content="u"))
+    account.answers.append(chat("ok", calls=[("get_price", '{"ticker": "X"}')]))
+    out = mind.complete(first)
+    sent = account.chats[0]["body"]
+    learned, mind._last = mind._last, None
+    assert mind._prompt_bound(sent) > 4000 + 1024              # every byte, and the tools' framing
+    mind._last = learned
+    assert mind._prompt_bound(sent) == 100                     # the provider counted 100 of it
+    later = {"messages": [*sent["messages"], {"role": "assistant", "content": "ok"},
+                          {"role": "tool", "tool_call_id": "t0c0", "content": "12.5"}],
+             "tools": sent["tools"]}
+    assert 100 + 2 * 16 < mind._prompt_bound(later) < 100 + 200
+    assert mind._prompt_bound({**later, "tools": []}) > 4000   # other tools: no prefix to trust
+    assert out.tool_calls[0].id == "t0c0"
+
+
+@pytest.mark.parametrize("pricing", [
+    {"prompt": "0.0000001", "completion": "0.0000005", "per_second": "0.01"},   # an unknown field
+    {"prompt": "-1", "completion": "-1"},                                       # variable prices
+    {"prompt": "0.0000001"},                                                    # no writing price
+    {"prompt": "0.0000001", "completion": "0.0000005", "overrides": [{"prompt": "0.1"}]},
+    None])
+def test_a_price_the_guard_cannot_bound_refuses_the_turn_unsent(account, pricing) -> None:
+    account.models[0]["pricing"] = pricing
+    _, _, mind = _mind(account, 1_000_000)
+    account.answers.append(chat("never"))
+    with pytest.raises(OpenRouterError):
+        mind.complete(request())
+    assert account.chats == []
+
+
+def test_a_model_missing_from_the_list_is_refused(account) -> None:
+    account.models.clear()
+    _, _, mind = _mind(account, 1_000_000)
+    with pytest.raises(OpenRouterError, match="HTTP 404"):
+        mind.complete(request())
+    assert account.chats == []
+
+
+def test_a_turn_billed_past_its_own_worst_case_stops_the_key(account) -> None:
+    p, meter, mind = _mind(account, 1_000_000)
+    account.answers += [chat("one", cost=0.01), chat("two")]     # $0.01 > the ~$0.0022 worst case
+    mind.complete(request())
+    assert p.left(meter.key_ref) == 0
+    with pytest.raises(OpenRouterError):
+        mind.complete(request())
+    assert len(account.chats) == 1
+
+
+def test_a_turn_that_did_not_say_its_cost_holds_its_worst_case(account) -> None:
+    p, meter, mind = _mind(account, 1_000_000)
+    answer = chat("one")
+    del answer["usage"]["cost"]
+    account.answers.append(answer)
+    mind.complete(request())
+    mind._last = None                              # as the turn was priced: before its answer
+    worst = p.prices("vendor/cheap").worst_case(mind._prompt_bound(account.chats[0]["body"]))
+    assert p.left(meter.key_ref) == 1_000_000 - worst

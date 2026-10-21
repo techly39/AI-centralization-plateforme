@@ -182,8 +182,12 @@ def metered_block(rows: list[list[Any]], outcome: dict[str, Any],
     block = rows[len(rows) - k:]
     keys = metering.get("keys") if isinstance(metering.get("keys"), list) else []
     posted = (metering.get("sync") or {}).get("posted")
-    if k == 0 or posted != k:
+    if posted != k or (k == 0 and not _charged_each_step(outcome)):
         return f"{k} cost rows end the ledger; the recorded sync posted {posted}"
+    if k == 0:
+        # A run that charged each step posted its keys' totals as it lived (rows the replay
+        # posts too, and the comparison holds): the last sync found nothing more to post.
+        return []
     want = {(key.get("agent_id"), key.get("key_ref"), key.get("spent_usd_micros"))
             for key in keys if isinstance(key, dict)}
     minds = {a for _, a in ((p[0], p[1]) for p in (outcome.get("run") or {}).get("agents") or [])}
@@ -215,6 +219,11 @@ def metered_block(rows: list[list[Any]], outcome: dict[str, Any],
             or registered.get(next(iter(actors)), (None, None))[0] != "runtime":
         return "the cost rows were not all posted by the Runtime"
     return block
+
+
+def _charged_each_step(outcome: dict[str, Any]) -> bool:
+    return any(step.get("charged") for step in (outcome.get("run") or {}).get("steps") or []
+               if isinstance(step, dict))
 
 
 def _registrations(rows: list[list[Any]]) -> dict[Any, tuple[Any, Any]]:

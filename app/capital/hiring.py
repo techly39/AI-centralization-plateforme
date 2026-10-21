@@ -10,8 +10,10 @@ fund: a pod the risk ladder closes is replaced by a new PM who must pitch to ear
 2. **The fill.** A registrar (``register_agents``: management, the Runtime's onboarding) fills an
    open vacancy: physics makes the new pod and its PM (``agent_registered``, then
    ``vacancy_filled``) and hands the PM's key back once. Refused, in the ledger (``hire_refused``),
-   when the firm already has its law's number of live pods; a vacancy is filled once. Only a
-   registrar the operator made fills or refuses (the API's check): a firm mind does not hire.
+   when the firm already has its law's number of live pods, or one more agent would pass the
+   Human's agent cap (:mod:`app.registry.population`); a vacancy is filled once. Only a
+   registrar the operator made fills or refuses (:func:`app.registry.permissions.may_hire`,
+   checked here and in the API): a firm mind does not hire.
    A hired PM deactivated before its pod earns a seed is a failed hire (``hire_failed``): its
    empty pod is closed and the vacancy opens again. The new pod has no capital: its PM pitches, and an eligible pitch earns
    a seed at the next sweep like any other.
@@ -46,7 +48,9 @@ from app.ledger.events import (
     append_event,
 )
 from app.oms.service import OMS_LOCK
+from app.registry.permissions import may_hire
 from app.registry.pods import create_pod
+from app.registry.population import over_cap
 from app.registry.service import register_agent
 
 SOURCE = "capital"   # app.capital.service.SOURCE (that module imports this one)
@@ -79,9 +83,16 @@ def hiring_law(session: Session) -> HiringConfig:
 
 
 def live_pods(session: Session) -> int:
-    """Pods that are not closed."""
-    return int(session.scalar(select(func.count()).select_from(Pod)
-                              .where(Pod.status != "closed")) or 0)
+    """Pods that are not closed and hold a place: an active agent works there, or the centre ever
+    put money in. An empty pod (made by the operator, or left when management deactivated its
+    PMs) holds none, so empty pods cannot fill the limit and stop the firm hiring (red-team,
+    a dead pod is replaced)."""
+    funded = {e.payload_json.get("pod_id") for e in _events(session, EVENT_CAPITAL_SEEDED,
+                                                            EVENT_ALLOCATION_SET)}
+    staffed = set(session.scalars(select(Agent.pod_id).where(Agent.status == AgentStatus.active,
+                                                              Agent.pod_id.is_not(None))))
+    return sum(1 for pod in session.scalars(select(Pod.id).where(Pod.status != "closed"))
+               if pod in staffed or pod in funded)
 
 
 # --- the post-mortem ----------------------------------------------------------------------------
@@ -125,9 +136,13 @@ def post_mortem(session: Session, *, pod_id: int, record: PodTrack) -> dict[str,
 
 # --- the vacancy --------------------------------------------------------------------------------
 
-def open_vacancy(session: Session, *, pod_id: int, record: PodTrack, actor: Agent) -> Event:
-    """Write the vacancy a closed pod leaves: its post-mortem and the hire the law names. Called by
-    the capital machine in the close's own transaction (under :data:`OMS_LOCK`)."""
+def open_vacancy(session: Session, *, pod_id: int, actor: Agent, record: PodTrack | None = None,
+                 lesson: dict[str, Any] | None = None) -> Event:
+    """Write the vacancy a closed pod leaves: its post-mortem (the ladder's, from ``record``, or the
+    lesson of a PM the generation law let go) and the hire the law names. Called in the close's
+    own transaction (under :data:`OMS_LOCK`)."""
+    if (record is None) == (lesson is None):
+        raise ValueError("a vacancy is opened from a ladder record or from a lesson")
     law = hiring_law(session)
     number = len(_events(session, EVENT_VACANCY_OPENED)) + 1
     hire = {"pod_name": f"hire-{number}", "pm_name": f"hire-{number}-pm", "role": "pm",
@@ -136,7 +151,8 @@ def open_vacancy(session: Session, *, pod_id: int, record: PodTrack, actor: Agen
     return append_event(session, type=EVENT_VACANCY_OPENED, actor_agent_id=actor.id, payload={
         "vacancy_no": number, "pod_id": pod_id,
         "pod_name": session.get(Pod, pod_id).name,
-        "post_mortem": post_mortem(session, pod_id=pod_id, record=record),
+        "post_mortem": (lesson if record is None
+                        else post_mortem(session, pod_id=pod_id, record=record)),
         "hire": hire, "law": law.model_dump(mode="json")})
 
 
@@ -191,6 +207,9 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
     A refusal physics decides (the pod limit) is written to the ledger, then raised. The names are
     the law's (``hire-<n>``, ``hire-<n>-pm``), or the first free ``hire-<n>-<k>`` when someone
     already took them (red-team: a name squatted in advance must not block the vacancy)."""
+    if not may_hire(session, actor):
+        raise HiringError(403, "only the operator's registrar hires: a firm mind does not fill "
+                               "or refuse a vacancy")
     with OMS_LOCK:  # one fill at a time, and none while a sweep closes pods
         try:
             found = vacancy(session, vacancy_id)
@@ -203,6 +222,8 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
             if live_pods(session) >= law.max_live_pods:
                 problem = (f"the firm is at its limit of {law.max_live_pods} live pods "
                            f"(the hiring law)")
+            elif (over := over_cap(session)) is not None:
+                problem = over
             elif names is None:
                 problem = f"no free name for the hire after {hire['pod_name']!r}"
             if problem is not None:
@@ -278,6 +299,9 @@ def hire_failed(session: Session, *, agent: Agent, actor: Agent | None) -> Event
 def refuse(session: Session, *, vacancy_id: int, reason: str, actor: Agent) -> dict[str, Any]:
     """The Runtime's refusal of a hire (its budget does not fit the cap): written, the vacancy
     stays open; commits."""
+    if not may_hire(session, actor):
+        raise HiringError(403, "only the operator's registrar hires: a firm mind does not fill "
+                               "or refuse a vacancy")
     reason = " ".join(reason.split())
     if not reason or len(reason) > MAX_REASON:
         raise HiringError(422, f"a reason is 1 to {MAX_REASON} characters")

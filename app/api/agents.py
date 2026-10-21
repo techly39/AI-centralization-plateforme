@@ -15,6 +15,7 @@ from app.api.schemas import (
 from app.capital.hiring import hire_failed
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
+from app.oms.service import OMS_LOCK
 from app.registry.auth import deny, get_current_agent, require
 from app.registry.permissions import Action
 from app.registry.service import (
@@ -39,16 +40,17 @@ def register(
     session: Session = Depends(get_session),
 ) -> AgentCreatedResponse:
     try:
-        agent, api_key = register_agent(
-            session,
-            name=body.name,
-            role=AgentRole(body.role),
-            pod_id=body.pod_id,
-            charter_ref=body.charter_ref,
-            research_domains=body.research_domains,
-            actor_agent_id=actor.id,
-        )
-        session.commit()
+        with OMS_LOCK:  # the cap is counted and the agent committed with no other maker between
+            agent, api_key = register_agent(
+                session,
+                name=body.name,
+                role=AgentRole(body.role),
+                pod_id=body.pod_id,
+                charter_ref=body.charter_ref,
+                research_domains=body.research_domains,
+                actor_agent_id=actor.id,
+            )
+            session.commit()
     except RegistryError as exc:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))

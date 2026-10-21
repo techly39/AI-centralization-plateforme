@@ -22,6 +22,7 @@ from app.api import (
     capital,
     clock,
     events,
+    generations,
     halt,
     marketdata,
     messages,
@@ -132,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(metrics.router)
     app.include_router(pitches.router)
     app.include_router(vacancies.router)
+    app.include_router(generations.router)
 
     logger.info("app created (env database_url={})", settings.database_url)
     return app
