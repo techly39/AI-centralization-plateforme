@@ -208,6 +208,13 @@ _EVERY_ROUTE = [
     ("GET", "/vacancies/1", None),
     ("POST", "/vacancies/1/fill", None),
     ("POST", "/vacancies/1/refuse", {"reason": "no"}),
+    # Teams (a PM builds its team): the clock key asks for, fills and reads no team.
+    ("GET", "/team", None),
+    ("GET", "/team/places", None),
+    ("POST", "/team/analysts", {"charter": "c", "model": "m", "budget_usd": 0.1}),
+    ("POST", "/team/places/1/let-go", None),
+    ("POST", "/team/places/1/fill", None),
+    ("POST", "/team/places/1/refuse", {"reason": "no"}),
 ]
 
 

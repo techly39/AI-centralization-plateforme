@@ -2089,3 +2089,41 @@ declared model gives its child a second, unrecorded difference (low). Strict-xfa
 and none, the law off; B0 hosted rehearsal; B the recorded real run, `evidence/designs-reproduce/`);
 `tests/test_reproduction.py`, `tests/test_redteam_designs_reproduce.py`,
 `tests/test_evidence_replays.py`.
+
+## ADR-053 — A PM builds its team: it asks for an analyst it describes, paid from its pod; a daily message quota; a firm mind does not restaff an empty pod past the limit (idea: pods, a PM and a small team) — accepted (cycle 64, 2026-10-22)
+
+**Context.** Every mind was a PM and every decision about people a law. The Human's pod is a PM with
+a small team it builds and pays for. Two holes stood in the way: a flood of messages could drain a
+metered reader's key (red-team 0021), and a firm mind could staff an empty pod after a fill the
+live-pod limit allowed (red-team, cycle 58).
+
+**Decision.**
+1. A law, `team:` (`on`, `max_analysts`, `budget_usd`, `models`; `config.yaml` or a world's recipe),
+   off by default and frozen into a run's first granted request, so every older run replays as
+   recorded.
+2. A PM of a living pod asks for an analyst (`POST /team/analysts`, `Action.REQUEST_TEAM`, PMs
+   only): a charter in its own words, a model from the pool, a thinking budget. Physics grants a
+   team place or refuses by name, in the ledger: the law off, the pod closed, at most 3 requests a
+   pod a fund day and 100 places a run, the model, the pod's limit of working-or-waiting analysts,
+   the pod's team budget, or the Human's agent cap counting the places still waiting.
+3. The pod's team budget counts every place's whole key limit from the grant, for good once filled
+   (the key is minted and held in the month); only a place withdrawn or closed before its fill gives
+   it back. The PM's own key stays the hiring law's; every dollar of both is the pod's fitness.
+4. Only the operator's registrar fills or refuses a place; the Runtime fills each open place the
+   next morning (its key's limit is the granted budget, under the cap) and hands the analyst its PM
+   and its PM's charter. An analyst researches (its backtests are its pod's attempts), reads and
+   messages; it cannot pitch, trade or ask for analysts.
+5. The PM lets its analyst go or withdraws a waiting place. When a pod's last PM goes (let go,
+   deactivated) or the ladder closes the pod, its team goes too (`team_member_let_go`,
+   `team_place_closed`).
+6. One agent sends at most 20 000 characters a fund day, counted as a reader is billed for them
+   (escapes included); physics' own identities are exempt. Over it: 429.
+7. A registrar that is a firm mind may not staff an empty, never-funded pod while the firm is at
+   its live-pod limit (409).
+
+**Known holes.** Each analyst brings its own daily message quota (low); after a backwards clock
+step the quota's day misses earlier messages (low). Strict-xfail tests.
+
+**Proof.** `acceptance/pm_builds_team.py` (A the law on and off, scripted; B0 a hosted rehearsal
+through the Runtime; B the recorded real run, `evidence/pm-builds-team/`: no PM chose to hire);
+`tests/test_team.py`, `tests/test_redteam_pm_builds_team.py`, `tests/test_evidence_replays.py`.

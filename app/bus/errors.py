@@ -79,3 +79,10 @@ class PodScopeError(BusAccessError):
     """A PM tried to broadcast without belonging to a pod to broadcast to."""
 
     code = "pod_scope"
+
+
+class QuotaExceededError(BusError):
+    """The sender has written its day's quota of characters (HTTP 429): a flood of messages cannot
+    bill a reader's thinking key (red-team 0021)."""
+
+    code = "message_quota_exceeded"

@@ -35,6 +35,7 @@ class Action(str, enum.Enum):
     RUN_RESEARCH = "run_research"          # research backtests for the own pod (ADR-048)
     SUBMIT_PITCH = "submit_pitch"          # pitch a strategy for the own pod (ADR-048)
     READ_PITCHES = "read_pitches"          # own pod's pitches and research; others need READ_CROSS_POD
+    REQUEST_TEAM = "request_team"          # a PM asks for (and lets go) its own pod's analysts
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -80,6 +81,7 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.RUN_RESEARCH,
             Action.SUBMIT_PITCH,
             Action.READ_PITCHES,
+            Action.REQUEST_TEAM,
         }
     ),
     AgentRole.management: _UNIVERSAL

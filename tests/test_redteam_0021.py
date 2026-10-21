@@ -154,15 +154,9 @@ def test_hole_mid_run_leaderboard_ranks_a_metered_mind_on_its_self_report(
 
 # --- (b)/(f) a rival bills a metered mind by filling its inbox -----------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "HOLE medium (budget: cost charged to another agent): the fake price bills a mind for "
-    "every character of its request, tool results included, and any agent may message any "
-    "agent (20 000-char bodies, no per-sender quota). A rival — even a zero-cost scripted "
-    "mind in another pod, which pays nothing to send — fills a metered PM's inbox; each turn "
-    "after the PM reads it costs ~$0.75, and its $1 key is exhausted on the 2nd day: every "
-    "later wake ends `error/provider_error:LimitExceeded` and the pod stops trading. Fix "
-    "(physics, one law): a per-sender daily character quota on `POST /messages` "
-    "(`app/bus/messages.py`), or bill the bytes a message adds to readers to its sender's key."))
+# Was a strict xfail (HOLE medium: a rival filled a metered PM's inbox with 50 bodies of 20 000
+# characters and its $1 key was gone on the 2nd day). Fixed in cycle 64 (a PM builds its team):
+# one agent sends at most MAX_CHARS_PER_DAY characters a fund day (app/bus/messages.py). Guard.
 def test_hole_a_rival_drains_a_metered_minds_key_by_stuffing_its_inbox(
         SessionFactory, world, woke, gov, monkeypatch) -> None:
     def reads_inbox(request):
@@ -174,10 +168,10 @@ def test_hole_a_rival_drains_a_metered_minds_key_by_stuffing_its_inbox(
     _cap(gov, 50)
     victim = _agent_id(SessionFactory, "pm-1")
     with TestClient(_app(SessionFactory)) as c:     # the rival: pod 2's PM, before the month
-        for i in range(50):
-            r = c.post("/messages", headers={"X-API-Key": world["pm"][2]},
-                       json={"to": f"agent:{victim}", "body": f"{i:02d}" + "x" * 19_998})
-            assert r.status_code == 201, r.status_code
+        answers = [c.post("/messages", headers={"X-API-Key": world["pm"][2]},
+                          json={"to": f"agent:{victim}", "body": f"{i:02d}" + "x" * 19_998}
+                          ).status_code for i in range(50)]
+    assert answers == [201] + [429] * 49, answers   # the day's quota: one such body
     prov = FakeProvisioner()
     meter = Meter(prov, prov.create_key(victim, 1_000_000))   # a $1 key
     run = _conduct(SessionFactory, [(_pm_spec("a-pm", 1, "reads-inbox", budget=1.0),

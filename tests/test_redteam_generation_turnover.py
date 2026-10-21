@@ -234,7 +234,8 @@ def test_redteam_generation_a_pod_closed_by_a_failed_hire_vanishes_from_the_mont
 
 # --- the hiring law's new count -----------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="known physics hole (low, red-team cycle 58): an empty pod restaffed by registration passes the live-pod limit")
+# Was a strict xfail (low, red-team cycle 58). Fixed in cycle 64: a firm mind may not staff an
+# empty pod while the firm is at its live-pod limit (hiring.staffing_problem). Guard.
 def test_redteam_generation_an_empty_pod_revived_by_registration_passes_the_live_pod_limit(
         client, db, SessionFactory, make_pod, pm_factory, admin_key, agent_factory, monkeypatch):
     """SEVERITY: low (needs a management agent; a pod over the hiring law's limit can pitch and
@@ -260,6 +261,7 @@ def test_redteam_generation_an_empty_pod_revived_by_registration_passes_the_live
     revived = client.post("/agents/register", headers=h(cio), json={
         "name": "pm-3", "role": "pm", "pod_id": 3})
     db.expire_all()
+    assert revived.status_code == 409, revived.text
     assert live_pods(db) <= 2, (
         f"the hiring law allows 2 live pods; the fill was allowed and the empty pod was staffed "
         f"again ({revived.status_code}): {live_pods(db)} live pods")

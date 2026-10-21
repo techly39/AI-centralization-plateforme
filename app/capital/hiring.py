@@ -95,6 +95,29 @@ def live_pods(session: Session) -> int:
                if pod in staffed or pod in funded)
 
 
+def staffing_problem(session: Session, *, pod_id: int, actor: Agent) -> str | None:
+    """Why a registrar that is a firm mind may not staff ``pod_id``, else ``None``: the pod holds
+    no live place (empty, never funded) and the firm is at its hiring law's live-pod limit, so the
+    registration would pass the limit (red-team, cycle 58: a management mind revived an empty pod
+    after a fill the limit allowed). The operator's registrar founds the world's pods as before."""
+    from app.registry.service import registered_by_operator
+
+    pod = session.get(Pod, pod_id)
+    if pod is None or registered_by_operator(session, actor):
+        return None
+    funded = any(e.payload_json.get("pod_id") == pod_id
+                 for e in _events(session, EVENT_CAPITAL_SEEDED, EVENT_ALLOCATION_SET))
+    staffed = session.scalar(select(Agent.id).where(
+        Agent.pod_id == pod_id, Agent.status == AgentStatus.active).limit(1)) is not None
+    if pod.status == "closed" or funded or staffed:
+        return None
+    limit = hiring_law(session).max_live_pods
+    if live_pods(session) >= limit:
+        return (f"pod {pod_id} is empty and the firm is at its limit of {limit} live pods (the "
+                f"hiring law): staffing it would pass the limit")
+    return None
+
+
 # --- the post-mortem ----------------------------------------------------------------------------
 
 def post_mortem(session: Session, *, pod_id: int, record: PodTrack) -> dict[str, Any]:

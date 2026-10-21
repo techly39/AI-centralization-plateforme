@@ -106,6 +106,10 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   Human's agent cap (cycle 51), four real PMs living a quarter with deaths and hires (cycle 55).
 - A hosted world's recipe can name its own laws (capital, hiring; ADR-051); the operator's quarter
   report: `fund-env quarter-report` (`app/capital/report.py`, a pure function of the ledger).
+- Generations (cycle 59), reproduction (cycle 62), teams (cycle 64, ADR-053): a PM asks for an
+  analyst it describes (`app/capital/team.py`, `app/api/team.py`, law `team:` off by default); the
+  Runtime hires granted places each morning (`runtime/onboarding.py`); a daily per-sender message
+  quota in `app/bus/messages.py`.
 - Every kept recording under `evidence/` replays IDENTICAL in the suite
   (`tests/test_evidence_replays.py`); a missing one fails it.
 

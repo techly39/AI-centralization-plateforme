@@ -12,7 +12,8 @@ from app.api.schemas import (
     DeactivateResponse,
     DirectoryEntry,
 )
-from app.capital.hiring import hire_failed
+from app.capital.hiring import hire_failed, staffing_problem
+from app.capital.team import member_deactivated, team_follows
 from app.db.base import get_session
 from app.db.models import Agent, AgentRole
 from app.oms.service import OMS_LOCK
@@ -45,6 +46,9 @@ def register(
                    context={"name": body.name, "role": body.role})
     try:
         with OMS_LOCK:  # the cap is counted and the agent committed with no other maker between
+            if body.pod_id is not None and (
+                    problem := staffing_problem(session, pod_id=body.pod_id, actor=actor)):
+                raise RegistryError(problem)
             agent, api_key = register_agent(
                 session,
                 name=body.name,
@@ -104,6 +108,11 @@ def deactivate(
 ) -> DeactivateResponse:
     try:
         agent = deactivate_agent(session, agent_id=agent_id, actor_agent_id=actor.id)
+        # A pod's team goes with its last PM (app/capital/team.py), before the hire is judged.
+        if agent.role == AgentRole.pm and agent.pod_id is not None:
+            team_follows(session, pod_id=agent.pod_id, reason="its PM was deactivated",
+                         actor=actor)
+        member_deactivated(session, agent=agent, actor=actor)
         # A hired PM gone before its pod's seed is a failed hire: its empty pod closes and the
         # vacancy opens again (app/capital/hiring.py).
         hire_failed(session, agent=agent, actor=actor)

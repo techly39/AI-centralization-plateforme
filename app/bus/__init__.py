@@ -15,6 +15,7 @@ there is exactly one record of what was said, and it is queryable.
 from app.bus.errors import (
     BroadcastNotPermittedError,
     BusAccessError,
+    QuotaExceededError,
     BusError,
     ConflictingCursorsError,
     InvalidRecipientError,
@@ -38,6 +39,7 @@ __all__ = [
     "MAX_PAGE",
     "BroadcastNotPermittedError",
     "BusAccessError",
+    "QuotaExceededError",
     "BusError",
     "ConflictingCursorsError",
     "InvalidRecipientError",

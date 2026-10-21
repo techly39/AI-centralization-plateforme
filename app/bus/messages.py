@@ -37,6 +37,7 @@ gathered, it is returned oldest-first, so callers only ever deal with one order.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -47,14 +48,15 @@ from app.bus.errors import (
     BroadcastNotPermittedError,
     ConflictingCursorsError,
     PodScopeError,
+    QuotaExceededError,
     SenderNotPermittedError,
     UnknownRecipientError,
 )
 from app.bus.refs import BROADCAST, Recipient, agent_ref, parse_ref, pod_ref
 from app.clock import get_clock
 from app.db.models import Agent, AgentRole, Message, Pod
-from app.ledger.events import EVENT_MESSAGE_SENT, append_event
-from app.registry.permissions import Action, has_permission
+from app.ledger.events import EVENT_MESSAGE_SENT, append_event, ledger_now
+from app.registry.permissions import PHYSICS_ROLES, Action, has_permission
 
 #: Cap on a single ``GET /messages`` page. Agents poll in a loop; an unbounded
 #: read would let one call return a whole run's history and blow the context
@@ -118,6 +120,34 @@ def resolve_audience(session: Session, *, sender: Agent, to: str) -> Recipient:
     return recipient
 
 
+#: Characters (body and structured payload) one agent may send in one day of the fund's clock,
+#: counted as a reader is billed for them (:func:`_size`). A reader is billed for every character
+#: it reads, so without it a sender that pays nothing (a scripted mind, or an analyst on its own
+#: key) could drain a metered reader's key (red-team 0021).
+MAX_CHARS_PER_DAY = 20_000
+
+
+def _billed(text: str) -> int:
+    """Characters a reader is billed for ``text``: escaped as a tool result is (ASCII JSON), then
+    escaped again inside the request's own JSON. Plain letters count one each; an emoji, a quote
+    or a control character counts what its escapes cost (red-team: a quota of code points let
+    20 000 emoji bill a reader like 280 000 letters)."""
+    return len(json.dumps(json.dumps(text))) - 6
+
+
+def _size(body: str, structured_payload: dict | None) -> int:
+    return _billed(body) + (0 if structured_payload is None else _billed(
+        json.dumps(structured_payload, separators=(",", ":"))))
+
+
+def sent_today(session: Session, sender: Agent) -> int:
+    """Characters ``sender`` has sent since the start of the fund's day."""
+    now = ledger_now(session)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return sum(_size(m.body, m.structured_payload_json) for m in session.scalars(
+        select(Message).where(Message.from_agent == sender.id, Message.ts >= start)))
+
+
 def send_message(
     session: Session,
     *,
@@ -134,6 +164,13 @@ def send_message(
     broadcast scoping).
     """
     recipient = resolve_audience(session, sender=sender, to=to)
+    if sender.role not in PHYSICS_ROLES:
+        size, used = _size(body, structured_payload), sent_today(session, sender)
+        if used + size > MAX_CHARS_PER_DAY:
+            raise QuotaExceededError(
+                f"you have sent {used} characters today and this message has {size}: one agent "
+                f"sends at most {MAX_CHARS_PER_DAY} characters a day",
+                detail={"sent_today": used, "size": size, "quota": MAX_CHARS_PER_DAY})
 
     message = Message(
         ts=get_clock().now(),

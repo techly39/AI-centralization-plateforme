@@ -112,7 +112,8 @@ class WakeRecord:
 
 #: Tools published after recorded minds that name no tools were made: shown only to a spec that
 #: names them (``spec.tools``). Every tool added from now on is listed here.
-NAMED_ONLY_TOOLS = frozenset({"read_library"})
+NAMED_ONLY_TOOLS = frozenset({"read_library", "get_team", "request_analyst", "let_go_analyst",
+                              "list_team_places", "fill_team_place", "refuse_team_hire"})
 
 
 def shown_tools(tools: list[ToolSpec], named: tuple[str, ...] | None = None) -> list[ToolSpec]:

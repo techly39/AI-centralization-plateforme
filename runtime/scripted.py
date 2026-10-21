@@ -322,6 +322,90 @@ def pitch_pm(request: CompletionRequest) -> CompletionResponse:
     return CompletionResponse(content="Done for today.")
 
 
+def team_pm(request: CompletionRequest) -> CompletionResponse:
+    """A PM that builds a team, then pitches and trades as :func:`pitch_pm` (idea: a PM builds
+    its team).
+
+    Its ask is the input's ``team_asks[<my name>]`` (charter, model, budget_usd); with one, it
+    pitches only once its pod's research holds a backtest (its analyst's). From the input's
+    ``let_go_on[<my name>]`` (a date) on, it lets every working analyst go. Turn 0 reads its
+    team, pitches, research, mandate and the clock; turn 1 acts; turn 2 is done.
+    """
+    context = _context(request)
+    me, given = context["me"], context["input"]
+    name = me.get("name")
+    pick = lambda key: (given.get(key) or {}).get(name) if isinstance(given.get(key), dict) else None  # noqa: E731
+    rule, ask, let_go_on = pick("pitch_rules"), pick("team_asks"), pick("let_go_on")
+    turn = _turn(request)
+    if turn == 0:
+        return CompletionResponse(content="Reading my team, pitches, research and mandate.",
+                                  tool_calls=[
+            ToolCall(id="team", name="get_team", arguments={}),
+            ToolCall(id="pitches", name="list_pitches", arguments={}),
+            ToolCall(id="research", name="list_research_backtests", arguments={}),
+            ToolCall(id="mandate", name="get_mandate", arguments={}),
+            ToolCall(id="clock", name="get_clock", arguments={})])
+    if turn > 1:
+        return CompletionResponse(content="Done for today.")
+    results = _results(request)
+    team, pitches, research = results.get("team"), results.get("pitches"), results.get("research")
+    clock = results.get("clock")
+    if not (isinstance(team, dict) and type(pitches) is list and type(research) is list
+            and isinstance(clock, dict)):
+        return CompletionResponse(content="A read failed; nothing today.")
+    calls: list[ToolCall] = []
+    places = team.get("places") or []
+    if isinstance(ask, dict) and not places:
+        calls.append(ToolCall(id="ask", name="request_analyst", arguments={
+            "charter": ask.get("charter"), "model": ask.get("model"),
+            "budget_usd": ask.get("budget_usd")}))
+    if type(let_go_on) is str and str(clock.get("now", ""))[:10] >= let_go_on:
+        calls += [ToolCall(id=f"let-go:{p['id']}", name="let_go_analyst",
+                           arguments={"place_id": p["id"]})
+                  for p in places if p.get("status") == "working"]
+    if not pitches and isinstance(rule, dict) and (ask is None or research):
+        calls.append(ToolCall(id="pitch", name="submit_pitch", arguments={
+            "hypothesis": "Slow diffusion of information: recent winners keep winning.",
+            "data_needed": "daily prices", "team": "my analyst",
+            "budget_usd": float((ask or {}).get("budget_usd") or 0.0), "rule": rule}))
+    mandate = results.get("mandate")
+    orders = mandate.get("orders") if isinstance(mandate, dict) else None
+    calls += [ToolCall(id=f"order:{i}:{o['ticker']}", name="place_order", arguments={
+        "ticker": o["ticker"], "side": o["side"], "qty": o["qty"], "price_type": "market",
+        "justification": "my funded rule's rebalance"}) for i, o in enumerate(orders or [])]
+    if not calls:
+        return CompletionResponse(content="Nothing to do today.")
+    return CompletionResponse(content=f"Acting: {len(calls)} call(s).", tool_calls=calls)
+
+
+def research_analyst(request: CompletionRequest) -> CompletionResponse:
+    """An analyst a PM hired (idea: a PM builds its team): each wake it backtests the next of
+    the input's ``research_rules[<its PM's name>]`` it has not yet run, and tells its PM. Turn 0
+    reads its pod's research; turn 1 backtests and messages; turn 2 is done."""
+    context = _context(request)
+    me, given = context["me"], context["input"]
+    pm, pm_id = given.get("hired_by"), given.get("hired_by_id")
+    rules = (given.get("research_rules") or {}).get(pm) if isinstance(
+        given.get("research_rules"), dict) else None
+    turn = _turn(request)
+    if turn == 0:
+        return CompletionResponse(content="Reading my pod's research.", tool_calls=[
+            ToolCall(id="research", name="list_research_backtests", arguments={})])
+    if turn > 1:
+        return CompletionResponse(content="Done for today.")
+    research = _results(request).get("research")
+    if type(research) is not list or type(rules) is not list or type(pm_id) is not int:
+        return CompletionResponse(content="Nothing I can do today.")
+    mine = sum(1 for r in research if isinstance(r, dict) and r.get("agent_id") == me.get("id"))
+    if mine >= len(rules):
+        return CompletionResponse(content="Every rule I was given is tested.")
+    return CompletionResponse(content="Testing the next rule.", tool_calls=[
+        ToolCall(id="backtest", name="run_research_backtest", arguments={"rule": rules[mine]}),
+        ToolCall(id="tell", name="send_message", arguments={
+            "to": f"agent:{pm_id}", "body": f"Backtest {mine + 1} of {len(rules)} is in our "
+                                            f"pod's research."})])
+
+
 #: The closed table: script name → policy. A spec names one of these keys.
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
@@ -329,4 +413,6 @@ SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "signal-pm": signal_pm,
     "ma-signal-analyst-underreports": self_reporting(ma_signal_analyst, 0.01),
     "pitch-pm": pitch_pm,
+    "team-pm": team_pm,
+    "research-analyst": research_analyst,
 })

@@ -450,6 +450,66 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         open, the refusal is in the ledger. Needs the right to register agents."""
         return await call("POST", f"/vacancies/{vacancy_id}/refuse", body={"reason": reason})
 
+    # --- Team: the analysts a PM builds its pod with ---------------------------
+
+    @api_tool(server, method="GET", path="/team")
+    async def get_team(
+        pod_id: Annotated[int | None, Field(description="Default: your own pod.", ge=1, le=MAX_ID)] = None,
+    ) -> Any:
+        """Your pod's team: the team law (how many analysts, which models, the team budget), every
+        analyst place (waiting for the morning's hire, working, let go) with its charter, model,
+        budget and what it has spent, the budget left, and every request that was refused."""
+        return await call("GET", "/team", params={"pod_id": pod_id})
+
+    @api_tool(server, method="POST", path="/team/analysts")
+    async def request_analyst(
+        charter: Annotated[str, Field(description=(
+            "Who the analyst is and what it must do, in your words: it is all it is told about "
+            "its job."), min_length=1, max_length=2000)],
+        model: Annotated[str, Field(description="A model from the team law's pool (get_team).",
+                                    min_length=1, max_length=100)],
+        budget_usd: Annotated[float, Field(description=(
+            "Its thinking budget, USD: its key's limit, taken from your pod's team budget."),
+            gt=0, le=50)],
+    ) -> Any:
+        """Ask for an analyst for your pod. PMs only. If granted, it is hired the next morning into
+        your pod. It can research (its backtests count as your pod's attempts when you pitch),
+        read the library and message you; it cannot pitch or trade. Everything it thinks is paid
+        by your pod: it lowers your fitness and capital score. A refusal says why."""
+        return await call("POST", "/team/analysts", body={
+            "charter": charter, "model": model, "budget_usd": budget_usd})
+
+    @api_tool(server, method="POST", path="/team/places/{place_id}/let-go")
+    async def let_go_analyst(
+        place_id: Annotated[int, Field(description="The team place (get_team).", ge=1, le=MAX_ID)],
+    ) -> Any:
+        """Let your analyst go (it stops working and spending), or withdraw a request not yet
+        filled. PMs only, your own pod's places."""
+        return await call("POST", f"/team/places/{place_id}/let-go")
+
+    @api_tool(server, method="GET", path="/team/places")
+    async def list_team_places() -> Any:
+        """Every team place of the firm, oldest first. Management only."""
+        return await call("GET", "/team/places")
+
+    @api_tool(server, method="POST", path="/team/places/{place_id}/fill")
+    async def fill_team_place(
+        place_id: Annotated[int, Field(description="The open team place.", ge=1, le=MAX_ID)],
+    ) -> Any:
+        """Hire the analyst a team place names, into its PM's pod. The answer holds its key, once.
+        Needs the right to register agents."""
+        return await call("POST", f"/team/places/{place_id}/fill")
+
+    @api_tool(server, method="POST", path="/team/places/{place_id}/refuse")
+    async def refuse_team_hire(
+        place_id: Annotated[int, Field(description="The open team place.", ge=1, le=MAX_ID)],
+        reason: Annotated[str, Field(description="Why the hire cannot be made now.",
+                                     min_length=1, max_length=200)],
+    ) -> Any:
+        """Refuse a team hire for now (its key does not fit the cap). The place stays open.
+        Needs the right to register agents."""
+        return await call("POST", f"/team/places/{place_id}/refuse", body={"reason": reason})
+
     # --- Orders & portfolio -------------------------------------------------
 
     @api_tool(server, method="POST", path="/orders")
