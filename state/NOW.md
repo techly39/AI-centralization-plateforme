@@ -77,4 +77,5 @@ hiring under the cap, metering per step: red-team + auditor before merge.
   cycle 58 the bound always held (2.4x slack) and would have stopped hire-1 at $0.193. No
   reserve in the monthly cap: a key cannot pass its limit (save one filed low hole: a provider that
   understates its prompt count), and the cap counts it at its
-  limit. Red-team 0031: 6 holes (2 medium), 5 fixed, 1 low filed. Re-recording B.
+  limit. Red-team 0031: 6 holes (2 medium), 5 fixed, 1 low filed. Auditor PASS. B re-recorded
+  with 24 tool calls a wake ($0.506; hire-1 stopped by the guard at $0.195): demo passes. Merged.

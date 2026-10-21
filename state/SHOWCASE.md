@@ -59,3 +59,6 @@ the ladder and replaced the same morning by hires who earned seeds; the firm end
 $10.00M, for $0.67 of thinking.  ·  Try: `uv run python acceptance/firm_quarter.py`  ·  See: the
 quarter report (equity per pod week by week, each pod's P&L net of thinking, every seed, close and
 hire), replayed identical for $0; the Human can print it with `fund-env quarter-report`.
+
+## A generation turns over: each month's end lets go the PMs who failed and hires into their places (cycle 59, 2026-10-21)
+What: at every month's end the firm measures each pod's P&L net of its thinking; the PM whose pod never earned a seed is let go, the crash's PM goes at the ladder's close, each lesson goes into a library every PM reads, and the freed places are hired the next morning. Real Haiku PMs lived three generations for $0.51, and no key can spend past its limit any more.  ·  Try: `uv run python acceptance/generation_turnover.py`  ·  See: the generation report (each month's pods, fitness, who stayed, who went and why, who was hired, the library), replayed identical for $0.

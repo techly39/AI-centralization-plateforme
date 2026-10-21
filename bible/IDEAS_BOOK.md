@@ -332,7 +332,7 @@ of their own (pitch, post-mortem, generation turnover).
 
 ### Every month is a generation
 From: Human
-Status: building
+Status: working
 The system resets every month: mark to market, measure every pod's fitness, the worst die, the
 best may reproduce, capital resets, lessons and the strategy registry persist.
 Now: the parts it stands on exist: the quarter (cycle 54) runs three months of pods with the
@@ -345,6 +345,11 @@ lets go the PMs whose pods are closed or never earned a seed in the month (they 
 keys stop), writes each departure's lesson into a library every PM can read, and the freed places
 are hired into the next morning. Reproduction (a winner's design copied with variation) is the
 next slice, then capital reset.
+Now (cycle 59, first slice working): at each month's end physics measures every pod's fitness
+(P&L minus its thinking), lets go the PMs whose pod the ladder closed or that earned no seed in
+the month, keeps their lessons in a library every PM reads, and the freed places are hired the
+next morning; `fund-env generation-report` prints it. Real Haiku PMs lived three generations
+($0.51 of thinking, every key under its hard limit). Next slices: reproduction, capital reset.
 
 ### Evolution: designs that work reproduce with variation
 From: Human
