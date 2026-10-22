@@ -44,7 +44,14 @@ from app.capital.allocation import (
     reallocate,
     worst_drawdown,
 )
-from app.capital.debate import debates, hold_reason, law_text, open_debate, seed_decision
+from app.capital.debate import (
+    debates,
+    hold_reason,
+    law_text,
+    open_debate,
+    queued_behind,
+    seed_decision,
+)
 from app.capital.generation import announcement, let_go_closed
 from app.capital.hiring import hiring_law, open_vacancy
 from app.config import CapitalConfig, get_settings
@@ -359,7 +366,7 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
 
     for pitch in eligible:
         pod = session.get(Pod, pitch["pod_id"])
-        reason = None
+        reason, bound = None, []
         if pod is None:
             reason = "the pod no longer exists"
         elif pod.status == "closed":
@@ -380,6 +387,9 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
                 continue
             if decision == "hold":
                 reason = hold_reason(debate)
+                # The hold binds the pod's pitches queued behind it while it was argued
+                # (red-team: the held rule, pitched again, was paid through silence).
+                bound = queued_behind(session, debate)
         gate = None
         if reason is None:
             if book(session)["centre_cash"] < law.seed_usd:
@@ -399,6 +409,12 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
                          payload={"pod_id": pitch["pod_id"], "pitch_id": pitch["pitch_id"],
                                   "reason": reason, **({"gate": gate} if gate else {})})
             done["refused"].append(pitch["pitch_id"])
+            for queued in bound:
+                append_event(session, type=EVENT_CAPITAL_SEED_REFUSED, actor_agent_id=system.id,
+                             payload={"pod_id": pitch["pod_id"], "pitch_id": queued,
+                                      "reason": f"pitched while pitch #{pitch['pitch_id']} was "
+                                                f"argued, and {reason}"})
+                done["refused"].append(queued)
             continue
         if book(session)["centre_cash"] < law.seed_usd:
             continue    # the centre is short today; the pitch waits

@@ -100,6 +100,7 @@ def debates(session: Session) -> dict[int, dict[str, Any]]:
         elif e.type == EVENT_PITCH_RULED:
             d["verdict"] = {"verdict": p["verdict"], "reason": p["reason"], "by": p["by_name"],
                             "on": on}
+            d["ruled_event"] = e.id
         elif e.type == EVENT_CAPITAL_SEEDED:
             d["capital"] = {"outcome": "seeded", "on": on, "seed_usd": p["seed_usd"]}
         else:
@@ -115,9 +116,12 @@ def is_open(debate: dict[str, Any], today: date) -> bool:
 
 
 def debating_pods(session: Session) -> set[int]:
-    """Pods whose pitch is in its debate now (opened, not yet paid or refused): such a pod has not
-    failed to earn a seed, its seed is being argued (the generation law does not judge it)."""
-    return {d["pod_id"] for d in debates(session).values() if d["capital"] is None}
+    """Pods whose pitch is in its debate now (open: before its closing day, no verdict, no capital
+    answer): such a pod has not failed to earn a seed, its seed is being argued (the generation
+    law does not judge it). A debate that closed but was not paid (the centre short, the copy
+    check without data) shelters nothing: its pod is judged as with no law (red-team)."""
+    today = ledger_now(session).date()
+    return {d["pod_id"] for d in debates(session).values() if is_open(d, today)}
 
 
 # --- the sweep's side ----------------------------------------------------------------------------
@@ -141,6 +145,18 @@ def seed_decision(debate: dict[str, Any] | None, today: date) -> str:
     if verdict == "seed" or today.isoformat() >= debate["closes_on"]:
         return "pay"
     return "wait"
+
+
+def queued_behind(session: Session, debate: dict[str, Any]) -> list[int]:
+    """The pod's other eligible pitches submitted while ``debate`` was argued, before its hold:
+    a hold binds them too, so the rule the manager held is not paid through a copy queued behind
+    it (red-team). Neither seeded nor refused yet; oldest first."""
+    answered = {e.payload_json["pitch_id"] for e in _events(
+        session, EVENT_CAPITAL_SEEDED, EVENT_CAPITAL_SEED_REFUSED)}
+    return [p["pitch_id"] for p in (e.payload_json for e in _events(session, EVENT_PITCH_JUDGED))
+            if p.get("pod_id") == debate["pod_id"] and p.get("eligible") is True
+            and debate["pitch_id"] < p["pitch_id"] < debate["ruled_event"]
+            and p["pitch_id"] not in answered]
 
 
 def hold_reason(debate: dict[str, Any]) -> str:
@@ -190,6 +206,13 @@ def _closed_reason(debate: dict[str, Any], today: date) -> str | None:
     return None
 
 
+def own_pitch(session: Session, pitch_id: int, actor: Agent) -> bool:
+    """Is ``pitch_id`` a pitch of ``actor``'s own pod?"""
+    submitted = session.get(Event, pitch_id)
+    return (submitted is not None and submitted.type == EVENT_PITCH_SUBMITTED
+            and actor.pod_id is not None and submitted.payload_json.get("pod_id") == actor.pod_id)
+
+
 def argue(session: Session, *, pitch_id: int, text: str, actor: Agent) -> dict[str, Any]:
     """``actor`` (a reviewer, or the pitch's own PM: the caller checked the role) writes ``text``
     in ``pitch_id``'s thread; commits. Returns the debate as ``actor`` reads it. A PM writing in
@@ -199,12 +222,14 @@ def argue(session: Session, *, pitch_id: int, text: str, actor: Agent) -> dict[s
         raise DebateError(422, f"an argument is 1 to {MAX_ARGUMENT} characters")
     with OMS_LOCK:     # no sweep between the read and the post
         debate = debates(session).get(pitch_id)
+        if actor.role != AgentRole.reviewer and not own_pitch(session, pitch_id, actor):
+            # Asked before anything else, with one answer for every pitch not its own: no
+            # other pod's pitch is told apart from another (red-team: the gates' verdict leaked).
+            raise NotYourDebate(f"pitch {pitch_id} is not your pod's: a PM argues only its own "
+                                "pod's pitch")
         if debate is None:
             raise _refuse(session, pitch_id=pitch_id, act="argue", actor=actor,
                           reason=_no_debate_reason(session, pitch_id))
-        if actor.role != AgentRole.reviewer and debate["pod_id"] != actor.pod_id:
-            raise NotYourDebate(f"pitch {pitch_id} is another pod's: a PM argues only its own "
-                                "pod's pitch")
         today = ledger_now(session).date()
         if (why := _closed_reason(debate, today)) is not None:
             raise _refuse(session, pitch_id=pitch_id, act="argue", actor=actor, reason=why)

@@ -24,6 +24,7 @@ from app.capital.debate import (
     debate_view,
     debates,
     list_debates,
+    own_pitch,
     rule,
 )
 from app.db.base import get_session
@@ -59,14 +60,15 @@ def _answer(exc: DebateError) -> HTTPException:
 
 
 def _readable(session: Session, actor: Agent, pitch_id: int) -> None:
-    """403 (logged) unless ``actor`` may read ``pitch_id``'s debate; 404 if there is none."""
-    debate = debates(session).get(pitch_id)
-    if debate is None:
-        raise HTTPException(404, detail=f"pitch {pitch_id} has no debate")
-    if actor.role not in _READ_ALL and debate["pod_id"] != actor.pod_id:
+    """403 (logged) unless ``actor`` may read ``pitch_id``'s debate; 404 if there is none. A pod
+    member is asked first whether the pitch is its own, with one answer for every other: whether
+    another pod's pitch is in debate is not told (red-team)."""
+    if actor.role not in _READ_ALL and not own_pitch(session, pitch_id, actor):
         raise deny(session, actor, Action.READ_DEBATES,
-                   detail=f"pitch {pitch_id}'s debate is another pod's",
+                   detail=f"pitch {pitch_id} is not your pod's",
                    context={"pitch_id": pitch_id})
+    if debates(session).get(pitch_id) is None:
+        raise HTTPException(404, detail=f"pitch {pitch_id} has no debate")
 
 
 @router.get("/debates", response_model=list[dict[str, Any]])

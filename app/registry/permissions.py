@@ -130,7 +130,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
     # 'reviewer' is a centre mind that argues pitches (idea: the pitch, then a full report; the
     # debate): it reads the pitches in debate and the data the operator gave it, and writes in a
     # pitch's thread, nowhere else. No pod: it cannot trade, pitch, research, message, hire or rule.
-    AgentRole.reviewer: _UNIVERSAL
+    # Nor does it read an inbox: nobody lobbies it off the thread (red-team, the debate).
+    AgentRole.reviewer: (_UNIVERSAL - {Action.READ_MESSAGES})
     | frozenset(
         {
             Action.READ_MARKET_DATA,
