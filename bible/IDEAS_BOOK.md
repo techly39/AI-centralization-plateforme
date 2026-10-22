@@ -131,7 +131,7 @@ engineers, a PM choosing its analyst's tools, the team as an inherited gene, a t
 
 ### Management above the pods
 From: Human
-Status: not started
+Status: building
 A manager sits above pods #1, #2, #3. Management (the CEO, the firm's vision) sees the basic data
 of every pod: cash, positions (size and amount), exposures, costs. The CEO sets the firm's
 direction; the algorithm (not the CEO) moves the capital.

@@ -8,7 +8,7 @@
       "idea": "Management above the pods",
       "acceptance": "acceptance/manager_chooses_hires.py",
       "demo": "uv run python acceptance/manager_chooses_hires.py — A (scripted): a manager reads the firm board (each pod's cash, positions, exposures, capital, drawdown, thinking cost, fitness); a place is freed and physics lists the candidates (the fittest's child as default, a child of another fit pod, a plain hire per model of the pool), each saying exactly what the hire would be; the manager picks a non-default one with a brief and the Runtime hires exactly that the next morning, the new PM reading the brief and the firm's direction (the 'yes' case); a silent manager leaves the default (the 'no' case); refused by name (403, logged): a pick not on the list, a pick after the hire, a PM or analyst reading the board or picking, the manager filling a vacancy, registering, deactivating or moving capital itself; the manager's thinking is charged to the centre, not to any pod's fitness; with the law off nothing changes; rebuild from the ledger gives the same books. B0: the same hosted through the Runtime with the very command of the real run, replay IDENTICAL. B: a real Haiku manager over a generation run (real PMs), recorded; physics' answers to whatever it chose are checked; replay IDENTICAL for $0; its picks against the law's default are the finding.",
-      "status": "ready",
+      "status": "active",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [
