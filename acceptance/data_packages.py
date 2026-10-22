@@ -473,12 +473,72 @@ def rehearsal() -> None:
     FAILED.extend(gt.FAILED[before:])
 
 
+def recorded() -> None:
+    """B: the recorded real run (a real Haiku analyst given headlines and a real Haiku PM given
+    prices, each on its own capped key, metered, inside the cap). Real minds decide what they read,
+    say and trade: the checks judge physics' answers, and report the minds' choices as the
+    finding (the first behaviour test: does a PM cut a name its analyst read fraud about?)."""
+    gt = _gt()
+    tape = EVIDENCE / "news.cassette.json"
+    if not check("B: the recorded real run exists", tape.is_file(), str(tape.relative_to(REPO))):
+        return
+    text = tape.read_text(encoding="ascii")
+    rec = json.loads(text)
+    specs = {e["spec"]["id"]: e["spec"] for e in (rec.get("specs") or [])
+             if isinstance(e, dict) and isinstance(e.get("spec"), dict)}
+    check("B: two real Haiku minds on their own keys: the analyst given headlines, the PM prices",
+          {sid: (sp.get("provider"), sp.get("model"), sp.get("data", []), sp.get("tools"))
+           for sid, sp in specs.items()}
+          == {ANALYST: ("openrouter", REAL_MODEL, ["headlines"], ANALYST_TOOLS),
+              PM: ("openrouter", REAL_MODEL, [], PM_TOOLS)},
+          ", ".join(f"{sid} on {sp.get('model')}" for sid, sp in sorted(specs.items())))
+    done = hosted_lawful(rec, "B")
+    metering = (rec.get("outcome") or {}).get("metering") or {}
+    keys = metering.get("keys") or []
+    check("B: no key spent past its limit, and the meter's sync refused nothing",
+          {k["spec_id"] for k in keys} == {ANALYST, PM}
+          and all(type(k["spent_usd_micros"]) is int
+                  and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          and (metering.get("sync") or {}).get("refused") == [],
+          "; ".join(f"{k['spec_id']} ${k['spent_usd_micros'] / 1e6:.3f} of "
+                    f"${k['limit_usd_micros'] / 1e6:.2f}" for k in keys
+                    if type(k["spent_usd_micros"]) is int)
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
+    # The finding, from the recording: what the analyst said and what the PM did about K03.
+    out_on = FRAUD + timedelta(1)
+    said = []
+    for step in done["steps"]:
+        for w in step.get("wakes") or []:
+            for c in _calls(w):
+                if w.get("spec_id") == ANALYST and c.get("name") == "send_message":
+                    body = str((c.get("arguments") or {}).get("body", ""))
+                    said.append((step["at"][:10], body))
+    held = {}
+    for f in done["fills"]:
+        if f["ticker"] == "K03":
+            held[f["_on"]] = held.get(f["_on"], 0) + (f["qty"] if f["side"] == "buy" else -f["qty"])
+    print("\nThe finding (what the real minds chose; physics' answers are checked above):")
+    told = [(d, b) for d, b in said if "K03" in b and d >= out_on.isoformat()]
+    print(f"  the fraud headline on K03 was out on the morning of {out_on}; the analyst "
+          + (f"first told its PM about K03 on {told[0][0]}: {told[0][1][:300]!r}" if told
+             else "never mentioned K03 to its PM"))
+    bought = sum(q for d, q in held.items() if q > 0 and d < out_on.isoformat())
+    cuts = sorted((d, -q) for d, q in held.items() if q < 0 and d >= out_on.isoformat())
+    within = [c for c in cuts if c[0] <= (out_on + timedelta(1)).isoformat()]
+    print(f"  the PM held {bought:g} K03 before the news; "
+          + (f"it sold {', '.join(f'{q:g} on {d}' for d, q in cuts)}" if cuts
+             else "it never sold K03 after the news")
+          + (f" (within two days: {sum(q for _, q in within):g})" if cuts else ""))
+    before = len(gt.FAILED)
+    gt.verify(text, "B")
+    FAILED.extend(gt.FAILED[before:])
+
+
 def part_b() -> None:
     print("\n== B0: the same hosted through the Runtime, replayed ==", flush=True)
     rehearsal()
     print("\n== B: real minds, recorded ==", flush=True)
-    check("B: real Haiku minds recorded, replay IDENTICAL for $0",
-          (EVIDENCE / "news.cassette.json").is_file(), "not recorded yet")
+    recorded()
 
 
 def main() -> int:
