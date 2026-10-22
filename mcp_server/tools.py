@@ -492,25 +492,26 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
 
     @api_tool(server, method="GET", path="/headlines")
     async def read_headlines(
-        days: Annotated[int, Field(description="Today and the days before it: 1 = today's only.",
+        days: Annotated[int, Field(description="The last days whose news is out: 1 = yesterday's.",
                                    ge=1, le=31)] = 3,
         ticker: Annotated[str | None, Field(description="Only the headlines about one ticker.",
                                             max_length=16)] = None,
     ) -> Any:
-        """The world's headlines published up to today, oldest first: about one company or the
-        whole market. Only for a mind given the headlines right (get_data_rights)."""
+        """The world's headlines, oldest first: about one company or the whole market. A day's
+        news is out at its close, with its prices. Only for a mind given the headlines right
+        (get_data_rights)."""
         return await call("GET", "/headlines", params={"days": days, "ticker": ticker})
 
     @api_tool(server, method="GET", path="/reports")
     async def read_reports(
-        days: Annotated[int, Field(description="Today and the days before it (a quarter is 91).",
-                                   ge=1, le=400)] = 91,
+        days: Annotated[int, Field(description="The last days whose reports are out (a quarter "
+                                               "is 91).", ge=1, le=400)] = 91,
         ticker: Annotated[str | None, Field(description="Only one company's reports.",
                                             max_length=16)] = None,
     ) -> Any:
-        """Companies' quarterly reports published up to today, oldest first: revenue, earnings
-        per share against what was expected, guidance. Only for a mind given the company right
-        (get_data_rights)."""
+        """Companies' quarterly reports, oldest first: revenue, earnings per share against what
+        was expected, guidance. A day's reports are out at its close. Only for a mind given the
+        company right (get_data_rights)."""
         return await call("GET", "/reports", params={"days": days, "ticker": ticker})
 
     @api_tool(server, method="GET", path="/data/rights")

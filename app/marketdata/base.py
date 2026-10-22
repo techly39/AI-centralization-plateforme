@@ -106,9 +106,11 @@ class Bar:
 
 @dataclass(frozen=True, slots=True)
 class Item:
-    """One dated item of a world's news (idea: data packages), as physics serves it. Published at
-    its day's 00:00 UTC: it exists from that moment on, never before. Nothing in it says whether
-    it moves a price."""
+    """One dated item of a world's news (idea: data packages), as physics serves it. The news of
+    day D is out at D's close, the moment D's bar ends (D+1 00:00 UTC): it exists from then on,
+    never before, so whatever it moves is already in the price when anyone reads it (red-team:
+    read at D's start, it sold at D-1's close ahead of a certain fall). Nothing in it says
+    whether it moves a price."""
 
     id: str
     kind: Literal["headline", "report"]
@@ -121,7 +123,8 @@ class Item:
 
     @property
     def at(self) -> datetime:
-        return datetime.combine(self.published, time(), tzinfo=UTC)
+        """When it is out: its day's close."""
+        return datetime.combine(self.published + timedelta(days=1), time(), tzinfo=UTC)
 
 
 # --- Interface --------------------------------------------------------------
@@ -240,9 +243,10 @@ class MarketDataProvider(metaclass=_SealedEntries):
 
     def get_news(self, *, kind: Literal["headline", "report"], as_of: datetime, since: date,
                  ticker: str | None = None) -> list[Item]:
-        """The world's items of ``kind`` published from ``since`` up to ``as_of`` (about
-        ``ticker``, when given), oldest first. An item published after ``as_of`` does not exist:
-        it is never served, whatever the implementation returns."""
+        """The world's items of ``kind`` of the days from ``since`` that are out by ``as_of``
+        (about ``ticker``, when given), oldest first. An item not out by ``as_of`` (its day's
+        close, :attr:`Item.at`) does not exist: it is never served, whatever the implementation
+        returns."""
         _require_aware(as_of)
         symbol = None if ticker is None else normalise_ticker(ticker)
         return [item for item in self._news(since=since, as_of=as_of)

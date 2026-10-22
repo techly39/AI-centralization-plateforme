@@ -20,7 +20,8 @@ momentum pitch is eligible on the days before the pivot. From the pivot on, by f
 
 With a ``news`` block (idea: data packages) the world also writes dated items: each day a few
 noise headlines from templates, a quarterly report per name (revenue, earnings against what was
-expected, guidance), and a few planted *causes*. A cause adds ``shock`` to its name's log-return on
+expected, guidance), and a few planted *causes*. A day's items are out at its close, with its bar
+(:class:`app.marketdata.base.Item`). A cause adds ``shock`` to its name's log-return on
 its day and ``drift`` on each of the next ``days``; nothing else moves any price, so a noise
 headline moves nothing. The items come from their own random stream: a recipe's bars without
 causes are exactly its bars without news, and a recipe without news is exactly as before.
@@ -240,44 +241,58 @@ def items(market: MadeUpMarket) -> list[Item]:
                 t = rng.choice(names)
                 title, body = rng.choice(_NAME_NOISE)
                 raw.append((day, "headline", t, title.format(t=t), body.format(t=t), None))
-    misses = {c.ticker: c for c in news.causes if c.kind == "earnings_miss"}
+    misses: dict[str, list[Cause]] = {}
+    for c in sorted(news.causes, key=lambda c: c.on):
+        if c.kind == "earnings_miss":
+            misses.setdefault(c.ticker, []).append(c)
+
+    def warn(t: str, miss: Cause, q: int, revenue: float, expected: float) -> None:
+        raw.append((miss.on, "report", t, *_report(t, miss.on, q, revenue * 0.93, expected,
+                                                   expected * 0.7, "lowered")))
+
     if news.reports:
         for t in names:
+            pending = list(misses.pop(t, ()))
             offset, revenue = rng.randrange(QUARTER), rng.uniform(200, 5000)
             expected = rng.uniform(0.5, 3.0)
+            q = 0
             for q, d in enumerate(range(offset, market.days, QUARTER), start=1):
                 revenue *= math.exp(rng.gauss(0.01, 0.03))
                 expected *= math.exp(rng.gauss(0.01, 0.02))
                 eps = expected * (1 + rng.gauss(0, 0.03))
                 guidance = rng.choices(("maintained", "raised", "lowered"), (8, 1, 1))[0]
                 day = market.origin + timedelta(d)
-                miss = misses.get(t)
-                if miss is not None and abs((day - miss.on).days) <= QUARTER // 2:
-                    # The miss is this quarter's report, on its own day, the company's own numbers.
-                    del misses[t]
-                    raw.append((miss.on, "report", t, *_report(t, miss.on, q, revenue * 0.93,
-                                                               expected, expected * 0.7,
-                                                               "lowered")))
-                    continue
-                raw.append((day, "report", t, *_report(t, day, q, revenue, expected, eps,
-                                                       guidance)))
+                replaced = False
+                # A miss is published on its own day, with the company's own numbers. It takes the
+                # place of the next scheduled report when that one is due within half a quarter
+                # after it; a report scheduled before a miss is never touched (red-team: a report
+                # gone missing told of the miss to come).
+                while pending and pending[0].on <= day:
+                    miss = pending.pop(0)
+                    warn(t, miss, q, revenue, expected)
+                    replaced = replaced or (day - miss.on).days <= QUARTER // 2
+                if not replaced:
+                    raw.append((day, "report", t, *_report(t, day, q, revenue, expected, eps,
+                                                           guidance)))
+            for miss in pending:          # after the last scheduled quarter
+                warn(t, miss, q + 1, revenue, expected)
     for c in news.causes:
         if c.kind == "fraud":
             title, body = _CAUSE_HEADLINE["fraud"]
             raw.append((c.on, "headline", c.ticker, title.format(t=c.ticker),
                         body.format(t=c.ticker), None))
-        elif c.ticker in misses:      # no scheduled quarter of its own (reports off, the edge)
-            q = 1 + (c.on - market.origin).days // QUARTER
-            r = random.Random(f"miss:{market.seed}:{c.ticker}:{c.on}")
-            revenue, expected = r.uniform(200, 5000), r.uniform(0.5, 3.0)
-            raw.append((c.on, "report", c.ticker, *_report(c.ticker, c.on, q, revenue * 0.93,
-                                                           expected, expected * 0.7, "lowered")))
-    # Ordered by day, then by what any reader can see: the id says nothing a reader cannot read.
+    for t, left in misses.items():        # reports off: each miss is a report of its own
+        for miss in left:
+            r = random.Random(f"miss:{market.seed}:{t}:{miss.on}")
+            warn(t, miss, 1 + (miss.on - market.origin).days // QUARTER, r.uniform(200, 5000),
+                 r.uniform(0.5, 3.0))
+    # Ordered by day, then by what any reader can see; each kind numbered on its own, so an id
+    # says nothing a reader of that kind cannot read (red-team: report ids counted headlines).
     raw.sort(key=lambda x: (x[0], x[1], x[2] or "", x[3], x[4]))
-    out, n, last = [], 0, None
+    out: list[Item] = []
+    count: dict[tuple[date, str], int] = {}
     for day, kind, t, title, body, figures in raw:
-        n = n + 1 if day == last else 1
-        last = day
-        out.append(Item(id=f"{day:%Y%m%d}-{n:03d}", kind=kind, published=day, ticker=t,  # type: ignore[arg-type]
-                        title=title, body=body, figures=figures))
+        n = count[(day, kind)] = count.get((day, kind), 0) + 1
+        out.append(Item(id=f"{day:%Y%m%d}-{kind[0]}{n:03d}", kind=kind,  # type: ignore[arg-type]
+                        published=day, ticker=t, title=title, body=body, figures=figures))
     return out

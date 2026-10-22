@@ -48,4 +48,6 @@ Left out: data that costs money, the manager reading news, real-history news, LL
 Market data, permissions and the seal: red-team + auditor before the paid real run and merge.
 
 ## Progress
-- cycle 68: started; plan written.
+- cycle 68: physics (news in the recipe, served under the look-ahead guard, rights by role,
+  the team's data, the endpoints, tools and three packages), demo parts A and B0 pass; the
+  red-team attacked it. Next: its fixes, then the real run B, then the auditor.

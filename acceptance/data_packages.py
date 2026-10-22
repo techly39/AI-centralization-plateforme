@@ -7,8 +7,9 @@ Costs $0 and needs no network.
   A  scripted, through the app's HTTP API, on one made-up market (stdlib ``random``, one fixed
      seed) whose recipe has news: three noise headlines a day, a quarterly report per company,
      and two planted causes (a fraud headline on K03, an earnings miss on M05).
-       look-ahead  the analyst given headlines does not find the fraud headline the day before,
-                   and finds it on its day (the 'no' and the 'yes')
+       look-ahead  a day's news is out at its close, with its bar: the analyst given headlines
+                   does not find the fraud headline during its day, and finds it the next
+                   morning (the 'no' and the 'yes'), when the price already holds the shock
        by role     its PM, given prices only, is refused by name (403, logged), through its tool
                    and in its morning package; a manager reads no news at all
        team        a PM asks for an analyst with headlines, which it lacks itself: granted, and the
@@ -97,7 +98,7 @@ def part_a() -> None:
     from app.cli import main as fund_env
     from app.db.base import session_scope
     from app.db.models import AgentRole, Event
-    from app.marketdata import get_provider
+    from app.marketdata import BarsProvider, get_provider
     from app.marketdata.made_up import MadeUpMarket, bars
     from app.main import create_app
     from app.registry.pods import create_pod
@@ -164,18 +165,25 @@ def part_a() -> None:
     print(f"  the world: {len(RECIPE['families'])} families, {RECIPE['news']['per_day']} noise "
           f"headlines a day, quarterly reports, causes on K03 ({FRAUD}) and M05 ({MISS})")
 
-    # --- the look-ahead law: the day before, then the day ---------------------------------------
-    advance((FRAUD - START).days - 1)
+    # --- the look-ahead law: a day's news is out at its close, with its bar --------------------
+    quiet = BarsProvider(bars(MadeUpMarket.model_validate({**RECIPE, "news": None})))
+    advance((FRAUD - START).days)
     eve = get(analyst, "/headlines", days=31, ticker="K03").json()
-    check("the day before, the fraud headline does not exist",
+    check("during the fraud's own day, before its close, the headline does not exist",
           not any("fraud" in x["title"] for x in eve["headlines"]),
-          f"{eve['day']}: {len(eve['headlines'])} K03 headlines in the last 31 days, none about fraud")
+          f"{eve['day']}: {len(eve['headlines'])} K03 headlines out, none about fraud")
     today = advance(1)
     day = get(analyst, "/headlines", days=1).json()
     fraud = [x for x in day["headlines"] if x["ticker"] == "K03" and "fraud" in x["title"]]
-    check("on its day, the entitled analyst reads it",
-          len(fraud) == 1 and fraud[0]["day"] == today == FRAUD.isoformat(),
-          f"{today}: {len(day['headlines'])} headlines, among them “{fraud[0]['title'] if fraud else '?'}”")
+    check("the next morning, the entitled analyst reads it, dated its day",
+          len(fraud) == 1 and fraud[0]["day"] == FRAUD.isoformat(),
+          f"{today}: {len(day['headlines'])} headlines of {FRAUD}, among them "
+          f"“{fraud[0]['title'] if fraud else '?'}”")
+    now = datetime.fromisoformat(client.get("/clock", headers=h(runtime)).json()["now"])
+    k03 = get(analyst, "/price/K03").json()["price"]
+    without = quiet.get_price("K03", as_of=now).price
+    check("when it is out, the price already holds its shock: only what follows is left to trade",
+          k03 < without * 0.92, f"K03 {k03:.2f}, against {without:.2f} in the world without news")
     noise = [x for x in day["headlines"] if x not in fraud]
     check("it comes among the day's noise", len(noise) >= 2,
           "; ".join(x["title"] for x in noise[:3]))
@@ -221,7 +229,7 @@ def part_a() -> None:
     filled = client.post(f"/team/places/{granted.json()['id']}/fill", headers=h(admin))
     hired = filled.json()["agent"]["api_key"] if filled.status_code == 201 else ""
     reads = get(hired, "/headlines", days=2, ticker="K03") if hired else None
-    check("the morning's fill gives the hire its right; it reads yesterday's fraud headline",
+    check("the morning's fill gives the hire its right; it reads the fraud headline",
           reads is not None and reads.status_code == 200
           and any("fraud" in x["title"] for x in reads.json()["headlines"])
           and get(pm2, "/headlines").status_code == 403,
@@ -250,10 +258,10 @@ def part_a() -> None:
     end = (MISS + timedelta(days=12)).isoformat()
     served = {t: get(reader, f"/ohlcv/{t}", start="2024-08-01", end=end).json()["bars"]
               for t in [f"K{k:02d}" for k in range(10)] + [f"M{k:02d}" for k in range(10)]}
-    quiet = bars(MadeUpMarket.model_validate({**RECIPE, "news": None}))
+    calm = bars(MadeUpMarket.model_validate({**RECIPE, "news": None}))
     moved, still = {}, []
     for t, rows in served.items():
-        plain = {b.ts.date().isoformat(): b.close for b in quiet[t]}
+        plain = {b.ts.date().isoformat(): b.close for b in calm[t]}
         diffs = {}
         for a, b in zip(rows, rows[1:]):
             d = b["ts"][:10]
@@ -404,9 +412,9 @@ def hosted_lawful(rec: dict, label: str) -> dict:
             if w.get("spec_id") in pkgs and "package" in ctx:
                 pkgs[w["spec_id"]].append(ctx["package"])
     a, p = pkgs[ANALYST], pkgs[PM]
-    check(f"{label}: every morning the analyst's package held the headlines, never one dated "
-          "after its day", len(a) == STEPS and all(
-              "headlines" in k and all(x["day"] <= k["day"] for x in k["headlines"]) for k in a),
+    check(f"{label}: every morning the analyst's package held the headlines out by then (none of "
+          "the morning's own day)", len(a) == STEPS and all(
+              "headlines" in k and all(x["day"] < k["day"] for x in k["headlines"]) for k in a),
           f"{len(a)} packages, {sum(len(k.get('headlines', [])) for k in a)} headlines in all")
     check(f"{label}: every morning the PM's package held prices, its headlines refused by name",
           len(p) == STEPS and all("headlines" not in k and "no right to headlines" in
@@ -414,8 +422,9 @@ def hosted_lawful(rec: dict, label: str) -> dict:
                                   for k in p), f"{len(p)} packages")
     fraud_in = [k["day"] for k in a if any(x["ticker"] == "K03" and "fraud" in x["title"]
                                            for x in k["headlines"])]
-    check(f"{label}: the fraud headline reached the analyst on its day and not before",
-          bool(fraud_in) and min(fraud_in) == FRAUD.isoformat(), f"in its packages of {fraud_in}")
+    check(f"{label}: the fraud headline reached the analyst the morning after its day, not before",
+          bool(fraud_in) and min(fraud_in) == (FRAUD + timedelta(1)).isoformat(),
+          f"in its packages of {fraud_in}")
     denied = [d for d in of("permission_denied") if d["_actor"] == agents.get(PM)]
     check(f"{label}: each refusal of the PM is physics' own, logged",
           len(denied) >= STEPS and all(d["action"] == "read_headlines" for d in denied),
@@ -456,7 +465,8 @@ def rehearsal() -> None:
     bought = sorted({f["ticker"] for f in done["fills"] if f["side"] == "buy"})
     check("B0: the scripted PM bought its book, and sold K03 the morning its analyst read the "
           "fraud headline (the scripted chain, so physics' part is proven)",
-          bought == BOOK and [f["_on"] for f in done["sold_k03"]] == [FRAUD.isoformat()],
+          bought == BOOK
+          and [f["_on"] for f in done["sold_k03"]] == [(FRAUD + timedelta(1)).isoformat()],
           f"bought {bought}; sold K03 on {[f['_on'] for f in done['sold_k03']]}")
     before = len(gt.FAILED)
     gt.verify(text, "B0")

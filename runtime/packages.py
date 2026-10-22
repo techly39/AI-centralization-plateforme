@@ -12,8 +12,8 @@ Packages are versioned by name; a run records the name it used (cassette ``param
 * ``prices-v1`` — for every ticker of the workflow input's ``universe`` (sorted), the daily bars
   of the last :data:`LOOKBACK_DAYS` days up to today, as rows ``[day, open, high, low, close,
   volume]``. A ticker physics refuses is listed under ``unavailable`` with its status.
-* ``headlines-v1`` — ``prices-v1`` and ``headlines``: the world's headlines of today and the
-  :data:`HEADLINE_DAYS` ``- 1`` days before (idea: data packages).
+* ``headlines-v1`` — ``prices-v1`` and ``headlines``: the world's headlines of the last
+  :data:`HEADLINE_DAYS` days whose news is out (a day's at its close, with its bar).
 * ``company-v1`` — ``prices-v1`` and ``reports``: the latest quarterly report of every ticker of
   the universe published in the last :data:`REPORT_DAYS` days.
 * ``everything-v1`` — ``prices-v1`` with both.

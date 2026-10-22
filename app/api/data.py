@@ -1,5 +1,6 @@
 """The world's news, handed by role (idea: data packages). Headlines and companies' quarterly
-reports are read at the ledger's now, like prices: an item published after it does not exist.
+reports are read at the ledger's now, like prices: a day's news is out at that day's close, with
+its bar, and does not exist before.
 Each needs its role's action and the agent's own data right (:mod:`app.registry.permissions`); a
 mind without it is refused by name, 403 and logged. No answer says whether an item moves a price.
 """
@@ -32,7 +33,8 @@ def _read(session: Session, agent: Agent, *, right: str, kind: Literal["headline
     if (problem := data_right_problem(session, agent, right)) is not None:
         raise deny(session, agent, DATA_RIGHTS[right], detail=problem, context={"right": right})
     now = ledger_now(session)
-    since = now.date() - timedelta(days=days - 1)
+    # The last ``days`` days whose news is out: today's comes out at today's close.
+    since = now.date() - timedelta(days=days)
     try:
         found = get_provider().get_news(kind=kind, as_of=now, since=since, ticker=ticker)
     except MarketDataError as exc:
@@ -47,24 +49,27 @@ def _read(session: Session, agent: Agent, *, right: str, kind: Literal["headline
 @router.get("/headlines")
 def read_headlines(
     days: int = Query(default=3, ge=1, le=MAX_HEADLINE_DAYS,
-                      description="Today and the days before it: 1 = today's only."),
+                      description="The last days whose news is out: 1 = yesterday's (a day's "
+                                  "news is out at its close)."),
     ticker: str | None = Query(default=None, description="Only the headlines about one ticker."),
     agent: Agent = Depends(require(Action.READ_HEADLINES)),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """The world's headlines published up to now, oldest first. Needs the headlines right."""
+    """The world's headlines out by now (a day's at its close), oldest first. Needs the headlines
+    right."""
     return _read(session, agent, right="headlines", kind="headline", days=days, ticker=ticker)
 
 
 @router.get("/reports")
 def read_reports(
     days: int = Query(default=91, ge=1, le=MAX_REPORT_DAYS,
-                      description="Today and the days before it (a quarter is 91 days)."),
+                      description="The last days whose reports are out (a quarter is 91)."),
     ticker: str | None = Query(default=None, description="Only one company's reports."),
     agent: Agent = Depends(require(Action.READ_COMPANY_DATA)),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """Companies' quarterly reports published up to now, oldest first. Needs the company right."""
+    """Companies' quarterly reports out by now (a day's at its close), oldest first. Needs the
+    company right."""
     return _read(session, agent, right="company", kind="report", days=days, ticker=ticker)
 
 

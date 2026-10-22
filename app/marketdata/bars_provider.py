@@ -89,7 +89,7 @@ class BarsProvider(MarketDataProvider):
         return record
 
     def _news(self, *, since: date, as_of: datetime) -> list[Item]:
-        last = as_of.astimezone(timezone.utc).date()
+        last = as_of.astimezone(timezone.utc).date() - timedelta(days=1)   # out at its close
         return self._items[bisect_left(self._published, since):bisect_right(self._published, last)]
 
     def _series(self, symbol: str) -> tuple[list[date], list[Bar]]:

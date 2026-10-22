@@ -70,9 +70,15 @@ def test_the_items_are_the_seeds_and_carry_no_effect() -> None:
     assert [x.ticker for x in miss] == ["K02"]
     assert miss[0].figures["eps"] < 0.8 * miss[0].figures["expected_eps"]
     assert miss[0].figures["guidance"] == "lowered"
-    # K02 reports once a quarter: the miss is that quarter's report, not a second one.
-    k02 = sorted(x.published for x in first if x.kind == "report" and x.ticker == "K02")
-    assert all((b - a).days > 45 for a, b in zip(k02, k02[1:]))
+    # K02's miss takes the place of its next scheduled report; every report before it is as in
+    # the world without the miss (a report gone missing would foretell it).
+    plain = items(market({**NEWS, "causes": []}))
+    k02 = lambda xs: sorted(x.published for x in xs if x.kind == "report" and x.ticker == "K02")  # noqa: E731
+    assert [d for d in k02(first) if d < MISS] == [d for d in k02(plain) if d < MISS]
+    after = [d for d in k02(plain) if d >= MISS]
+    replaced = bool(after) and (after[0] - MISS).days <= 45
+    assert k02(first) == sorted([d for d in k02(plain) if d < MISS] + [MISS]
+                                + (after[1:] if replaced else after))
     for x in first:
         assert set(vars(x) if hasattr(x, "__dict__") else {s: 0 for s in x.__slots__}) == {
             "id", "kind", "published", "ticker", "title", "body", "figures"}
@@ -87,17 +93,21 @@ def test_a_cause_names_a_name_of_the_world_on_a_day_of_the_world() -> None:
             market({"causes": [bad]})
 
 
-def test_an_item_does_not_exist_before_its_day() -> None:
+def test_a_days_news_is_out_at_its_close_with_its_bar_never_before() -> None:
     m = market()
     provider = BarsProvider(bars(m), news=items(m))
+    quiet = BarsProvider(bars(market({**NEWS, "causes": []})))
     at = lambda d: datetime.combine(d, datetime.min.time(), UTC)  # noqa: E731
     since = FRAUD - timedelta(days=5)
-    before = provider.get_news(kind="headline", as_of=at(FRAUD) - timedelta(seconds=1),
-                               since=since, ticker="K01")
-    on = provider.get_news(kind="headline", as_of=at(FRAUD), since=since, ticker="K01")
-    assert not any("fraud" in x.title for x in before)
-    assert any("fraud" in x.title for x in on)
-    assert all(x.published <= FRAUD for x in on)
+    close = at(FRAUD + timedelta(days=1))
+    for early in (at(FRAUD), at(FRAUD) + timedelta(hours=14), close - timedelta(seconds=1)):
+        before = provider.get_news(kind="headline", as_of=early, since=since, ticker="K01")
+        assert not any("fraud" in x.title for x in before)
+    out = provider.get_news(kind="headline", as_of=close, since=since, ticker="K01")
+    assert any("fraud" in x.title for x in out)
+    assert all(x.published <= FRAUD for x in out)
+    # When it is out, the price already holds its shock: only the drift is left to trade.
+    assert provider.get_price("K01", as_of=close).price < quiet.get_price("K01", as_of=close).price
     assert "news_fingerprint" in provider.world()
     assert "news_fingerprint" not in BarsProvider(bars(m)).world()
 
@@ -110,7 +120,8 @@ def newsroom(SessionFactory):
     set_provider(BarsProvider(bars(m), news=items(m)))
     s = SessionFactory()
     try:
-        start_backtest(s, start=datetime.combine(FRAUD, datetime.min.time(), UTC))
+        # The morning after the fraud's day: its news is out (at the day's close).
+        start_backtest(s, start=datetime.combine(FRAUD + timedelta(days=1), datetime.min.time(), UTC))
         s.commit()
     finally:
         s.close()
@@ -220,7 +231,7 @@ def test_everything_is_exactly_prices_and_headlines_and_reports_each_by_right(
     both = _register(client, admin_key, "a-1", "analyst", pod,
                      ["headlines", "company"]).json()["api_key"]
     pm = _register(client, admin_key, "pm-1", "pm", pod).json()["api_key"]
-    at, universe = f"{FRAUD.isoformat()}T00:00:00+00:00", ["K01", "K02", "K03"]
+    at, universe = f"{FRAUD + timedelta(days=1)}T00:00:00+00:00", ["K01", "K02", "K03"]
     build = lambda name, key: asyncio.run(  # noqa: E731
         packages.build(name, _Through(client, key), at, universe))
     every, prices = build("everything-v1", both), build("prices-v1", both)
@@ -238,3 +249,17 @@ def test_everything_is_exactly_prices_and_headlines_and_reports_each_by_right(
     assert "no right to headlines" in refused["refused"]["headlines"]
     assert refused["bars"] == prices["bars"]
     assert math.isfinite(refused["bars"]["K01"][-1][4])
+
+
+def test_a_miss_just_before_a_scheduled_report_takes_its_place_and_two_misses_are_two_reports(
+        ) -> None:
+    plain = items(market({"per_day": 1}))
+    k02 = lambda xs: sorted(x.published for x in xs if x.kind == "report" and x.ticker == "K02")  # noqa: E731
+    origin = date.fromisoformat(BASE["origin"])
+    due = next(d for d in k02(plain) if d > origin + timedelta(days=10))  # a scheduled report
+    early, late = due - timedelta(days=6), due + timedelta(days=15)
+    made = items(market({"per_day": 1, "causes": [
+        {"kind": "earnings_miss", "ticker": "K02", "on": early.isoformat()},
+        {"kind": "earnings_miss", "ticker": "K02", "on": late.isoformat()}]}))
+    assert k02(made) == sorted([d for d in k02(plain) if d != due] + [early, late])
+    assert [x for x in made if x.published < early] == [x for x in plain if x.published < early]
