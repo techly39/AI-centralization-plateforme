@@ -96,7 +96,8 @@ A separate process (`uv run fund-runtime`), deterministic, no LLM logic of its o
 
 - **AgentSpec** (the genome, stored in the App, mirrored to files):
   `id, name, role, pod, parent_id, generation_born, adapter, model, charter (text),
-  tools, memory_policy, budget_usd, wake_policy, mutations[]`.
+  tools, memory_policy, budget_usd, wake_policy, mutations[], data[]` (`data`: what it reads
+  beyond prices, headlines and/or company reports, granted by the operator's registrar).
 - **Scheduler:** driven by the App clock. In live mode: wake policies (cron-like,
   event-triggered: "new message", "order filled", "world event"). In backtest mode:
   for each `/clock/advance` step, wake the agents whose policy fires, wait until they

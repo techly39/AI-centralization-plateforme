@@ -368,6 +368,7 @@ def test_spec_defaults_are_the_quiet_ones() -> None:
     assert s.adapter == "native" and s.model is None and s.tools is None
     assert s.budget_usd == 0.0 and s.generation_born == 0 and s.parent_id is None
     assert s.memory_policy == "none" and s.wake_policy == "every_step" and s.mutations == ()
+    assert s.data == ()
 
 
 def test_spec_carries_every_03_world_field() -> None:
@@ -379,7 +380,8 @@ def test_spec_carries_every_03_world_field() -> None:
     assert fields - {
         "id", "name", "role", "pod", "parent_id", "generation_born", "adapter", "model",
         "charter", "tools", "memory_policy", "budget_usd", "wake_policy", "mutations",
-    } == {"provider", "script"}  # ADR-032 (3) provider; amendment (g) script
+    } == {"provider", "script", "data"}  # ADR-032 (3) provider; amendment (g) script; data
+    # packages: the data the operator's registrar grants
 
 
 @pytest.mark.parametrize("over", [
