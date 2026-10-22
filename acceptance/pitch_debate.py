@@ -467,8 +467,9 @@ def write_world(directory: Path, provider: str) -> None:
     for k, pod in enumerate(PODS, start=1):
         spec = {"id": f"{pod}-pm", "name": f"{pod}-pm", "role": "pm", "pod": k,
                 "charter": PM_CHARTER.format(name=f"{pod}-pm"), "tools": PM_TOOLS,
-                "provider": "fake-metered", "script": "pitch-pm",
-                "budget_usd": REHEARSAL_BUDGET_USD}
+                # Scripted in both runs and unmetered (one run holds one metered kind): the PMs
+                # only pitch and trade their mandate; the minds under test are the centre's.
+                "provider": "scripted", "script": "pitch-pm"}
         (directory / "specs" / f"{pod}-pm.yaml").write_text(json.dumps(spec))
     for sid, role, tools, script, data in (
             ("bull", "reviewer", REVIEWER_TOOLS, "debate-reviewer", []),
