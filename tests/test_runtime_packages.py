@@ -70,4 +70,5 @@ def test_a_package_the_run_cannot_have_is_a_usage_error(
 
 
 def test_the_package_names_are_known() -> None:
-    assert packages.PACKAGES == frozenset({"prices-v1"})
+    assert packages.PACKAGES == frozenset({"prices-v1", "headlines-v1", "company-v1",
+                                           "everything-v1"})

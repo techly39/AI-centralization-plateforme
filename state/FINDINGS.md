@@ -108,3 +108,23 @@ prices "net of thinking" never changes a verdict; it would with costlier minds o
 Follow-up: make a key's limit hard (size or refuse the turn that would cross it, and count the
 reserve in the monthly cap), then re-record; reproduction (the best pods spawn) and the capital
 reset, the idea's next slices.
+
+## F-0007 — A PM who could not see the news cut a fraud name on its analyst's word, a day late because it did not read its inbox   [tags: firm, behaviour]   (cycle 68)
+Setup: a made-up market with news (three noise headlines a day, quarterly reports) and one planted
+cause: a fraud headline on K03 dated 2024-09-05, out at that day's close, with a −9% shock then
+−1.2% a day for six days. One pod, $100k: a Haiku 5.5 analyst given headlines, a Haiku 5.5 PM
+given prices only, each on its own $0.25 key; ten mornings from 2 September; package
+`headlines-v1` (the PM's morning package shows its headlines refused).
+Result: the PM bought an equal-weight book of K00–K04 on the first morning. On 6 September the
+analyst told the pod "K03 - MATERIAL. Short seller alleges revenue overstated…". The PM did not
+open its inbox that morning: it saw K03 down 8% "with no headline access to explain it" and held.
+On 7 September it read the message and sold all 97 K03 shares (at 180.57, the shock already in the
+price), putting the proceeds into the other four names. $0.078 for both minds.
+Evidence: `evidence/data-packages/news.cassette.json`; `acceptance/data_packages.py` (B).
+Interpretation: information that only one mind holds did travel through the pod and changed what
+it held: the first time a PM acted on something it could not read itself. The lag came from the
+PM's habit, not its judgement: a PM that remembers nothing between days and does not read its
+messages first loses a day on news. The passing grade ("cut within two days") was met by one
+run, which is an anecdote, not a rate.
+Follow-up: the behaviour-test idea (scenarios with expected outcomes, run per model and scored);
+a charter or tool order that reads messages first, compared against this one.

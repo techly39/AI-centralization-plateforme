@@ -18,7 +18,13 @@ from app.db.base import get_session
 from app.db.models import Agent, AgentRole
 from app.oms.service import OMS_LOCK
 from app.registry.auth import deny, get_current_agent, require
-from app.registry.permissions import Action, may_declare_model, may_register_role
+from app.registry.permissions import (
+    Action,
+    grant_data,
+    may_declare_model,
+    may_grant_data,
+    may_register_role,
+)
 from app.registry.service import (
     RegistryError,
     ReservedIdentityError,
@@ -44,6 +50,11 @@ def register(
         raise deny(session, actor, Action.REGISTER_AGENTS,
                    detail="only the operator's registrar declares a model, and only a PM's",
                    context={"name": body.name, "role": body.role})
+    if body.data and not may_grant_data(session, actor, AgentRole(body.role)):
+        raise deny(session, actor, Action.REGISTER_AGENTS,
+                   detail="only the operator's registrar grants data, and only to a PM or an "
+                          "analyst",
+                   context={"name": body.name, "role": body.role})
     if not may_register_role(session, actor, AgentRole(body.role)):
         raise deny(session, actor, Action.REGISTER_AGENTS,
                    detail="only the operator's registrar makes the firm's manager",
@@ -66,6 +77,8 @@ def register(
                 actor_agent_id=actor.id,
                 model=body.model,
             )
+            grant_data(session, agent_id=agent.id, rights=body.data or (), by=actor,
+                       how="registration")
             session.commit()
     except RegistryError as exc:
         session.rollback()

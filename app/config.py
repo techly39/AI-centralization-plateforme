@@ -272,6 +272,9 @@ class TeamConfig(BaseModel):
     models: tuple[str, ...] = Field(default=("anthropic/claude-haiku-5.5",), min_length=1,
                                     max_length=32)
 
+    # The data a PM may ask for its analyst beyond prices (idea: data packages): none by default.
+    data: tuple[Literal["headlines", "company"], ...] = Field(default=(), max_length=2)
+
     @field_validator("models")
     @classmethod
     def _models_are_named(cls, value: tuple[str, ...]) -> tuple[str, ...]:

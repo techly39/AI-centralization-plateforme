@@ -90,6 +90,10 @@ EVENT_HIRE_PICKED = "hire_picked"        # payload: {vacancy_id, candidate, brie
 EVENT_HIRE_PICK_REFUSED = "hire_pick_refused"  # payload: {vacancy_id, candidate, reason, by}
 EVENT_DIRECTION_SET = "direction_set"    # payload: {direction_no, text, by, by_name}
 
+# Data rights (app/registry/permissions.py): what an agent may read beyond prices (idea: data
+# packages). Granted by the operator's registrar at registration, or by a team place's fill.
+EVENT_DATA_RIGHTS_GRANTED = "data_rights_granted"  # payload: {agent_id, rights, by, how}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

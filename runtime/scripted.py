@@ -448,6 +448,41 @@ def firm_manager(request: CompletionRequest) -> CompletionResponse:
 
 
 #: The closed table: script name → policy. A spec names one of these keys.
+def headline_analyst(request: CompletionRequest) -> CompletionResponse:
+    """An analyst given headlines (idea: data packages): each wake it reads the clock and the last
+    31 days of headlines, then sends its pod a ``signal`` (as :func:`ma_signal_analyst` does):
+    ``flat`` for each name of the input's ``universe`` a headline ties to fraud, ``long`` for the
+    rest. A refused or failed read ends the wake without a signal.
+    """
+    context = _context(request)
+    pod_id = context["me"]["pod_id"]
+    universe = context["input"].get("universe")
+    if type(universe) is not list or not universe or pod_id is None:
+        return CompletionResponse(content="No pod or no universe in my input; nothing to do.")
+    turn = _turn(request)
+
+    if turn == 0:
+        return CompletionResponse(content="Reading the clock and the headlines.", tool_calls=[
+            ToolCall(id="clock", name="get_clock"),
+            ToolCall(id="news", name="read_headlines", arguments={"days": 31})])
+
+    if turn == 1:
+        results = _results(request)
+        if any(v is None for v in results.values()):
+            return CompletionResponse(content="A read failed; no signal today.")
+        flagged = sorted({x["ticker"] for x in results["news"]["headlines"]
+                          if x["ticker"] in universe and "fraud" in x["title"].lower()})
+        signals = {t: "flat" if t in flagged else "long" for t in universe}
+        payload = {"kind": "signal", "as_of": results["clock"]["now"], "signals": signals}
+        body = ("Signal: flat " + ", ".join(flagged) + " (a fraud headline); long the rest"
+                if flagged else "Signal: no fraud headline on our names; long them all")
+        return CompletionResponse(content="Sending today's signal to my pod.", tool_calls=[
+            ToolCall(id="signal", name="send_message", arguments={
+                "to": f"pod:{pod_id}", "body": body, "structured_payload": payload})])
+
+    return CompletionResponse(content="Done for today.")
+
+
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
     "ma-signal-analyst": ma_signal_analyst,
@@ -457,4 +492,5 @@ SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "team-pm": team_pm,
     "research-analyst": research_analyst,
     "firm-manager": firm_manager,
+    "headline-analyst": headline_analyst,
 })

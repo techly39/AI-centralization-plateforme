@@ -54,7 +54,7 @@ from app.ledger.events import (
 )
 from app.metrics.metering import metered_by_agent
 from app.oms.service import OMS_LOCK
-from app.registry.permissions import may_hire
+from app.registry.permissions import grant_data, may_hire
 from app.registry.population import over_cap
 from app.registry.service import deactivate_agent, register_agent
 
@@ -112,7 +112,9 @@ def places(session: Session, pod_id: int | None = None) -> list[dict[str, Any]]:
                 "asked_by": p["asked_by"], "asked_by_name": p["asked_by_name"],
                 "name": p["name"], "role": p["role"], "model": p["model"],
                 "budget_usd": p["budget_usd"], "charter": p["charter"], "status": "open",
-                "member": None, "refusals": [], "ended": None}
+                "member": None, "refusals": [], "ended": None,
+                # the data its analyst reads beyond prices: shown only when some was asked for
+                **({"data": p["data"]} if p.get("data") else {})}
             continue
         place = out.get(p.get("place_id"))
         if place is None:
@@ -184,7 +186,10 @@ def team_of(session: Session, pod_id: int) -> dict[str, Any]:
                 f"backtests are your pod's attempts at your next pitch), reads the library and "
                 f"messages; it cannot pitch, trade or ask for analysts. Its thinking is your "
                 f"pod's: it lowers your fitness and capital score. Let it go with "
-                f"let_go_analyst." if law.on else "The team law is off in this firm."),
+                f"let_go_analyst."
+                + (f" You may ask for an analyst who reads data beyond prices, even data you do "
+                   f"not read yourself: {list(law.data)} (request_analyst_with_data)."
+                   if law.data else "") if law.on else "The team law is off in this firm."),
         "max_analysts": law.max_analysts, "models": list(law.models),
         "budget_usd": law.budget_usd, "budget_used_usd": used,
         "budget_left_usd": max(0.0, law.budget_usd - used),
@@ -208,13 +213,14 @@ def _refuse_request(session: Session, *, actor: Agent, reason: str, asked: dict[
 
 
 def request_analyst(session: Session, *, actor: Agent, charter: str, model: str,
-                    budget_usd: float) -> dict[str, Any]:
+                    budget_usd: float, data: Any = ()) -> dict[str, Any]:
     """A PM asks for an analyst: granted (the open place) or refused by name, written; commits.
     The caller has checked the role (``Action.REQUEST_TEAM``)."""
     charter = charter.strip()
     if not charter or len(charter) > MAX_CHARTER:
         raise TeamError(422, f"a charter is 1 to {MAX_CHARTER} characters")
-    asked = {"model": model, "budget_usd": budget_usd}
+    data = sorted(set(data))
+    asked = {"model": model, "budget_usd": budget_usd, **({"data": data} if data else {})}
     with OMS_LOCK:   # one request at a time, and none while a sweep closes pods
         try:
             law = team_law(session)
@@ -234,6 +240,9 @@ def request_analyst(session: Session, *, actor: Agent, charter: str, model: str,
                 reason = f"your pod has been granted {MAX_PLACES} analysts in this run: no more"
             elif model not in law.models:
                 reason = f"the model {model!r} is not in the team law's pool {list(law.models)}"
+            elif not set(data) <= set(law.data):
+                reason = (f"the data {sorted(set(data) - set(law.data))} is not in the team "
+                          f"law's list {list(law.data)}: an analyst reads prices and those only")
             elif sum(1 for x in held if x["status"] in ("open", "working")) >= law.max_analysts:
                 reason = (f"your pod already holds {law.max_analysts} analysts (working or "
                           f"waiting): the team law's limit")
@@ -253,7 +262,8 @@ def request_analyst(session: Session, *, actor: Agent, charter: str, model: str,
                                      "name": f"{pod.name[:NAME_STEM].rstrip('-')}-analyst-{number}",
                                      "role": "analyst",
                                      "model": model, "budget_usd": budget_usd,
-                                     "charter": charter, "law": law.model_dump(mode="json")})
+                                     "charter": charter, "law": law.model_dump(mode="json"),
+                                     **({"data": data} if data else {})})
             session.commit()
             return place(session, event.id)
         except TeamError:
@@ -317,6 +327,8 @@ def fill(session: Session, *, place_id: int, actor: Agent) -> tuple[dict[str, An
             append_event(session, type=EVENT_TEAM_PLACE_FILLED, actor_agent_id=actor.id, payload={
                 "place_id": place_id, "pod_id": x["pod_id"], "agent_id": agent.id,
                 "agent_name": agent.name, "model": x["model"], "budget_usd": x["budget_usd"]})
+            grant_data(session, agent_id=agent.id, rights=x.get("data", ()), by=actor,
+                       how=f"team place {place_id}")
             session.commit()
             return place(session, place_id), agent, key
         except TeamError:

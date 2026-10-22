@@ -12,6 +12,13 @@ Packages are versioned by name; a run records the name it used (cassette ``param
 * ``prices-v1`` — for every ticker of the workflow input's ``universe`` (sorted), the daily bars
   of the last :data:`LOOKBACK_DAYS` days up to today, as rows ``[day, open, high, low, close,
   volume]``. A ticker physics refuses is listed under ``unavailable`` with its status.
+* ``headlines-v1`` — ``prices-v1`` and ``headlines``: the world's headlines of the last
+  :data:`HEADLINE_DAYS` days whose news is out (a day's at its close, with its bar).
+* ``company-v1`` — ``prices-v1`` and ``reports``: the latest quarterly report of every ticker of
+  the universe published in the last :data:`REPORT_DAYS` days.
+* ``everything-v1`` — ``prices-v1`` with both.
+  A section is read through the mind's own key, so physics decides it: a mind without the right
+  gets ``refused: {section: physics' reason}`` instead (the refusal is physics', 403 and logged).
 
 Boundary law: physics is reached only through :class:`FundClient`.
 """
@@ -26,8 +33,14 @@ from urllib.parse import quote
 from mcp_server.client import FundAPIError, FundClient
 
 #: Every package a run may name. Adding one is a change a cassette records by name.
-PACKAGES = frozenset({"prices-v1"})
+PACKAGES = frozenset({"prices-v1", "headlines-v1", "company-v1", "everything-v1"})
+#: Each package's sections beyond prices.
+SECTIONS: dict[str, tuple[str, ...]] = {
+    "prices-v1": (), "headlines-v1": ("headlines",), "company-v1": ("reports",),
+    "everything-v1": ("headlines", "reports")}
 LOOKBACK_DAYS = 30
+HEADLINE_DAYS = 3
+REPORT_DAYS = 91
 COLUMNS = ("day", "open", "high", "low", "close", "volume")
 
 
@@ -68,4 +81,24 @@ async def build(name: str, client: FundClient, at: str, universe: Sequence[str])
                                "bars": bars}
     if unavailable:
         package["unavailable"] = unavailable
+    wanted = set(universe)
+    for section in SECTIONS[name]:
+        path, days = (("/headlines", HEADLINE_DAYS) if section == "headlines"
+                      else ("/reports", REPORT_DAYS))
+        try:
+            answer = await client.get(path, days=days)
+        except FundAPIError as exc:
+            if exc.status_code == 401:
+                raise           # its key is dead: the caller refuses the wake
+            package.setdefault("refused", {})[section] = exc.detail
+            continue
+        found = answer.get(section) if isinstance(answer, dict) else None
+        found = [x for x in found or [] if isinstance(x, dict)]
+        if section == "reports":
+            latest: dict[str, Any] = {}
+            for report in found:            # oldest first: the last one standing is the latest
+                if report.get("ticker") in wanted:
+                    latest[report["ticker"]] = report
+            found = [latest[t] for t in sorted(latest)]
+        package[section] = found
     return package

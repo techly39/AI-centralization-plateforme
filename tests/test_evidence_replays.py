@@ -29,6 +29,7 @@ KEYS = {
     "designs-reproduce/reproduce.cassette.json": b"fund-generation-turnover/1",
     "pm-builds-team/team.cassette.json": b"fund-generation-turnover/1",
     "manager-chooses-hires/manager.cassette.json": b"fund-generation-turnover/1",
+    "data-packages/news.cassette.json": b"fund-generation-turnover/1",
 }
 #: kept trials that do not replay against today's code, and why (each has its README line)
 TRIALS = {

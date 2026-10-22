@@ -1,54 +1,55 @@
-# A manager chooses the hires: one manager mind reads every pod, picks who fills a freed place among the hires the law allows, briefs the new PM and sets the firm's direction; it never moves capital, hires or fires by itself
+# Headlines and company data, handed by role: the made-up world writes dated headlines and quarterly reports (a few planted causes among the noise), physics serves them only on their day and only to a mind given the right, so an analyst can know what its PM does not
 
 ## How I understand it
-Today every hire is the law's alone: a freed place goes to the fittest pod's child (or a plain
-hire). The Human's firm has management above the pods: it sees every pod and sets the direction,
-while the algorithm moves the money. This slice gives the firm its first manager mind:
-- **The board.** The manager reads every pod: cash, positions, exposures, capital from the centre,
-  stage and drawdown, thinking cost, last month's fitness, its design (model, family). No PM sees it.
-- **The choice.** When a place is freed, physics lists the hires the law allows: the default (the
-  law's own hire), a child of each other fit pod, a plain hire on each model of the pool, each
-  saying exactly what it would be. The place waits one day: the manager may pick one and write a
-  brief; silent, the default stands. The Runtime hires exactly the pick the next morning.
-- **The direction.** The manager writes the firm's direction; every PM reads it in its capital
-  view. The new PM also reads its brief.
-- **What it cannot do.** Move capital, hire, fire, register or deactivate anyone, trade, pitch:
-  it is a new role (`manager`), not the registrar, and only the operator's registrar can make one.
-- **Its cost.** It has no pod: its thinking is the centre's cost, never a pod's fitness.
-Whether a real manager picks better than the law is the finding.
+Until now every mind sees the same thing: prices. So a PM offered analysts works alone, and a
+manager finds no pod that knows something another does not. This slice gives the world news:
+- **The world writes it.** The made-up market's recipe gains a news block: each day a few noise
+  headlines (from templates, by the seed), a quarterly report per company (revenue, earnings
+  against what was expected, guidance), and a few *planted causes*: a fraud headline on one
+  ticker, an earnings miss on another. Each cause moves its ticker's prices from its day on, as
+  the recipe says; noise moves nothing. No LLM writes any of it: it is physics.
+- **Never early.** A day's news is out at its close, with its bar (the same look-ahead law as
+  prices): when anyone reads it, the price already holds what it moved. No endpoint ever says which item is a cause or what it will do: the recipe is the
+  world and stays with the operator.
+- **Handed by role.** Everyone reads prices. Headlines and company reports are rights: the
+  operator grants them when it registers a mind, or a PM asks for an analyst with a package the
+  team law lists (one the PM itself may lack). A mind without the right is refused by name
+  (403, logged), through its tool and in its morning package.
+- **Versioned packages.** Beside `prices-v1`: `headlines-v1`, `company-v1`, `everything-v1`.
+  Each is built through the mind's own key, so what a mind gets is what physics lets it read.
+Whether a PM acts on what only its analyst read is the finding (the first behaviour test).
 
 ## What done looks like
-`uv run python acceptance/manager_chooses_hires.py` ($0, offline):
-- A (scripted): September with two fit pods and a failing one; at the month's end the failing
-  PM goes, the place lists its candidates; the manager picks the other fit pod's child with a
-  brief (the 'yes' case) and the Runtime hires exactly that the next morning, the new PM reading
-  brief and direction; in a second world a silent manager leaves the default (the 'no' case);
-  refused by name: a pick not on the list, a second pick, a pick after the hire, a PM or analyst
-  reading the board or picking, the manager filling, registering, deactivating, trading; the
-  manager's thinking is the centre's; law off → today's hires; rebuild gives the same books.
-- B0: the same through the Runtime with the real run's very command, replay IDENTICAL.
-- B (recorded): a real Haiku manager over a generation run; physics' answers checked; replay $0.
+`uv run python acceptance/data_packages.py` ($0, offline):
+- A (scripted, through the API): a made-up world with noise headlines and reports and two
+  planted causes; an entitled analyst does not find the fraud headline during its day and finds
+  it the next morning (the 'no' and the 'yes' of the look-ahead law); its PM, without the right, is refused by name both
+  through the tool and in its morning package; a PM asks for an analyst with headlines and gets
+  it, a package outside the law's list is refused; the causes move their tickers' later prices
+  as the recipe says and a noise headline moves nothing (from the bars alone); everything-v1 is
+  exactly the union; no answer carries an effect; rebuild gives the same rights.
+- B0: the same hosted through the Runtime with the real run's very command, replay IDENTICAL.
+- B (recorded): real Haiku minds, a PM holding the fraud ticker (prices only) and its analyst
+  (headlines); physics' answers checked; replay for $0; whether the PM cut is the finding.
 
 ## Plan
-1. A `management:` law (off by default; frozen into the first vacancy like reproduction).
-2. Role `manager` + action `manage_firm` in the permission matrix; only the operator's registrar
-   registers one, podless. No register / deactivate / allocation / orders / pitches.
-3. `app/capital/management.py`: the board, the candidates (reproduction's child_of opened to any
-   parent), the pick (`hire_picked`), the direction (`direction_set`); the vacancy fold applies the
-   pick, so the fill, the design and the inherited attempts follow it. The place waits a day.
-4. API `app/api/management.py` + MCP tools; the brief in the hire's vacancy, the direction in
-   every capital view (only once one is written, so old recordings replay unchanged).
-5. Holes: a family's sibling attempts count (law-frozen, old runs keep the old count); a parent
-   with no model on record: its child's model is shown as the pool's.
-6. Runtime: the onboarding skips a place still in its manager's day; a manager mind's tools.
-7. Demo A, B0, real run B, red-team, auditor, merge.
-Left out: firing early, opening pods, departments, a manager moving capital (never).
+1. `app/marketdata/made_up.py`: an optional `news` block (noise per day, reports, causes); a
+   recipe without it gives byte-identical bars, so every older world is unchanged.
+2. `app/marketdata/news.py`: the news desk (items from the recipe, served at the world's now).
+3. Rights in `app/registry/permissions.py`: `data_rights_granted` events, folded from the
+   ledger; granted by the operator's registrar at registration, or by a team place's fill.
+4. Team law gains `data` (the packages a PM may ask for); the request names an optional package.
+5. API `app/api/data.py` (headlines, company reports, my rights) + MCP tools, named-only.
+6. `runtime/packages.py`: the three new packages; the spec's `data` passed at registration.
+7. Demo A, then B0, red-team, auditor, the real run B, merge.
+Left out: data that costs money, the manager reading news, real-history news, LLM-written text.
 
 ## Risk
-Permissions, hiring, the Runtime's hire: red-team + auditor before merge.
+Market data, permissions and the seal: red-team + auditor before the paid real run and merge.
 
 ## Progress
-- cycle 66: physics, the Runtime's side, demo parts A and B0 pass; the reproduction law's
-  second edition (a family's attempts; no hidden second change); real run B recorded; red-team
-  found 4 holes (2 medium: a hire reads other pods' rules in its vacancy, a pick landing during
-  the morning hire; 2 low: the family tree and the child's note ignore the pick), being fixed.
+- cycle 68: physics (news in the recipe, served under the look-ahead guard, rights by role,
+  the team's data, the endpoints, tools and three packages), demo parts A and B0; red-team 4
+  holes fixed (news now out at its day's close, with its bar; a miss never hides an earlier
+  report); real run B recorded ($0.078: the PM cut K03 a day after its analyst's warning);
+  auditor: one block (the recording not in the replay suite) fixed, then PASS. Merged.

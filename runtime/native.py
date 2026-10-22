@@ -114,7 +114,9 @@ class WakeRecord:
 #: names them (``spec.tools``). Every tool added from now on is listed here.
 NAMED_ONLY_TOOLS = frozenset({"read_library", "get_team", "request_analyst", "let_go_analyst",
                               "list_team_places", "fill_team_place", "refuse_team_hire",
-                              "read_board", "pick_hire", "get_direction", "set_direction"})
+                              "read_board", "pick_hire", "get_direction", "set_direction",
+                              "read_headlines", "read_reports", "get_data_rights",
+                              "request_analyst_with_data"})
 
 
 def shown_tools(tools: list[ToolSpec], named: tuple[str, ...] | None = None) -> list[ToolSpec]:
