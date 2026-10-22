@@ -250,13 +250,15 @@ def family_tree(session: Session) -> list[dict[str, Any]]:
     each with its model and the one change it was born with; ``[]`` when no hire was made under
     it. Founding pods and plain hires are roots. A pure function of the ledger: a pod's name and
     stage are the events' (a pod row is not an event), so a recording alone draws the same tree."""
-    from app.capital.reproduction import design_of
+    from app.capital.reproduction import design_of, hire_of
     from app.ledger.rebuild import stage_from
 
     opened = {e.id: e.payload_json for e in _events(session, EVENT_VACANCY_OPENED)}
     if not any("design" in v["hire"] for v in opened.values()):
         return []
-    born = {e.payload_json["pod_id"]: opened.get(e.payload_json["vacancy_id"], {}).get("hire", {})
+    # Each hire as it was hired: its manager's pick, if one was made (red-team, a manager chooses
+    # the hires: the tree drew a picked child under the law's own parent).
+    born = {e.payload_json["pod_id"]: hire_of(session, e.payload_json["pod_id"]) or {}
             for e in _events(session, EVENT_VACANCY_FILLED)}
     names: dict[int, str | None] = {}
     stages: dict[int, str] = {}

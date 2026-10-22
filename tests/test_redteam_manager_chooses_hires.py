@@ -74,10 +74,11 @@ def _seed(SessionFactory, pod_id: int) -> None:
         s.close()
 
 
-def _world(SessionFactory, make_pod, pm_factory) -> int:
+def _world(SessionFactory, make_pod, pm_factory, morning: bool = True) -> int:
     """Three seeded pods (edge the fittest, steady fit, weak not); weak's place is freed at the
     month's end and its vacancy lists the candidates. The clock then reaches the place's
-    fill_from morning. Returns the vacancy's id."""
+    fill_from morning (``morning=False``: it stays on the manager's day). Returns the vacancy's
+    id."""
     from app.capital.hiring import open_vacancy
 
     for pod_id, name in ((1, "edge"), (2, "steady"), (3, "weak")):
@@ -96,8 +97,13 @@ def _world(SessionFactory, make_pod, pm_factory) -> int:
         assert event.payload_json["fill_from"] == "2024-09-02"
     finally:
         s.close()
-    get_clock().move_to(datetime(2024, 9, 2, 13, tzinfo=UTC))   # the place's morning
+    if morning:
+        _morning()
     return vid
+
+
+def _morning() -> None:
+    get_clock().move_to(datetime(2024, 9, 2, 13, tzinfo=UTC))   # the place's morning
 
 
 def _candidate(client, key: str, vid: int, parent: str) -> str:
@@ -234,6 +240,7 @@ def _picked_and_filled(client, admin_key, agent_factory, vid: int) -> tuple[int,
     r = client.post(f"/vacancies/{vid}/pick", headers=h(manager),
                     json={"candidate": steady_child, "brief": "slower"})
     assert r.status_code == 200, r.text
+    _morning()      # the pick is the manager's day's (cycle 66: refused from the fill morning on)
     made = client.post(f"/vacancies/{vid}/fill", headers=h(admin_key))
     assert made.status_code == 201, made.text
     return made.json()["agent"]["pod_id"], made.json()["agent"]["api_key"]
@@ -253,7 +260,7 @@ def test_redteam_management_the_family_tree_draws_a_picked_child_under_the_defau
     """
     from app.capital.report import family_tree
 
-    vid = _world(SessionFactory, make_pod, pm_factory)
+    vid = _world(SessionFactory, make_pod, pm_factory, morning=False)
     pod_id, _ = _picked_and_filled(client, admin_key, agent_factory, vid)
     db.expire_all()
 
@@ -284,7 +291,7 @@ def test_redteam_management_a_picked_child_is_told_its_parent_is_the_fittest_pod
     Expected: the note and the law's words say how the parent was chosen (the law's fittest, or
     the manager's pick among the fit pods).
     """
-    vid = _world(SessionFactory, make_pod, pm_factory)
+    vid = _world(SessionFactory, make_pod, pm_factory, morning=False)
     _, new_pm = _picked_and_filled(client, admin_key, agent_factory, vid)
     view = client.get("/capital", headers=h(new_pm))
     assert view.status_code == 200, view.text

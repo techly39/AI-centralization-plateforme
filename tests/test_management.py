@@ -209,3 +209,15 @@ def test_the_scripted_manager_picks_the_other_child_or_stays_silent():
         ("set_direction", {"text": "d"}),
         ("pick_hire", {"vacancy_id": 7, "candidate": "c2", "brief": "b"})]
     assert reply({}) == []
+
+
+def test_the_managers_day_ends_at_the_fill_morning(client, db, september, manager,
+                                                    SessionFactory):
+    """From the place's fill morning the hire is fixed: the Runtime may read it to make the mind,
+    so a later pick is refused by name and the law's hire stands."""
+    _, key = manager
+    vid = _listed_vacancy(SessionFactory, fill_from="2024-09-01")
+    r = client.post(f"/vacancies/{vid}/pick", headers=h(key), json={"candidate": "c2"})
+    assert r.status_code == 409 and "day for the manager is over" in r.json()["detail"]
+    assert _types(db, "hire_picked") == []
+    assert client.get(f"/vacancies/{vid}", headers=h(key)).json()["hire"]["model"] == HAIKU

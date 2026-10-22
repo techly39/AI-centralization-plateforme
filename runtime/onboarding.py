@@ -252,6 +252,11 @@ class Onboarding:
                 and agent.get("role") == "pm" and type(agent.get("api_key")) is str
                 and agent["api_key"]):
             raise _Failed(f"hire_wrong_agent:{vid}")
+        # The mind is made from what physics hired (its fill's answer), not from the listing read
+        # before it (red-team, a manager chooses the hires: a pick landing between the two).
+        answered = made.get("vacancy")
+        if isinstance(answered, dict) and isinstance(answered.get("hire"), dict):
+            vacancy, hire = answered, answered["hire"]
         spec_id = pod_name   # unique: physics names pods once; the run's own ids cannot be hire-*
         if spec_id in taken:
             raise _Failed(f"hire_spec_taken:{spec_id}")

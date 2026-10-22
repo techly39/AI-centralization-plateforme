@@ -167,6 +167,13 @@ def pick(session: Session, *, vacancy_id: int, candidate: str, brief: str,
         if found["status"] != "open":
             raise _refuse(session, vacancy_id=vacancy_id, candidate=candidate, actor=actor,
                           reason=f"vacancy {vacancy_id} is already filled")
+        if ledger_now(session).date().isoformat() >= found["fill_from"]:
+            # The manager's day is over: from this morning the Runtime may fill the place, so its
+            # hire is fixed before anyone reads it to make the mind (red-team, a manager chooses
+            # the hires: a late pick split the ledger from the mind).
+            raise _refuse(session, vacancy_id=vacancy_id, candidate=candidate, actor=actor,
+                          reason=f"vacancy {vacancy_id}'s day for the manager is over: it is "
+                                 f"filled from {found['fill_from']} (the law's hire stands)")
         if found.get("picked") is not None:
             raise _refuse(session, vacancy_id=vacancy_id, candidate=candidate, actor=actor,
                           reason=f"vacancy {vacancy_id} already has its pick "
@@ -207,13 +214,24 @@ def direction(session: Session) -> dict[str, Any] | None:
             "set_on": last.ts.date().isoformat()}
 
 
-def brief_of(session: Session, pod_id: int) -> dict[str, Any] | None:
-    """The manager's brief to the PM hired into ``pod_id`` (``None``: no pick made its hire)."""
+def _picked_vacancy(session: Session, pod_id: int) -> dict[str, Any] | None:
+    """The vacancy a manager's pick filled ``pod_id`` from (``None``: no pick made its hire)."""
     from app.capital.hiring import vacancies
 
-    found = next((v for v in vacancies(session) if (v.get("picked") or {}).get("brief")
-                  and v["filled"] is not None and v["filled"]["pod_id"] == pod_id), None)
-    if found is None:
+    return next((v for v in vacancies(session) if v.get("picked") is not None
+                 and v["filled"] is not None and v["filled"]["pod_id"] == pod_id), None)
+
+
+def pick_of(session: Session, pod_id: int) -> dict[str, Any] | None:
+    """The manager's pick that hired ``pod_id`` (``candidate``, ``brief``, ``by``, ``on``)."""
+    found = _picked_vacancy(session, pod_id)
+    return None if found is None else found["picked"]
+
+
+def brief_of(session: Session, pod_id: int) -> dict[str, Any] | None:
+    """The manager's brief to the PM hired into ``pod_id`` (``None``: no pick, or no brief)."""
+    found = _picked_vacancy(session, pod_id)
+    if found is None or not found["picked"]["brief"]:
         return None
     p = found["picked"]
     return {"text": p["brief"], "by": p["by"], "on": p["on"], "candidate": p["candidate"],
