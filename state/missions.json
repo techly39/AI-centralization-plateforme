@@ -3,6 +3,22 @@
   "standard": "protocol/CYCLE.md §2 (ADR-046)",
   "missions": [
     {
+      "id": "believable-market",
+      "title": "A believable made-up market: its planted edges are the size of real ones, the gates still tell an edge from noise, and the firm's judges debate pitches a market-wise mind can believe",
+      "idea": "Real history and synthetic worlds",
+      "acceptance": "acceptance/believable_market.py",
+      "demo": "uv run python acceptance/believable_market.py — A (scripted): a recipe without per-family strengths gives exactly its old bars (an old world's bars hash unchanged); the believable preset's answer key (operator command) shows a plain 20-day momentum rule at about Sharpe 1 to 3 a year net of fees on the edge sector and near 0 on noise; over many seeds the gates pass a momentum pitch on a believable edge at a printed rate well above their pass rate on noise (yes and no cases, thresholds untouched); the new pitch view edition says its numbers are net of fees and what a null correlation means, older runs keep the old edition; an agent cannot read the answer key (refused by name). B0: the debate's real command rehearsed scripted on the believable market, replay IDENTICAL. B (recorded): real Haiku bull, bear (headlines) and manager on scripted PMs' pitches in a believable market (one with a fraud name in its universe); physics' answers checked (thread, verdict or silence, seed paid or refused); replay IDENTICAL at $0; the verdicts are the finding.",
+      "status": "ready",
+      "estimate_sessions": 2,
+      "physics": true,
+      "depends_on": [
+        "pitch-debate",
+        "data-packages"
+      ],
+      "branch": "idea/believable-market",
+      "notes": "Why (cycle 71 plan): F-0008, the real manager held every planted-edge pitch because the made-up edge (planted 0.004 vs noise 0.010, app/marketdata/made_up.py) gives momentum Sharpe 15-27. A per-family strength must default to the market's own so every older recipe and recording is byte-identical. Gates thresholds (config.yaml gates:) are the law: do not tune them to make the demo pass; if a believable edge cannot pass a 180-day holdout, report the rate honestly and say so. Holes to check inside it: held-out days readable (red-team: measure how often an offline search on a believable-noise sector passes the gates with one counted attempt); IC prediction count = width x rebalances; pitch view not saying net of fees (new view edition, app/strategy/service.py pitch_view; recorded minds read the old words, so the edition must be chosen by the run's law). Before the real run, read the numbers the minds will see as a sceptic would (CYCLE.md §3)."
+    },
+    {
       "id": "pitch-debate",
       "title": "A pitch is argued before its seed: a bull and a bear argue an eligible pitch in its thread, and the manager seeds it now or holds it with a reason; silence keeps the law's seed",
       "idea": "The pitch, then a full report",

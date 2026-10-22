@@ -104,8 +104,10 @@ itself every month (a PM who never earns a seed is let go, thinking is charged a
 real run). Cycle 62: a freed place goes to a child of the month's fittest pod. Cycle 64: a PM
 can hire its own analysts (real PMs chose not to). Cycle 66: a manager mind may pick who fills a
 freed place among the hires the law allows (a real Haiku manager kept the law's own hire). Cycle 68: headlines and company data are handed by role, so an analyst can
-know what its PM does not (a real prices-only PM cut a fraud name on its analyst's word). Not yet:
-anyone but the gates judging a pitch before its seed.
+know what its PM does not (a real prices-only PM cut a fraud name on its analyst's word). Cycle 70:
+under a debate law, reviewers argue an eligible pitch and the manager seeds it now or holds it (a
+real Haiku manager held every planted-edge pitch as too good to be true). Not yet: a market whose
+edges are believable enough for that judgement to let money through.
 
 ## The firm's people
 
@@ -289,7 +291,28 @@ From: Human
 Status: not started
 Strategies and agents are tested on real market history (1999–2026) and on synthetic regimes
 (crashes, bubbles, flat markets). Agents never see beyond the simulated today.
-Now: the yfinance provider and the look-ahead guard exist; no cached 1999–2026 history yet.
+Now: the yfinance provider and the look-ahead guard exist; no cached 1999–2026 history yet. The
+made-up market (cycle 48 on) plants edges, sinks, crashes and dips by recipe, and news (cycle 68).
+Matured (cycle 71 plan), first slice "a believable made-up market" (Next up 1): the cycle-70
+finding (F-0008) is that a planted edge is far stronger than any real one (a plain momentum rule
+shows Sharpe 15 to 27), so a real manager reads it as a bug and holds every seed. In this slice:
+- *Edges the size of real ones.* A recipe's family may carry its own edge strength (and noise);
+  a recipe that names none is exactly as before. A believable preset puts a plain momentum rule
+  on an edge sector at about Sharpe 1 to 3 a year net of fees, IC a few hundredths, and on a
+  noise sector at nothing.
+- *The operator can see the truth.* An operator command prints, per family, what a plain rule
+  truly earns in the recipe (the world's answer key; never an agent's).
+- *The gates still tell edge from noise, measured as a rate.* Over many seeds, a momentum pitch
+  on a believable edge passes the gates often and on noise almost never; both rates are printed
+  (the gates' thresholds are not touched to make it pass).
+- *The pitch view says what its numbers are.* A new view edition says returns, Sharpe and IC are
+  net of fees and a null correlation means "no other pod to compare with yet" (F-0008's two
+  misreadings); older recordings keep the edition they read.
+- *The judgement, again.* Real Haiku bull, bear (with headlines) and manager debate scripted
+  pitches on a believable market (an edge sector, one with a fraud name in its universe); physics'
+  answers are checked, the verdicts are the finding.
+Left out: real 1999–2026 history (next slice: disguised names and dates, since a model may know
+what happened in 2008), new regimes (bubbles, flat markets).
 
 ### Live paper trading: the real score
 From: Human
@@ -654,6 +677,17 @@ generation turns over every month. Done, cycle 62: 2b, designs reproduce. Done, 
 builds its team. Done, cycle 66: a manager chooses the hires. Done, cycle 68: headlines and
 company data, handed by role. Done, cycle 70: a pitch is argued before its seed.)
 
+Cycle 71 plan: a believable made-up market moves first, ahead of capital resets. Why: the debate
+works, but with real minds it stops all money, for a sound reason (F-0008: the planted edges are
+ten times any real one, so a manager who knows markets reads them as a bug). Until the world's
+edges are believable, no real run can keep the debate law on and still have a firm that trades,
+and the manager's judgement measures our world's flaw, not the pitch. The world's answer key also
+lets a later run score the manager against the truth. Capital resets still add no mind and no
+decision; they wait. Holes it stands on, checked inside it: the held-out days are readable (with
+weak edges, a PM's offline search on noise could pass the gates more often: the red-team measures
+it); the IC gate's prediction count is universe width × rebalances (a wide noise universe meets
+its floor sooner); the pitch view does not say its numbers are net of fees (fixed inside it).
+
 Cycle 69 plan: the debate moves ahead of capital resets. Why: since cycle 68 some minds know what
 others do not, but money still moves only by formula: the gates decide every seed. A bull and a
 bear arguing a pitch, and the manager holding or speeding its seed, is the first agent judgement
@@ -748,6 +782,11 @@ verdicts move capital.
    pod; no law → seeds as today); real: Haiku bull, bear and manager on a scripted PM's pitch
    whose universe holds a name with a fraud headline only the bear reads; the verdict is the
    finding. Later slices: the backtest operator, a debate that judges the hypothesis.
+1. **A believable made-up market** (Real history and synthetic worlds, first slice). A family
+   may carry its own edge strength; a believable preset; an operator command prints each family's
+   true strength; over many seeds the gates pass a believable edge often and noise almost never
+   (both rates printed); the pitch view says its numbers are net of fees; real Haiku bull, bear
+   and manager debate pitches on it, the verdicts are the finding. Later: real history, disguised.
 2. **Capital resets** at the month's turn (the monthly generation's c, below), small.
 3. **The behaviour battery.** The cycle-68 news scenario and a few more (an earnings miss, a
    crash), each with its expected outcome, run per model and scored; grows into the model exam

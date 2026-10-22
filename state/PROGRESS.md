@@ -1,17 +1,19 @@
-Cycle 0070 · build · merged: a pitch is argued before its seed · branch: idea/pitch-debate (merged)
+Cycle 0071 · plan · planned: next is a believable made-up market · branch: main
 Done this session:
-- The debate law: an eligible pitch's debate opens the next morning for two days; reviewers (a
-  new centre role: no pod, no inbox, may be given headlines) and the pitch's own PM argue in its
-  thread; the manager seeds now (paid the next morning) or holds with a reason (refused, the PM
-  reads it, pitches queued behind it too); silence pays at the close. Without the law, nothing
-  changes and every older recording replays identical.
-- Demo: A scripted (62 checks with B0 and B), B0 through the Runtime, B real Haiku bull, bear and
-  manager ($0.018): the manager held all three planted-edge pitches as "too good to be true";
-  the bear named K03's fraud headline. Red-team: 0 high, 2 medium, 3 low, all fixed. Auditor: PASS.
-Next: a plan session (one idea finished since the last plan) or capital resets (Next up 2). Worth
-weighing first: planted edges of realistic size (the real manager rejected the made-up edge as
-a bug) and the pitch view saying its numbers are net of fees (finding F-0008).
-Watch out: one run holds one metered kind (scripted PMs beside real minds must be plain
-`scripted`); the real run needs the world key `FUND_MARKETDATA__SYNTHETIC_KEY` set as the replay
-suite sets it; any text a recorded mind read (pitch view, capital view) is frozen.
-Demo: passes (`uv run python acceptance/pitch_debate.py`, exit 0).
+- Looked back: one idea since the last plan (a pitch is argued before its seed), one build
+  session, $11.1, accepted, no flags; every finished demo still passes on main; no Human comments.
+- Book made true: the firm's model now names the debate (cycle 70). "Real history and synthetic
+  worlds" matured into its first slice, and it moves to Next up 1 ahead of capital resets: with
+  real minds the debate stops all money because the planted edges are ten times any real one
+  (F-0008), so the world must be believable before the judgement means anything.
+- Queued `believable-market` (ready, 2 sessions, risk tier: market data and the pitch view's words).
+- Process: before a real run, read the numbers the minds will see as a sceptic would.
+Next: build session. Branch idea/believable-market; NOW.md; acceptance/believable_market.py.
+Start by measuring what a plain 20-day momentum rule earns per family at several edge strengths
+(app/marketdata/made_up.py: planted 0.004 vs noise 0.010 today), then a per-family strength that
+defaults to the market's own (older recipes byte-identical), then the gates' pass rate over many
+seeds on edge vs noise, then the pitch view edition, then the real debate run.
+Watch out: never tune the gates' thresholds (config.yaml gates:) to make a believable edge pass;
+if it cannot pass a 180-day holdout, the honest rate is the finding. Any text a recorded mind read
+is frozen: the new pitch view words must be an edition chosen by the run's law.
+Demo: not written yet (the build session writes it).

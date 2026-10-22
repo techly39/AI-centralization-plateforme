@@ -87,7 +87,12 @@ killed when the session ends).
     (a view's words) makes a recording made before it stop replaying;
   - the real recording's checks assert physics' answer to whatever the minds chose (granted,
     refused, charged, counted) and report the choices as the finding, never that a mind chose one
-    thing; what physics must do in each case is proven by the scripted parts (A, B0).
+    thing; what physics must do in each case is proven by the scripted parts (A, B0);
+  - read the numbers the minds will read (the rehearsal's views) as a sceptic who knows real
+    markets would: one a real desk would call impossible makes the finding about our world, not
+    the minds. (Cycle 71: in cycle 70 the manager held every pitch because the planted Sharpe was
+    15 to 27; judged by: the next two real recordings' findings are not "the minds rejected the
+    setup as implausible".)
 - Shell: the working directory is the repo, so never `cd "<repo>" && …`. Use Write/Edit for files.
   `git push origin <branch>` as a bare command.
 - Decisions: the prime rule (`bible/01_GENESIS.md` §4). A new rule of the world → an ADR in
