@@ -8,7 +8,7 @@
       "idea": "Data packages: prices / company data / headlines / everything",
       "acceptance": "acceptance/data_packages.py",
       "demo": "uv run python acceptance/data_packages.py — A (scripted): a made-up world with noise headlines and reports and two planted causes (a fraud headline on one ticker, an earnings miss on another); an entitled analyst reads the fraud headline on its day and not the day before (the 'yes' and 'no' of the look-ahead law); its PM, without the right, is refused by name (403, logged) both through the tool and in its morning package; a PM asks for an analyst with headlines and physics grants it, a package outside the law's list is refused; the planted causes move their tickers' later prices as the recipe says and a noise headline moves nothing (checked from the bars); everything-v1 is exactly the union; each mind's package is recorded by name; rebuild from the ledger gives the same rights. B0: the same hosted through the Runtime with the very command of the real run, replay IDENTICAL. B: real Haiku minds, a PM holding the fraud ticker (prices only) and its analyst (headlines), recorded; physics' answers checked (who read what when, refusals); replay IDENTICAL for $0; whether the PM cut within two days of the headline is the finding.",
-      "status": "ready",
+      "status": "active",
       "estimate_sessions": 3,
       "physics": true,
       "depends_on": [

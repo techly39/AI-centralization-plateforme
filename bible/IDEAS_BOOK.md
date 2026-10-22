@@ -210,7 +210,7 @@ and cost. Not yet: the richer data packages (company data, headlines), memory ac
 
 ### Data packages: prices / company data / headlines / everything
 From: Human
-Status: not started
+Status: building
 The packages an AI can be given: 1) just market prices, 2) fake company data, 3) fake headlines +
 description, 4) everything together. The data is a table of days × tickers (Mon/Tue/Wed × AAPL,
 NVDA, TSLA…). Each package is versioned, so a run says exactly what each mind saw.
