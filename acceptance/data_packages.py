@@ -19,7 +19,9 @@ Costs $0 and needs no network.
        packages    everything-v1 is exactly prices-v1 with headlines-v1's and company-v1's parts
        seal        no answer any mind got says what an item does or which one is a cause
        rebuild     the ledger replayed into a fresh state gives the same rights
-  B0 (next session) the same hosted through the Runtime with the real run's very command
+  B0 the same hosted through the Runtime with the real run's very command: one pod, a scripted
+     analyst given headlines and a scripted PM given prices, ten mornings, package headlines-v1;
+     physics' answers checked from the recording, replay IDENTICAL
   B  (next session) real Haiku minds: a PM holding K03 (prices only) and its analyst (headlines)
 
     uv run python acceptance/data_packages.py        # exit 0 = the idea works
@@ -302,12 +304,171 @@ def part_a() -> None:
     client.__exit__(None, None, None)
 
 
+# --- B0 / B: hosted through the Runtime --------------------------------------------------------
+
+#: The hosted run (B) and its rehearsal (B0) are made with this very command, in the directory
+#: ``--write-world`` fills; only the cassette's name differs. Ten mornings from 2 September: the
+#: fraud headline lands on the fourth.
+STEPS, DAYS_PER_STEP, MAX_TOOL_CALLS, PACKAGE = 10, 1, 16, "headlines-v1"
+BOOK = UNIVERSE[:5]
+ANALYST, PM = "desk-analyst", "desk-pm"
+ANALYST_TOOLS = ["whoami", "get_clock", "get_data_rights", "read_headlines", "get_ohlcv",
+                 "send_message", "get_messages"]
+PM_TOOLS = ["whoami", "get_clock", "get_data_rights", "read_headlines", "get_portfolio",
+            "list_agents", "get_messages", "send_message", "get_price", "get_ohlcv",
+            "place_order"]
+REAL_MODEL, REAL_BUDGET_USD, REHEARSAL_BUDGET_USD = HAIKU, 0.25, 2.0
+FIRM = ("You work in a hedge fund that trades a simulated market with fake money. Your pod, desk, "
+        "has a PM and an analyst. Each morning you are handed the day's data package (input "
+        "names your universe). You remember nothing between days: read what you need first. Be "
+        "brief: every word you think is paid from your pod's P&L. When you are done, stop. ")
+CHARTERS = {
+    ANALYST: FIRM + "You are desk-analyst, the analyst of desk. You are given the world's "
+             "headlines (read_headlines; your package holds the last three days'); your PM is "
+             "not. Each morning, tell your PM (send_message to pod:1) what in the news matters "
+             "for the pod's names, if anything. You cannot trade.",
+    PM: FIRM + "You are desk-pm, the portfolio manager of desk. Your data is prices only; your "
+          "analyst reads the headlines and may message you (get_messages). On your first "
+          "morning, buy an equal-weight book of your universe with most of your cash; then each "
+          "morning decide whether to keep, cut or add to each position (place_order).",
+}
+
+
+def command(cassette: str) -> list[str]:
+    return ["backtest", "--world", "world.json", "--specs", "specs", "--input", "input.json",
+            "--steps", str(STEPS), "--days-per-step", str(DAYS_PER_STEP), "--package", PACKAGE,
+            "--charge-each-step", "--max-tool-calls", str(MAX_TOOL_CALLS), "--cassette", cassette]
+
+
+def write_world(directory: Path, provider: str) -> None:
+    """The hosted run's files: the made-up world with its news, one pod, its PM and analyst."""
+    (directory / "specs").mkdir(parents=True, exist_ok=True)
+    (directory / "world.json").write_text(json.dumps({
+        "start": f"{START.isoformat()}T14:30:00Z", "admin": "news-mgmt",
+        "pods": [{"name": "desk", "allocation": 100_000}], "market": RECIPE}))
+    (directory / "input.json").write_text(json.dumps({"universe": BOOK}))
+    for sid, role, tools, script, data in (
+            (ANALYST, "analyst", ANALYST_TOOLS, "headline-analyst", ["headlines"]),
+            (PM, "pm", PM_TOOLS, "signal-pm", [])):
+        spec = {"id": sid, "name": sid, "role": role, "pod": 1, "charter": CHARTERS[sid],
+                "tools": tools, **({"data": data} if data else {})}
+        spec |= ({"provider": "fake-metered", "script": script,
+                  "budget_usd": REHEARSAL_BUDGET_USD} if provider == "fake-metered"
+                 else {"provider": provider, "model": REAL_MODEL, "budget_usd": REAL_BUDGET_USD})
+        (directory / "specs" / f"{sid}.yaml").write_text(json.dumps(spec))
+
+
+def _gt():
+    sys.path.insert(0, str(REPO / "acceptance"))
+    import generation_turnover as gt
+    return gt
+
+
+def _tool_results(wake: dict) -> dict:
+    """A wake's tool results by call id (a refused call's text as it came)."""
+    out = {}
+    for m in wake.get("transcript") or []:
+        if m.get("role") == "tool" and m.get("tool_call_id"):
+            try:
+                out[m["tool_call_id"]] = json.loads(m["content"])
+            except ValueError:
+                out[m["tool_call_id"]] = m["content"]
+    return out
+
+
+def _calls(wake: dict) -> list[dict]:
+    return [c for m in wake.get("transcript") or [] for c in m.get("tool_calls") or []]
+
+
+def hosted_lawful(rec: dict, label: str) -> dict:
+    """What physics did with whatever the minds asked, from the recording alone."""
+    params = rec.get("parameters") or {}
+    check(f"{label}: the run is the one this idea describes: {STEPS} mornings of {DAYS_PER_STEP} "
+          f"day, package {PACKAGE}, thinking charged each step, {MAX_TOOL_CALLS} tool calls a wake",
+          (params.get("steps"), params.get("days_per_step"), params.get("package"),
+           params.get("charge_each_step"), params.get("max_tool_calls"))
+          == (STEPS, DAYS_PER_STEP, PACKAGE, True, MAX_TOOL_CALLS),
+          json.dumps({k: params.get(k) for k in ("steps", "days_per_step", "package",
+                                                 "charge_each_step", "max_tool_calls")}))
+    ledger = [(r[0], r[1], r[2], r[3], json.loads(r[4])) for r in rec["ledger"]["rows"]]
+    of = lambda t: [dict(p, _on=ts[:10], _actor=a) for _, ts, a, ty, p in ledger if ty == t]  # noqa: E731
+    agents = {p["name"]: p["agent_id"] for p in of("agent_registered")}
+    grants = {p["agent_id"]: p["rights"] for p in of("data_rights_granted")}
+    check(f"{label}: the operator's registrar gave the analyst headlines at registration, the PM "
+          "nothing", grants == {agents.get(ANALYST): ["headlines"]}, json.dumps(grants))
+    steps = (rec.get("outcome") or {}).get("run", {}).get("steps") or []
+    pkgs: dict[str, list[dict]] = {ANALYST: [], PM: []}
+    for step in steps:
+        for w in step.get("wakes") or []:
+            ctx = json.loads(w["transcript"][1]["content"]) if len(w.get("transcript") or []) > 1 else {}
+            if w.get("spec_id") in pkgs and "package" in ctx:
+                pkgs[w["spec_id"]].append(ctx["package"])
+    a, p = pkgs[ANALYST], pkgs[PM]
+    check(f"{label}: every morning the analyst's package held the headlines, never one dated "
+          "after its day", len(a) == STEPS and all(
+              "headlines" in k and all(x["day"] <= k["day"] for x in k["headlines"]) for k in a),
+          f"{len(a)} packages, {sum(len(k.get('headlines', [])) for k in a)} headlines in all")
+    check(f"{label}: every morning the PM's package held prices, its headlines refused by name",
+          len(p) == STEPS and all("headlines" not in k and "no right to headlines" in
+                                  (k.get("refused") or {}).get("headlines", "") and k["bars"]
+                                  for k in p), f"{len(p)} packages")
+    fraud_in = [k["day"] for k in a if any(x["ticker"] == "K03" and "fraud" in x["title"]
+                                           for x in k["headlines"])]
+    check(f"{label}: the fraud headline reached the analyst on its day and not before",
+          bool(fraud_in) and min(fraud_in) == FRAUD.isoformat(), f"in its packages of {fraud_in}")
+    denied = [d for d in of("permission_denied") if d["_actor"] == agents.get(PM)]
+    check(f"{label}: each refusal of the PM is physics' own, logged",
+          len(denied) >= STEPS and all(d["action"] == "read_headlines" for d in denied),
+          f"{len(denied)} refusals logged")
+    leaked = {k for step in steps for w in step.get("wakes") or []
+              for m in w.get("transcript") or [] for k in keys_of(_jsonish(m.get("content")))}
+    check(f"{label}: nothing any mind was shown says what an item does or which is a cause",
+          not leaked & set(SEALED), "no sealed word among the keys of anything shown")
+    fills = of("order_filled")
+    sold = [f for f in fills if f["ticker"] == "K03" and f["side"] == "sell"]
+    return {"agents": agents, "fills": fills, "sold_k03": sold, "steps": steps}
+
+
+def _jsonish(text):
+    try:
+        return json.loads(text) if isinstance(text, str) else text
+    except ValueError:
+        return None
+
+
+def rehearsal() -> None:
+    """B0, $0: the hosted desk with scripted minds billed per step, made with the real run's very
+    command, recorded and verified now."""
+    gt = _gt()
+    with tempfile.TemporaryDirectory(prefix="fund-data-") as t:
+        tmp = Path(t)
+        write_world(tmp, "fake-metered")
+        r = gt.fund_runtime(command("rehearsal.cassette.json"), tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted desk completes and is recorded",
+                     r.returncode == 0 and tape.is_file(),
+                     f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-400:] if r.returncode else 'completed'}"):
+            return
+        text = tape.read_text(encoding="ascii")
+    rec = json.loads(text)
+    done = hosted_lawful(rec, "B0")
+    bought = sorted({f["ticker"] for f in done["fills"] if f["side"] == "buy"})
+    check("B0: the scripted PM bought its book, and sold K03 the morning its analyst read the "
+          "fraud headline (the scripted chain, so physics' part is proven)",
+          bought == BOOK and [f["_on"] for f in done["sold_k03"]] == [FRAUD.isoformat()],
+          f"bought {bought}; sold K03 on {[f['_on'] for f in done['sold_k03']]}")
+    before = len(gt.FAILED)
+    gt.verify(text, "B0")
+    FAILED.extend(gt.FAILED[before:])
+
+
 def part_b() -> None:
-    print("\n== B0 / B: the Runtime and real minds ==")
-    check("B0: hosted through the Runtime with the real run's command, replay IDENTICAL",
-          (EVIDENCE / "rehearsal").is_dir(), "not built yet")
+    print("\n== B0: the same hosted through the Runtime, replayed ==", flush=True)
+    rehearsal()
+    print("\n== B: real minds, recorded ==", flush=True)
     check("B: real Haiku minds recorded, replay IDENTICAL for $0",
-          (EVIDENCE / "cassette.json").is_file(), "not recorded yet")
+          (EVIDENCE / "news.cassette.json").is_file(), "not recorded yet")
 
 
 def main() -> int:
@@ -318,4 +479,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--write-world"]:   # the files a recorded run is made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        print("fund-runtime " + " ".join(command("news.cassette.json")))
+        raise SystemExit(0)
     sys.exit(main())
