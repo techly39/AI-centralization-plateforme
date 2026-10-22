@@ -10,6 +10,10 @@ ended, stamped at that day's end.
 The bars are the world: whoever holds them knows every future close. ``world()`` records only a
 fingerprint (SHA-256 of the canonical bars), so a run names the market it lived in without carrying
 it, and refuses to resume under different bars. Daily bars only.
+
+It may also hold the world's news (dated items, :class:`app.marketdata.base.Item`), served by the
+base under the same law: an item published after the world's now does not exist. A market with
+news records the news' fingerprint too; one without records exactly what it always did.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from app.marketdata.base import (
     Bar,
     InvalidRequestError,
+    Item,
     MarketDataProvider,
     Quote,
     UnknownTickerError,
@@ -38,7 +43,7 @@ class BarsProvider(MarketDataProvider):
 
     name = "bars"
 
-    def __init__(self, bars: Mapping[str, Sequence[Bar]]) -> None:
+    def __init__(self, bars: Mapping[str, Sequence[Bar]], news: Sequence[Item] = ()) -> None:
         table: dict[str, tuple[list[date], list[Bar]]] = {}
         for raw, rows in bars.items():
             symbol = normalise_ticker(raw)
@@ -67,11 +72,25 @@ class BarsProvider(MarketDataProvider):
                  for d, b in zip(days, rows)] for s, (days, rows) in sorted(table.items())},
             separators=(",", ":"), sort_keys=True)
         self._fingerprint = hashlib.sha256(canonical.encode()).hexdigest()[:FINGERPRINT_HEX]
+        self._items = sorted(news, key=lambda x: x.published)
+        self._published = [x.published for x in self._items]
+        self._news_fingerprint = None if not self._items else hashlib.sha256(json.dumps(
+            [[x.id, x.kind, x.published.isoformat(), x.ticker, x.title, x.body, x.figures]
+             for x in self._items], separators=(",", ":"), sort_keys=True).encode()
+        ).hexdigest()[:FINGERPRINT_HEX]
 
     def world(self) -> dict[str, object]:
         """The market's fingerprint and its tickers; never a bar."""
-        return {"provider": self.name, "reproducible": True,
-                "symbols": sorted(self._table), "bars_fingerprint": self._fingerprint}
+        record: dict[str, object] = {"provider": self.name, "reproducible": True,
+                                     "symbols": sorted(self._table),
+                                     "bars_fingerprint": self._fingerprint}
+        if self._news_fingerprint is not None:
+            record["news_fingerprint"] = self._news_fingerprint
+        return record
+
+    def _news(self, *, since: date, as_of: datetime) -> list[Item]:
+        last = as_of.astimezone(timezone.utc).date()
+        return self._items[bisect_left(self._published, since):bisect_right(self._published, last)]
 
     def _series(self, symbol: str) -> tuple[list[date], list[Bar]]:
         series = self._table.get(symbol)

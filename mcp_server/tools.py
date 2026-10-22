@@ -488,6 +488,36 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """Write the firm's direction: every PM reads it in its capital view. The manager only."""
         return await call("POST", "/direction", body={"text": text})
 
+    # --- Data: the world's news, handed by role ---------------------------------
+
+    @api_tool(server, method="GET", path="/headlines")
+    async def read_headlines(
+        days: Annotated[int, Field(description="Today and the days before it: 1 = today's only.",
+                                   ge=1, le=31)] = 3,
+        ticker: Annotated[str | None, Field(description="Only the headlines about one ticker.",
+                                            max_length=16)] = None,
+    ) -> Any:
+        """The world's headlines published up to today, oldest first: about one company or the
+        whole market. Only for a mind given the headlines right (get_data_rights)."""
+        return await call("GET", "/headlines", params={"days": days, "ticker": ticker})
+
+    @api_tool(server, method="GET", path="/reports")
+    async def read_reports(
+        days: Annotated[int, Field(description="Today and the days before it (a quarter is 91).",
+                                   ge=1, le=400)] = 91,
+        ticker: Annotated[str | None, Field(description="Only one company's reports.",
+                                            max_length=16)] = None,
+    ) -> Any:
+        """Companies' quarterly reports published up to today, oldest first: revenue, earnings
+        per share against what was expected, guidance. Only for a mind given the company right
+        (get_data_rights)."""
+        return await call("GET", "/reports", params={"days": days, "ticker": ticker})
+
+    @api_tool(server, method="GET", path="/data/rights")
+    async def get_data_rights() -> Any:
+        """What you may read: prices always; headlines and company reports only if granted."""
+        return await call("GET", "/data/rights")
+
     # --- Team: the analysts a PM builds its pod with ---------------------------
 
     @api_tool(server, method="GET", path="/team")
@@ -516,6 +546,27 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         by your pod: it lowers your fitness and capital score. A refusal says why."""
         return await call("POST", "/team/analysts", body={
             "charter": charter, "model": model, "budget_usd": budget_usd})
+
+    @api_tool(server, method="POST", path="/team/analysts")
+    async def request_analyst_with_data(
+        charter: Annotated[str, Field(description=(
+            "Who the analyst is and what it must do, in your words: it is all it is told about "
+            "its job."), min_length=1, max_length=2000)],
+        model: Annotated[str, Field(description="A model from the team law's pool (get_team).",
+                                    min_length=1, max_length=100)],
+        budget_usd: Annotated[float, Field(description=(
+            "Its thinking budget, USD: its key's limit, taken from your pod's team budget."),
+            gt=0, le=50)],
+        data: Annotated[list[Literal["headlines", "company"]], Field(description=(
+            "What it reads beyond prices, from the team law's list (get_team): 'headlines', "
+            "'company' (quarterly reports). You need not read them yourself."),
+            min_length=1, max_length=2)],
+    ) -> Any:
+        """Ask for an analyst for your pod who reads data beyond prices (headlines, company
+        reports). PMs only. Otherwise exactly request_analyst: hired the next morning into your
+        pod, paid by your pod. A refusal says why."""
+        return await call("POST", "/team/analysts", body={
+            "charter": charter, "model": model, "budget_usd": budget_usd, "data": data})
 
     @api_tool(server, method="POST", path="/team/places/{place_id}/let-go")
     async def let_go_analyst(

@@ -26,8 +26,8 @@ import calendar
 import math
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from typing import Literal
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Any, Literal
 
 # Intervals we accept on /ohlcv. Kept deliberately small: these are the ones
 # yfinance serves reliably and the ones a daily-horizon fund actually needs.
@@ -104,11 +104,31 @@ class Bar:
     volume: float
 
 
+@dataclass(frozen=True, slots=True)
+class Item:
+    """One dated item of a world's news (idea: data packages), as physics serves it. Published at
+    its day's 00:00 UTC: it exists from that moment on, never before. Nothing in it says whether
+    it moves a price."""
+
+    id: str
+    kind: Literal["headline", "report"]
+    published: date
+    ticker: str | None
+    title: str
+    body: str
+    #: A report's numbers: quarter, revenue (USD millions), eps, expected eps, guidance.
+    figures: dict[str, Any] | None = None
+
+    @property
+    def at(self) -> datetime:
+        return datetime.combine(self.published, time(), tzinfo=UTC)
+
+
 # --- Interface --------------------------------------------------------------
 
 #: The public entries a subclass may not override: the look-ahead guard is in
 #: them, and an override would be a provider that skips it.
-_GUARDED = ("get_price", "get_ohlcv")
+_GUARDED = ("get_price", "get_ohlcv", "get_news")
 
 
 def _refuse_override(owner: str, method: str) -> TypeError:
@@ -217,6 +237,22 @@ class MarketDataProvider(metaclass=_SealedEntries):
                 f"{end.isoformat()}) had ended by {as_of.isoformat()}"
             )
         return ended
+
+    def get_news(self, *, kind: Literal["headline", "report"], as_of: datetime, since: date,
+                 ticker: str | None = None) -> list[Item]:
+        """The world's items of ``kind`` published from ``since`` up to ``as_of`` (about
+        ``ticker``, when given), oldest first. An item published after ``as_of`` does not exist:
+        it is never served, whatever the implementation returns."""
+        _require_aware(as_of)
+        symbol = None if ticker is None else normalise_ticker(ticker)
+        return [item for item in self._news(since=since, as_of=as_of)
+                if item.kind == kind and since <= item.published and item.at <= as_of
+                and (symbol is None or item.ticker == symbol)]
+
+    def _news(self, *, since: date, as_of: datetime) -> list[Item]:
+        """The implementation's items from ``since`` to ``as_of`` (the base filters again).
+        A world with no news has none."""
+        return []
 
     def world(self) -> dict[str, object]:
         """The market this provider serves, as a JSON record a run's ledger keeps.

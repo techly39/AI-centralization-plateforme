@@ -55,6 +55,9 @@ class AgentSpec(BaseModel):
     #: Backtest lockstep: wake on every step, or never (a spec kept on file).
     wake_policy: Literal["every_step", "never"] = "every_step"
     mutations: tuple[str, ...] = ()
+    #: The data it reads beyond prices (idea: data packages), granted by the operator's registrar
+    #: when it is registered: a PM's or an analyst's only.
+    data: tuple[Literal["headlines", "company"], ...] = Field(default=(), max_length=2)
 
     @model_validator(mode="after")
     def _pod_roles_have_a_pod(self) -> AgentSpec:
@@ -62,6 +65,8 @@ class AgentSpec(BaseModel):
             raise ValueError(f"a {self.role} belongs to a pod: set `pod`")
         if self.role == "manager" and self.pod is not None:
             raise ValueError("the firm's manager sits above the pods: it has no `pod`")
+        if self.data and self.role not in {"pm", "analyst"}:
+            raise ValueError("only a PM or an analyst is given `data`")
         return self
 
 

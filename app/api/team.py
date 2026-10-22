@@ -5,7 +5,7 @@ place the next morning. A pod's PM and analysts read their team; management read
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,6 +40,9 @@ class AnalystIn(BaseModel):
     model: str = Field(min_length=1, max_length=100,
                        description="A model from the team law's pool (GET /team).")
     budget_usd: float = Field(gt=0, le=50, description="Its thinking budget (its key's limit).")
+    data: list[Literal["headlines", "company"]] = Field(
+        default_factory=list, max_length=2,
+        description="The data it reads beyond prices, from the team law's list (GET /team).")
 
 
 class RefuseIn(BaseModel):
@@ -88,10 +91,10 @@ def post_analyst(
 ) -> dict[str, Any]:
     """Ask for an analyst for your pod. Granted: a team place, hired the next morning (201).
     Refused by name (409, in the ledger): the law off, the pool, the pod's limit, its team budget,
-    the Human's agent cap. PMs only."""
+    the Human's agent cap, data the law does not list. PMs only."""
     try:
         return request_analyst(session, actor=actor, charter=body.charter, model=body.model,
-                               budget_usd=body.budget_usd)
+                               budget_usd=body.budget_usd, data=body.data)
     except TeamError as exc:
         raise _answer(exc) from exc
 

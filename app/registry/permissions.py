@@ -37,6 +37,8 @@ class Action(str, enum.Enum):
     READ_PITCHES = "read_pitches"          # own pod's pitches and research; others need READ_CROSS_POD
     REQUEST_TEAM = "request_team"          # a PM asks for (and lets go) its own pod's analysts
     MANAGE_FIRM = "manage_firm"            # the manager mind: pick a freed place's hire, set direction
+    READ_HEADLINES = "read_headlines"      # the world's headlines, with the agent's data right
+    READ_COMPANY_DATA = "read_company_data"  # companies' quarterly reports, with the data right
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -68,6 +70,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.READ_OWN_PORTFOLIO,
             Action.RUN_RESEARCH,
             Action.READ_PITCHES,
+            Action.READ_HEADLINES,
+            Action.READ_COMPANY_DATA,
         }
     ),
     AgentRole.pm: _UNIVERSAL
@@ -83,6 +87,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.SUBMIT_PITCH,
             Action.READ_PITCHES,
             Action.REQUEST_TEAM,
+            Action.READ_HEADLINES,
+            Action.READ_COMPANY_DATA,
         }
     ),
     AgentRole.management: _UNIVERSAL
@@ -167,3 +173,64 @@ def may_declare_model(session: Any, actor: Any, role: AgentRole) -> bool:
     the reproduction law) is the operator's registrar's act, and only for a PM: a firm mind that
     registers agents does not put a model on the record (red-team, designs reproduce)."""
     return role == AgentRole.pm and may_hire(session, actor)
+
+
+# --- data rights (idea: data packages) ----------------------------------------------------------
+
+#: What an agent may be granted beyond prices, which every reader holds. Each is one Action.
+DATA_RIGHTS: dict[str, Action] = {"headlines": Action.READ_HEADLINES,
+                                  "company": Action.READ_COMPANY_DATA}
+
+
+def data_rights(session: Any, agent_id: int) -> frozenset[str]:
+    """The data rights the ledger grants ``agent_id`` (never taken back while it lives): folded
+    from ``data_rights_granted``, so a rebuilt world holds exactly the same."""
+    from sqlalchemy import select
+
+    from app.db.models import Event
+    from app.ledger.events import EVENT_DATA_RIGHTS_GRANTED
+
+    held: set[str] = set()
+    for payload in session.scalars(select(Event.payload_json).where(
+            Event.type == EVENT_DATA_RIGHTS_GRANTED)):
+        if payload.get("agent_id") == agent_id:
+            held.update(r for r in payload.get("rights", ()) if r in DATA_RIGHTS)
+    return frozenset(held)
+
+
+def data_right_problem(session: Any, agent: Any, right: str) -> str | None:
+    """Why ``agent`` may not read ``right``'s data, else ``None``. The role must hold the right's
+    action, and the agent the right itself (physics' own identity reads everything)."""
+    if right not in DATA_RIGHTS:
+        return f"no data named {right!r}"
+    if agent.role == AgentRole.system:
+        return None
+    if not has_permission(agent.role, DATA_RIGHTS[right]):
+        return f"a {agent.role.value} reads no {right}: only PMs and analysts are given data"
+    if right not in data_rights(session, agent.id):
+        return (f"you hold no right to {right}: your data is "
+                f"{', '.join(['prices', *sorted(data_rights(session, agent.id))])} (the operator "
+                f"grants data at registration; a PM may ask for an analyst with it)")
+    return None
+
+
+def may_grant_data(session: Any, actor: Any, role: AgentRole) -> bool:
+    """Granting data at registration is the operator's registrar's act, and only to a PM or an
+    analyst: a firm mind that registers agents hands out no data."""
+    return role in (AgentRole.pm, AgentRole.analyst) and may_hire(session, actor)
+
+
+def grant_data(session: Any, *, agent_id: int, rights: Any, by: Any, how: str) -> None:
+    """Write ``data_rights_granted`` (nothing when ``rights`` is empty). The caller has checked
+    who may grant, and owns the transaction."""
+    from app.ledger.events import EVENT_DATA_RIGHTS_GRANTED, append_event
+
+    rights = sorted(set(rights))
+    if not rights:
+        return
+    if not set(rights) <= set(DATA_RIGHTS):
+        raise ValueError(f"data rights are {sorted(DATA_RIGHTS)}")
+    append_event(session, type=EVENT_DATA_RIGHTS_GRANTED,
+                 actor_agent_id=by.id if by is not None else None,
+                 payload={"agent_id": agent_id, "rights": rights,
+                          "by": by.name if by is not None else None, "how": how})
