@@ -398,9 +398,13 @@ def check_pick(ledger, pods, seen, tried, boards, final_board, boss) -> None:
     read = seen.get(hired, {})
     hire = (read.get("vacancy") or {}).get("hire") or {}
     capital = read.get("capital") or {}
+    filled = next((p for p in of(ledger, "vacancy_filled") if p["vacancy_id"] == v.get("_id")),
+                  {})
     check("pick: the next morning exactly the pick is hired: its design under the place's names, "
-          "budget and charter", hired is not None and design(hire) == other.get("hire")
-          and all(hire.get(k) == v["hire"][k] for k in FRAME),
+          "budget and charter, on the pick's model", hired is not None
+          and design(hire) == other.get("hire") and all(hire.get(k) == v["hire"][k] for k in FRAME)
+          and filled.get("model") == other.get("hire", {}).get("model")
+          and other.get("hire", {}).get("model") != v["hire"]["model"],
           f"{hired}: {hire.get('design')} of {(hire.get('parent') or {}).get('pod_name')}, on "
           f"{hire.get('model')}, change {(hire.get('change') or {}).get('what')}")
     family = ((capital.get("generation") or {}).get("your_pod") or {}).get("family") or {}
@@ -620,6 +624,12 @@ def hosted_lawful(rec: dict, label: str) -> list[dict]:
             # the hire's design is what its first wake was handed and its PM was registered as
             hired = {k: given.get(k) for k in ("parent", "change", "inherited_rule")
                      if k in want}
+            # ... and the model it runs is the pick's: physics' record and the mind's own wakes
+            models = {w.get("model") for st in run.get("steps") or [] for w in st["wakes"]
+                      if w["spec_id"] == spec} - {None}
+            if fill.get("model") != want.get("model") or not models <= {want.get("model")}:
+                bad.append(f"vacancy {v['vacancy_no']}: hired on {fill.get('model')} "
+                           f"(its wakes: {sorted(models)}), the pick is on {want.get('model')}")
             if hired != {k: want[k] for k in hired} or (
                     bool(mine) != ("brief" in given)
                     or (mine and (given.get("brief") or {}).get("text") != mine[0]["brief"])):
@@ -637,7 +647,9 @@ def hosted_lawful(rec: dict, label: str) -> list[dict]:
             r["candidate"] not in {c["id"] for v in opened if v["_id"] == r["vacancy_id"]
                                    for c in v.get("candidates") or []}
             or any(p["vacancy_id"] == r["vacancy_id"] and p["_id"] < r["_id"] for p in picks)
-            or (filled.get(r["vacancy_id"]) or {}).get("_id", 1e18) < r["_id"])
+            or (filled.get(r["vacancy_id"]) or {}).get("_id", 1e18) < r["_id"]
+            or any(v["_id"] == r["vacancy_id"] and v.get("fill_from")
+                   and r["_on"] >= v["fill_from"] for v in opened))   # the manager's day over
         for r in refusals)
     check(f"{label}: every freed place listed the law's hires (c1 the law's own) and waited a day; "
           "every pick was the manager's, from its list, once, before the fill; each fill hired "
