@@ -110,6 +110,12 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   analyst it describes (`app/capital/team.py`, `app/api/team.py`, law `team:` off by default); the
   Runtime hires granted places each morning (`runtime/onboarding.py`); a daily per-sender message
   quota in `app/bus/messages.py`.
+- A manager above the pods (cycle 66, ADR-054): role `manager` (right `manage_firm`, no pod, only
+  the operator's registrar makes one); `app/capital/management.py` + `app/api/management.py`
+  (`GET /board`, `POST /vacancies/{id}/pick`, `GET/POST /direction`), law `management:` off by
+  default: a freed place lists the hires the law allows and waits a day; the Runtime's morning
+  hire skips it until then. Reproduction law edition 2 (a family's attempts); recipes naming no
+  edition live by edition 1.
 - Every kept recording under `evidence/` replays IDENTICAL in the suite
   (`tests/test_evidence_replays.py`); a missing one fails it.
 

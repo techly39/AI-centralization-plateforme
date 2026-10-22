@@ -131,7 +131,7 @@ engineers, a PM choosing its analyst's tools, the team as an inherited gene, a t
 
 ### Management above the pods
 From: Human
-Status: building
+Status: working
 A manager sits above pods #1, #2, #3. Management (the CEO, the firm's vision) sees the basic data
 of every pod: cash, positions (size and amount), exposures, costs. The CEO sets the firm's
 direction; the algorithm (not the CEO) moves the capital.
@@ -146,6 +146,14 @@ pool) with the law's default marked; the manager may pick one and write the new 
 the morning hire, else the default stands (a silent manager never blocks turnover). It writes the
 firm's direction, which every PM reads. It never moves capital, never hires or fires by itself:
 the Runtime's registrar still does both. Its thinking is the centre's cost, against the firm's P&L.
+Now (cycle 66, ADR-054): built. A manager mind (role `manager`: it reads every pod on its board,
+picks, briefs and writes the firm's direction; it cannot trade, pitch, hire, fire or move capital;
+only the operator makes one) sees each freed place's list (c1 the law's own hire, a child of each
+other fit pod, a plain hire on each model) for one day; its pick is hired exactly, silence keeps
+the law's hire. Its thinking is the centre's. A real Haiku manager over three months of real
+Haiku PMs (recorded twice, $0.59 each): both times it kept the law's own hire, wrote a brief for
+the new PM, and never wrote a direction. Not yet: a manager that opens pods, fires early, or
+judges a pitch; departments.
 
 ### The pitch, then a full report
 From: Human
@@ -489,6 +497,11 @@ analyst a PM hires brings its own daily message quota, so a pod can send a rival
 times the quota (low); after a backwards clock step the quota's day misses earlier messages (low,
 not an agent's lever). Auditor notes: an analyst hire the cap refuses is retried every morning
 (one ledger row each); the team endpoints answer untyped dicts.
+From a manager chooses the hires (cycle 66, red-team 4 holes, all fixed). Auditor notes: the board
+shows every pod's live rule to the manager, and a brief or the direction can pass it to a plain
+hire, who would then pitch it without that family's attempts counted (agent freedom: watch for it
+in a finding, not patched); runs set up from `config.yaml` without a recipe now get the
+reproduction law's second edition by default.
 From the real-model month (cycle 43, ADR-047 known limits): the mint lock is one file per copy of
 the repo, so two clones minting at the same moment do not share it, and a lagging key list can hide
 a fresh mint; a turn whose cost went unstated is waited for 30 s, after which the ledger may record
@@ -567,7 +580,7 @@ a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a,
 results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
 real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycle 59: 2a, a
 generation turns over every month. Done, cycle 62: 2b, designs reproduce. Done, cycle 64: a PM
-builds its team.)
+builds its team. Done, cycle 66: a manager chooses the hires.)
 
 Cycle 65 plan: a manager chooses the hires moves first. Why: the firm now selects, reproduces and
 lets PMs hire, but every decision above the pods is still a law: who fills a freed place is the
