@@ -450,6 +450,44 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         open, the refusal is in the ledger. Needs the right to register agents."""
         return await call("POST", f"/vacancies/{vacancy_id}/refuse", body={"reason": reason})
 
+    # --- Management: the firm's manager above the pods ------------------------
+
+    @api_tool(server, method="GET", path="/board")
+    async def read_board() -> Any:
+        """The firm's board: every pod not closed (cash, positions, exposures, the capital the
+        centre put in, its risk stage and drawdown, its thinking cost, last month's fitness, its
+        design), the centre's cash and thinking cost, the open vacancies and the direction.
+        Management only."""
+        return await call("GET", "/board")
+
+    @api_tool(server, method="POST", path="/vacancies/{vacancy_id}/pick")
+    async def pick_hire(
+        vacancy_id: Annotated[int, Field(description="The open vacancy (read_board, list_vacancies).",
+                                         ge=1, le=MAX_ID)],
+        candidate: Annotated[str, Field(description="A candidate's id from its list (c1, c2, ...).",
+                                        min_length=1, max_length=16)],
+        brief: Annotated[str, Field(description="What the new PM is told from you on its first "
+                                                "morning.", max_length=2000)] = "",
+    ) -> Any:
+        """Pick who fills a freed place: one of the candidates its vacancy lists, once, before
+        the morning it is filled. If you do not pick, the law's default (c1) is hired. You never
+        hire, fire or move capital yourself. The manager only."""
+        return await call("POST", f"/vacancies/{vacancy_id}/pick",
+                          body={"candidate": candidate, "brief": brief})
+
+    @api_tool(server, method="GET", path="/direction")
+    async def get_direction() -> Any:
+        """The firm's direction, as its manager last wrote it (null while none is written)."""
+        return await call("GET", "/direction")
+
+    @api_tool(server, method="POST", path="/direction")
+    async def set_direction(
+        text: Annotated[str, Field(description="The firm's direction, in your words: every PM "
+                                               "reads it.", min_length=1, max_length=2000)],
+    ) -> Any:
+        """Write the firm's direction: every PM reads it in its capital view. The manager only."""
+        return await call("POST", "/direction", body={"text": text})
+
     # --- Team: the analysts a PM builds its pod with ---------------------------
 
     @api_tool(server, method="GET", path="/team")

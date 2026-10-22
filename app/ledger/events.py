@@ -84,6 +84,12 @@ EVENT_TEAM_HIRE_REFUSED = "team_hire_refused"  # payload: {place_id, reason, by}
 EVENT_TEAM_PLACE_CLOSED = "team_place_closed"  # payload: {place_id, pod_id, reason}: never filled
 EVENT_TEAM_MEMBER_LET_GO = "team_member_let_go"  # payload: {place_id, pod_id, agent_id, agent_name, reason, by}
 
+# Management (app/capital/management.py): a manager mind picks a freed place's hire among the
+# candidates its vacancy lists, briefs the new PM, and writes the firm's direction.
+EVENT_HIRE_PICKED = "hire_picked"        # payload: {vacancy_id, candidate, brief, by, by_name}
+EVENT_HIRE_PICK_REFUSED = "hire_pick_refused"  # payload: {vacancy_id, candidate, reason, by}
+EVENT_DIRECTION_SET = "direction_set"    # payload: {direction_no, text, by, by_name}
+
 # OMS lifecycle events (audit only — no effect on derived state):
 EVENT_ORDER_PLACED = "order_placed"       # payload: {order_id, pod_id, ticker, side, ...}
 EVENT_ORDER_REJECTED = "order_rejected"   # payload: {order_id, reason, detail}

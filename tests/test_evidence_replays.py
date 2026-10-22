@@ -28,12 +28,15 @@ KEYS = {
     "generation-turnover/generations.cassette.json": b"fund-generation-turnover/1",
     "designs-reproduce/reproduce.cassette.json": b"fund-generation-turnover/1",
     "pm-builds-team/team.cassette.json": b"fund-generation-turnover/1",
+    "manager-chooses-hires/manager.cassette.json": b"fund-generation-turnover/1",
 }
 #: kept trials that do not replay against today's code, and why (each has its README line)
 TRIALS = {
     "pod-replacement/trial-1-refusal-unseen.cassette.json": "pitches now carry the capital answer",
     "firm-quarter/trial-1-meter-timeout.cassette.json": "stopped at step 26: only a completed "
                                                         "run replays",
+    "manager-chooses-hires/trial-1-before-the-law-named-the-manager.cassette.json":
+        "every PM's capital view now says the manager may pick another hire",
 }
 
 

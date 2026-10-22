@@ -215,6 +215,12 @@ _EVERY_ROUTE = [
     ("POST", "/team/places/1/let-go", None),
     ("POST", "/team/places/1/fill", None),
     ("POST", "/team/places/1/refuse", {"reason": "no"}),
+    # Management (a manager chooses the hires): the clock key reads no board, picks no hire,
+    # reads or writes no direction.
+    ("GET", "/board", None),
+    ("GET", "/direction", None),
+    ("POST", "/vacancies/1/pick", {"candidate": "c1"}),
+    ("POST", "/direction", {"text": "t"}),
 ]
 
 

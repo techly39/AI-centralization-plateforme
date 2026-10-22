@@ -483,4 +483,11 @@ def capital_view(session: Session, *, pod_id: int | None, cross: bool) -> dict[s
     generation = announcement(session, pod_id=pod_id)
     if generation is not None:
         view["generation"] = generation
+    # The manager's words, once written (a run without a manager reads as before).
+    from app.capital.management import brief_of, direction
+
+    if (said := direction(session)) is not None:
+        view["direction"] = said
+    if pod_id is not None and (brief := brief_of(session, pod_id)) is not None:
+        view["brief"] = brief
     return view

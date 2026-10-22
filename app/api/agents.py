@@ -18,7 +18,7 @@ from app.db.base import get_session
 from app.db.models import Agent, AgentRole
 from app.oms.service import OMS_LOCK
 from app.registry.auth import deny, get_current_agent, require
-from app.registry.permissions import Action, may_declare_model
+from app.registry.permissions import Action, may_declare_model, may_register_role
 from app.registry.service import (
     RegistryError,
     ReservedIdentityError,
@@ -44,6 +44,13 @@ def register(
         raise deny(session, actor, Action.REGISTER_AGENTS,
                    detail="only the operator's registrar declares a model, and only a PM's",
                    context={"name": body.name, "role": body.role})
+    if not may_register_role(session, actor, AgentRole(body.role)):
+        raise deny(session, actor, Action.REGISTER_AGENTS,
+                   detail="only the operator's registrar makes the firm's manager",
+                   context={"name": body.name, "role": body.role})
+    if body.role == AgentRole.manager.value and body.pod_id is not None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="the firm's manager sits above the pods: it has no pod")
     try:
         with OMS_LOCK:  # the cap is counted and the agent committed with no other maker between
             if body.pod_id is not None and (

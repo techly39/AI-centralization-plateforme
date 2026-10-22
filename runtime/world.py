@@ -57,7 +57,8 @@ MAX_RECIPE_BYTES = 64 * 1024
 MAX_PODS = 16
 MAX_EXTRA_SYMBOLS = 50
 #: The ``config.yaml`` sections a recipe may set for its world.
-LAW_SECTIONS = frozenset({"capital", "hiring", "generation", "reproduction", "team"})
+LAW_SECTIONS = frozenset({"capital", "hiring", "generation", "reproduction", "team",
+                          "management"})
 _NAME = r"^[a-z][a-z0-9-]{0,62}$"
 _KEY = re.compile(r"\bfk_\S+")
 _SERVE_WAIT_SECONDS = 60
@@ -202,6 +203,11 @@ def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
         # recording made before cycle 54 replays as recorded (auditor, the firm lives a quarter).
         env["FUND_GATES__CLOSED_POD_PITCHES_BIND"] = "true"
     for section, law in (laws or {}).items():
+        if section == "reproduction" and "edition" not in law:
+            # A recipe that names no edition of the reproduction law lives by its first (a
+            # parent's line counted, the old draw), so every recording made before cycle 66
+            # replays as recorded.
+            env["FUND_REPRODUCTION__EDITION"] = "1"
         for name, value in law.items():
             # A text as it is; a number, a flag or a list as JSON (how the settings read them).
             env[f"FUND_{section.upper()}__{name.upper()}"] = (

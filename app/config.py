@@ -229,6 +229,27 @@ class ReproductionConfig(BaseModel):
     on: bool = False
     # The draw of each child's one change: random.Random(f"{seed}:{vacancy number}").
     seed: int = Field(default=0, ge=0, le=2**31)
+    # The law's edition. 2 (cycle 66): a child's attempts are its whole family's (siblings and
+    # failed hires too), and a parent whose model is not on the record passes on a model change
+    # only (its child's model is the pool's: that is its one change). A run frozen before the
+    # edition existed reads 1: the parent's line only, and the old draw.
+    edition: int = Field(default=2, ge=1, le=2)
+
+
+class ManagementConfig(BaseModel):
+    """The management law (idea: management above the pods; first slice, a manager chooses the
+    hires): a freed place's vacancy lists every hire the law allows (its own default, a child of
+    each other fit pod, a plain hire on each model of the pool) and waits ``wait_days`` for the
+    firm's manager to pick one and brief the new PM; silent, the default stands. Off by default,
+    so every run recorded before it replays as it was. Frozen into the run's first vacancy."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    on: bool = False
+    # Children of fit pods other than the default's parent offered, fittest first.
+    other_parents: int = Field(default=2, ge=0, le=8)
+    # Days a listed place waits for the manager's pick before the Runtime may fill it.
+    wait_days: int = Field(default=1, ge=1, le=31)
 
 
 class TeamConfig(BaseModel):
@@ -354,6 +375,7 @@ class Settings(BaseSettings):
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     reproduction: ReproductionConfig = Field(default_factory=ReproductionConfig)
     team: TeamConfig = Field(default_factory=TeamConfig)
+    management: ManagementConfig = Field(default_factory=ManagementConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

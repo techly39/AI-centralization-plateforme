@@ -152,7 +152,7 @@ def test_redteam_reproduction_an_analysts_declared_model_becomes_its_pods_design
 
 # --- the child's one change ---------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="known physics hole (low, red-team designs reproduce): a parent with no declared model gives a child two changes, one unrecorded")
+# Fixed in cycle 66 (the reproduction law's second edition).
 def test_redteam_reproduction_a_child_of_an_undeclared_model_differs_in_two_things(
         client, db, SessionFactory, make_pod, pm_factory, reproduction_on):
     """SEVERITY: low (a mislabelled record: "exactly one change" is not what was hired).
@@ -179,7 +179,7 @@ def test_redteam_reproduction_a_child_of_an_undeclared_model_differs_in_two_thin
 
 # --- the family's attempts ----------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="known physics hole (medium, red-team designs reproduce): a sibling's attempts on the family's design are not in the next child's N")
+# Fixed in cycle 66 (the reproduction law's second edition).
 def test_redteam_reproduction_a_siblings_attempts_vanish_from_the_familys_count(
         client, db, SessionFactory, make_pod, admin_key, pm_factory, reproduction_on):
     """SEVERITY: medium (trials split across correlated clones: a lower deflated-Sharpe N).

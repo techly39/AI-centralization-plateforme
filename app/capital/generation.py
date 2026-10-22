@@ -437,12 +437,19 @@ def _your_pod(session: Session, pod_id: int, law: GenerationConfig,
     row = None if last is None else next(
         (p for p in last.payload_json["pods"] if p["pod_id"] == pod_id), None)
     hire = hire_of(session, pod_id) or {}
+    from app.capital.management import pick_of
+
+    # The manager picked another than the law's own hire (c1): its parent was the manager's choice.
+    chosen = (pick_of(session, pod_id) or {}).get("candidate") not in (None, "c1")
     family = None if hire.get("design") != "child" else {
         "parent": hire["parent"], "family": hire["family"], "change": hire["change"],
         "inherited_rule": hire["inherited_rule"],
         "inherited_attempts": hire["lineage_attempts"],
-        "note": (f"Your pod is a child of {hire['parent']['pod_name']}, the fittest pod of "
-                 f"generation {hire['parent']['generation']}: its model and rule with one change "
+        "note": (f"Your pod is a child of {hire['parent']['pod_name']}, "
+                 + (f"the fittest pod of generation {hire['parent']['generation']}" if not chosen
+                    else f"a fit pod of generation {hire['parent']['generation']} the firm's "
+                         f"manager chose")
+                 + f": its model and rule with one change "
                  f"({hire['change']['what']} {hire['change']['from']} -> "
                  f"{hire['change']['to']}). The inherited rule is your starting point: it earns "
                  f"capital only through your own pitch and the gates, and every pitch counts the "
@@ -460,6 +467,8 @@ def _your_pod(session: Session, pod_id: int, law: GenerationConfig,
 def announcement(session: Session, *, pod_id: int | None = None) -> dict[str, Any] | None:
     """The generation law in plain words, for every PM's capital view (``None`` while it is off);
     with ``pod_id``, what it says of that pod (:func:`_your_pod`)."""
+    from app.capital.management import management_law
+
     law = generation_law(session)
     if not law.on:
         return None
@@ -480,6 +489,10 @@ def announcement(session: Session, *, pod_id: int | None = None) -> dict[str, An
                     "fittest pod of the generation last measured (fitness above zero, still "
                     "alive), its model and rule with exactly one change, its parent named; with no "
                     "fit pod, the plain hire. Each month's end measures the firm's diversity."
-                    if reproduction_law(session).on else "")),
+                    if reproduction_law(session).on else "") + (
+                    " The firm's manager may instead pick, within a day of the place being freed, "
+                    "another hire the law lists (a child of another fit pod, or a plain hire) and "
+                    "brief the new PM; if it says nothing, the law's own hire stands."
+                    if management_law(session).on else "")),
         "grace_days": law.grace_days, "generation": window[0] if window else None,
         "next_judged_on": nxt.isoformat()}

@@ -74,6 +74,10 @@ def get_vacancy(
         raise deny(session, actor, Action.READ_CROSS_POD,
                    detail=f"vacancy {vacancy_id} is not the one your pod filled",
                    context={"vacancy_id": vacancy_id})
+    if "candidates" in found and not has_permission(actor.role, Action.READ_CROSS_POD):
+        # The management law's list holds other live pods' rules (each candidate's parent): a pod
+        # member reads its own hire only (red-team, a manager chooses the hires).
+        found = {k: v for k, v in found.items() if k != "candidates"}
     return found
 
 

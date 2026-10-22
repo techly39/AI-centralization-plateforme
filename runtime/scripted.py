@@ -406,6 +406,47 @@ def research_analyst(request: CompletionRequest) -> CompletionResponse:
                                             f"pod's research."})])
 
 
+def firm_manager(request: CompletionRequest) -> CompletionResponse:
+    """The firm's manager (idea: a manager chooses the hires): it reads the board, writes the
+    input's ``manager.direction`` once, and picks for every open place still waiting for it:
+    ``manager.pick`` is a candidate id, ``"other_child"`` (the first child of a pod other than
+    the default's parent) or absent (silent: the law's default stands), with ``manager.brief``.
+    Turn 0 reads the board; turn 1 acts; turn 2 is done."""
+    context = _context(request)
+    given = context["input"].get("manager")
+    given = given if isinstance(given, dict) else {}
+    turn = _turn(request)
+    if turn == 0:
+        return CompletionResponse(content="Reading the firm's board.", tool_calls=[
+            ToolCall(id="board", name="read_board", arguments={})])
+    if turn > 1:
+        return CompletionResponse(content="Done for today.")
+    board = _results(request).get("board")
+    if not isinstance(board, dict):
+        return CompletionResponse(content="I could not read the board; nothing today.")
+    calls: list[ToolCall] = []
+    if board.get("direction") is None and type(given.get("direction")) is str:
+        calls.append(ToolCall(id="direction", name="set_direction",
+                              arguments={"text": given["direction"]}))
+    want = given.get("pick")
+    for v in board.get("open_vacancies") or []:
+        listed = v.get("candidates") or []
+        if not listed or v.get("picked") is not None or want is None:
+            continue
+        if want == "other_child":
+            choice = next((c["id"] for c in listed if not c.get("default")
+                           and str(c.get("what", "")).startswith("a child of")), None)
+        else:
+            choice = want
+        if choice is not None:
+            calls.append(ToolCall(id=f"pick:{v['id']}", name="pick_hire", arguments={
+                "vacancy_id": v["id"], "candidate": choice,
+                "brief": str(given.get("brief") or "")}))
+    if not calls:
+        return CompletionResponse(content="Nothing to decide today.")
+    return CompletionResponse(content=f"Deciding: {len(calls)} call(s).", tool_calls=calls)
+
+
 #: The closed table: script name → policy. A spec names one of these keys.
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
@@ -415,4 +456,5 @@ SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "pitch-pm": pitch_pm,
     "team-pm": team_pm,
     "research-analyst": research_analyst,
+    "firm-manager": firm_manager,
 })
