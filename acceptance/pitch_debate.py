@@ -45,6 +45,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+EVIDENCE = REPO / "evidence" / "pitch-debate"
 
 START = date(2024, 9, 26)
 FRAUD = START
@@ -601,11 +602,62 @@ def rehearsal() -> None:
     FAILED.extend(gt.FAILED[before:])
 
 
+def recorded() -> None:
+    """B: the recorded real run (a real Haiku bull, bear and manager, each on its own capped key,
+    metered, inside the cap; the PMs scripted). Real minds decide what they argue and rule: the
+    checks judge physics' answers, and report the minds' choices as the finding."""
+    gt = _gt()
+    tape = EVIDENCE / "debate.cassette.json"
+    if not check("B: the recorded real run exists", tape.is_file(), str(tape.relative_to(REPO))):
+        return
+    text = tape.read_text(encoding="ascii")
+    rec = json.loads(text)
+    specs = {e["spec"]["id"]: e["spec"] for e in (rec.get("specs") or [])
+             if isinstance(e, dict) and isinstance(e.get("spec"), dict)}
+    check("B: three real Haiku minds on their own keys (bull, bear given headlines, manager); the "
+          "PMs scripted",
+          {sid: (sp.get("provider"), sp.get("model"), sp.get("data", []))
+           for sid, sp in specs.items() if sid in CHARTERS}
+          == {"bull": ("openrouter", REAL_MODEL, []), "bear": ("openrouter", REAL_MODEL,
+                                                               ["headlines"]),
+              "manager": ("openrouter", REAL_MODEL, [])}
+          and all(specs.get(f"{pod}-pm", {}).get("provider") == "scripted" for pod in PODS),
+          ", ".join(f"{sid} on {sp.get('model') or sp.get('provider')}"
+                    for sid, sp in sorted(specs.items())))
+    done = hosted_lawful(rec, "B")
+    metering = (rec.get("outcome") or {}).get("metering") or {}
+    keys = metering.get("keys") or []
+    check("B: no key spent past its limit, and the meter's sync refused nothing",
+          {k["spec_id"] for k in keys} == set(CHARTERS)
+          and all(type(k["spent_usd_micros"]) is int
+                  and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          and (metering.get("sync") or {}).get("refused") == [],
+          "; ".join(f"{k['spec_id']} ${k['spent_usd_micros'] / 1e6:.4f} of "
+                    f"${k['limit_usd_micros'] / 1e6:.2f}" for k in keys
+                    if type(k["spent_usd_micros"]) is int)
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.4f}")
+    print("\nThe finding (what the real minds chose; physics' answers are checked above):")
+    names = {1: "alpha (K, holds K03)", 2: "beta (L)", 3: "gamma (T)"}
+    for k, o in sorted(done["opened"].items()):
+        posts = [p for p in done["posts"] if p["pitch_id"] == k]
+        v = done["ruled"].get(k)
+        print(f"  pitch #{k}, {names.get(o['pod_id'], o['pod_id'])}: "
+              f"{len(posts)} post(s) by {', '.join(p['by_name'] for p in posts) or 'nobody'}; "
+              + (f"the manager ruled {v['verdict']} on {v['_on']}: {v['reason'][:220]!r}" if v
+                 else "no verdict (silence)"))
+    fraud = [p for p in done["posts"] if "K03" in p["text"]]
+    print(f"  K03's fraud headline was named in {len(fraud)} post(s) "
+          f"({', '.join(sorted({p['by_name'] for p in fraud})) or 'none'})")
+    before = len(gt.FAILED)
+    gt.verify(text, "B")
+    FAILED.extend(gt.FAILED[before:])
+
+
 def part_b() -> None:
     print("\n== B0: the same hosted through the Runtime, replayed ==", flush=True)
     rehearsal()
     print("\n== B: real minds, recorded ==", flush=True)
-    check("B: real Haiku bull, bear and manager recorded", False, "not recorded yet")
+    recorded()
 
 
 def main() -> int:
