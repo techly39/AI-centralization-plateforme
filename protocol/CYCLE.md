@@ -96,7 +96,12 @@ killed when the session ends).
 
 ## 4. Finish an idea
 When the acceptance demo passes:
-1. Full suite green. Run the demo yourself once and look at its output like the Human would.
+1. Full suite green, run after the last code or evidence commit, never before the evidence lands
+   (a new recording fails the suite until it is in `tests/test_evidence_replays.py` KEYS). Run
+   the demo yourself once and look at its output like the Human would. (Cycle 69: in cycle 68 the
+   suite ran before the recording landed and the auditor's one block was a thing the suite
+   catches; judged by: no auditor BLOCK in the next three merges is a failure `uv run pytest`
+   would have shown.)
 2. **Risk tier** (`physics: true`): launch the `red-team` (brief: the diff range, what changed in
    physics/money/seal) and then the `auditor` (brief: `git diff main...HEAD`, NOW.md, the demo output,
    the red-team result). Both in the foreground, no `model` override. Fix every high finding and every

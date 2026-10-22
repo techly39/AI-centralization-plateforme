@@ -103,8 +103,9 @@ Human reads a quarter report (`fund-env quarter-report`). Cycle 59: the firm tur
 itself every month (a PM who never earns a seed is let go, thinking is charged at every step of a
 real run). Cycle 62: a freed place goes to a child of the month's fittest pod. Cycle 64: a PM
 can hire its own analysts (real PMs chose not to). Cycle 66: a manager mind may pick who fills a
-freed place among the hires the law allows (a real Haiku manager kept the law's own hire). Not yet:
-any data beyond prices, so a second mind in a pod knows nothing its PM does not.
+freed place among the hires the law allows (a real Haiku manager kept the law's own hire). Cycle 68: headlines and company data are handed by role, so an analyst can
+know what its PM does not (a real prices-only PM cut a fraud name on its analyst's word). Not yet:
+anyone but the gates judging a pitch before its seed.
 
 ## The firm's people
 
@@ -169,6 +170,21 @@ on what the pod will do. The pitch goes to a backtest operator (an agent who rer
 independently). Then a **debate** (the notes' "3 Debate"): a bull and a bear agent argue the pitch
 in a thread before the decision. The Human can read every pitch and comment; the firm's process decides.
 `approvals.pitch_requires_human` in `governance/human.yaml` is the Human's switch.
+Matured (cycle 69 plan), first slice "a pitch is argued before its seed" (Next up 1): when a
+debate law is on, a pitch the gates find eligible waits a set number of days before its seed.
+Physics opens a thread for it. Two centre minds the operator makes, a bull and a bear (a new
+`reviewer` role: they read pitches and the data their rights give them, write only in a pitch's
+thread, cannot trade, pitch, hire or message a pod), each read the pitch (hypothesis, rule, the
+gates' numbers) and argue their side in the thread; the PM may answer. The manager reads the
+thread and gives a verdict before the window ends: *seed* (now) or *hold* (the seed is refused,
+with the manager's reason, which the PM reads). Silence: the law's seed stands, so a quiet manager
+never blocks capital. The manager can only stop or speed a seed the gates and the centre already
+allow: it never seeds an ineligible pitch, never changes the amount. The reviewers' and the
+manager's thinking is the centre's cost. Without the law, pitches seed exactly as today. The
+backtest operator is left out: the gates already re-run the rule on held-out days with physics'
+own code. Why this slice: the cycle-68 news gives a bear something real to argue (a fraud
+headline on a name in the pitched rule's universe, read only by the bear), and it is the first
+time an agent's judgement, not a formula, decides whether money moves.
 
 ### Hiring new PMs: turnover
 From: Human
@@ -246,7 +262,7 @@ money, the manager reading news, news in real history, a PM asking for a package
 
 ### Known expected outcomes: tests of behaviour
 From: Human
-Status: not started
+Status: working (first scenario, cycle 68)
 "Know in advance what must come out": a scenario plus the behaviour we expect (e.g. after a fraud
 headline about a stock it holds, the PM cuts the position within 2 days). A predictable sequence of
 inputs lets us test agents, prompts and models like a lab test.
@@ -371,12 +387,13 @@ Now: `app/ledger/`, `GET /events`, every state change is an event, derived state
 
 ### Agents talk: inside pods, between pods, warnings
 From: Human
-Status: not started
+Status: working (inside pods)
 Roles talk inside a pod and pods talk to each other, for efficiency: an agent that finds something
 can warn the others. Chat must work correctly through the tools (MCP).
 Now: the physics works (`POST /messages` to an agent, a pod or the whole firm; `GET /me`; latest n
 messages; one MCP tool per endpoint). Real agents used it in cycle 43: the analysts message their PM
-each day (one forgot to send on 7 of 31 days: `state/FINDINGS.md` F-0003). Nothing between pods yet.
+each day (one forgot to send on 7 of 31 days: `state/FINDINGS.md` F-0003). Cycle 68: an analyst's
+warning about a fraud headline made its PM sell the name (F-0007). Nothing between pods yet.
 
 ### The pod hub
 From: Human
@@ -620,7 +637,19 @@ a rule, pitches it, and the gates judge it on held-out days. Done, cycle 48: 1a,
 results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Done, cycle 55: 1c, four
 real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycle 59: 2a, a
 generation turns over every month. Done, cycle 62: 2b, designs reproduce. Done, cycle 64: a PM
-builds its team. Done, cycle 66: a manager chooses the hires.)
+builds its team. Done, cycle 66: a manager chooses the hires. Done, cycle 68: headlines and
+company data, handed by role.)
+
+Cycle 69 plan: the debate moves ahead of capital resets. Why: since cycle 68 some minds know what
+others do not, but money still moves only by formula: the gates decide every seed. A bull and a
+bear arguing a pitch, and the manager holding or speeding its seed, is the first agent judgement
+that moves (or stops) capital, and it gives the manager, so far silent, a decision with something
+to read. Capital resets add no mind and no decision; they stay small and wait. The behaviour
+battery (3) reuses the news scenario per model once there are more decisions to score. Holes it
+stands on, checked inside it: the held-out days are readable (the bear may say so, physics does
+not hide it); the board shows live rules to the manager and a brief can pass one on (reviewers
+write only in a pitch's thread, never to a pod); a pitch waiting in its debate window at a month's
+end must not count as "never earned a seed" against its PM.
 
 Cycle 67 plan: order kept, data packages next. Why: the last two real runs added minds that had
 nothing to add: PMs offered analysts worked alone, and a manager kept the law's hire every time,
@@ -696,17 +725,23 @@ days are readable; a forward trial with small capital on days that have not happ
 how a multi-manager really works and the cure for that hole. A debate's verdict matters once
 verdicts move capital.
 
-1. **Data packages: headlines and company data, handed by role.** Queued (cycle 67). The made-up
-   world writes dated headlines and quarterly reports (mostly noise from templates; a few planted
-   causes with an effect on later prices); physics serves them at the world's now, only to an
-   agent holding the right (the operator grants it; a PM may ask for an analyst with a package it
-   lacks); versioned packages `headlines-v1`, `company-v1`, `everything-v1`. Proven scripted
-   (read on the day, not the day before; refused without the right; the planted cause moves the
-   price, the noise does not); real: a Haiku PM holding a stock, its analyst alone reads the fraud
-   headline; whether the PM cuts within two days is the finding (the first behaviour test).
-   Later slices: data that costs the pod money, the manager reading headlines, real history.
+1. **A pitch is argued before its seed** (the pitch, part two, first slice). Queued (cycle 69).
+   Under a debate law an eligible pitch waits a few days; a bull and a bear (centre `reviewer`
+   minds) argue it in its thread, the PM may answer, and the manager seeds it now or holds it
+   with a reason; silence keeps the law's seed. The manager never seeds what the gates or the
+   centre refuse. Proven scripted (a hold refuses the seed, a seed verdict pays it early, silence
+   pays it at the window's end, an ineligible pitch cannot be seeded, a reviewer cannot reach a
+   pod; no law → seeds as today); real: Haiku bull, bear and manager on a scripted PM's pitch
+   whose universe holds a name with a fraud headline only the bear reads; the verdict is the
+   finding. Later slices: the backtest operator, a debate that judges the hypothesis.
 2. **Capital resets** at the month's turn (the monthly generation's c, below), small.
-3. **The pitch, part two** (4 below): the debate, now with headlines to argue about.
+3. **The behaviour battery.** The cycle-68 news scenario and a few more (an earnings miss, a
+   crash), each with its expected outcome, run per model and scored; grows into the model exam
+   (Model comparison at different noise levels).
+(Done, cycle 68) **Data packages: headlines and company data, handed by role.** The made-up world
+   writes news; physics serves it at its day's close, only to a mind holding the right. A real
+   prices-only PM cut a fraud name a day after its analyst's warning. Later slices: data that
+   costs the pod money, the manager reading headlines, real history.
 (Done, cycle 66) **A manager chooses the hires.** One manager mind reads every pod; for each freed
    place it picks among the hires the law allows and briefs the new PM, or the law's own stands; it
    writes the firm's direction. Real Haiku managers kept the law's hire. Later slices: a manager who
@@ -743,7 +778,7 @@ verdicts move capital.
       attempts counted at its pitch; no fit pod → the plain hire; a diversity measure at each
       month's end, a finding if it collapses. Real PMs: the hires are the edge pod's children.
    c. *Capital resets* at the month's turn, the strategy registry persists.
-4. **The pitch, part two.** A backtest operator re-runs the strategy independently, and a bull and a
-   bear argue the pitch in a thread; the firm's process decides (and judges the hypothesis).
+4. **The pitch, part two, later slices.** A backtest operator re-runs the strategy independently;
+   the firm's process judges the hypothesis (its first slice, the debate, is 1 above).
 5. **The Observatory.** "What's new" and the agents in action, for the Human.
 6. **Strategies as agent-written code**, run in a sandboxed subprocess (seal work).
