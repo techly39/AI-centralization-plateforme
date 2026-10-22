@@ -116,7 +116,8 @@ NAMED_ONLY_TOOLS = frozenset({"read_library", "get_team", "request_analyst", "le
                               "list_team_places", "fill_team_place", "refuse_team_hire",
                               "read_board", "pick_hire", "get_direction", "set_direction",
                               "read_headlines", "read_reports", "get_data_rights",
-                              "request_analyst_with_data"})
+                              "request_analyst_with_data", "read_debates", "read_debate",
+                              "argue_pitch", "rule_pitch"})
 
 
 def shown_tools(tools: list[ToolSpec], named: tuple[str, ...] | None = None) -> list[ToolSpec]:

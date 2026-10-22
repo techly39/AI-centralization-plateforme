@@ -22,6 +22,7 @@ from app.api import (
     capital,
     clock,
     data,
+    debates,
     events,
     generations,
     halt,
@@ -140,6 +141,7 @@ def create_app() -> FastAPI:
     app.include_router(team.router)
     app.include_router(management.router)
     app.include_router(data.router)
+    app.include_router(debates.router)
 
     logger.info("app created (env database_url={})", settings.database_url)
     return app

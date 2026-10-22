@@ -36,6 +36,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.capital.debate import debating_pods
 from app.capital.reproduction import diversity, hire_of, reproduction_law
 from app.config import GenerationConfig, get_settings
 from app.db.models import Agent, AgentRole, AgentStatus, Event, Pod
@@ -312,6 +313,7 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
                  if since_id is None or e.id > since_id}
     registered = _registered_on(session)
     seeded = _seeded_pods(session)
+    debating = debating_pods(session)
 
     rows = []
     to_let_go: list[int] = []
@@ -336,6 +338,10 @@ def _turnover(session: Session, *, provider: MarketDataProvider) -> dict[str, An
             row["verdict"], row["why"] = "empty", "no PM works there"
         elif pod.id in seeded:
             row["verdict"], row["why"] = "stays", "its pod holds a seed"
+        elif pod.id in debating:
+            # Its eligible pitch is being argued before its seed (the debate law): the pod has not
+            # failed to earn one, the firm has not finished deciding.
+            row["verdict"], row["why"] = "stays", "its pitch is in its debate before its seed"
         else:
             # The pod is judged by its longest-serving PM (red-team: judged by its newest, a
             # colleague registered on the last day kept a PM past its grace).

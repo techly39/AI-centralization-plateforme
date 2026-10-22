@@ -160,7 +160,7 @@ judges a pitch; departments.
 
 ### The pitch, then a full report
 From: Human
-Status: working (first slice)
+Status: building (the debate; first slice, the gates, working)
 Now: a PM researches a strategy written as a rule (every backtest counted), pitches, and the gates
 (IC, deflated Sharpe, capacity, correlation) judge it on held-out days; the Human reads the verdict.
 Not yet: the backtest operator, the bull/bear debate, the full report, strategies as code.

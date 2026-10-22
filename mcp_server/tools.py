@@ -519,6 +519,50 @@ def build_server(client: FundClient, *, name: str = "fund-env") -> MCPServer:
         """What you may read: prices always; headlines and company reports only if granted."""
         return await call("GET", "/data/rights")
 
+    # --- Debate: a pitch argued before its seed ---------------------------------
+
+    @api_tool(server, method="GET", path="/debates")
+    async def read_debates(
+        status: Annotated[Literal["open", "all"], Field(
+            description="open: those still argued; all: every one.")] = "open",
+    ) -> Any:
+        """The pitches argued before their seed (yours: your own pod's), oldest first: the pitch
+        (hypothesis, rule, the gates' numbers), the day its debate closes, the thread, the
+        manager's verdict, what the centre did."""
+        return await call("GET", "/debates", params={"status": status})
+
+    @api_tool(server, method="GET", path="/debates/{pitch_id}")
+    async def read_debate(
+        pitch_id: Annotated[int, Field(description="The pitch in debate.", ge=1, le=MAX_ID)],
+    ) -> Any:
+        """One pitch's debate: the pitch, its thread, the verdict."""
+        return await call("GET", f"/debates/{pitch_id}")
+
+    @api_tool(server, method="POST", path="/debates/{pitch_id}/argue")
+    async def argue_pitch(
+        pitch_id: Annotated[int, Field(description="The pitch in debate.", ge=1, le=MAX_ID)],
+        text: Annotated[str, Field(description="Your argument: everyone in the debate reads it.",
+                                   min_length=1, max_length=2000)],
+    ) -> Any:
+        """Write in a pitch's debate thread while it is open (a reviewer in any; a PM in its own
+        pod's). At most five posts each."""
+        return await call("POST", f"/debates/{pitch_id}/argue", body={"text": text})
+
+    @api_tool(server, method="POST", path="/debates/{pitch_id}/verdict")
+    async def rule_pitch(
+        pitch_id: Annotated[int, Field(description="The pitch in debate.", ge=1, le=MAX_ID)],
+        verdict: Annotated[Literal["seed", "hold"], Field(
+            description="seed: the law's seed is paid the next morning; hold: the seed is "
+                        "refused and the PM reads your reason.")],
+        reason: Annotated[str, Field(description="Why (required for a hold): the PM reads it.",
+                                     max_length=1000)] = "",
+    ) -> Any:
+        """Rule once on a pitch in debate, while it is open. No verdict: the seed is paid when
+        the debate closes. You never name an amount and never seed what the gates or the centre
+        refuse. The manager only."""
+        return await call("POST", f"/debates/{pitch_id}/verdict",
+                          body={"verdict": verdict, "reason": reason})
+
     # --- Team: the analysts a PM builds its pod with ---------------------------
 
     @api_tool(server, method="GET", path="/team")

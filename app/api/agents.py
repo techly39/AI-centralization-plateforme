@@ -52,16 +52,21 @@ def register(
                    context={"name": body.name, "role": body.role})
     if body.data and not may_grant_data(session, actor, AgentRole(body.role)):
         raise deny(session, actor, Action.REGISTER_AGENTS,
-                   detail="only the operator's registrar grants data, and only to a PM or an "
-                          "analyst",
+                   detail="only the operator's registrar grants data, and only to a PM, an "
+                          "analyst or a reviewer",
                    context={"name": body.name, "role": body.role})
     if not may_register_role(session, actor, AgentRole(body.role)):
         raise deny(session, actor, Action.REGISTER_AGENTS,
-                   detail="only the operator's registrar makes the firm's manager",
+                   detail=(f"only the operator's registrar makes the firm's {body.role}"
+                           if body.role == AgentRole.reviewer.value
+                           else "only the operator's registrar makes the firm's manager"),
                    context={"name": body.name, "role": body.role})
     if body.role == AgentRole.manager.value and body.pod_id is not None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="the firm's manager sits above the pods: it has no pod")
+    if body.role == AgentRole.reviewer.value and body.pod_id is not None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="a reviewer argues for the centre: it has no pod")
     try:
         with OMS_LOCK:  # the cap is counted and the agent committed with no other maker between
             if body.pod_id is not None and (

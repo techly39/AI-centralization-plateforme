@@ -45,6 +45,7 @@ class AgentRole(str, enum.Enum):
     pm = "pm"
     management = "management"
     manager = "manager"      # the firm's manager mind: reads every pod, picks hires, sets direction
+    reviewer = "reviewer"    # a centre mind that argues pitches in their debate threads, only there
     system = "system"
     runtime = "runtime"      # the Runtime's clock hand (ADR-033); never a mind's
 

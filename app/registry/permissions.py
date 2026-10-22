@@ -39,6 +39,8 @@ class Action(str, enum.Enum):
     MANAGE_FIRM = "manage_firm"            # the manager mind: pick a freed place's hire, set direction
     READ_HEADLINES = "read_headlines"      # the world's headlines, with the agent's data right
     READ_COMPANY_DATA = "read_company_data"  # companies' quarterly reports, with the data right
+    READ_DEBATES = "read_debates"          # pitches in debate and their threads (a pod member: its own)
+    ARGUE = "argue"                        # write in a pitch's debate thread (a PM: its own pod's)
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -72,6 +74,7 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.READ_PITCHES,
             Action.READ_HEADLINES,
             Action.READ_COMPANY_DATA,
+            Action.READ_DEBATES,
         }
     ),
     AgentRole.pm: _UNIVERSAL
@@ -89,6 +92,8 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.REQUEST_TEAM,
             Action.READ_HEADLINES,
             Action.READ_COMPANY_DATA,
+            Action.READ_DEBATES,
+            Action.ARGUE,
         }
     ),
     AgentRole.management: _UNIVERSAL
@@ -119,6 +124,20 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.READ_CROSS_POD,
             Action.READ_PITCHES,
             Action.MANAGE_FIRM,
+            Action.READ_DEBATES,
+        }
+    ),
+    # 'reviewer' is a centre mind that argues pitches (idea: the pitch, then a full report; the
+    # debate): it reads the pitches in debate and the data the operator gave it, and writes in a
+    # pitch's thread, nowhere else. No pod: it cannot trade, pitch, research, message, hire or rule.
+    AgentRole.reviewer: _UNIVERSAL
+    | frozenset(
+        {
+            Action.READ_MARKET_DATA,
+            Action.READ_HEADLINES,
+            Action.READ_COMPANY_DATA,
+            Action.READ_DEBATES,
+            Action.ARGUE,
         }
     ),
     # 'runtime' is the Runtime's identity (ADR-033, B-032): it moves a backtest's
@@ -162,10 +181,15 @@ def may_hire(session: Any, actor: Any) -> bool:
             and registered_by_operator(session, actor))
 
 
+#: Centre minds: no pod, made only by the operator's registrar.
+CENTRE_ROLES: frozenset[AgentRole] = frozenset({AgentRole.manager, AgentRole.reviewer})
+
+
 def may_register_role(session: Any, actor: Any, role: AgentRole) -> bool:
-    """Who may make an agent of ``role``: a firm's manager only by the operator's registrar (a
-    management agent another agent made does not make the firm's management)."""
-    return role != AgentRole.manager or may_hire(session, actor)
+    """Who may make an agent of ``role``: the firm's manager and its reviewers only by the
+    operator's registrar (a management agent another agent made does not make the firm's
+    management)."""
+    return role not in CENTRE_ROLES or may_hire(session, actor)
 
 
 def may_declare_model(session: Any, actor: Any, role: AgentRole) -> bool:
@@ -215,9 +239,10 @@ def data_right_problem(session: Any, agent: Any, right: str) -> str | None:
 
 
 def may_grant_data(session: Any, actor: Any, role: AgentRole) -> bool:
-    """Granting data at registration is the operator's registrar's act, and only to a PM or an
-    analyst: a firm mind that registers agents hands out no data."""
-    return role in (AgentRole.pm, AgentRole.analyst) and may_hire(session, actor)
+    """Granting data at registration is the operator's registrar's act, and only to a PM, an
+    analyst or a reviewer: a firm mind that registers agents hands out no data."""
+    return (role in (AgentRole.pm, AgentRole.analyst, AgentRole.reviewer)
+            and may_hire(session, actor))
 
 
 def grant_data(session: Any, *, agent_id: int, rights: Any, by: Any, how: str) -> None:

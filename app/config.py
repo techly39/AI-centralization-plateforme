@@ -157,6 +157,12 @@ class CapitalConfig(BaseModel):
     # replaced). Off by default, and left out of the frozen law while off, so a run recorded before
     # it existed replays as it was; a world turns it on (its recipe's ``laws``).
     tell_pms: bool = Field(default=False, exclude_if=lambda v: v is False)
+    # The debate law (idea: the pitch, then a full report; first slice, a pitch is argued before
+    # its seed): an eligible pitch waits this many days from the morning its debate opens; the
+    # firm's manager may seed it sooner or hold it, reviewers argue it in its thread, silence pays
+    # it when the window closes. 0 = off (seeded the next morning, as before), and left out of the
+    # frozen law while off, so every run recorded before it replays as it was.
+    debate_days: int = Field(default=0, ge=0, le=31, exclude_if=lambda v: v == 0)
 
     @model_validator(mode="after")
     def _ladder_climbs(self) -> CapitalConfig:
