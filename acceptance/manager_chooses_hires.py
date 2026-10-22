@@ -699,7 +699,54 @@ EVIDENCE = REPO / "evidence" / "manager-chooses-hires" / "manager.cassette.json"
 
 
 def recorded() -> None:
-    check("B: the recorded real run exists", EVIDENCE.is_file(), str(EVIDENCE.relative_to(REPO)))
+    """B: the recorded real run (a real Haiku manager and real Haiku PMs on their own capped keys,
+    metered, inside the cap). Real minds decide what they pick and pitch: the checks judge
+    physics' answers, and report the manager's choices as the finding."""
+    gt = _dr()._gt()
+    if not check("B: the recorded real run exists", EVIDENCE.is_file(),
+                 str(EVIDENCE.relative_to(REPO))):
+        return
+    text = EVIDENCE.read_text(encoding="ascii")
+    rec = json.loads(text)
+    settings(rec, "B")
+    specs = {e["spec"]["id"]: e["spec"] for e in (rec.get("specs") or [])
+             if isinstance(e, dict) and isinstance(e.get("spec"), dict)}
+    boss = specs.get(MANAGER) or {}
+    check("B: the manager is a real Haiku mind on its own key, with only the manager's tools",
+          (boss.get("role"), boss.get("provider"), boss.get("model"), boss.get("tools"))
+          == ("manager", "openrouter", HAIKU, MANAGER_TOOLS),
+          f"{boss.get('role')} on {boss.get('provider')} / {boss.get('model')}")
+    before = len(gt.FAILED)
+    gt.lawful(rec, "B")
+    FAILED.extend(gt.FAILED[before:])
+    done = hosted_lawful(rec, "B")
+    metering = (rec.get("outcome") or {}).get("metering") or {}
+    keys = metering.get("keys") or []
+    check("B: no key spent past its limit (the manager's too), and the meter's sync refused "
+          "nothing", bool(keys) and MANAGER in {k["spec_id"] for k in keys}
+          and all(type(k["spent_usd_micros"]) is int
+                  and k["spent_usd_micros"] <= k["limit_usd_micros"] for k in keys)
+          and (metering.get("sync") or {}).get("refused") == [],
+          "; ".join(f"{k['spec_id']} ${k['spent_usd_micros'] / 1e6:.3f} of "
+                    f"${k['limit_usd_micros'] / 1e6:.2f}" for k in keys
+                    if type(k["spent_usd_micros"]) is int)
+          + f"; total ${(metering.get('total_usd_micros') or 0) / 1e6:.3f}")
+    ledger = [(r[0], r[1][:10], r[3], json.loads(r[4])) for r in rec["ledger"]["rows"]]
+    said = of(ledger, "direction_set")
+    print("\nThe finding (what the real manager chose; physics' answers are checked above):")
+    for o in done:
+        print(f"  vacancy {o['vacancy_no']} ({o['pod_name']}): listed {o['listed']}; "
+              + (f"picked {o['picked']}, brief {o['brief']!r}" if o["picked"]
+                 else "no pick: the law's own hire stood")
+              + f"; hired {o['hired']} = {o['design']}"
+              + (f" of {o['parent']}" if o["parent"] else "") + f" on {o['model']}")
+    for d in said:
+        print(f"  direction #{d['direction_no']} ({d['_on']}): {d['text']!r}")
+    if not said:
+        print("  no direction written")
+    before = len(gt.FAILED)
+    gt.verify(text, "B")
+    FAILED.extend(gt.FAILED[before:])
 
 
 # --- the demo -----------------------------------------------------------------------------------

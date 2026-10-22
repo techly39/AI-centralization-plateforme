@@ -23,7 +23,7 @@ from app.capital.management import (
 )
 from app.db.base import get_session
 from app.db.models import Agent
-from app.registry.auth import get_current_agent, require
+from app.registry.auth import require
 from app.registry.permissions import Action
 
 router = APIRouter(tags=["management"])
@@ -77,7 +77,8 @@ def post_pick(
 
 @router.get("/direction", response_model=dict[str, Any])
 def get_direction(
-    _: Agent = Depends(get_current_agent),
+    # The manager's word to the firm, read like a message: every firm agent, never the clock key.
+    _: Agent = Depends(require(Action.READ_MESSAGES)),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     """The firm's latest direction (``null`` while none is written)."""

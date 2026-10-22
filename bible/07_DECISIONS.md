@@ -2127,3 +2127,40 @@ step the quota's day misses earlier messages (low). Strict-xfail tests.
 **Proof.** `acceptance/pm_builds_team.py` (A the law on and off, scripted; B0 a hosted rehearsal
 through the Runtime; B the recorded real run, `evidence/pm-builds-team/`: no PM chose to hire);
 `tests/test_team.py`, `tests/test_redteam_pm_builds_team.py`, `tests/test_evidence_replays.py`.
+
+## ADR-054 — A manager chooses the hires: one manager mind reads every pod, picks a freed place's hire among those the law allows, briefs the new PM and writes the firm's direction; it never moves capital, hires or fires (idea: management above the pods) — accepted (cycle 66, 2026-10-22)
+
+**Context.** Every hire was the law's alone (the fittest pod's child, or a plain hire). The Human's
+firm has a management above the pods that sees every pod and sets the direction, while the
+algorithm moves the money. The old `management` role is the operator's registrar: a mind holding it
+could register and deactivate agents. Two reproduction holes stood beside it: a sibling's attempts
+were not in the next child's deflated-Sharpe N, and a parent with no model on the record gave its
+child a second, unrecorded difference.
+
+**Decision.**
+1. A law, `management:` (`on`, `other_parents`, `wait_days`; `config.yaml` or a world's recipe),
+   off by default and frozen into a run's first vacancy, so every older run replays as recorded.
+2. A new role, `manager`, with one new right, `manage_firm`: it reads every pod (`GET /board`:
+   cash, positions, exposures, the centre's capital, stage, drawdown, thinking cost, last month's
+   fitness, design; `read_cross_pod`), picks and writes the direction. It never registers,
+   deactivates, fills, refuses, trades, pitches or moves capital. Only the operator's registrar
+   makes a manager, and with no pod; its thinking is the centre's cost, never a pod's fitness.
+3. Under the law a freed place's vacancy lists every hire the law allows: `c1` the law's own hire
+   (exactly today's), a child of each other fit pod (fittest first, `other_parents` of them), a
+   plain hire on each model of the pool; each says what it would be. The place waits `wait_days`
+   (the Runtime's morning hire skips it until then, writing nothing).
+4. The manager picks one candidate, once, while the place is open, with a brief (`hire_picked`);
+   the fill hires exactly it (the place's names, budget and charter, the candidate's design).
+   Refused by name in the ledger (`hire_pick_refused`): a place the law did not list, a candidate
+   not on the list, a second pick, a filled place. Silent, `c1` stands.
+5. The direction (`direction_set`) is in every agent's capital view once written (`GET
+   /direction`); the new PM reads its brief there and in its first input.
+6. The reproduction law's second edition (the default from now): a child's inherited attempts are
+   its whole family's (every research backtest and pitch of every pod of the family, closed ones
+   too), and a parent whose model is not on the record passes on a model change only. A run
+   frozen before it (a recipe naming no edition) lives by the first.
+
+**Proof.** `acceptance/manager_chooses_hires.py` (A: pick, silent, law off, scripted; B0 the
+generation months through the Runtime with a scripted manager; B the recorded real run,
+`evidence/manager-chooses-hires/`); `tests/test_management.py`,
+`tests/test_redteam_designs_reproduce.py` (the two holes, now fixed).
