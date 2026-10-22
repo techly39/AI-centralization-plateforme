@@ -78,6 +78,8 @@ killed when the session ends).
   - the demo's check of the run's settings (steps, days per step, tool calls a wake, charging, the
     world's key) is written first and passed by a scripted rehearsal made with the very command the
     real run will use, kept in the queue `notes`;
+  - on the risk tier, the red-team's fixes are in first: a fix that changes what any mind reads
+    (a view's words) makes a recording made before it stop replaying;
   - the real recording's checks assert physics' answer to whatever the minds chose (granted,
     refused, charged, counted) and report the choices as the finding, never that a mind chose one
     thing; what physics must do in each case is proven by the scripted parts (A, B0).
