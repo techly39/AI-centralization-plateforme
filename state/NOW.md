@@ -49,5 +49,7 @@ Market data, permissions and the seal: red-team + auditor before the paid real r
 
 ## Progress
 - cycle 68: physics (news in the recipe, served under the look-ahead guard, rights by role,
-  the team's data, the endpoints, tools and three packages), demo parts A and B0 pass; the
-  red-team attacked it. Next: its fixes, then the real run B, then the auditor.
+  the team's data, the endpoints, tools and three packages), demo parts A and B0; red-team 4
+  holes fixed (news now out at its day's close, with its bar; a miss never hides an earlier
+  report); real run B recorded ($0.078: the PM cut K03 a day after its analyst's warning);
+  auditor: one block (the recording not in the replay suite) fixed, then PASS. Merged.

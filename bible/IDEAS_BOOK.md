@@ -210,7 +210,7 @@ and cost. Not yet: the richer data packages (company data, headlines), memory ac
 
 ### Data packages: prices / company data / headlines / everything
 From: Human
-Status: building
+Status: working
 The packages an AI can be given: 1) just market prices, 2) fake company data, 3) fake headlines +
 description, 4) everything together. The data is a table of days × tickers (Mon/Tue/Wed × AAPL,
 NVDA, TSLA…). Each package is versioned, so a run says exactly what each mind saw.
@@ -234,6 +234,15 @@ Matured (cycle 67 plan), first slice "headlines and company data, handed by role
 Why now: the cycle-64 and cycle-66 findings: a PM offered analysts worked alone (on prices alone it
 is right), and a manager kept the law's hire (no pod knew anything another did not). Information
 that only some minds hold is what gives a team, a manager and a debate their work.
+Now (cycle 68): working. A made-up market's recipe may carry news: noise headlines, a quarterly
+report per company and planted causes (a fraud headline, an earnings miss) that move only their
+name's later prices. A day's news is out at its close, with its bar. Headlines and company data
+are rights: the operator grants them at registration, or a PM asks for an analyst with data the
+team law lists; a mind without the right is refused by name, through its tools and in its
+package. Packages `headlines-v1`, `company-v1`, `everything-v1`. A real Haiku analyst flagged
+K03's fraud the first morning it was out; its prices-only PM read the message a day later and
+sold all of K03 ($0.078): `uv run python acceptance/data_packages.py`. Not yet: data that costs
+money, the manager reading news, news in real history, a PM asking for a package for itself.
 
 ### Known expected outcomes: tests of behaviour
 From: Human
@@ -241,8 +250,10 @@ Status: not started
 "Know in advance what must come out": a scenario plus the behaviour we expect (e.g. after a fraud
 headline about a stock it holds, the PM cuts the position within 2 days). A predictable sequence of
 inputs lets us test agents, prompts and models like a lab test.
-Now: needs headlines (Next up 1). Its real run is the first such test: a planted fraud headline on a
-stock a real PM holds, read only by its analyst; whether the PM cuts within two days is reported.
+Now (cycle 68): the first such test ran inside the data packages idea: a planted fraud headline on
+a stock a real Haiku PM held, read only by its analyst; the PM cut the whole position within two
+days, one day late because it did not open its inbox the first morning
+(`evidence/data-packages/`). Not yet: a battery of scenarios, run per model, scored.
 
 ### Model comparison at different noise levels
 From: Human
@@ -586,6 +597,13 @@ model, and only a PM's; a pod's design reads only its PM's model; a parent needs
 deflated Sharpe (only the parent's own and inherited ones are frozen in the vacancy); (low) a
 parent with no declared model gives its child a second, unrecorded difference (its model from
 the hiring pool). Strict-xfail tests in `tests/test_redteam_designs_reproduce.py`.
+
+From headlines and company data (cycle 68, red-team 2 high + 2 low and the auditor's notes, all
+fixed but these): (low) a morning package built through a mind's own key logs its refusals as
+that mind's own denials, so a study of minds probing past their rights must tell the two apart
+(the package's refusals come at the wake's start, before any tool call); (low) a team place's
+frozen law now stores `"data": []` even when the law lists none (old ledgers still validate and
+replay).
 
 ### Paid to report holes
 From: Builder

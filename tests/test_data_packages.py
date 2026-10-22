@@ -263,3 +263,10 @@ def test_a_miss_just_before_a_scheduled_report_takes_its_place_and_two_misses_ar
         {"kind": "earnings_miss", "ticker": "K02", "on": late.isoformat()}]}))
     assert k02(made) == sorted([d for d in k02(plain) if d != due] + [early, late])
     assert [x for x in made if x.published < early] == [x for x in plain if x.published < early]
+
+
+def test_a_ticker_filter_is_a_ticker(newsroom, client, admin_key, make_pod) -> None:
+    pod = make_pod(1)
+    key = _register(client, admin_key, "a-1", "analyst", pod, ["headlines"]).json()["api_key"]
+    assert client.get("/headlines", headers=h(key), params={"ticker": "K" * 17}).status_code == 422
+    assert client.get("/headlines", headers=h(key), params={"ticker": "K01"}).status_code == 200

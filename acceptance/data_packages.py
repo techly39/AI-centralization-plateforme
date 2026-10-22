@@ -76,7 +76,8 @@ def h(key: str) -> dict:
 def keys_of(value) -> set[str]:
     """Every key and every word of every text in ``value`` (lower case)."""
     if isinstance(value, dict):
-        return {str(k).lower() for k in value} | {k for v in value.values() for k in keys_of(v)}
+        return ({w for k in value for w in re.findall(r"[a-z]+", str(k).lower())}
+                | {k for v in value.values() for k in keys_of(v)})
     if isinstance(value, list):
         return {k for v in value for k in keys_of(v)}
     if isinstance(value, str):
@@ -433,15 +434,17 @@ def hosted_lawful(rec: dict, label: str) -> dict:
     check(f"{label}: each refusal of the PM is physics' own, logged",
           len(denied) >= STEPS and all(d["action"] == "read_headlines" for d in denied),
           f"{len(denied)} refusals logged")
-    news_tools = {"read_headlines", "read_reports", "get_data_rights"}
+    #: answers that carry a mind's own words back to it (or to its colleague)
+    minds_words = {"send_message", "get_messages"}
     shown: set[str] = set()
     for step in steps:
         for w in step.get("wakes") or []:
             asked = {c.get("id"): c.get("name") for c in _calls(w)}
             ctx = _jsonish(w["transcript"][1]["content"]) if len(w.get("transcript") or []) > 1 else {}
-            shown |= keys_of((ctx or {}).get("package"))       # the package physics served
+            shown |= keys_of(ctx)                     # the whole morning context
             for m in w.get("transcript") or []:
-                if m.get("role") == "tool" and asked.get(m.get("tool_call_id")) in news_tools:
+                if (m.get("role") == "tool"
+                        and asked.get(m.get("tool_call_id")) not in minds_words):
                     shown |= keys_of(_jsonish(m.get("content")))
     check(f"{label}: nothing physics showed any mind says what an item does or which is a cause",
           not shown & set(SEALED), "no sealed word in any key or text physics showed")

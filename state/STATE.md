@@ -41,7 +41,10 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   Not done (R-4b-2b): cassette v2, hash links, size cap. Label `cassette` (Q-0006).
 - **Real minds** (ADR-047, `runtime/openrouter.py`, `docs/real_minds_v1.md`): provider `openrouter`
   is metered; one capped `firm-` key per agent, minted under a repo lock after counting the whole
-  month at the provider, disabled after the run; daily package `prices-v1` (`runtime/packages.py`);
+  month at the provider, disabled after the run; daily packages `prices-v1`, `headlines-v1`,
+  `company-v1`, `everything-v1` (`runtime/packages.py`; news from a made-up recipe's `news` block,
+  `app/marketdata/made_up.py`, out at a day's close; data rights in `app/registry/permissions.py`,
+  read through `app/api/data.py`);
   pod `specs/real-desk/`; the recorded real month `evidence/real-agents-backtest/` replays at $0.
 - **Cassettes** (R-4a, ADR-037, `tests/test_cassette.py`): `fund-runtime backtest --cassette PATH`
   writes a redacted, 0600, exclusive `*.cassette.json`; every `WakeRecord` has `exchanges`
