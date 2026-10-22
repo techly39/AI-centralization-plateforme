@@ -48,4 +48,7 @@ Left out: firing early, opening pods, departments, a manager moving capital (nev
 Permissions, hiring, the Runtime's hire: red-team + auditor before merge.
 
 ## Progress
-- cycle 66: started; plan, demo part A, physics.
+- cycle 66: physics, the Runtime's side, demo parts A and B0 pass; the reproduction law's
+  second edition (a family's attempts; no hidden second change); real run B recorded; red-team
+  found 4 holes (2 medium: a hire reads other pods' rules in its vacancy, a pick landing during
+  the morning hire; 2 low: the family tree and the child's note ignore the pick), being fixed.
