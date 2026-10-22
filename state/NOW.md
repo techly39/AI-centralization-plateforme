@@ -1,55 +1,51 @@
-# A PM builds its own team: it hires an analyst it describes, paid from its pod's thinking budget, and the analyst's research and cost count as the pod's
+# A manager chooses the hires: one manager mind reads every pod, picks who fills a freed place among the hires the law allows, briefs the new PM and sets the firm's direction; it never moves capital, hires or fires by itself
 
 ## How I understand it
-Today every mind in the firm is a PM, and every decision about people is a law: who is hired,
-with what model, with what charter. The Human's pod is a PM *with a small team it builds and pays
-for*. This first slice lets a PM create one kind of teammate, an analyst:
-- **The request.** A PM asks for an analyst: what it should do (a charter in the PM's words), a
-  model from the firm's pool, and a thinking budget.
-- **Physics decides.** The pod's team limit, the Human's agent cap and the pod's team budget
-  (its analysts' keys together; the PM's own key stays the hiring law's, and every dollar of both
-  is the pod's fitness) grant it or refuse it by name.
-- **The hire.** A granted request opens a place in the PM's living pod; the Runtime fills it the
-  next morning (the same Onboarding as a PM hire), with a key carved from the pod's budget.
-- **The analyst works.** It researches rules (its backtests are the pod's attempts, so the gates'
-  deflated Sharpe counts them at the PM's next pitch), reads the library and messages its PM. It
-  cannot pitch, trade or hire.
-- **It costs the pod.** Its thinking lowers the pod's fitness and capital score. The PM can let it
-  go; when the PM is let go or the pod closes, the analyst stops too.
-Whether real PMs choose to hire, and whether a team pays for itself, is the finding.
+Today every hire is the law's alone: a freed place goes to the fittest pod's child (or a plain
+hire). The Human's firm has management above the pods: it sees every pod and sets the direction,
+while the algorithm moves the money. This slice gives the firm its first manager mind:
+- **The board.** The manager reads every pod: cash, positions, exposures, capital from the centre,
+  stage and drawdown, thinking cost, last month's fitness, its design (model, family). No PM sees it.
+- **The choice.** When a place is freed, physics lists the hires the law allows: the default (the
+  law's own hire), a child of each other fit pod, a plain hire on each model of the pool, each
+  saying exactly what it would be. The place waits one day: the manager may pick one and write a
+  brief; silent, the default stands. The Runtime hires exactly the pick the next morning.
+- **The direction.** The manager writes the firm's direction; every PM reads it in its capital
+  view. The new PM also reads its brief.
+- **What it cannot do.** Move capital, hire, fire, register or deactivate anyone, trade, pitch:
+  it is a new role (`manager`), not the registrar, and only the operator's registrar can make one.
+- **Its cost.** It has no pod: its thinking is the centre's cost, never a pod's fitness.
+Whether a real manager picks better than the law is the finding.
 
 ## What done looks like
-`uv run python acceptance/pm_builds_team.py` ($0, offline):
-- A (scripted): a PM's first request is granted and its analyst wakes the next morning; requests
-  past the team limit, the pod's budget or the agent cap are refused by name; the analyst is
-  refused when it pitches or trades; its backtests raise the pod's count of attempts; its thinking
-  lowers the pod's fitness; let go, it stops waking; a flood of messages cannot drain the PM's key;
-  law off → nothing changes; rebuild from the ledger gives the same books.
-- B0: the same through the Runtime, replay IDENTICAL.
-- B (recorded, real Haiku PMs offered a team): physics' answers to whatever they chose are
-  checked; IDENTICAL for $0; the report shows each pod's team and what it cost.
+`uv run python acceptance/manager_chooses_hires.py` ($0, offline):
+- A (scripted): September with two fit pods and a failing one; at the month's end the failing
+  PM goes, the place lists its candidates; the manager picks the other fit pod's child with a
+  brief (the 'yes' case) and the Runtime hires exactly that the next morning, the new PM reading
+  brief and direction; in a second world a silent manager leaves the default (the 'no' case);
+  refused by name: a pick not on the list, a second pick, a pick after the hire, a PM or analyst
+  reading the board or picking, the manager filling, registering, deactivating, trading; the
+  manager's thinking is the centre's; law off → today's hires; rebuild gives the same books.
+- B0: the same through the Runtime with the real run's very command, replay IDENTICAL.
+- B (recorded): a real Haiku manager over a generation run; physics' answers checked; replay $0.
 
 ## Plan
-1. A `team:` law (off by default, so every older recording replays as it was): analysts per pod,
-   the pod's thinking budget, the models allowed.
-2. The request: a PM-only endpoint + MCP tool; physics names the hire in a vacancy of role analyst
-   into the PM's living pod; refusals logged.
-3. Onboarding reused for the analyst; its key carved from the pod's budget, under the cap.
-4. Permissions: an analyst researches, reads, messages; never pitches, orders or hires.
-5. Attempts and cost: check the pod (not the agent) is what both are counted on.
-6. Letting go: by its PM; with its PM; with its pod.
-7. Holes fixed inside: a message flood draining a metered key; a registration restaffing an empty
-   pod past the live-pod limit.
-8. Demo A, B0 rehearsal with the real run's very command, the real run, red-team, auditor, merge.
-Left out: engineers, a PM choosing its analyst's tools, a manager mind, the team as an inherited gene.
+1. A `management:` law (off by default; frozen into the first vacancy like reproduction).
+2. Role `manager` + action `manage_firm` in the permission matrix; only the operator's registrar
+   registers one, podless. No register / deactivate / allocation / orders / pitches.
+3. `app/capital/management.py`: the board, the candidates (reproduction's child_of opened to any
+   parent), the pick (`hire_picked`), the direction (`direction_set`); the vacancy fold applies the
+   pick, so the fill, the design and the inherited attempts follow it. The place waits a day.
+4. API `app/api/management.py` + MCP tools; the brief in the hire's vacancy, the direction in
+   every capital view (only once one is written, so old recordings replay unchanged).
+5. Holes: a family's sibling attempts count (law-frozen, old runs keep the old count); a parent
+   with no model on record: its child's model is shown as the pool's.
+6. Runtime: the onboarding skips a place still in its manager's day; a manager mind's tools.
+7. Demo A, B0, real run B, red-team, auditor, merge.
+Left out: firing early, opening pods, departments, a manager moving capital (never).
 
 ## Risk
-Agents created by an agent, keys and budgets, the cap, permissions: red-team + auditor before merge.
+Permissions, hiring, the Runtime's hire: red-team + auditor before merge.
 
 ## Progress
-- cycle 63: planned.
-- cycle 64: physics built (the law, request, fill, letting go, the team following its PM
-  and its pod out, the two holes fixed); demo part A passes in full; next: the Runtime hires
-  team places each morning (B0), then the real run (B).
-- cycle 64 (later): Runtime and rehearsal done; red-team 7 holes, 5 fixed (2 low filed); real run
-  recorded ($0.264, no PM chose to hire); auditor PASS; merged.
+- cycle 66: started; plan, demo part A, physics.

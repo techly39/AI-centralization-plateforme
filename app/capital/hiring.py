@@ -40,12 +40,14 @@ from app.ledger.events import (
     EVENT_ALLOCATION_SET,
     EVENT_CAPITAL_SEEDED,
     EVENT_HIRE_FAILED,
+    EVENT_HIRE_PICKED,
     EVENT_HIRE_REFUSED,
     EVENT_PITCH_SUBMITTED,
     EVENT_POD_STAGE_CHANGED,
     EVENT_VACANCY_FILLED,
     EVENT_VACANCY_OPENED,
     append_event,
+    ledger_now,
 )
 from app.oms.service import OMS_LOCK
 from app.registry.permissions import may_hire
@@ -167,7 +169,8 @@ def open_vacancy(session: Session, *, pod_id: int, actor: Agent, record: PodTrac
     law the hire is a child of the fittest pod (:func:`app.capital.reproduction.child_of`; at a
     month's end, of the generation ``measured``). Called in the close's own transaction (under
     :data:`OMS_LOCK`)."""
-    from app.capital.reproduction import child_of, reproduction_law
+    from app.capital.management import candidates, fill_from, management_law
+    from app.capital.reproduction import child_of, frozen, reproduction_law
 
     if (record is None) == (lesson is None):
         raise ValueError("a vacancy is opened from a ladder record or from a lesson")
@@ -176,36 +179,58 @@ def open_vacancy(session: Session, *, pod_id: int, actor: Agent, record: PodTrac
     hire = {"pod_name": f"hire-{number}", "pm_name": f"hire-{number}-pm", "role": "pm",
             "model": law.models[(number - 1) % len(law.models)], "budget_usd": law.budget_usd,
             "charter": law.charter}
-    # Read before this vacancy is written: the first vacancy freezes the law.
+    # Read before this vacancy is written: the first vacancy freezes the laws.
     reproduction = reproduction_law(session)
+    management = management_law(session)
     if reproduction.on:
         child = child_of(session, number=number, hiring=law, measured=measured)
         hire |= {"design": "plain"} if child is None else {
             "design": "child", **child, "model": child["model"] or hire["model"]}
+    listed = {}
+    if management.on:
+        # Every hire the law allows, its own first; the place waits for the manager's pick.
+        listed = {"candidates": candidates(session, number=number, hiring=law, default=hire,
+                                           measured=measured),
+                  "fill_from": fill_from(ledger_now(session).date(), management).isoformat(),
+                  "management": management.model_dump(mode="json")}
     return append_event(session, type=EVENT_VACANCY_OPENED, actor_agent_id=actor.id, payload={
         "vacancy_no": number, "pod_id": pod_id,
         "pod_name": session.get(Pod, pod_id).name,
         "post_mortem": (lesson if record is None
                         else post_mortem(session, pod_id=pod_id, record=record)),
         "hire": hire, "law": law.model_dump(mode="json"),
-        **({"reproduction": reproduction.model_dump(mode="json")} if reproduction.on else {})})
+        **({"reproduction": frozen(reproduction)} if reproduction.on else {}), **listed})
 
 
 def vacancies(session: Session) -> list[dict[str, Any]]:
     """Every vacancy of the run, oldest first, folded from the ledger: ``status`` is ``open`` or
     ``filled``; ``filled`` names the new pod and PM; ``refusals`` lists every refused hire."""
+    from app.capital.reproduction import with_pick
+
     out: dict[int, dict[str, Any]] = {}
+    opened: dict[int, dict[str, Any]] = {}
     for event in _events(session, EVENT_VACANCY_OPENED, EVENT_VACANCY_FILLED, EVENT_HIRE_REFUSED,
-                         EVENT_HIRE_FAILED):
+                         EVENT_HIRE_FAILED, EVENT_HIRE_PICKED):
         p = event.payload_json
         if event.type != EVENT_VACANCY_OPENED and p.get("vacancy_id") not in out:
             continue    # names no vacancy of this run: nothing to fold (never fails the read)
         if event.type == EVENT_VACANCY_OPENED:
+            opened[event.id] = p
             out[event.id] = {"id": event.id, "vacancy_no": p["vacancy_no"],
                              "opened_on": event.ts.date().isoformat(), "pod_id": p["pod_id"],
                              "pod_name": p["pod_name"], "status": "open", "hire": p["hire"],
                              "post_mortem": p["post_mortem"], "filled": None, "refusals": [],
                              "failed": []}
+            if "candidates" in p:   # the management law's: what the manager may pick, and when
+                out[event.id] |= {"candidates": p["candidates"], "fill_from": p["fill_from"],
+                                  "picked": None}
+        elif event.type == EVENT_HIRE_PICKED:
+            if "candidates" not in opened[p["vacancy_id"]]:
+                continue    # physics never writes one there (never fails the read)
+            out[p["vacancy_id"]]["hire"] = with_pick(opened[p["vacancy_id"]], p)
+            out[p["vacancy_id"]]["picked"] = {"candidate": p["candidate"], "brief": p["brief"],
+                                              "by": p["by_name"],
+                                              "on": event.ts.date().isoformat()}
         elif event.type == EVENT_HIRE_FAILED:
             out[p["vacancy_id"]]["status"] = "open"
             out[p["vacancy_id"]]["filled"] = None
@@ -250,6 +275,10 @@ def fill(session: Session, *, vacancy_id: int, actor: Agent) -> tuple[dict[str, 
             found = vacancy(session, vacancy_id)
             if found["status"] != "open":
                 raise HiringError(409, f"vacancy {vacancy_id} is already filled")
+            if found.get("fill_from") and ledger_now(session).date().isoformat() < found["fill_from"]:
+                # Not a refusal: the place is the manager's to pick until then (no ledger row).
+                raise HiringError(409, f"vacancy {vacancy_id} waits for the manager's pick: it "
+                                       f"is filled from {found['fill_from']}")
             law = hiring_law(session)
             hire = found["hire"]
             problem = None

@@ -18,10 +18,12 @@ a world's recipe), so every run recorded before it replays as it was.
    parent, the change and the inherited rule; the child reads them (``GET /vacancies/{id}``, its
    capital view). The rule is a starting point: the child still pitches and passes the gates.
 4. **The family's attempts.** A rule chosen as the best of a family has been tried by the family:
-   the vacancy freezes the parent's attempts as they stood (its own research and pitches, plus
-   what it inherited), and every pitch of the child counts them in the deflated Sharpe's N
-   (:func:`inherited_attempts`). Only the parent's line: a sibling's attempts are not counted
-   (a known hole, ``tests/test_redteam_designs_reproduce.py``).
+   the vacancy freezes the family's attempts as they stood (every research backtest and pitch of
+   every pod of the family: founder, children, siblings, failed hires), and every pitch of the
+   child counts them in the deflated Sharpe's N (:func:`inherited_attempts`). The law's first
+   edition (a run frozen before cycle 66) counted the parent's line only.
+   Its second edition also refuses a hidden second difference: a parent whose model is not on the
+   record passes on a model change only (the child's model is the pool's, and that is its change).
 5. **Diversity.** Each month's end (:func:`diversity`) counts the distinct designs alive and the
    largest family's share of the live pods; when one family holds every live pod (two or more),
    that is written as a finding (``diversity_collapsed``).
@@ -45,8 +47,10 @@ from app.ledger.events import (
     EVENT_AGENT_REGISTERED,
     EVENT_CAPITAL_SEEDED,
     EVENT_GENERATION_ENDED,
+    EVENT_HIRE_PICKED,
     EVENT_PITCH_JUDGED,
     EVENT_PITCH_SUBMITTED,
+    EVENT_RESEARCH_BACKTEST_RUN,
     EVENT_VACANCY_FILLED,
     EVENT_VACANCY_OPENED,
 )
@@ -70,13 +74,21 @@ def reproduction_law(session: Session) -> ReproductionConfig:
                            .order_by(Event.id).limit(1))
     if first is None:
         return get_settings().reproduction
-    return ReproductionConfig.model_validate(first.payload_json.get("reproduction") or {})
+    # Frozen before the law had editions: its first.
+    return ReproductionConfig.model_validate({"edition": 1,
+                                              **(first.payload_json.get("reproduction") or {})})
+
+
+def frozen(law: ReproductionConfig) -> dict[str, Any]:
+    """The law as a vacancy freezes it (a first edition as it was written before editions)."""
+    return law.model_dump(mode="json", exclude={"edition"} if law.edition == 1 else None)
 
 
 # --- a pod's design -----------------------------------------------------------------------------
 
 def hire_of(session: Session, pod_id: int) -> dict[str, Any] | None:
-    """The hire a vacancy named for the pod it filled, ``None`` for a pod no vacancy made."""
+    """The hire a vacancy named for the pod it filled (its manager's pick, if it made one),
+    ``None`` for a pod no vacancy made."""
     filled = next((e for e in _events(session, EVENT_VACANCY_FILLED)
                    if e.payload_json.get("pod_id") == pod_id), None)
     if filled is None:
@@ -84,7 +96,23 @@ def hire_of(session: Session, pod_id: int) -> dict[str, Any] | None:
     opened = session.get(Event, filled.payload_json["vacancy_id"])
     if opened is None or opened.type != EVENT_VACANCY_OPENED:
         return None
-    return opened.payload_json["hire"]
+    picked = next((e for e in _events(session, EVENT_HIRE_PICKED)
+                   if e.payload_json.get("vacancy_id") == opened.id and e.id < filled.id), None)
+    return with_pick(opened.payload_json, None if picked is None else picked.payload_json)
+
+
+def with_pick(opened: dict[str, Any], picked: dict[str, Any] | None) -> dict[str, Any]:
+    """A vacancy's hire once its manager's pick (a ``hire_picked`` payload) is applied: the
+    picked candidate's design, under the vacancy's own names, budget and charter."""
+    if picked is None:
+        return opened["hire"]
+    candidate = next(c for c in opened.get("candidates") or []
+                     if c["id"] == picked["candidate"])
+    return {**{k: v for k, v in opened["hire"].items() if k in HIRE_FRAME}, **candidate["hire"]}
+
+
+#: What a hire keeps whoever is picked: the place's names, budget and charter.
+HIRE_FRAME = ("pod_name", "pm_name", "role", "budget_usd", "charter")
 
 
 def _rule_of(session: Session, pod_id: int) -> dict[str, Any] | None:
@@ -137,16 +165,22 @@ def last_generation(session: Session) -> tuple[int, list[dict[str, Any]]] | None
     return None if last is None else (last.payload_json["generation"], last.payload_json["pods"])
 
 
+def fit_parents(session: Session, *, generation: int,
+                rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every pod of ``rows`` (one generation's table) still alive with fitness above zero, fittest
+    first (ties: the older pod)."""
+    fit = [r for r in rows if r.get("verdict") in ALIVE and r.get("fitness_usd") is not None
+           and r["fitness_usd"] > 0 and _alive(session, r["pod_id"])]
+    return [{"pod_id": r["pod_id"], "pod_name": r["pod_name"], "generation": generation,
+             "fitness_usd": r["fitness_usd"]}
+            for r in sorted(fit, key=lambda r: (-r["fitness_usd"], r["pod_id"]))]
+
+
 def choose_parent(session: Session, *, generation: int,
                   rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     """The fittest pod of ``rows`` (one generation's table) still alive with fitness above zero."""
-    fit = [r for r in rows if r.get("verdict") in ALIVE and r.get("fitness_usd") is not None
-           and r["fitness_usd"] > 0 and _alive(session, r["pod_id"])]
-    if not fit:
-        return None
-    best = max(fit, key=lambda r: (r["fitness_usd"], -r["pod_id"]))
-    return {"pod_id": best["pod_id"], "pod_name": best["pod_name"], "generation": generation,
-            "fitness_usd": best["fitness_usd"]}
+    fit = fit_parents(session, generation=generation, rows=rows)
+    return fit[0] if fit else None
 
 
 def _rungs(value: int, ladder: tuple[int, ...]) -> list[int]:
@@ -155,10 +189,15 @@ def _rungs(value: int, ladder: tuple[int, ...]) -> list[int]:
     return ([lower[-1]] if lower else []) + ([higher[0]] if higher else [])
 
 
-def changes(design: dict[str, Any], models: tuple[str, ...]) -> list[dict[str, Any]]:
-    """Every change one step away from ``design``, each a valid design (in a fixed order)."""
+def changes(design: dict[str, Any], models: tuple[str, ...],
+            edition: int = 1) -> list[dict[str, Any]]:
+    """Every change one step away from ``design``, each a valid design (in a fixed order). Under
+    the second edition, a design whose model is not on the record changes its model only: its
+    child runs a model of the pool, and that is its one change."""
     from app.strategy.rule import StrategyRule
 
+    if design["model"] is None and edition >= 2:
+        return [{"what": "model", "from": None, "to": m} for m in dict.fromkeys(models)]
     out: list[dict[str, Any]] = []
     if design["model"] is not None:
         out += [{"what": "model", "from": design["model"], "to": m}
@@ -192,19 +231,38 @@ def child_of(session: Session, *, number: int, hiring: HiringConfig,
     parent = choose_parent(session, generation=measured[0], rows=measured[1])
     if parent is None:
         return None
+    return child_from(session, parent=parent, number=number, hiring=hiring)
+
+
+def child_from(session: Session, *, parent: dict[str, Any], number: int, hiring: HiringConfig,
+               salt: str = "") -> dict[str, Any] | None:
+    """The child of ``parent`` (a :func:`fit_parents` entry) a vacancy (its ``number``) would hire:
+    its parent's design with one change drawn by ``random.Random(f"{seed}:{number}{salt}")``.
+    ``None``: no change one step away."""
+    law = reproduction_law(session)
     design = design_of(session, parent["pod_id"])
-    options = changes(design, hiring.models)
+    options = changes(design, hiring.models, law.edition)
     if not options:
         return None
-    change = random.Random(f"{law.seed}:{number}").choice(options)
+    change = random.Random(f"{law.seed}:{number}{salt}").choice(options)
     rule = design["rule"] and {**design["rule"], **({change["what"]: change["to"]}
                                                     if change["what"] != "model" else {})}
     from app.strategy.service import pod_attempts   # the gates read the capital machine
 
+    attempts = (family_attempts(session, design["family"]["pod_id"]) if law.edition >= 2
+                else pod_attempts(session, parent["pod_id"]))
     return {"model": change["to"] if change["what"] == "model" else design["model"],
             "parent": {**parent, "model": design["model"], "rule": design["rule"]},
             "family": design["family"], "change": change, "inherited_rule": rule,
-            "lineage_attempts": pod_attempts(session, parent["pod_id"])}
+            "lineage_attempts": attempts}
+
+
+def family_attempts(session: Session, family_pod_id: int) -> int:
+    """Every research backtest and pitch any pod of the family made (closed ones too)."""
+    members = {pod for pod in session.scalars(select(Pod.id))
+               if design_of(session, pod)["family"]["pod_id"] == family_pod_id}
+    return sum(1 for e in _events(session, EVENT_RESEARCH_BACKTEST_RUN, EVENT_PITCH_SUBMITTED)
+               if e.payload_json.get("pod_id") in members)
 
 
 def inherited_attempts(session: Session, pod_id: int) -> int:

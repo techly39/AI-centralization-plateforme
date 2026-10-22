@@ -44,6 +44,7 @@ class AgentRole(str, enum.Enum):
     analyst = "analyst"
     pm = "pm"
     management = "management"
+    manager = "manager"      # the firm's manager mind: reads every pod, picks hires, sets direction
     system = "system"
     runtime = "runtime"      # the Runtime's clock hand (ADR-033); never a mind's
 

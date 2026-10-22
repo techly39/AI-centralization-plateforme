@@ -57,7 +57,7 @@ IdPath = Annotated[int, Path(ge=1, le=MAX_ID)]
 
 # Roles an operator/management may assign via the API. 'system' and 'runtime'
 # are physics' own (ADR-033), created by code or the operator CLI, never over HTTP.
-RegisterableRole = Literal["analyst", "pm", "management"]
+RegisterableRole = Literal["analyst", "pm", "management", "manager"]
 
 
 class AgentRegisterRequest(BaseModel):

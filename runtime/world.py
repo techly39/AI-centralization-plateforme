@@ -202,6 +202,11 @@ def child_env(db: Path, key: str, extra_symbols: dict[str, float] | None = None,
         # recording made before cycle 54 replays as recorded (auditor, the firm lives a quarter).
         env["FUND_GATES__CLOSED_POD_PITCHES_BIND"] = "true"
     for section, law in (laws or {}).items():
+        if section == "reproduction" and "edition" not in law:
+            # A recipe that names no edition of the reproduction law lives by its first (a
+            # parent's line counted, the old draw), so every recording made before cycle 66
+            # replays as recorded.
+            env["FUND_REPRODUCTION__EDITION"] = "1"
         for name, value in law.items():
             # A text as it is; a number, a flag or a list as JSON (how the settings read them).
             env[f"FUND_{section.upper()}__{name.upper()}"] = (

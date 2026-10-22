@@ -36,6 +36,7 @@ class Action(str, enum.Enum):
     SUBMIT_PITCH = "submit_pitch"          # pitch a strategy for the own pod (ADR-048)
     READ_PITCHES = "read_pitches"          # own pod's pitches and research; others need READ_CROSS_POD
     REQUEST_TEAM = "request_team"          # a PM asks for (and lets go) its own pod's analysts
+    MANAGE_FIRM = "manage_firm"            # the manager mind: pick a freed place's hire, set direction
 
 
 #: Actions the TRD §6 table does not list because they are not privileges at
@@ -99,6 +100,21 @@ _MATRIX: dict[AgentRole, frozenset[Action]] = {
             Action.READ_PITCHES,
         }
     ),
+    # 'manager' is the firm's manager mind (idea: management above the pods): it reads every pod
+    # and picks among the hires the law lists, briefs the new PM and writes the firm's direction.
+    # It is not the registrar: it registers, deactivates, moves capital, trades and pitches
+    # nothing (the TRD's 'management' role is the operator's registrar, which the Runtime holds).
+    AgentRole.manager: _UNIVERSAL
+    | frozenset(
+        {
+            Action.SEND_MESSAGE,
+            Action.LIST_AGENTS,
+            Action.READ_MARKET_DATA,
+            Action.READ_CROSS_POD,
+            Action.READ_PITCHES,
+            Action.MANAGE_FIRM,
+        }
+    ),
     # 'runtime' is the Runtime's identity (ADR-033, B-032): it moves a backtest's
     # clock between lockstep steps and does nothing a participant does — not
     # even the universal inbox / cost / task reports, so no ledger row it writes
@@ -138,6 +154,12 @@ def may_hire(session: Any, actor: Any) -> bool:
 
     return (has_permission(actor.role, Action.REGISTER_AGENTS)
             and registered_by_operator(session, actor))
+
+
+def may_register_role(session: Any, actor: Any, role: AgentRole) -> bool:
+    """Who may make an agent of ``role``: a firm's manager only by the operator's registrar (a
+    management agent another agent made does not make the firm's management)."""
+    return role != AgentRole.manager or may_hire(session, actor)
 
 
 def may_declare_model(session: Any, actor: Any, role: AgentRole) -> bool:
