@@ -102,7 +102,9 @@ never funded, the sinking and crashing pods closed and replaced by hires who ear
 Human reads a quarter report (`fund-env quarter-report`). Cycle 59: the firm turns over by
 itself every month (a PM who never earns a seed is let go, thinking is charged at every step of a
 real run). Cycle 62: a freed place goes to a child of the month's fittest pod. Cycle 64: a PM
-can hire its own analysts (real PMs chose not to). Not yet: a manager mind.
+can hire its own analysts (real PMs chose not to). Cycle 66: a manager mind may pick who fills a
+freed place among the hires the law allows (a real Haiku manager kept the law's own hire). Not yet:
+any data beyond prices, so a second mind in a pod knows nothing its PM does not.
 
 ## The firm's people
 
@@ -180,7 +182,8 @@ next morning under the cap, and the new PM wakes with the post-mortem, researche
 Recorded: a real Haiku 5.5 hire pitched long-short, read the refusal on its pitch, re-pitched
 long-only, was seeded $200k and trades. Cycle 59: a PM who never earns a seed in a month is let go
 and hired over; every departure's lesson is in a library all PMs read. Cycle 62: the hire into a
-freed place is a child of the month's fittest pod. Not yet: a manager mind choosing the hire.
+freed place is a child of the month's fittest pod. Cycle 66: a manager mind may pick the hire
+among those the law allows, and brief the new PM (real Haiku managers kept the law's own pick).
 
 ### The firm governs itself
 From: Human
@@ -214,6 +217,23 @@ NVDA, TSLA…). Each package is versioned, so a run says exactly what each mind 
 Now: prices exist (synthetic keyed market, static and yfinance providers in `app/marketdata/`),
 and the first versioned package, `prices-v1`, is handed to each real mind every morning
 (`runtime/packages.py`). No company data or headlines yet.
+Matured (cycle 67 plan), first slice "headlines and company data, handed by role" (Next up 1):
+- *The world writes them.* The made-up market's recipe gains dated items: headlines (a title and
+  a short description, about one ticker or none) and quarterly company reports (revenue, earnings,
+  guidance). Most are noise, made from templates by the seed (how many a day is the world's noise
+  level); a few are *planted causes*: a fraud headline, an earnings miss, each with an effect on
+  that ticker's later prices written in the recipe. No LLM writes them: they are physics.
+- *Physics serves them, never early.* Headlines and reports are read through the API at the
+  world's now: an item published tomorrow does not exist today (the same look-ahead law as prices).
+- *Handed by role.* Each agent holds data rights (prices for everyone; headlines and company
+  data only if granted). The operator grants them at registration; a PM may ask for an analyst
+  with a package the PM itself does not have. A mind without the right is refused by name (403,
+  logged), in its tools and in its morning package.
+- *Versioned packages.* `headlines-v1`, `company-v1`, `everything-v1` beside `prices-v1`; each
+  mind's spec names its package; a run records which package each mind saw.
+Why now: the cycle-64 and cycle-66 findings: a PM offered analysts worked alone (on prices alone it
+is right), and a manager kept the law's hire (no pod knew anything another did not). Information
+that only some minds hold is what gives a team, a manager and a debate their work.
 
 ### Known expected outcomes: tests of behaviour
 From: Human
@@ -221,6 +241,8 @@ Status: not started
 "Know in advance what must come out": a scenario plus the behaviour we expect (e.g. after a fraud
 headline about a stock it holds, the PM cuts the position within 2 days). A predictable sequence of
 inputs lets us test agents, prompts and models like a lab test.
+Now: needs headlines (Next up 1). Its real run is the first such test: a planted fraud headline on a
+stock a real PM holds, read only by its analyst; whether the PM cuts within two days is reported.
 
 ### Model comparison at different noise levels
 From: Human
@@ -582,6 +604,15 @@ real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycl
 generation turns over every month. Done, cycle 62: 2b, designs reproduce. Done, cycle 64: a PM
 builds its team. Done, cycle 66: a manager chooses the hires.)
 
+Cycle 67 plan: order kept, data packages next. Why: the last two real runs added minds that had
+nothing to add: PMs offered analysts worked alone, and a manager kept the law's hire every time,
+because every mind sees the same prices. Headlines and company data that only some minds are given
+make a team worth paying for, give the manager something to judge, and are the base of the
+behaviour tests (a planted fraud headline: does the PM cut?). Capital resets stay small and wait;
+the debate needs a pitch with more than prices to argue about. Holes it stands on, checked inside
+it: new tools must stay out of older recordings' tool lists (named-only, as the manager's were);
+the recipe is the world (whoever reads it knows every future headline), so it stays the operator's.
+
 Cycle 65 plan: a manager chooses the hires moves first. Why: the firm now selects, reproduces and
 lets PMs hire, but every decision above the pods is still a law: who fills a freed place is the
 Builder's formula. The Human's firm has management above the pods that sees every pod and sets the
@@ -647,17 +678,21 @@ days are readable; a forward trial with small capital on days that have not happ
 how a multi-manager really works and the cure for that hole. A debate's verdict matters once
 verdicts move capital.
 
-1. **A manager chooses the hires.** Queued (cycle 65). One real manager mind reads the firm board
-   each morning (every pod's cash, positions, exposures, capital, drawdown, thinking, fitness);
-   for each freed place physics lists the hires the law allows, the default marked; the manager
-   picks one and writes the new PM's brief, or the default stands; it writes the firm's direction
-   every PM reads. It cannot move capital, hire or fire by itself. Proven scripted (a pick, a
-   silence, refusals by name); real: a Haiku manager over a generation run, its picks the finding.
-   Later slices: a manager who lets a PM go early (with its reason, inside a law), who opens pods.
-2. **Data packages: headlines and company data.** Versioned packages beyond prices (fake company
-   data, fake headlines with a planted cause), handed by role, so an analyst can see what its PM
-   does not; the base of "known expected outcomes" (a fraud headline → the PM cuts within 2 days).
-3. **Capital resets** at the month's turn (the monthly generation's c, below), small.
+1. **Data packages: headlines and company data, handed by role.** Queued (cycle 67). The made-up
+   world writes dated headlines and quarterly reports (mostly noise from templates; a few planted
+   causes with an effect on later prices); physics serves them at the world's now, only to an
+   agent holding the right (the operator grants it; a PM may ask for an analyst with a package it
+   lacks); versioned packages `headlines-v1`, `company-v1`, `everything-v1`. Proven scripted
+   (read on the day, not the day before; refused without the right; the planted cause moves the
+   price, the noise does not); real: a Haiku PM holding a stock, its analyst alone reads the fraud
+   headline; whether the PM cuts within two days is the finding (the first behaviour test).
+   Later slices: data that costs the pod money, the manager reading headlines, real history.
+2. **Capital resets** at the month's turn (the monthly generation's c, below), small.
+3. **The pitch, part two** (4 below): the debate, now with headlines to argue about.
+(Done, cycle 66) **A manager chooses the hires.** One manager mind reads every pod; for each freed
+   place it picks among the hires the law allows and briefs the new PM, or the law's own stands; it
+   writes the firm's direction. Real Haiku managers kept the law's hire. Later slices: a manager who
+   lets a PM go early (with its reason, inside a law), who opens pods.
 (Done, cycle 64) **A PM builds its team.** A PM requests an analyst (charter, model, budget);
    physics grants it inside the team limit, the cap and the pod's budget; the Runtime hires it;
    its research and thinking are the pod's. Real PMs offered it worked alone. Later slices: an

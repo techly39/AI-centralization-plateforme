@@ -1,18 +1,19 @@
-Cycle 0066 · build · merged: a manager chooses the hires · branch: idea/manager-chooses-hires
+Cycle 0067 · plan · planned · next: headlines and company data, handed by role · branch: main
 Done this session:
-- The firm's first manager mind: it reads every pod on one board, sees each freed place's list of
-  the hires the law allows (the law's own first) for one day, picks one and briefs the new PM, or
-  stays silent and the law's choice stands; it may write the firm's direction, which every PM
-  reads. It cannot trade, hire, fire or move money; its thinking is the firm's cost, not a pod's.
-- Two old holes closed with it: a family's attempts now count together in every child's test, and
-  a child of a pod whose model was never recorded changes its model only. Older recordings keep
-  the old rule, so all of them still replay identical.
-- Real run (Haiku manager over three months of Haiku PMs), recorded twice ($0.581, then $0.590
-  after a fix changed what PMs read; the first kept as a trial): both times the manager kept the
-  law's own hire, wrote a brief, and never wrote a direction.
-- Red-team: 4 holes (2 medium, 2 low), all fixed. Auditor: no code defect; passed once re-recorded.
-Next: plan session (the book's Next up: data packages, capital resets, the pitch's debate...).
-Watch out: any change to what a PM reads (the capital view's words) breaks a real recording's
-replay: settle the red-team and the auditor before spending on the real run, not after. A mind's
-new tools must be named in its spec (they are shown only to a spec that names them).
-Demo: passes (`uv run python acceptance/manager_chooses_hires.py`, $0).
+- Looked back: since the last plan one idea merged (a manager chooses the hires) in two sessions
+  (the first cut by the usage limit), $16 in all; every finished idea's demo still passes on main.
+  No new comments from the Human.
+- The book made true: the firm's and the hiring idea's "Now" lines name the manager mind; data
+  packages matured into a first slice; the behaviour tests idea names its first test.
+- Queued (ready): headlines and company data, handed by role. The made-up world writes dated
+  headlines and quarterly reports, mostly noise, a few planted causes that move later prices;
+  physics serves each only on its day and only to a mind given the right; a PM may ask for an
+  analyst with a package it lacks. Why: PMs offered analysts worked alone and the manager kept the
+  law's hire, because every mind sees the same prices.
+- Process: a finished idea's demo is changed only to keep it showing the same, with one
+  "Older demo:" line in the commit.
+Next: build session: start idea/data-packages, write NOW.md and acceptance/data_packages.py.
+Watch out: the recipe is the world (it holds every future headline): it never reaches an agent
+and no endpoint shows an item's effect. New data tools go named-only so older recordings replay.
+Touches market data and permissions: red-team and auditor before the paid real run is recorded.
+Demo: none yet (planning session).

@@ -70,6 +70,11 @@ killed when the session ends).
   any file that is not committed.
 - Tests proportionate to the code. Never weaken or delete a test to pass; if a test is wrong, say
   why in the commit.
+- A finished idea's demo is changed only to keep it showing what it showed (pin the law edition
+  it was made under, follow a renamed call), never to loosen a check; that commit's body has one
+  line `Older demo: <which, what changed, why it still proves the same>`. (Cycle 67: the runner
+  flagged it in 2 of the last 4 merges, with the reason buried in a long summary; judged by: every
+  `acceptance_changed` flag in the metrics points to a commit with that line.)
 - Real LLM spend (firm agents) only through the metered path, inside the cap, and only for the run
   that produces the evidence. Record it (cassette) so every later check is free.
   Before that run (each rule cost one wasted real run when missing):
