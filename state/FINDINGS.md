@@ -128,3 +128,27 @@ messages first loses a day on news. The passing grade ("cut within two days") wa
 run, which is an anecdote, not a rate.
 Follow-up: the behaviour-test idea (scenarios with expected outcomes, run per model and scored);
 a charter or tool order that reads messages first, compared against this one.
+
+## F-0008 — A real manager held every planted-edge pitch as too good to be true; the bear used the fraud headline, the minds misread the gates' numbers as before costs   [tags: firm, behaviour, world]   (cycle 70)
+Setup: a made-up market with four edge sectors and a fraud headline on K03 (out at the close of
+2024-09-26), a 2-day debate law. Three scripted PMs pitch 20-day momentum (alpha on K, whose
+universe holds K03; beta on L; gamma on T); all pass the gates. Real Haiku 5.5 centre minds on
+$0.25 keys: a bull, a bear given headlines, the manager. Five mornings from 26 September.
+Result: on 27 September the bear argued against all three, first that the numbers are "not
+believable" (IC 0.37 to 0.57, Sharpe 15 to 27 for a momentum rule: "a red flag for leakage"),
+for alpha also K03's fraud headline; the bull argued for each, granting the numbers look too
+good and asking for a smaller seed (a verdict names no amount). The manager held all three that
+morning ("far beyond any credible daily edge; treat as probable leakage or artifact"), asking
+for a fresh window and results net of costs. Physics refused the three seeds the next morning
+with its reasons. $0.018 for the three minds.
+Evidence: `evidence/pitch-debate/debate.cassette.json`; `acceptance/pitch_debate.py` (B).
+Interpretation: the first agent judgement on money stopped all of it, and for a sound reason:
+the made-up market's planted edge is far stronger than any real one, so a mind that knows real
+markets reads it as a bug. Two misreadings came from what physics showed: the gates judge net of
+fees, but the pitch view does not say so ("costs not modelled"); and the correlation gate's
+null on the first pitch (nothing to compare with) read as "no check run". The fraud headline
+reached the thread through the bear only, as designed, but did not decide the verdicts.
+Follow-up: planted edges of realistic size (Sharpe 1 to 3) so the debate judges something
+plausible; the pitch view saying its numbers are net of fees (it changes what recorded PMs read:
+a new view edition); the same run per model (the behaviour battery).
+

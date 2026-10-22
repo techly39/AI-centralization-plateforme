@@ -228,8 +228,12 @@ def argue(session: Session, *, pitch_id: int, text: str, actor: Agent) -> dict[s
             raise NotYourDebate(f"pitch {pitch_id} is not your pod's: a PM argues only its own "
                                 "pod's pitch")
         if debate is None:
+            # A reviewer reads no pod's pitches: one answer for every pitch not in debate (auditor:
+            # the reason told it whether the gates refused another pod's pitch).
             raise _refuse(session, pitch_id=pitch_id, act="argue", actor=actor,
-                          reason=_no_debate_reason(session, pitch_id))
+                          reason=(f"pitch {pitch_id} has no debate"
+                                  if actor.role == AgentRole.reviewer
+                                  else _no_debate_reason(session, pitch_id)))
         today = ledger_now(session).date()
         if (why := _closed_reason(debate, today)) is not None:
             raise _refuse(session, pitch_id=pitch_id, act="argue", actor=actor, reason=why)
@@ -320,6 +324,7 @@ def law_text(days: int) -> str:
             f"sweep its debate opens for {days} day{'s' if days != 1 else ''}. The firm's "
             f"reviewers argue it in its thread and its PM may answer there (read_debates, "
             f"argue_pitch). The firm's manager may rule once while it is open: seed (paid the "
-            f"next morning) or hold (the seed is refused, with the manager's reason). With no "
+            f"next morning) or hold (the seed is refused, with the manager's reason, and so is "
+            f"every other pitch its pod made while it was argued). With no "
             f"verdict the seed is paid the morning the debate closes. The manager never names an "
             f"amount and never seeds what the gates or the centre refuse.")

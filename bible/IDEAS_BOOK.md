@@ -155,12 +155,12 @@ only the operator makes one) sees each freed place's list (c1 the law's own hire
 other fit pod, a plain hire on each model) for one day; its pick is hired exactly, silence keeps
 the law's hire. Its thinking is the centre's. A real Haiku manager over three months of real
 Haiku PMs (recorded twice, $0.59 each): both times it kept the law's own hire, wrote a brief for
-the new PM, and never wrote a direction. Not yet: a manager that opens pods, fires early, or
-judges a pitch; departments.
+the new PM, and never wrote a direction. Cycle 70: the manager rules on pitches in debate (seed
+now or hold with a reason). Not yet: a manager that opens pods or fires early; departments.
 
 ### The pitch, then a full report
 From: Human
-Status: building (the debate; first slice, the gates, working)
+Status: working (the gates; the debate)
 Now: a PM researches a strategy written as a rule (every backtest counted), pitches, and the gates
 (IC, deflated Sharpe, capacity, correlation) judge it on held-out days; the Human reads the verdict.
 Not yet: the backtest operator, the bull/bear debate, the full report, strategies as code.
@@ -185,6 +185,13 @@ backtest operator is left out: the gates already re-run the rule on held-out day
 own code. Why this slice: the cycle-68 news gives a bear something real to argue (a fraud
 headline on a name in the pitched rule's universe, read only by the bear), and it is the first
 time an agent's judgement, not a formula, decides whether money moves.
+Now (cycle 70, ADR-055): built. Under the debate law an eligible pitch's debate opens the next
+morning; reviewers (a new centre role, operator-made, no pod, no inbox) and the pitch's PM argue in
+its thread; the manager seeds now or holds with a reason (refused by the next sweep, the PM reads
+it); silence pays at the close. Real Haiku bull, bear (given headlines) and manager on three
+planted-edge pitches: the bear named K03's fraud, and the manager held all three as "too good to
+be true" (the made-up edge is far stronger than any real one). Not yet: the backtest operator, the
+full report, realistic planted edges.
 
 ### Hiring new PMs: turnover
 From: Human
@@ -621,6 +628,13 @@ that mind's own denials, so a study of minds probing past their rights must tell
 (the package's refusals come at the wake's start, before any tool call); (low) a team place's
 frozen law now stores `"data": []` even when the law lists none (old ledgers still validate and
 replay).
+From the debate (cycle 70, red-team 0 high, 2 medium + 3 low, all fixed; the auditor's notes):
+(low) the pitch view does not say the gates' numbers are net of fees, so real minds read them as
+gross (changing it changes what recorded PMs read: a new view edition); (low) a reviewer reads
+every pod's rule and writes in every pod's thread, so one pod's rule can reach another pod's PM
+through a thread (all in the ledger; the copy gate still applies at payment); (low) a hold also
+refuses a pitch its pod made during the debate with a different rule the manager never read (the
+law text and the reason say so); the debate routes answer untyped dicts.
 
 ### Paid to report holes
 From: Builder
@@ -638,7 +652,7 @@ results. Done, cycle 51: 1b, a dead pod is replaced by a newly hired real PM. Do
 real PMs lived a quarter, two deaths and two hires, a quarter report. Done, cycle 59: 2a, a
 generation turns over every month. Done, cycle 62: 2b, designs reproduce. Done, cycle 64: a PM
 builds its team. Done, cycle 66: a manager chooses the hires. Done, cycle 68: headlines and
-company data, handed by role.)
+company data, handed by role. Done, cycle 70: a pitch is argued before its seed.)
 
 Cycle 69 plan: the debate moves ahead of capital resets. Why: since cycle 68 some minds know what
 others do not, but money still moves only by formula: the gates decide every seed. A bull and a
@@ -725,7 +739,7 @@ days are readable; a forward trial with small capital on days that have not happ
 how a multi-manager really works and the cure for that hole. A debate's verdict matters once
 verdicts move capital.
 
-1. **A pitch is argued before its seed** (the pitch, part two, first slice). Queued (cycle 69).
+(Done, cycle 70) **A pitch is argued before its seed** (the pitch, part two, first slice).
    Under a debate law an eligible pitch waits a few days; a bull and a bear (centre `reviewer`
    minds) argue it in its thread, the PM may answer, and the manager seeds it now or holds it
    with a reason; silence keeps the law's seed. The manager never seeds what the gates or the

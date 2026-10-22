@@ -50,4 +50,6 @@ Left out: the backtest operator, a debate on the hypothesis itself, reviewers pa
 Money (the seed) and permissions: red-team + auditor before the paid run and merge.
 
 ## Progress
-- cycle 70: plan; physics, API and demo part A.
+- cycle 70: physics, API, tools, demo A and B0; red-team 0 high, 2 medium + 3 low, all fixed;
+  real run B recorded ($0.018: the manager held all three pitches as too good to be true, the bear
+  named K03's fraud); auditor PASS, its notes acted on. Merged.

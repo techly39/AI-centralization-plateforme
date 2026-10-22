@@ -119,6 +119,11 @@ notes it held through cycle 32 are in git (`git show 5bffbfa:state/STATE.md`) an
   default: a freed place lists the hires the law allows and waits a day; the Runtime's morning
   hire skips it until then. Reproduction law edition 2 (a family's attempts); recipes naming no
   edition live by edition 1.
+- The debate before a seed (cycle 70, ADR-055): law `capital.debate_days` (0 = off);
+  `app/capital/debate.py` + `app/api/debates.py` (`GET /debates`, `GET /debates/{pitch_id}`,
+  `POST .../argue`, `POST .../verdict`); the sweep opens, waits, pays early, refuses a hold, pays
+  at the close; role `reviewer` (no pod, no inbox, may be given data; operator-made); scripted
+  `debate-reviewer`, `debate-manager` in `runtime/scripted.py`.
 - Every kept recording under `evidence/` replays IDENTICAL in the suite
   (`tests/test_evidence_replays.py`); a missing one fails it.
 

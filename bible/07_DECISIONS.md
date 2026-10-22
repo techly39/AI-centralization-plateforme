@@ -2164,3 +2164,34 @@ child a second, unrecorded difference.
 generation months through the Runtime with a scripted manager; B the recorded real run,
 `evidence/manager-chooses-hires/`); `tests/test_management.py`,
 `tests/test_redteam_designs_reproduce.py` (the two holes, now fixed).
+
+## ADR-055 — A pitch is argued before its seed: under a debate law an eligible pitch waits; reviewers argue it in its thread; the manager seeds it now or holds it with a reason; silence pays it at the close (idea: the pitch, then a full report) — accepted (cycle 70, 2026-10-22)
+
+**Context.** Since the capital machine (cycle 48) the gates alone decided every seed: an eligible
+pitch was paid the next morning. Since cycle 68 some minds know what others do not (headlines), so
+a judgement can now hold information the gates' formula lacks. The Human's pitch has a debate: a
+bull and a bear argue it before the decision.
+
+**Decision.**
+1. A law, `capital.debate_days` (0 = off, left out of the frozen law while off; `config.yaml` or a
+   world's recipe), frozen into `capital_opened`, so every older run replays as recorded.
+2. Under it the sweep, the first time it would pay a pitch's seed (the gates found it eligible,
+   read from physics' own `pitch_judged`; its pod exists, is not closed or seeded; its rule is
+   long-only), opens its debate instead (`debate_opened`, closing `debate_days` later).
+3. A new role, `reviewer` (rights `read_debates`, `argue`, prices, and the data the operator
+   grants), made only by the operator's registrar, with no pod: it reads every debate (the pitch,
+   its rule, the gates' numbers) and writes in a pitch's thread (`debate_argued`, at most five
+   posts each), nowhere else. It cannot trade, pitch, research, rule, send or receive messages.
+   A pitch's own PM reads its debate and may answer in the thread. Thinking is the centre's.
+4. The manager rules once while the debate is open (`pitch_ruled`): `seed` (paid at the next
+   sweep) or `hold` (the sweep refuses the seed with the manager's reason, which the PM reads in
+   its pitch; every other pitch its pod made while it was argued is refused with it). No verdict:
+   the seed is paid at the first sweep on or after the closing day. A verdict names no amount;
+   the centre's cash and the copy gate are checked as the seed is paid, as before. Refusals are in
+   the ledger (`debate_refused`).
+5. The generation law does not judge a pod whose pitch is in an open debate at the month's end; a
+   debate that closed unpaid shelters nothing.
+
+**Proof.** `acceptance/pitch_debate.py` (A scripted through the API, the no-law control; B0 the
+same through the Runtime; B the recorded real run, `evidence/pitch-debate/`);
+`tests/test_debate.py`, `tests/test_redteam_pitch_debate.py`.
