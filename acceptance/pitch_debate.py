@@ -24,9 +24,12 @@ Costs $0 and needs no network.
        no law    the same first day in a world without the law: the pitch is seeded the next
                  morning, no debate, the frozen law has no debate key, a verdict is refused
        rebuild   the ledger replayed into a fresh state: the same cash, debates and verdicts
-  B0 (next session) the same hosted through the Runtime with the real run's very command
-  B  (next session) real Haiku bull, bear and manager on a planted-edge pitch whose universe holds
-     K03, a name with a fraud headline only the bear reads; the verdict is the finding
+  B0 the same hosted through the Runtime with the real run's very command: three pods whose
+     scripted PMs pitch on the first morning, a scripted bull, bear (given headlines) and manager
+     (it holds a pitch whose thread names a fraud, seeds beta early, lets gamma run); physics'
+     answers to every verdict checked from the recording, replay IDENTICAL
+  B  real Haiku bull, bear and manager on the same pitches (alpha's universe holds K03, whose
+     fraud headline only the bear reads); physics' answers checked; the verdicts are the finding
 
     uv run python acceptance/pitch_debate.py        # exit 0 = the idea works
 """
@@ -402,16 +405,218 @@ def part_no_law() -> None:
           out["verdict"][0] == 409 and "no debate law" in out["verdict"][1], str(out["verdict"]))
 
 
+# --- B0 / B: hosted through the Runtime --------------------------------------------------------
+
+#: The hosted run (B) and its rehearsal (B0) are made with this very command, in the directory
+#: ``--write-world`` fills; only the cassette's name differs. Five mornings from 26 September: the
+#: PMs pitch on the first, the debates open on the second (K03's fraud headline is out by then)
+#: and close on the fourth.
+STEPS, DAYS_PER_STEP, MAX_TOOL_CALLS = 5, 1, 16
+HAIKU = "anthropic/claude-haiku-5.5"
+REAL_MODEL, REAL_BUDGET_USD, REHEARSAL_BUDGET_USD = HAIKU, 0.25, 2.0
+PODS = {"alpha": "K", "beta": "L", "gamma": "T"}
+PM_TOOLS = ["list_pitches", "get_mandate", "submit_pitch", "place_order", "get_capital",
+            "read_debates", "argue_pitch"]
+REVIEWER_TOOLS = ["whoami", "get_clock", "read_debates", "read_debate", "argue_pitch",
+                  "get_ohlcv"]
+MANAGER_TOOLS = ["whoami", "get_clock", "read_debates", "read_debate", "rule_pitch"]
+FIRM = ("You work in a hedge fund that trades a simulated market with fake money. A PM's pitch "
+        "the gates find eligible is argued before the centre pays its $200,000 seed: its debate "
+        "opens the next morning for two days. You remember nothing between days: read what you "
+        "need first. Be brief: every word you think is paid from the firm's P&L. When you are "
+        "done, stop. ")
+CHARTERS = {
+    "bull": FIRM + "You are bull, a reviewer. Each morning read the open debates (read_debates) "
+            "and argue FOR each pitch you have not argued yet, once, in its thread "
+            "(argue_pitch): the strongest honest case for funding it. You cannot trade or rule.",
+    "bear": FIRM + "You are bear, a reviewer. You are given the world's headlines "
+            "(read_headlines). Each morning read the open debates (read_debates) and the recent "
+            "headlines, and argue AGAINST each pitch you have not argued yet, once, in its thread "
+            "(argue_pitch): the strongest honest case against funding it, with anything in the "
+            "news about the names it may buy. You cannot trade or rule.",
+    "manager": FIRM + "You are the firm's manager. Each morning read the open debates "
+               "(read_debates). For each, you may rule once while it is open (rule_pitch): seed "
+               "(the seed is paid the next morning) or hold (the seed is refused; give the PM your "
+               "reason). If you say nothing, the seed is paid when the debate closes. You never "
+               "choose an amount.",
+}
+PM_CHARTER = ("You are {name}, a PM. Pitch your rule (submit_pitch) if you have not; once seeded, "
+              "trade your mandate (get_mandate, place_order).")
+
+
+def command(cassette: str) -> list[str]:
+    return ["backtest", "--world", "world.json", "--specs", "specs", "--input", "input.json",
+            "--steps", str(STEPS), "--days-per-step", str(DAYS_PER_STEP), "--charge-each-step",
+            "--max-tool-calls", str(MAX_TOOL_CALLS), "--cassette", cassette]
+
+
+def write_world(directory: Path, provider: str) -> None:
+    """The hosted run's files: the made-up world with its news under the debate law, three pods
+    with scripted pitching PMs, a bull, a bear (given headlines) and the firm's manager."""
+    (directory / "specs").mkdir(parents=True, exist_ok=True)
+    (directory / "world.json").write_text(json.dumps({
+        "start": f"{START.isoformat()}T14:30:00Z", "admin": "debate-mgmt",
+        "pods": [{"name": name, "allocation": 0} for name in PODS], "market": RECIPE,
+        "laws": {"capital": {"debate_days": DEBATE_DAYS, "seed_usd": SEED_USD}}}))
+    scripted = provider == "fake-metered"
+    (directory / "input.json").write_text(json.dumps({
+        "pitch_rules": {f"{pod}-pm": rule(family) for pod, family in PODS.items()},
+        "sides": {"bull": "bull", "bear": "bear"},
+        # The scripted manager's one instruction (the real one decides alone).
+        **({"seed_early": ["beta"]} if scripted else {})}))
+    for k, pod in enumerate(PODS, start=1):
+        spec = {"id": f"{pod}-pm", "name": f"{pod}-pm", "role": "pm", "pod": k,
+                "charter": PM_CHARTER.format(name=f"{pod}-pm"), "tools": PM_TOOLS,
+                "provider": "fake-metered", "script": "pitch-pm",
+                "budget_usd": REHEARSAL_BUDGET_USD}
+        (directory / "specs" / f"{pod}-pm.yaml").write_text(json.dumps(spec))
+    for sid, role, tools, script, data in (
+            ("bull", "reviewer", REVIEWER_TOOLS, "debate-reviewer", []),
+            ("bear", "reviewer", [*REVIEWER_TOOLS, "read_headlines"], "debate-reviewer",
+             ["headlines"]),
+            ("manager", "manager", MANAGER_TOOLS, "debate-manager", [])):
+        spec = {"id": sid, "name": sid, "role": role, "charter": CHARTERS[sid], "tools": tools,
+                **({"data": data} if data else {})}
+        spec |= ({"provider": "fake-metered", "script": script,
+                  "budget_usd": REHEARSAL_BUDGET_USD} if scripted
+                 else {"provider": provider, "model": REAL_MODEL, "budget_usd": REAL_BUDGET_USD})
+        (directory / "specs" / f"{sid}.yaml").write_text(json.dumps(spec))
+
+
+def _gt():
+    sys.path.insert(0, str(REPO / "acceptance"))
+    import generation_turnover as gt
+    return gt
+
+
+def _calls(wake: dict) -> list[dict]:
+    return [c for m in wake.get("transcript") or [] for c in m.get("tool_calls") or []]
+
+
+def _tool_texts(wake: dict) -> list[str]:
+    return [m.get("content") or "" for m in wake.get("transcript") or [] if m.get("role") == "tool"]
+
+
+def hosted_lawful(rec: dict, label: str) -> dict:
+    """What physics did with whatever the minds chose, from the recording alone."""
+    params = rec.get("parameters") or {}
+    check(f"{label}: the run is the one this idea describes: {STEPS} mornings of {DAYS_PER_STEP} "
+          f"day, thinking charged each step, {MAX_TOOL_CALLS} tool calls a wake",
+          (params.get("steps"), params.get("days_per_step"), params.get("charge_each_step"),
+           params.get("max_tool_calls")) == (STEPS, DAYS_PER_STEP, True, MAX_TOOL_CALLS),
+          json.dumps({k: params.get(k) for k in ("steps", "days_per_step", "charge_each_step",
+                                                 "max_tool_calls")}))
+    ledger = [(r[0], r[1], r[2], r[3], json.loads(r[4])) for r in rec["ledger"]["rows"]]
+    of = lambda t: [dict(p, _on=ts[:10], _actor=a) for _, ts, a, ty, p in ledger if ty == t]  # noqa: E731
+    agents = {p["name"]: p for p in of("agent_registered")}
+    ids = {name: p["agent_id"] for name, p in agents.items()}
+    check(f"{label}: the operator's registrar made bull and bear reviewers with no pod, the bear "
+          "given headlines",
+          all((agents.get(n) or {}).get("role") == "reviewer"
+              and (agents.get(n) or {}).get("pod_id") is None for n in ("bull", "bear"))
+          and {p["agent_id"]: p["rights"] for p in of("data_rights_granted")}
+          == {ids.get("bear"): ["headlines"]})
+    law = of("capital_opened")[0]["law"] if of("capital_opened") else {}
+    check(f"{label}: the centre opened under the debate law ({DEBATE_DAYS} days)",
+          law.get("debate_days") == DEBATE_DAYS)
+    judged = {p["pitch_id"]: p for p in of("pitch_judged")}
+    opened = {p["pitch_id"]: p for p in of("debate_opened")}
+    ruled = {p["pitch_id"]: p for p in of("pitch_ruled")}
+    seeds = {p["pitch_id"]: p for p in of("capital_seeded")}
+    refused = {p["pitch_id"]: p for p in of("capital_seed_refused")}
+    eligible = sorted(k for k, p in judged.items() if p["eligible"])
+    check(f"{label}: every eligible pitch had its debate opened the morning after, for "
+          f"{DEBATE_DAYS} days", eligible and sorted(opened) == eligible and all(
+              opened[k]["opened_on"] > judged[k]["_on"] and opened[k]["closes_on"]
+              == (date.fromisoformat(opened[k]["opened_on"])
+                  + timedelta(DEBATE_DAYS)).isoformat() for k in eligible),
+          f"{len(eligible)} eligible, {len(opened)} debates")
+    answers = []
+    for k in eligible:
+        o, v = opened[k], ruled.get(k)
+        if v is not None and v["verdict"] == "hold":
+            ok = k not in seeds and k in refused and v["reason"] in refused[k]["reason"]
+            answers.append((k, "hold", ok))
+        elif v is not None:
+            nxt = (date.fromisoformat(v["_on"]) + timedelta(1)).isoformat()
+            answers.append((k, "seed", k in seeds and seeds[k]["_on"] == nxt))
+        else:
+            answers.append((k, "silence", k in seeds and seeds[k]["_on"] == o["closes_on"]))
+    check(f"{label}: physics answered each verdict: a hold refused with its reason, a seed paid "
+          "the next morning, silence paid the morning the debate closed",
+          bool(answers) and all(ok for _, _, ok in answers),
+          ", ".join(f"#{k} {what}{'' if ok else ' WRONG'}" for k, what, ok in answers))
+    check(f"{label}: no ruling came after its debate closed, none twice, none by anyone but the "
+          "manager", all(v["_on"] < opened[k]["closes_on"] and v["_actor"] == ids.get("manager")
+                         for k, v in ruled.items()) and len(of("pitch_ruled")) == len(ruled))
+    posts = of("debate_argued")
+    check(f"{label}: only reviewers and the pitch's own PM wrote in a thread, while it was open",
+          all(p["_actor"] in (ids.get("bull"), ids.get("bear"))
+              or (agents.get(p["by_name"]) or {}).get("pod_id") == opened[p["pitch_id"]]["pod_id"]
+              for p in posts)
+          and all(p["_on"] < opened[p["pitch_id"]]["closes_on"] for p in posts),
+          f"{len(posts)} posts")
+    reviewers = {ids.get("bull"), ids.get("bear")}
+    acts = [ty for _, _, a, ty, _ in ledger if a in reviewers]
+    check(f"{label}: the reviewers' only acts were posts (no order, pitch, message, verdict)",
+          set(acts) <= {"debate_argued", "debate_refused", "permission_denied"},
+          ", ".join(sorted(set(acts))))
+    steps = (rec.get("outcome") or {}).get("run", {}).get("steps") or []
+    return {"of": of, "ids": ids, "opened": opened, "ruled": ruled, "seeds": seeds,
+            "refused": refused, "posts": posts, "steps": steps, "judged": judged}
+
+
+def rehearsal() -> None:
+    """B0, $0: the hosted debate with scripted minds billed per step, made with the real run's
+    very command, recorded and verified now."""
+    gt = _gt()
+    with tempfile.TemporaryDirectory(prefix="fund-debate-") as t:
+        tmp = Path(t)
+        write_world(tmp, "fake-metered")
+        r = gt.fund_runtime(command("rehearsal.cassette.json"), tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted debate completes and is recorded",
+                     r.returncode == 0 and tape.is_file(),
+                     f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-600:] if r.returncode else 'completed'}"):
+            return
+        text = tape.read_text(encoding="ascii")
+    rec = json.loads(text)
+    done = hosted_lawful(rec, "B0")
+    by_pod = {p["pod_id"]: k for k, p in done["opened"].items()}
+    a, b, g = (by_pod.get(k) for k in (1, 2, 3))
+    bear_on_a = [p["text"] for p in done["posts"] if p["pitch_id"] == a and p["by_name"] == "bear"]
+    check("B0: the bear named K03's fraud headline in alpha's thread; the manager held alpha, "
+          "seeded beta early and let gamma's debate run to its close",
+          bool(bear_on_a) and "K03" in bear_on_a[0]
+          and (done["ruled"].get(a) or {}).get("verdict") == "hold"
+          and (done["ruled"].get(b) or {}).get("verdict") == "seed" and g not in done["ruled"],
+          f"bear: {bear_on_a[:1]}")
+    read = [t for step in done["steps"] for w in step.get("wakes") or []
+            if w.get("spec_id") == "alpha-pm" for t in _tool_texts(w) if "held it" in t]
+    check("B0: alpha's PM read the hold and its reason in its pitches", bool(read))
+    before = len(gt.FAILED)
+    gt.verify(text, "B0")
+    FAILED.extend(gt.FAILED[before:])
+
+
 def part_b() -> None:
-    print("\n== B0 / B: hosted through the Runtime, then real minds ==")
-    check("B0: the debate hosted through the Runtime, replay IDENTICAL", False,
-          "not built yet (next session)")
+    print("\n== B0: the same hosted through the Runtime, replayed ==", flush=True)
+    rehearsal()
+    print("\n== B: real minds, recorded ==", flush=True)
     check("B: real Haiku bull, bear and manager recorded", False, "not recorded yet")
 
 
 def main() -> int:
     if sys.argv[1:] == ["--no-law"]:
         return no_law_child()
+    if sys.argv[1:2] == ["--write-world"]:   # the files a recorded run is made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        print("fund-runtime " + " ".join(command("debate.cassette.json")))
+        return 0
+    if sys.argv[1:] == ["--b0"]:
+        part_b()
+        return 0 if not FAILED else 1
     part_a()
     part_no_law()
     part_b()
