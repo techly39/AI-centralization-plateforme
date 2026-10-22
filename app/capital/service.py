@@ -44,6 +44,14 @@ from app.capital.allocation import (
     reallocate,
     worst_drawdown,
 )
+from app.capital.debate import (
+    debates,
+    hold_reason,
+    law_text,
+    open_debate,
+    queued_behind,
+    seed_decision,
+)
 from app.capital.generation import announcement, let_go_closed
 from app.capital.hiring import hiring_law, open_vacancy
 from app.config import CapitalConfig, get_settings
@@ -337,8 +345,10 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
                      payload={"law": law.model_dump(), "firm_capital_usd": law.firm_capital_usd})
         state = book(session)
     law = CapitalConfig.model_validate(state["law"])
-    done: dict[str, Any] = {"stages": [], "seeded": [], "refused": [], "reallocated": False}
+    done: dict[str, Any] = {"stages": [], "seeded": [], "refused": [], "reallocated": False,
+                            "debating": []}
     costs = _pod_cost_usd(session)
+    debating = debates(session) if law.debate_days else {}
 
     for pod_id, entry in sorted(state["pods"].items()):
         if entry["stage"] == "closed":
@@ -356,13 +366,30 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
 
     for pitch in eligible:
         pod = session.get(Pod, pitch["pod_id"])
-        reason = None
+        reason, bound = None, []
         if pod is None:
             reason = "the pod no longer exists"
         elif pod.status == "closed":
             reason = "the pod is closed"
         elif pitch["rule"].get("side") != "long_only":
             reason = "a long-short rule: the order system cannot short yet, so it cannot trade it"
+        if reason is None and law.debate_days:
+            # The debate law (idea: the pitch, then a full report): the pitch the machine would
+            # seed is argued first; the manager's hold refuses it, its seed verdict or the
+            # window's close lets it through to the same checks as any seed below.
+            debate = debating.get(pitch["pitch_id"])
+            decision = seed_decision(debate, now.date())
+            if decision == "open":
+                open_debate(session, pitch=pitch, days=law.debate_days, actor=system)
+                done["debating"].append(pitch["pitch_id"])
+                continue
+            if decision == "wait":
+                continue
+            if decision == "hold":
+                reason = hold_reason(debate)
+                # The hold binds the pod's pitches queued behind it while it was argued
+                # (red-team: the held rule, pitched again, was paid through silence).
+                bound = queued_behind(session, debate)
         gate = None
         if reason is None:
             if book(session)["centre_cash"] < law.seed_usd:
@@ -382,6 +409,12 @@ def _sweep(session: Session, *, provider: MarketDataProvider) -> dict[str, Any] 
                          payload={"pod_id": pitch["pod_id"], "pitch_id": pitch["pitch_id"],
                                   "reason": reason, **({"gate": gate} if gate else {})})
             done["refused"].append(pitch["pitch_id"])
+            for queued in bound:
+                append_event(session, type=EVENT_CAPITAL_SEED_REFUSED, actor_agent_id=system.id,
+                             payload={"pod_id": pitch["pod_id"], "pitch_id": queued,
+                                      "reason": f"pitched while pitch #{pitch['pitch_id']} was "
+                                                f"argued, and {reason}"})
+                done["refused"].append(queued)
             continue
         if book(session)["centre_cash"] < law.seed_usd:
             continue    # the centre is short today; the pitch waits
@@ -480,6 +513,8 @@ def capital_view(session: Session, *, pod_id: int | None, cross: bool) -> dict[s
                     "centre; a vacancy opens with the pod's post-mortem, and on a later morning a "
                     "new PM is hired into a new pod in its place. A closed pod never reopens."),
             "max_live_pods": hiring.max_live_pods, "new_pm_budget_usd": hiring.budget_usd}
+    if law.debate_days:
+        view["debate"] = law_text(law.debate_days)
     generation = announcement(session, pod_id=pod_id)
     if generation is not None:
         view["generation"] = generation

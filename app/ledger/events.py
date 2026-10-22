@@ -90,6 +90,13 @@ EVENT_HIRE_PICKED = "hire_picked"        # payload: {vacancy_id, candidate, brie
 EVENT_HIRE_PICK_REFUSED = "hire_pick_refused"  # payload: {vacancy_id, candidate, reason, by}
 EVENT_DIRECTION_SET = "direction_set"    # payload: {direction_no, text, by, by_name}
 
+# The debate (app/capital/debate.py): under the debate law an eligible pitch waits before its seed;
+# reviewers and its PM argue it in its thread, the manager seeds it now or holds it.
+EVENT_DEBATE_OPENED = "debate_opened"    # payload: {pitch_id, pod_id, opened_on, closes_on}
+EVENT_DEBATE_ARGUED = "debate_argued"    # payload: {pitch_id, post_no, text, by, by_name, role}
+EVENT_DEBATE_REFUSED = "debate_refused"  # payload: {pitch_id, act, reason, by, by_name}
+EVENT_PITCH_RULED = "pitch_ruled"        # payload: {pitch_id, pod_id, verdict, reason, by, by_name}
+
 # Data rights (app/registry/permissions.py): what an agent may read beyond prices (idea: data
 # packages). Granted by the operator's registrar at registration, or by a team place's fill.
 EVENT_DATA_RIGHTS_GRANTED = "data_rights_granted"  # payload: {agent_id, rights, by, how}

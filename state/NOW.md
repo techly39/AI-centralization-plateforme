@@ -1,55 +1,55 @@
-# Headlines and company data, handed by role: the made-up world writes dated headlines and quarterly reports (a few planted causes among the noise), physics serves them only on their day and only to a mind given the right, so an analyst can know what its PM does not
+# A pitch is argued before its seed: a bull and a bear argue an eligible pitch in its thread, and the manager seeds it now or holds it with a reason; silence keeps the law's seed
 
 ## How I understand it
-Until now every mind sees the same thing: prices. So a PM offered analysts works alone, and a
-manager finds no pod that knows something another does not. This slice gives the world news:
-- **The world writes it.** The made-up market's recipe gains a news block: each day a few noise
-  headlines (from templates, by the seed), a quarterly report per company (revenue, earnings
-  against what was expected, guidance), and a few *planted causes*: a fraud headline on one
-  ticker, an earnings miss on another. Each cause moves its ticker's prices from its day on, as
-  the recipe says; noise moves nothing. No LLM writes any of it: it is physics.
-- **Never early.** A day's news is out at its close, with its bar (the same look-ahead law as
-  prices): when anyone reads it, the price already holds what it moved. No endpoint ever says which item is a cause or what it will do: the recipe is the
-  world and stays with the operator.
-- **Handed by role.** Everyone reads prices. Headlines and company reports are rights: the
-  operator grants them when it registers a mind, or a PM asks for an analyst with a package the
-  team law lists (one the PM itself may lack). A mind without the right is refused by name
-  (403, logged), through its tool and in its morning package.
-- **Versioned packages.** Beside `prices-v1`: `headlines-v1`, `company-v1`, `everything-v1`.
-  Each is built through the mind's own key, so what a mind gets is what physics lets it read.
-Whether a PM acts on what only its analyst read is the finding (the first behaviour test).
+Today the gates decide every seed: a pitch they find eligible gets $200k the next morning, no
+one asks. This slice puts a judgement between the gates and the money:
+- **The debate law** (in the capital law, frozen when the centre opens): an eligible pitch waits
+  a set number of days before its seed. Physics opens a debate for it at the next morning's sweep,
+  with the day it closes.
+- **Reviewers.** Two centre minds the operator makes, a bull and a bear (a new `reviewer` role).
+  They read every open debate (the pitch's hypothesis, rule, the gates' numbers) and the data the
+  operator gave them (the bear: headlines), and write in the pitch's thread, nowhere else: they
+  cannot trade, pitch, hire, message a pod or rule. The pitch's PM reads its own debate and may
+  answer in the thread.
+- **The verdict.** The manager reads the thread and rules once, before the window closes:
+  *seed* (paid at the next morning's sweep) or *hold* (the seed is refused, with the manager's
+  reason, which the PM reads in its pitch's capital answer). Silent: the seed is paid when the
+  window closes. The manager only stops or speeds a seed the gates and the centre allow: an
+  ineligible pitch, a closed pod, a long-short rule, a copy, a short centre are refused as today;
+  there is no amount to name.
+- Reviewers' and manager's thinking has no pod: the centre's cost. Without the law, nothing
+  changes: no debate, the seed the next morning, every older recording replays identical.
+- A pod whose pitch is in its window at a month's end is not "a pod that never earned a seed".
 
 ## What done looks like
-`uv run python acceptance/data_packages.py` ($0, offline):
-- A (scripted, through the API): a made-up world with noise headlines and reports and two
-  planted causes; an entitled analyst does not find the fraud headline during its day and finds
-  it the next morning (the 'no' and the 'yes' of the look-ahead law); its PM, without the right, is refused by name both
-  through the tool and in its morning package; a PM asks for an analyst with headlines and gets
-  it, a package outside the law's list is refused; the causes move their tickers' later prices
-  as the recipe says and a noise headline moves nothing (from the bars alone); everything-v1 is
-  exactly the union; no answer carries an effect; rebuild gives the same rights.
+`uv run python acceptance/pitch_debate.py` ($0, offline):
+- A (scripted, through the API): three pods under a 2-day debate law; bull, bear, manager.
+  Pod 1: argued, the PM answers, the manager holds → refused with the reason, the PM reads it, no
+  money. Pod 2: a seed verdict → paid the next morning, before the window closes. Pod 3: silence →
+  paid the morning the window closes, not before. Refused by name (logged): an ineligible pitch,
+  a second verdict, a late verdict, a verdict or argument by a reviewer/PM where it is not theirs,
+  an amount; a reviewer cannot trade, pitch, message or read a pod. Month's end mid-window: the
+  PM stays. Without the law: seeds as today. Rebuild: the same seeds and verdicts.
 - B0: the same hosted through the Runtime with the real run's very command, replay IDENTICAL.
-- B (recorded): real Haiku minds, a PM holding the fraud ticker (prices only) and its analyst
-  (headlines); physics' answers checked; replay for $0; whether the PM cut is the finding.
+- B (recorded): real Haiku bull, bear and manager on a scripted PM's pitch whose universe holds
+  a name with a fraud headline only the bear reads; the verdict is the finding.
 
 ## Plan
-1. `app/marketdata/made_up.py`: an optional `news` block (noise per day, reports, causes); a
-   recipe without it gives byte-identical bars, so every older world is unchanged.
-2. `app/marketdata/news.py`: the news desk (items from the recipe, served at the world's now).
-3. Rights in `app/registry/permissions.py`: `data_rights_granted` events, folded from the
-   ledger; granted by the operator's registrar at registration, or by a team place's fill.
-4. Team law gains `data` (the packages a PM may ask for); the request names an optional package.
-5. API `app/api/data.py` (headlines, company reports, my rights) + MCP tools, named-only.
-6. `runtime/packages.py`: the three new packages; the spec's `data` passed at registration.
-7. Demo A, then B0, red-team, auditor, the real run B, merge.
-Left out: data that costs money, the manager reading news, real-history news, LLM-written text.
+1. Law: `capital.debate_days` (0 = off, left out of the frozen law while off).
+2. `app/capital/debate.py`: open debates (events `debate_opened`), the thread (`debate_argued`),
+   the verdict (`pitch_ruled`, refusals `pitch_ruling_refused`), views for each reader.
+3. The sweep: under the law, open the debate, wait, pay early on seed, refuse on hold, pay at the
+   window's close on silence; the pod checks first, cash and the copy check at payment, as today.
+4. Role `reviewer` (operator-made, no pod, may be given headlines/company data).
+5. API `app/api/debates.py` + MCP tools (named-only); the PM's pitch view shows its debate.
+6. Generation: a pod whose pitch is in debate stays.
+7. Demo A, then B0 (Runtime: reviewer specs, packages), red-team, auditor, real run B, merge.
+Left out: the backtest operator, a debate on the hypothesis itself, reviewers paid by outcome.
 
 ## Risk
-Market data, permissions and the seal: red-team + auditor before the paid real run and merge.
+Money (the seed) and permissions: red-team + auditor before the paid run and merge.
 
 ## Progress
-- cycle 68: physics (news in the recipe, served under the look-ahead guard, rights by role,
-  the team's data, the endpoints, tools and three packages), demo parts A and B0; red-team 4
-  holes fixed (news now out at its day's close, with its bar; a miss never hides an earlier
-  report); real run B recorded ($0.078: the PM cut K03 a day after its analyst's warning);
-  auditor: one block (the recording not in the replay suite) fixed, then PASS. Merged.
+- cycle 70: physics, API, tools, demo A and B0; red-team 0 high, 2 medium + 3 low, all fixed;
+  real run B recorded ($0.018: the manager held all three pitches as too good to be true, the bear
+  named K03's fraud); auditor PASS, its notes acted on. Merged.

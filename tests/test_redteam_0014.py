@@ -224,6 +224,12 @@ _EVERY_ROUTE = [
     ("GET", "/data/rights", None),
     ("POST", "/vacancies/1/pick", {"candidate": "c1"}),
     ("POST", "/direction", {"text": "t"}),
+    # The debate (a pitch is argued before its seed): the clock key reads, argues and rules on
+    # no debate.
+    ("GET", "/debates", None),
+    ("GET", "/debates/1", None),
+    ("POST", "/debates/1/argue", {"text": "t"}),
+    ("POST", "/debates/1/verdict", {"verdict": "seed"}),
 ]
 
 

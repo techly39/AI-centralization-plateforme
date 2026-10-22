@@ -38,7 +38,7 @@ class AgentSpec(BaseModel):
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,62}$")
     name: str = Field(min_length=1, max_length=64)
-    role: Literal["pm", "analyst", "management", "manager"]
+    role: Literal["pm", "analyst", "management", "manager", "reviewer"]
     pod: int | None = Field(default=None, ge=1)
     parent_id: str | None = None
     generation_born: int = Field(default=0, ge=0)
@@ -56,7 +56,7 @@ class AgentSpec(BaseModel):
     wake_policy: Literal["every_step", "never"] = "every_step"
     mutations: tuple[str, ...] = ()
     #: The data it reads beyond prices (idea: data packages), granted by the operator's registrar
-    #: when it is registered: a PM's or an analyst's only.
+    #: when it is registered: a PM's, an analyst's or a reviewer's only.
     data: tuple[Literal["headlines", "company"], ...] = Field(default=(), max_length=2)
 
     @model_validator(mode="after")
@@ -65,8 +65,10 @@ class AgentSpec(BaseModel):
             raise ValueError(f"a {self.role} belongs to a pod: set `pod`")
         if self.role == "manager" and self.pod is not None:
             raise ValueError("the firm's manager sits above the pods: it has no `pod`")
-        if self.data and self.role not in {"pm", "analyst"}:
-            raise ValueError("only a PM or an analyst is given `data`")
+        if self.role == "reviewer" and self.pod is not None:
+            raise ValueError("a reviewer argues for the centre: it has no `pod`")
+        if self.data and self.role not in {"pm", "analyst", "reviewer"}:
+            raise ValueError("only a PM, an analyst or a reviewer is given `data`")
         return self
 
 

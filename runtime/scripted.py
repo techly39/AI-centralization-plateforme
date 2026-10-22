@@ -483,6 +483,92 @@ def headline_analyst(request: CompletionRequest) -> CompletionResponse:
     return CompletionResponse(content="Done for today.")
 
 
+def debate_reviewer(request: CompletionRequest) -> CompletionResponse:
+    """A reviewer (idea: the pitch, then a full report; the debate) that argues its side once in
+    every open debate. Its side is the input's ``sides[<my name>]`` (``bull`` | ``bear``). Turn 0
+    reads the open debates (a bear also the last 7 days of headlines). Turn 1 writes one post in
+    each open debate it has not written in: a bull quotes the gates' numbers; a bear names each
+    name of the pitch's universe a headline ties to fraud, else says it found none. Turn 2 is done.
+    """
+    context = _context(request)
+    me = context["me"].get("name")
+    sides = context["input"].get("sides")
+    side = sides.get(me) if isinstance(sides, dict) else None
+    if side not in ("bull", "bear"):
+        return CompletionResponse(content="No side in my input; nothing to argue.")
+    turn = _turn(request)
+    if turn == 0:
+        calls = [ToolCall(id="debates", name="read_debates", arguments={})]
+        if side == "bear":
+            calls.append(ToolCall(id="news", name="read_headlines", arguments={"days": 7}))
+        return CompletionResponse(content="Reading the open debates.", tool_calls=calls)
+    if turn > 1:
+        return CompletionResponse(content="Done for today.")
+    results = _results(request)
+    debates = results.get("debates")
+    if type(debates) is not list:
+        return CompletionResponse(content="I could not read the debates; nothing today.")
+    news = results.get("news") if isinstance(results.get("news"), dict) else {}
+    frauds = {x["ticker"]: x["title"] for x in news.get("headlines") or []
+              if "fraud" in str(x.get("title", "")).lower()}
+    calls = []
+    for d in debates:
+        if any(post.get("by") == me for post in d.get("thread") or []):
+            continue
+        pitch = d.get("pitch") or {}
+        if side == "bull":
+            numbers = ", ".join(f"{g['gate']} {g['value']:.3g}" for g in pitch.get("gates") or []
+                                if isinstance(g.get("value"), (int, float)))
+            text = f"For: the gates passed it on the held-out days ({numbers})."
+        else:
+            named = sorted(t for t in frauds if t in ((pitch.get("rule") or {}).get("universe")
+                                                       or []))
+            text = ("Against: " + "; ".join(f"{t} is in its universe: {frauds[t]!r}"
+                                            for t in named) if named
+                    else "Against: I found no news against its names; only the gates' word.")
+        calls.append(ToolCall(id=f"argue:{d['pitch_id']}", name="argue_pitch",
+                              arguments={"pitch_id": d["pitch_id"], "text": text}))
+    if not calls:
+        return CompletionResponse(content="Nothing new to argue.")
+    return CompletionResponse(content=f"Arguing {len(calls)} pitch(es).", tool_calls=calls)
+
+
+def debate_manager(request: CompletionRequest) -> CompletionResponse:
+    """The firm's manager ruling on pitches in debate (idea: the debate). Turn 0 reads the open
+    debates. Turn 1 rules on each one not ruled whose thread has a post: ``hold`` (quoting the
+    post) if a post names a fraud headline, ``seed`` if its pod is in the input's ``seed_early``,
+    else nothing (silence: the law's seed at the close). Turn 2 is done."""
+    context = _context(request)
+    early = context["input"].get("seed_early")
+    early = early if isinstance(early, list) else []
+    turn = _turn(request)
+    if turn == 0:
+        return CompletionResponse(content="Reading the open debates.", tool_calls=[
+            ToolCall(id="debates", name="read_debates", arguments={})])
+    if turn > 1:
+        return CompletionResponse(content="Done for today.")
+    debates = _results(request).get("debates")
+    if type(debates) is not list:
+        return CompletionResponse(content="I could not read the debates; nothing today.")
+    calls = []
+    for d in debates:
+        thread = d.get("thread") or []
+        if d.get("verdict") is not None or not thread:
+            continue
+        fraud = next((p for p in thread if "fraud" in str(p.get("text", "")).lower()), None)
+        if fraud is not None:
+            ruling = {"verdict": "hold", "reason": f"{fraud['by']} wrote: {fraud['text']}"}
+        elif d.get("pod_name") in early:
+            ruling = {"verdict": "seed", "reason": "nothing against it in its thread"}
+        else:
+            continue
+        calls.append(ToolCall(id=f"rule:{d['pitch_id']}", name="rule_pitch",
+                              arguments={"pitch_id": d["pitch_id"], **ruling}))
+    if not calls:
+        return CompletionResponse(content="Nothing to rule today.")
+    return CompletionResponse(content=f"Ruling on {len(calls)} pitch(es).", tool_calls=calls)
+
+
 SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "moving-average-pm": moving_average_pm,
     "ma-signal-analyst": ma_signal_analyst,
@@ -493,4 +579,6 @@ SCRIPTS: Mapping[str, Script] = MappingProxyType({
     "research-analyst": research_analyst,
     "firm-manager": firm_manager,
     "headline-analyst": headline_analyst,
+    "debate-reviewer": debate_reviewer,
+    "debate-manager": debate_manager,
 })

@@ -27,6 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.capital.service import book as capital_book
+from app.capital.debate import list_debates
 from app.capital.reproduction import inherited_attempts
 from app.capital.service import eligible_unseeded, run_law
 from app.config import GatesConfig
@@ -244,11 +245,13 @@ def submit_pitch(session: Session, *, actor: Agent, rule: StrategyRule, hypothes
 
 
 def pitch_view(submitted: Event, judged: dict[str, Any] | None,
-               capital: dict[str, Any] | None = None) -> dict[str, Any]:
+               capital: dict[str, Any] | None = None,
+               debate: dict[str, Any] | None = None) -> dict[str, Any]:
     """One pitch as the read side shows it: what was asked, the verdict, and what the capital
-    machine did with it (``None``: nothing yet)."""
+    machine did with it (``None``: nothing yet); its debate once one is open (the debate law)."""
     return {"id": submitted.id, "submitted_at": submitted.ts, **submitted.payload_json,
-            "verdict": judged, "capital": capital}
+            "verdict": judged, "capital": capital,
+            **({"debate": debate} if debate is not None else {})}
 
 
 def capital_answers(session: Session) -> dict[int, dict[str, Any]]:
@@ -305,11 +308,15 @@ def list_pitches(session: Session, *, pod_id: int | None) -> list[dict[str, Any]
     verdicts = {e.payload_json.get("pitch_id"): e.payload_json for e in session.scalars(
         select(Event).where(Event.type == EVENT_PITCH_JUDGED))}
     capital = capital_answers(session)
+    debated = {d["pitch_id"]: d for d in list_debates(session, pod_id=pod_id, open_only=False)}
     out = []
     for event in session.scalars(select(Event).where(Event.type == EVENT_PITCH_SUBMITTED)
                                  .order_by(Event.id)):
         if pod_id is None or event.payload_json.get("pod_id") == pod_id:
-            out.append(pitch_view(event, verdicts.get(event.id), capital.get(event.id)))
+            debate = debated.get(event.id)
+            out.append(pitch_view(event, verdicts.get(event.id), capital.get(event.id),
+                                  None if debate is None else {
+                                      k: v for k, v in debate.items() if k != "pitch"}))
     return out
 
 

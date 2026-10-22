@@ -81,6 +81,12 @@ class PodScopeError(BusAccessError):
     code = "pod_scope"
 
 
+class CentreOnlyError(BusAccessError):
+    """The addressee reads no inbox: a reviewer argues only in debate threads (idea: the debate)."""
+
+    code = "reviewer_reads_threads_only"
+
+
 class QuotaExceededError(BusError):
     """The sender has written its day's quota of characters (HTTP 429): a flood of messages cannot
     bill a reader's thinking key (red-team 0021)."""

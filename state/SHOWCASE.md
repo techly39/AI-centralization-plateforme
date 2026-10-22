@@ -74,3 +74,7 @@ What: the firm has its first manager mind. It reads every pod on one board (cash
 
 ## Headlines and company data, handed by role (cycle 68, 2026-10-22)
 What: the made-up world now writes news: a few noise headlines a day, each company's quarterly report, and planted causes (a fraud headline, an earnings miss) that move only their company's later prices. A day's news comes out at its close, with its prices. Headlines and company data are rights: the operator gives them, or a PM asks for an analyst who reads what it does not; anyone else is refused by name. A real Haiku analyst flagged a fraud the first morning it was out; its PM, who could not see the news, read the message a day later and sold the whole position ($0.08).  ·  Try: `uv run python acceptance/data_packages.py`  ·  See: who could read what and when, every refusal, the causes moving only their names, and the real pair's choices, replayed identical for $0.
+
+## A pitch is argued before its seed (cycle 70, 2026-10-22)
+What: under a debate law an eligible pitch waits two days; a bull and a bear argue it in its thread, the manager seeds it now or holds it with a reason, silence pays it at the close. Real Haiku minds held all three planted-edge pitches as too good to be true  ·  Try: `uv run python acceptance/pitch_debate.py`  ·  See: the scripted hold, early seed and silence, the refusals, then the real debate's verdicts and reasons
+

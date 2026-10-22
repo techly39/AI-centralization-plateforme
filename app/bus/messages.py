@@ -46,6 +46,7 @@ from sqlalchemy.orm import Session
 
 from app.bus.errors import (
     BroadcastNotPermittedError,
+    CentreOnlyError,
     ConflictingCursorsError,
     PodScopeError,
     QuotaExceededError,
@@ -105,10 +106,18 @@ def resolve_audience(session: Session, *, sender: Agent, to: str) -> Recipient:
         # A deactivated agent is still a legal recipient: the message is
         # recorded, and it is readable again if the agent comes back. Refusing
         # would throw away an audit trail to prevent nothing.
-        if session.get(Agent, recipient.id) is None:
+        target = session.get(Agent, recipient.id)
+        if target is None:
             raise UnknownRecipientError(
                 f"no agent with id {recipient.id}",
                 detail={"to": recipient.ref},
+            )
+        if target.role is AgentRole.reviewer:
+            # A reviewer's word is the debate's record: nobody lobbies it off the thread (red-team,
+            # the debate). It reads no inbox; argue in the pitch's thread instead.
+            raise CentreOnlyError(
+                f"agent {recipient.id} is a reviewer: it reads only pitches' debate threads "
+                "(argue_pitch), never messages"
             )
     elif recipient.kind == "pod":
         if session.get(Pod, recipient.id) is None:

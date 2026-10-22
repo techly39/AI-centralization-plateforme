@@ -8,7 +8,7 @@
       "idea": "The pitch, then a full report",
       "acceptance": "acceptance/pitch_debate.py",
       "demo": "uv run python acceptance/pitch_debate.py — A (scripted, through the API): under a debate law, an eligible pitch waits its window; a bull and a bear (centre reviewer minds) write in its thread and the PM answers; a manager's hold refuses the seed with its reason (the PM reads it), a seed verdict pays it the next sweep, silence pays it at the window's end; the manager cannot seed an ineligible pitch, change the amount, rule twice or rule after the window (refused by name, 403/409, logged); a reviewer cannot trade, pitch or message a pod; a pitch in its window at a month's end does not count as 'never seeded'; without the law, seeds happen exactly as today; rebuild gives the same seeds and verdicts. B0: the same hosted through the Runtime with the real run's very command, replay IDENTICAL. B (recorded): real Haiku bull, bear and manager on a scripted PM's planted-edge pitch whose universe holds a name with a fraud headline only the bear reads; physics' answers checked (thread, verdict or silence, seed paid or refused); replay IDENTICAL at $0; the verdict is the finding.",
-      "status": "ready",
+      "status": "done",
       "estimate_sessions": 2,
       "physics": true,
       "depends_on": [
@@ -16,7 +16,7 @@
         "manager-chooses-hires"
       ],
       "branch": "idea/pitch-debate",
-      "notes": "Reuse: the manager's one-day window for a freed place (app/capital/management.py fill_from, pick) is the pattern for the verdict window; the seed is paid in app/capital/service.py _sweep (eligible_unseeded): the law adds a wait and a hold, nothing else; the reviewers' rights go in app/registry/permissions.py (new role 'reviewer', operator-made only, like 'manager'); news rights from cycle 68. Holes to check inside it: a pitch waiting in its window at a month's end must not be judged 'never earned a seed' (app/capital/generation.py); reviewers write only in a pitch's thread (the board/brief rule-leak note in the book); the gates' verdict event carries the PM as actor, the debate must read eligibility only from the pitch_judged event physics writes. New tools named-only so older recordings' tool lists stay fixed; no law in a recording made before → it replays identical. Red-team + auditor before the paid run B and merge; add the new recording to tests/test_evidence_replays.py KEYS in its own commit."
+      "notes": "Done cycle 70 (one session). Real run: the Haiku manager held all three planted-edge pitches as too good to be true; the bear used K03's fraud headline. Follow-ups in F-0008: realistic planted edges, the pitch view saying it is net of fees."
     },
     {
       "id": "data-packages",

@@ -57,7 +57,7 @@ IdPath = Annotated[int, Path(ge=1, le=MAX_ID)]
 
 # Roles an operator/management may assign via the API. 'system' and 'runtime'
 # are physics' own (ADR-033), created by code or the operator CLI, never over HTTP.
-RegisterableRole = Literal["analyst", "pm", "management", "manager"]
+RegisterableRole = Literal["analyst", "pm", "management", "manager", "reviewer"]
 
 
 class AgentRegisterRequest(BaseModel):
@@ -674,3 +674,8 @@ class PitchOut(BaseModel):
         description="What the capital machine did with the pitch: absent = nothing yet (it looks "
                     "at eligible pitches at the next advance); outcome 'seeded' with seed_usd, or "
                     "'refused' with the reason (e.g. the order system cannot short yet).")
+    # Absent unless the debate law opened one (a run without the law reads as before).
+    debate: dict[str, Any] | None = Field(
+        default=None, exclude_if=lambda v: v is None,
+        description="The pitch's debate before its seed (the debate law): when it opened and "
+                    "closes, its thread, the manager's verdict, what the centre did.")
