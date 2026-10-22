@@ -8,8 +8,8 @@ manager finds no pod that knows something another does not. This slice gives the
   against what was expected, guidance), and a few *planted causes*: a fraud headline on one
   ticker, an earnings miss on another. Each cause moves its ticker's prices from its day on, as
   the recipe says; noise moves nothing. No LLM writes any of it: it is physics.
-- **Never early.** An item dated tomorrow does not exist today (the same look-ahead law as
-  prices). No endpoint ever says which item is a cause or what it will do: the recipe is the
+- **Never early.** A day's news is out at its close, with its bar (the same look-ahead law as
+  prices): when anyone reads it, the price already holds what it moved. No endpoint ever says which item is a cause or what it will do: the recipe is the
   world and stays with the operator.
 - **Handed by role.** Everyone reads prices. Headlines and company reports are rights: the
   operator grants them when it registers a mind, or a PM asks for an analyst with a package the
@@ -22,8 +22,8 @@ Whether a PM acts on what only its analyst read is the finding (the first behavi
 ## What done looks like
 `uv run python acceptance/data_packages.py` ($0, offline):
 - A (scripted, through the API): a made-up world with noise headlines and reports and two
-  planted causes; an entitled analyst reads the fraud headline on its day and not the day before
-  (the 'yes' and 'no' of the look-ahead law); its PM, without the right, is refused by name both
+  planted causes; an entitled analyst does not find the fraud headline during its day and finds
+  it the next morning (the 'no' and the 'yes' of the look-ahead law); its PM, without the right, is refused by name both
   through the tool and in its morning package; a PM asks for an analyst with headlines and gets
   it, a package outside the law's list is refused; the causes move their tickers' later prices
   as the recipe says and a noise headline moves nothing (from the bars alone); everything-v1 is
