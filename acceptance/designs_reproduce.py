@@ -105,7 +105,10 @@ def live_world(name: str) -> int:
         "FUND_CAPITAL__TELL_PMS": "true", "FUND_GENERATION__ON": "true",
         "FUND_GENERATION__GRACE_DAYS": str(GRACE),
         "FUND_REPRODUCTION__ON": "true" if on else "false",
-        "FUND_REPRODUCTION__SEED": str(REPRODUCTION_SEED)})
+        "FUND_REPRODUCTION__SEED": str(REPRODUCTION_SEED),
+        # This demo shows the law's first edition (a parent's line counted); the second edition
+        # (a whole family's attempts) is shown by acceptance/manager_chooses_hires.py.
+        "FUND_REPRODUCTION__EDITION": "1"})
     sys.path.insert(0, str(REPO))
 
     from fastapi.testclient import TestClient

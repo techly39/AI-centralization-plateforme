@@ -162,8 +162,21 @@ class Onboarding:
         records: list[HireRecord] = []
         new: list[Mind] = []
         law = read_governance()  # one read of the law for the morning
-        for vacancy in sorted((v for v in listed if isinstance(v, dict) and v.get("status") == "open"),
-                              key=lambda v: v.get("id", 0)):
+        open_ = sorted((v for v in listed if isinstance(v, dict) and v.get("status") == "open"),
+                       key=lambda v: v.get("id", 0))
+        if any(v.get("fill_from") is not None for v in open_):
+            # The management law: a listed place waits for the manager's pick until its morning
+            # (no record: physics said when, and a replay reads the same vacancy).
+            try:
+                clock = await self.registrar.get("/clock")
+            except FundAPIError as exc:
+                return [], [], ("error", f"hiring_unreadable:{exc.status_code}")
+            today = str((clock or {}).get("now", ""))[:10] if isinstance(clock, dict) else ""
+            if not today:
+                return [], [], ("error", "hiring_malformed")
+            open_ = [v for v in open_ if v.get("fill_from") is None
+                     or (type(v["fill_from"]) is str and v["fill_from"] <= today)]
+        for vacancy in open_:
             if not decide_batch().allowed:
                 return records, new, ("halted", "halted")
             try:
@@ -280,6 +293,9 @@ class Onboarding:
         if hire.get("design") == "child":   # the reproduction law: the child knows its parent
             self.inputs[spec_id] |= {k: hire.get(k) for k in (
                 "parent", "family", "change", "inherited_rule", "lineage_attempts")}
+        picked = vacancy.get("picked")
+        if isinstance(picked, dict):        # the management law: the manager's brief to it
+            self.inputs[spec_id]["brief"] = {"text": picked.get("brief"), "by": picked.get("by")}
         return done, mind
 
     async def _team_morning(self, step: int, taken: set[str], meters: Sequence[Meter],

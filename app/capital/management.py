@@ -278,8 +278,10 @@ def board(session: Session) -> dict[str, Any]:
                    "thinking_usd": costs.get(None, 0.0)},
         "live_pods": live_pods(session), "max_live_pods": law.max_live_pods,
         "generation": None if last is None else last.payload_json["generation"],
-        "open_vacancies": [{"id": v["id"], "pod_name": v["pod_name"],
-                            "fill_from": v.get("fill_from"), "picked": v.get("picked")}
+        "open_vacancies": [{"id": v["id"], "pod_name": v["pod_name"], "opened_on": v["opened_on"],
+                            "fill_from": v.get("fill_from"), "picked": v.get("picked"),
+                            "candidates": [{k: c[k] for k in ("id", "default", "what")}
+                                           for c in v.get("candidates") or []]}
                            for v in vacancies(session) if v["status"] == "open"],
         "direction": direction(session),
         "pods": pods}

@@ -38,7 +38,7 @@ class AgentSpec(BaseModel):
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,62}$")
     name: str = Field(min_length=1, max_length=64)
-    role: Literal["pm", "analyst", "management"]
+    role: Literal["pm", "analyst", "management", "manager"]
     pod: int | None = Field(default=None, ge=1)
     parent_id: str | None = None
     generation_born: int = Field(default=0, ge=0)
@@ -60,6 +60,8 @@ class AgentSpec(BaseModel):
     def _pod_roles_have_a_pod(self) -> AgentSpec:
         if self.role in {"pm", "analyst"} and self.pod is None:
             raise ValueError(f"a {self.role} belongs to a pod: set `pod`")
+        if self.role == "manager" and self.pod is not None:
+            raise ValueError("the firm's manager sits above the pods: it has no `pod`")
         return self
 
 
