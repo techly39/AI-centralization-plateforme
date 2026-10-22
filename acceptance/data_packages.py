@@ -34,6 +34,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 from datetime import UTC, date, datetime, timedelta
@@ -73,10 +74,13 @@ def h(key: str) -> dict:
 
 
 def keys_of(value) -> set[str]:
+    """Every key and every word of every text in ``value`` (lower case)."""
     if isinstance(value, dict):
-        return set(value) | {k for v in value.values() for k in keys_of(v)}
+        return {str(k).lower() for k in value} | {k for v in value.values() for k in keys_of(v)}
     if isinstance(value, list):
         return {k for v in value for k in keys_of(v)}
+    if isinstance(value, str):
+        return set(re.findall(r"[a-z]+", value.lower()))
     return set()
 
 
@@ -429,10 +433,18 @@ def hosted_lawful(rec: dict, label: str) -> dict:
     check(f"{label}: each refusal of the PM is physics' own, logged",
           len(denied) >= STEPS and all(d["action"] == "read_headlines" for d in denied),
           f"{len(denied)} refusals logged")
-    leaked = {k for step in steps for w in step.get("wakes") or []
-              for m in w.get("transcript") or [] for k in keys_of(_jsonish(m.get("content")))}
-    check(f"{label}: nothing any mind was shown says what an item does or which is a cause",
-          not leaked & set(SEALED), "no sealed word among the keys of anything shown")
+    news_tools = {"read_headlines", "read_reports", "get_data_rights"}
+    shown: set[str] = set()
+    for step in steps:
+        for w in step.get("wakes") or []:
+            asked = {c.get("id"): c.get("name") for c in _calls(w)}
+            ctx = _jsonish(w["transcript"][1]["content"]) if len(w.get("transcript") or []) > 1 else {}
+            shown |= keys_of((ctx or {}).get("package"))       # the package physics served
+            for m in w.get("transcript") or []:
+                if m.get("role") == "tool" and asked.get(m.get("tool_call_id")) in news_tools:
+                    shown |= keys_of(_jsonish(m.get("content")))
+    check(f"{label}: nothing physics showed any mind says what an item does or which is a cause",
+          not shown & set(SEALED), "no sealed word in any key or text physics showed")
     fills = of("order_filled")
     sold = [f for f in fills if f["ticker"] == "K03" and f["side"] == "sell"]
     return {"agents": agents, "fills": fills, "sold_k03": sold, "steps": steps}

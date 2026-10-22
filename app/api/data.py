@@ -51,7 +51,8 @@ def read_headlines(
     days: int = Query(default=3, ge=1, le=MAX_HEADLINE_DAYS,
                       description="The last days whose news is out: 1 = yesterday's (a day's "
                                   "news is out at its close)."),
-    ticker: str | None = Query(default=None, description="Only the headlines about one ticker."),
+    ticker: str | None = Query(default=None, max_length=16,
+                               description="Only the headlines about one ticker."),
     agent: Agent = Depends(require(Action.READ_HEADLINES)),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
@@ -64,7 +65,8 @@ def read_headlines(
 def read_reports(
     days: int = Query(default=91, ge=1, le=MAX_REPORT_DAYS,
                       description="The last days whose reports are out (a quarter is 91)."),
-    ticker: str | None = Query(default=None, description="Only one company's reports."),
+    ticker: str | None = Query(default=None, max_length=16,
+                               description="Only one company's reports."),
     agent: Agent = Depends(require(Action.READ_COMPANY_DATA)),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
