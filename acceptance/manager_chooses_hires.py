@@ -497,14 +497,205 @@ def rebuilt(label: str) -> None:
           before == after)
 
 
-# --- B0 and B: the next session -----------------------------------------------------------------
+# --- B0: the generation months hosted, lived by the Runtime, a manager mind among the minds ------
 
-EVIDENCE = REPO / "evidence" / "manager-chooses-hires" / "manager.cassette.json"
+def _dr():
+    sys.path.insert(0, str(REPO / "acceptance"))
+    import designs_reproduce as dr
+    return dr
+
+
+#: The hosted world: the generation-turnover months, the reproduction law (its second edition:
+#: a family's attempts) and the management law on, and the firm's manager among the minds.
+REPRODUCTION_LAW = {"on": True, "seed": REPRODUCTION_SEED, "edition": 2}
+MANAGEMENT_LAW = {"on": True}
+MANAGER = "ceo"
+MANAGER_TOOLS = ["whoami", "get_clock", "read_board", "get_vacancy", "pick_hire",
+                 "get_direction", "set_direction"]
+MANAGER_CHARTER = (
+    "You are ceo, the manager of a hedge fund that trades a simulated market with fake money. "
+    "Several pods, each run by its own PM, compete for the firm's capital; an algorithm, not you, "
+    "moves the capital, and the laws, not you, let a PM go. Your board (read_board) shows every "
+    "pod: its cash, positions, exposures, the capital the centre put in, its risk stage and "
+    "drawdown, what its thinking costs and last month's fitness (its P&L net of thinking), and "
+    "its design (model, family). When a place is freed, its vacancy lists every hire the law "
+    "allows (candidates c1, c2, ...; c1 is the law's own choice) and waits one day for you: you "
+    "may pick one with pick_hire and write a brief for the new PM, once; if you say nothing, c1 "
+    "is hired. You may write the firm's direction (set_direction): every PM reads it. You cannot "
+    "trade, pitch, hire, fire or move capital. Your thinking is paid by the firm's centre: be "
+    "brief. You remember nothing between days: read the board first. When you are done, stop.")
+REAL_MANAGER_BUDGET_USD = 0.30
+#: The rehearsal's scripted manager: it writes the direction and picks c2 for every listed place
+#: (a place whose list has no c2 refuses it by name; the law's own hire then stands).
+REHEARSAL_MANAGER = {"pick": "c2", "brief": BRIEF, "direction": DIRECTION}
+
+
+def command(cassette: str) -> list[str]:
+    return _dr().command(cassette)
+
+
+def write_world(directory: Path, provider: str) -> None:
+    """The hosted run's files: the generation-turnover world, both laws on, and the manager."""
+    dr = _dr()
+    dr.write_world(directory, provider)
+    doc = json.loads((directory / "world.json").read_text())
+    doc["laws"]["reproduction"] = REPRODUCTION_LAW
+    doc["laws"]["management"] = MANAGEMENT_LAW
+    (directory / "world.json").write_text(json.dumps(doc))
+    given = json.loads((directory / "input.json").read_text())
+    if provider == "fake-metered":
+        given["manager"] = REHEARSAL_MANAGER
+    (directory / "input.json").write_text(json.dumps(given))
+    spec = {"id": MANAGER, "name": MANAGER, "role": "manager", "charter": MANAGER_CHARTER,
+            "tools": MANAGER_TOOLS}
+    spec |= ({"provider": "fake-metered", "script": "firm-manager",
+              "budget_usd": dr._gt().REHEARSAL_BUDGET_USD} if provider == "fake-metered"
+             else {"provider": provider, "model": HAIKU, "budget_usd": REAL_MANAGER_BUDGET_USD})
+    (directory / "specs" / f"{MANAGER}.yaml").write_text(json.dumps(spec))
+
+
+def settings(rec: dict, label: str) -> None:
+    """The run is the one this idea describes: written before the real run, passed first by the
+    rehearsal made with the very command."""
+    gt = _dr()._gt()
+    params = rec.get("parameters") or {}
+    laws = (((rec.get("world") or {}).get("recipe") or {}).get("laws") or {})
+    check(f"{label}: the run is the one this idea describes: {gt.STEPS} steps of "
+          f"{gt.DAYS_PER_STEP} days, thinking charged each step, {_dr().MAX_TOOL_CALLS} tool calls "
+          "a wake, the generation, reproduction (second edition) and management laws on",
+          (params.get("steps"), params.get("days_per_step"), params.get("charge_each_step"),
+           params.get("max_tool_calls"), laws.get("reproduction"), laws.get("management"),
+           (laws.get("generation") or {}).get("on"))
+          == (gt.STEPS, gt.DAYS_PER_STEP, True, _dr().MAX_TOOL_CALLS, REPRODUCTION_LAW,
+              MANAGEMENT_LAW, True),
+          f"{params.get('steps')} steps of {params.get('days_per_step')} days, charged "
+          f"{params.get('charge_each_step')}, {params.get('max_tool_calls')} tool calls a wake, "
+          f"reproduction {laws.get('reproduction')}, management {laws.get('management')}")
+
+
+def hosted_lawful(rec: dict, label: str) -> list[dict]:
+    """Whatever the manager chose, physics answered by the law (written before the real run was
+    seen): every freed place listed and waited; a pick was taken only from its list, once, before
+    the fill, by the manager; each fill hired exactly the pick, or the law's own hire when none;
+    the new PM was handed its brief; the manager's thinking was the centre's; it made no one,
+    moved no money. Returns the listed vacancies, each with what became of it."""
+    dr = _dr()
+    rows = rec["ledger"]["rows"]
+    ledger = [(r[0], r[1][:10], r[3], json.loads(r[4])) for r in rows]
+    actor = {r[0]: r[2] for r in rows}
+    run = (rec.get("outcome") or {}).get("run") or {}
+    agents = dict(run.get("agents") or [])
+    boss = agents.get(MANAGER)
+    opened = of(ledger, "vacancy_opened")
+    filled = {p["vacancy_id"]: p for p in of(ledger, "vacancy_filled")}
+    picks = of(ledger, "hire_picked")
+    refusals = of(ledger, "hire_pick_refused")
+    out, bad = [], []
+    for v in opened:
+        listed = v.get("candidates") or []
+        mine = [p for p in picks if p["vacancy_id"] == v["_id"]]
+        fill = filled.get(v["_id"])
+        if not listed or v.get("fill_from") is None:
+            bad.append(f"vacancy {v['vacancy_no']}: not listed")
+            continue
+        if listed[0]["hire"] != design(v["hire"]) or not listed[0]["default"]:
+            bad.append(f"vacancy {v['vacancy_no']}: c1 is not the law's own hire")
+        if len(mine) > 1 or any(p["candidate"] not in {c["id"] for c in listed} for p in mine):
+            bad.append(f"vacancy {v['vacancy_no']}: picks {[p['candidate'] for p in mine]}")
+        if any(actor[p["_id"]] != boss for p in mine):
+            bad.append(f"vacancy {v['vacancy_no']}: a pick not the manager's")
+        if fill is not None:
+            if fill["_on"] < v["fill_from"]:
+                bad.append(f"vacancy {v['vacancy_no']}: filled {fill['_on']} before "
+                           f"{v['fill_from']}")
+            if any(p["_id"] > fill["_id"] for p in mine):
+                bad.append(f"vacancy {v['vacancy_no']}: a pick taken after the fill")
+        want = (next(c["hire"] for c in listed if c["id"] == mine[0]["candidate"])
+                if mine and (fill is None or mine[0]["_id"] < fill["_id"]) else listed[0]["hire"])
+        spec = next((sp for sp, a in agents.items() if fill and a == fill["agent_id"]), None)
+        first = next((w for st in run.get("steps") or [] for w in st["wakes"]
+                      if w["spec_id"] == spec and w.get("transcript")), None)
+        given = dr.first_input(first) or {}
+        if fill is not None:
+            # the hire's design is what its first wake was handed and its PM was registered as
+            hired = {k: given.get(k) for k in ("parent", "change", "inherited_rule")
+                     if k in want}
+            if hired != {k: want[k] for k in hired} or (
+                    bool(mine) != ("brief" in given)
+                    or (mine and (given.get("brief") or {}).get("text") != mine[0]["brief"])):
+                bad.append(f"vacancy {v['vacancy_no']}: its hire was not handed its pick or brief")
+        out.append({"vacancy_no": v["vacancy_no"], "pod_name": v["pod_name"],
+                    "listed": [c["id"] + ("*" if c["default"] else "") for c in listed],
+                    "picked": mine[0]["candidate"] if mine else None,
+                    "brief": mine[0]["brief"] if mine else None,
+                    "hired": None if fill is None else fill["pod_name"],
+                    "design": want.get("design"),
+                    "parent": (want.get("parent") or {}).get("pod_name"),
+                    "model": want.get("model")})
+    refused_lawfully = all(
+        r["reason"] and actor[r["_id"]] == boss and (
+            r["candidate"] not in {c["id"] for v in opened if v["_id"] == r["vacancy_id"]
+                                   for c in v.get("candidates") or []}
+            or any(p["vacancy_id"] == r["vacancy_id"] and p["_id"] < r["_id"] for p in picks)
+            or (filled.get(r["vacancy_id"]) or {}).get("_id", 1e18) < r["_id"])
+        for r in refusals)
+    check(f"{label}: every freed place listed the law's hires (c1 the law's own) and waited a day; "
+          "every pick was the manager's, from its list, once, before the fill; each fill hired "
+          "exactly the pick (or c1 when none) and handed the new PM its brief",
+          bool(opened) and not bad and refused_lawfully,
+          "; ".join(f"vacancy {o['vacancy_no']} ({o['pod_name']}): list {o['listed']}, picked "
+                    f"{o['picked']}, hired {o['hired']} = {o['design']}"
+                    + (f" of {o['parent']}" if o["parent"] else "") + f" on {o['model']}"
+                    for o in out) + f"; {len(refusals)} pick(s) refused by name"
+          + (f"; BAD {bad}" if bad else "") + ("" if refused_lawfully else "; BAD refusal"))
+    acts = sorted({t for i, _, t, _ in ledger if actor[i] == boss and boss is not None})
+    check(f"{label}: the manager moved no money and made no one: its only acts are picks, "
+          "directions, refusals and its own reports",
+          boss is not None and set(acts) <= {"hire_picked", "hire_pick_refused",
+                                             "direction_set", "permission_denied",
+                                             "task_reported", "cost_reported"},
+          f"its acts: {acts}")
+    costs = [p for p in of(ledger, "cost_metered") if p.get("agent_id") == boss]
+    check(f"{label}: the manager's thinking was metered as the run lived and is the centre's (no "
+          "pod holds it)", bool(costs) and all(p.get("pod_id") is None for p in costs),
+          f"{len(costs)} cost rows, ${max((p['usd_micros_total'] for p in costs), default=0) / 1e6:.3f}")
+    return out
 
 
 def rehearsal() -> None:
-    check("B0: the scripted rehearsal through the Runtime with the real run's very command",
-          False, "not built yet")
+    """B0, $0: the hosted months with scripted minds (the manager among them) billed per step,
+    made with the real run's very command, recorded and verified now."""
+    dr, gt = _dr(), _dr()._gt()
+    with tempfile.TemporaryDirectory(prefix="fund-manager-") as t:
+        tmp = Path(t)
+        write_world(tmp, "fake-metered")
+        r = gt.fund_runtime(command("rehearsal.cassette.json"), tmp)
+        tape = tmp / "rehearsal.cassette.json"
+        if not check("B0: a scripted rehearsal of the hosted months, a manager among the minds, "
+                     "completes and is recorded", r.returncode == 0 and tape.is_file(),
+                     f"exit {r.returncode}: "
+                     f"{r.stderr.strip()[-300:] if r.returncode else 'completed'}"):
+            return
+        text = tape.read_text(encoding="ascii")
+    rec = json.loads(text)
+    settings(rec, "B0")
+    before = len(gt.FAILED)
+    gt.lawful(rec, "B0")         # the generation law still holds, a manager or not
+    FAILED.extend(gt.FAILED[before:])
+    done = hosted_lawful(rec, "B0")
+    check("B0: the scripted manager picked a hire that is not the law's own, and it was hired",
+          any(o["picked"] not in (None, "c1") and o["hired"] for o in done),
+          ", ".join(f"vacancy {o['vacancy_no']}: {o['picked']}" for o in done))
+    ledger = [(r[0], r[1][:10], r[3], json.loads(r[4])) for r in rec["ledger"]["rows"]]
+    said = of(ledger, "direction_set")
+    check("B0: the manager wrote the firm's direction once", len(said) == 1
+          and said[0]["text"] == DIRECTION, f"{len(said)} direction(s)")
+    before = len(gt.FAILED)
+    gt.verify(text, "B0")
+    FAILED.extend(gt.FAILED[before:])
+
+
+EVIDENCE = REPO / "evidence" / "manager-chooses-hires" / "manager.cassette.json"
 
 
 def recorded() -> None:
@@ -543,4 +734,8 @@ def main() -> int:
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--world"]:
         raise SystemExit(live_world(sys.argv[2]))
+    if sys.argv[1:2] == ["--write-world"]:   # the files a recorded run is made from ($0)
+        write_world(Path(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else "openrouter")
+        print("fund-runtime " + " ".join(command("manager.cassette.json")))
+        raise SystemExit(0)
     raise SystemExit(main())
