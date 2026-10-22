@@ -17,7 +17,7 @@ from app.db.base import get_session
 from app.db.models import Agent
 from app.ledger.events import ledger_now
 from app.marketdata import MarketDataError, get_provider
-from app.registry.auth import deny, get_current_agent, require
+from app.registry.auth import deny, require
 from app.registry.permissions import DATA_RIGHTS, Action, data_right_problem, data_rights
 
 router = APIRouter(tags=["data"])
@@ -70,9 +70,10 @@ def read_reports(
 
 @router.get("/data/rights")
 def my_data_rights(
-    agent: Agent = Depends(get_current_agent),
+    agent: Agent = Depends(require(Action.READ_MARKET_DATA)),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    """What the caller may read: prices always; headlines and company reports if granted."""
+    """What the caller may read: prices always; headlines and company reports if granted. A
+    reader of market data only (physics' Runtime identity reads none)."""
     held = data_rights(session, agent.id)
     return {"prices": True, **{right: right in held for right in DATA_RIGHTS}}

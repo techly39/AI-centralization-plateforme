@@ -219,6 +219,9 @@ _EVERY_ROUTE = [
     # reads or writes no direction.
     ("GET", "/board", None),
     ("GET", "/direction", None),
+    ("GET", "/headlines", None),
+    ("GET", "/reports", None),
+    ("GET", "/data/rights", None),
     ("POST", "/vacancies/1/pick", {"candidate": "c1"}),
     ("POST", "/direction", {"text": "t"}),
 ]
